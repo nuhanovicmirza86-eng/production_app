@@ -44,7 +44,7 @@ ios/Runner/GeneratedPluginRegistrant.*
 
 # ================= FIREBASE =================
 firebase_options.dart
-
+firebase.json
 # ================= ENV =================
 .env
 .env.*
