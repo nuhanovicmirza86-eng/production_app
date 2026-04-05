@@ -1,5 +1,3 @@
-// lib/modules/production/production_orders/models/production_order_model.dart
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProductionOrderModel {
@@ -49,6 +47,11 @@ class ProductionOrderModel {
   final DateTime updatedAt;
   final String updatedBy;
 
+  // 🔥 NOVO
+  final bool hasCriticalChanges;
+  final DateTime? lastChangedAt;
+  final String? lastChangedBy;
+
   ProductionOrderModel({
     required this.id,
     required this.companyId,
@@ -81,6 +84,9 @@ class ProductionOrderModel {
     required this.createdBy,
     required this.updatedAt,
     required this.updatedBy,
+    required this.hasCriticalChanges,
+    this.lastChangedAt,
+    this.lastChangedBy,
   });
 
   factory ProductionOrderModel.fromMap(String id, Map<String, dynamic> map) {
@@ -116,6 +122,11 @@ class ProductionOrderModel {
       createdBy: map['createdBy'] ?? '',
       updatedAt: (map['updatedAt'] as Timestamp).toDate(),
       updatedBy: map['updatedBy'] ?? '',
+
+      // 🔥 NOVO
+      hasCriticalChanges: map['hasCriticalChanges'] ?? false,
+      lastChangedAt: (map['lastChangedAt'] as Timestamp?)?.toDate(),
+      lastChangedBy: map['lastChangedBy'],
     );
   }
 
@@ -151,6 +162,11 @@ class ProductionOrderModel {
       'createdBy': createdBy,
       'updatedAt': updatedAt,
       'updatedBy': updatedBy,
+
+      // 🔥 NOVO
+      'hasCriticalChanges': hasCriticalChanges,
+      'lastChangedAt': lastChangedAt,
+      'lastChangedBy': lastChangedBy,
     };
   }
 }

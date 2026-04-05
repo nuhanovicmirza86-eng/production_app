@@ -36,6 +36,7 @@ android/local.properties
 android/app/debug
 android/app/profile
 android/app/release
+android/app/google-services.json
 
 # ================= IOS =================
 ios/Flutter/.last_build_id
