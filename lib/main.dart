@@ -18,8 +18,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Production App',
-      debugShowCheckedModeBanner: false,
+      title: 'Operonix Production',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
@@ -38,7 +37,6 @@ class ProductionEntryScreen extends StatelessWidget {
       'companyId': 'test_company',
       'plantKey': 'test_plant',
       'userId': 'test_user',
-      'enabledModules': ['production', 'quality', 'logistics'],
     };
 
     return ProductionDashboardScreen(companyData: companyData);
