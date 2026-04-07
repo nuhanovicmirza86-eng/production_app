@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../auth/register/screens/pending_users_screen.dart';
 import '../../production_orders/screens/production_orders_list_screen.dart';
 
 class ProductionDashboardScreen extends StatelessWidget {
@@ -9,6 +10,7 @@ class ProductionDashboardScreen extends StatelessWidget {
 
   String get _companyId => (companyData['companyId'] ?? '').toString();
   String get _plantKey => (companyData['plantKey'] ?? '').toString();
+  String get _role => (companyData['role'] ?? '').toString().toLowerCase();
 
   List<String> get _enabledModules {
     final raw = companyData['enabledModules'];
@@ -22,13 +24,13 @@ class ProductionDashboardScreen extends StatelessWidget {
 
   bool _hasModule(String moduleKey) {
     if (_enabledModules.isEmpty) {
-      // U ranoj fazi projekta Production dashboard mora ostati upotrebljiv.
-      // Production sekcija je osnovna za ovu aplikaciju.
       return moduleKey == 'production';
     }
 
     return _enabledModules.contains(moduleKey);
   }
+
+  bool get _isAdmin => _role == 'admin';
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +52,34 @@ class ProductionDashboardScreen extends StatelessWidget {
         children: [
           _ContextCard(companyId: _companyId, plantKey: _plantKey),
           const SizedBox(height: 16),
+
+          if (_isAdmin) ...[
+            const _SectionTitle(title: 'Administracija'),
+            const SizedBox(height: 12),
+            GridView.count(
+              crossAxisCount: 2,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              childAspectRatio: 1.15,
+              children: [
+                _DashboardCard(
+                  title: 'Registracije',
+                  icon: Icons.person_add_alt_1,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PendingUsersScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+          ],
 
           if (showProduction) ...[
             _SectionTitle(title: 'Proizvodnja'),

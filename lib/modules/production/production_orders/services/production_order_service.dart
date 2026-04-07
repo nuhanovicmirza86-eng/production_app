@@ -165,13 +165,21 @@ class ProductionOrderService {
 
       final now = DateTime.now();
 
-      final updates = {
+      final updates = <String, dynamic>{
         'updatedAt': now,
         'updatedBy': actorUserId.trim(),
         'hasCriticalChanges': true,
         'lastChangedAt': now,
         'lastChangedBy': actorUserId.trim(),
       };
+
+      if (hasPlannedQtyChange) {
+        updates['plannedQty'] = plannedQty;
+      }
+
+      if (hasScheduledEndAtChange) {
+        updates['scheduledEndAt'] = scheduledEndAt;
+      }
 
       tx.update(docRef, updates);
 
@@ -184,6 +192,14 @@ class ProductionOrderService {
         'changedBy': actorUserId,
         'changedByRole': actorRole,
         'changedAt': now,
+        'before': {
+          'plannedQty': currentPlannedQty,
+          'scheduledEndAt': currentScheduledEndAt,
+        },
+        'after': {
+          'plannedQty': plannedQty ?? currentPlannedQty,
+          'scheduledEndAt': scheduledEndAt ?? currentScheduledEndAt,
+        },
       });
     });
   }
@@ -193,7 +209,7 @@ class ProductionOrderService {
   Future<void> releaseProductionOrder({
     required String productionOrderId,
     required String companyId,
-    required String plantKey, // 🔥 DODANO
+    required String plantKey,
     required String releasedBy,
   }) async {
     final docRef = _orders.doc(productionOrderId);
@@ -211,7 +227,6 @@ class ProductionOrderService {
         throw Exception('Podaci naloga nedostaju');
       }
 
-      // 🔥 KRITIČNO – COMPANY + PLANT
       if (data['companyId'] != companyId || data['plantKey'] != plantKey) {
         throw Exception('Nemaš pristup ovom nalogu');
       }

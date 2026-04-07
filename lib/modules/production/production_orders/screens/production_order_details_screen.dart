@@ -4,6 +4,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../models/production_order_model.dart';
 import '../services/production_order_service.dart';
+import 'production_order_edit_screen.dart';
 
 class ProductionOrderDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
@@ -373,8 +374,32 @@ class _ProductionOrderDetailsScreenState
             ),
           ),
         ),
+
+        const SizedBox(height: 16),
+
+        // ================= EDIT BUTTON =================
+        ElevatedButton.icon(
+          onPressed: () async {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ProductionOrderEditScreen(
+                  companyData: widget.companyData,
+                  order: order,
+                ),
+              ),
+            );
+
+            if (result == true) {
+              await _loadOrder();
+            }
+          },
+          icon: const Icon(Icons.edit),
+          label: const Text('Izmijeni nalog'),
+        ),
+
         if (order.status == 'draft') ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           ElevatedButton.icon(
             onPressed: _isReleasing ? null : _releaseOrder,
             icon: _isReleasing
