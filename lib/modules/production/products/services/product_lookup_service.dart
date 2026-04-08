@@ -1,39 +1,224 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class ProductLookupService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+class ProductLookupItem {
+  final String productId;
+  final String companyId;
+  final String productCode;
+  final String productName;
+  final String? customerId;
+  final String? customerName;
+  final String? unit;
+  final String status;
+  final bool isActive;
 
-  Future<Map<String, dynamic>?> getByCode({
-    required String companyId,
-    required String productCode,
-  }) async {
-    final code = productCode.trim();
+  final String? bomId;
+  final String? bomVersion;
+  final String? routingId;
+  final String? routingVersion;
 
-    if (code.isEmpty) return null;
+  const ProductLookupItem({
+    required this.productId,
+    required this.companyId,
+    required this.productCode,
+    required this.productName,
+    required this.status,
+    required this.isActive,
+    this.customerId,
+    this.customerName,
+    this.unit,
+    this.bomId,
+    this.bomVersion,
+    this.routingId,
+    this.routingVersion,
+  });
 
-    final query = await _db
-        .collection('products')
-        .where('companyId', isEqualTo: companyId)
-        .where('productCode', isEqualTo: code)
-        .limit(1)
-        .get();
-
-    if (query.docs.isEmpty) return null;
-
-    final doc = query.docs.first;
+  factory ProductLookupItem.fromDoc(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
     final data = doc.data();
 
-    return {
-      'productId': doc.id,
-      'productCode': data['productCode'],
-      'productName': data['productName'],
-      'productType': data['productType'],
-      'defaultCustomerId': data['defaultCustomerId'],
-      'customerName': data['customerName'],
-      'bomId': data['bomId'],
-      'bomVersion': data['bomVersion'],
-      'routingId': data['routingId'],
-      'routingVersion': data['routingVersion'],
+    return ProductLookupItem(
+      productId: doc.id,
+      companyId: (data['companyId'] ?? '').toString().trim(),
+      productCode: (data['productCode'] ?? '').toString().trim(),
+      productName: (data['productName'] ?? '').toString().trim(),
+      customerId: _readNullableString(
+        data['defaultCustomerId'] ?? data['customerId'],
+      ),
+      customerName: _readNullableString(data['customerName']),
+      unit: _readNullableString(data['unit']),
+      status: (data['status'] ?? 'active').toString().trim().toLowerCase(),
+      isActive: (data['isActive'] as bool?) ?? true,
+      bomId: _readNullableString(data['bomId']),
+      bomVersion: _readNullableString(data['bomVersion']),
+      routingId: _readNullableString(data['routingId']),
+      routingVersion: _readNullableString(data['routingVersion']),
+    );
+  }
+
+  Map<String, dynamic> toSelectionMap() {
+    return <String, dynamic>{
+      'productId': productId,
+      'companyId': companyId,
+      'productCode': productCode,
+      'productName': productName,
+      'customerId': customerId,
+      'customerName': customerName,
+      'unit': unit,
+      'status': status,
+      'isActive': isActive,
+      'bomId': bomId,
+      'bomVersion': bomVersion,
+      'routingId': routingId,
+      'routingVersion': routingVersion,
     };
+  }
+
+  static String? _readNullableString(dynamic value) {
+    final text = (value ?? '').toString().trim();
+    return text.isEmpty ? null : text;
+  }
+}
+
+class ProductLookupService {
+  final FirebaseFirestore _firestore;
+
+  ProductLookupService({FirebaseFirestore? firestore})
+    : _firestore = firestore ?? FirebaseFirestore.instance;
+
+  CollectionReference<Map<String, dynamic>> get _products =>
+      _firestore.collection('products');
+
+  Future<List<ProductLookupItem>> searchProducts({
+    required String companyId,
+    required String query,
+    int limit = 10,
+    bool onlyActive = true,
+  }) async {
+    final normalizedCompanyId = companyId.trim();
+    final normalizedQuery = normalizeLookupInput(query);
+
+    if (normalizedCompanyId.isEmpty) {
+      throw Exception('Nedostaje companyId za pretragu proizvoda.');
+    }
+
+    if (normalizedQuery.isEmpty) {
+      return const [];
+    }
+
+    Query<Map<String, dynamic>> firestoreQuery = _products
+        .where('companyId', isEqualTo: normalizedCompanyId)
+        .where('searchTokens', arrayContains: normalizedQuery)
+        .limit(limit);
+
+    if (onlyActive) {
+      firestoreQuery = firestoreQuery.where('status', isEqualTo: 'active');
+    }
+
+    final snapshot = await firestoreQuery.get();
+
+    final items = snapshot.docs.map(ProductLookupItem.fromDoc).where((item) {
+      if (item.companyId != normalizedCompanyId) return false;
+      if (item.productCode.isEmpty) return false;
+      if (item.productName.isEmpty) return false;
+
+      if (onlyActive && (!item.isActive || item.status != 'active')) {
+        return false;
+      }
+
+      return true;
+    }).toList();
+
+    items.sort((a, b) {
+      final aCodeStarts = normalizeLookupInput(
+        a.productCode,
+      ).startsWith(normalizedQuery);
+      final bCodeStarts = normalizeLookupInput(
+        b.productCode,
+      ).startsWith(normalizedQuery);
+
+      if (aCodeStarts != bCodeStarts) {
+        return aCodeStarts ? -1 : 1;
+      }
+
+      final aNameStarts = normalizeLookupInput(
+        a.productName,
+      ).startsWith(normalizedQuery);
+      final bNameStarts = normalizeLookupInput(
+        b.productName,
+      ).startsWith(normalizedQuery);
+
+      if (aNameStarts != bNameStarts) {
+        return aNameStarts ? -1 : 1;
+      }
+
+      final codeCompare = a.productCode.toLowerCase().compareTo(
+        b.productCode.toLowerCase(),
+      );
+      if (codeCompare != 0) return codeCompare;
+
+      return a.productName.toLowerCase().compareTo(b.productName.toLowerCase());
+    });
+
+    return items;
+  }
+
+  Future<ProductLookupItem?> getByExactCode({
+    required String companyId,
+    required String productCode,
+    bool onlyActive = true,
+  }) async {
+    final results = await searchProducts(
+      companyId: companyId,
+      query: productCode,
+      limit: 20,
+      onlyActive: onlyActive,
+    );
+
+    final normalizedCode = normalizeLookupInput(productCode);
+
+    for (final item in results) {
+      if (normalizeLookupInput(item.productCode) == normalizedCode) {
+        return item;
+      }
+    }
+
+    return null;
+  }
+
+  static String normalizeLookupInput(String value) {
+    return value.trim().toLowerCase();
+  }
+
+  static List<String> buildSearchTokens({
+    required String productCode,
+    required String productName,
+  }) {
+    final tokens = <String>{};
+
+    void addPrefixesFromText(String input) {
+      final normalized = normalizeLookupInput(input);
+      if (normalized.isEmpty) return;
+
+      for (int i = 1; i <= normalized.length; i++) {
+        tokens.add(normalized.substring(0, i));
+      }
+
+      final parts = normalized
+          .split(RegExp(r'[^a-z0-9]+'))
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty);
+
+      for (final part in parts) {
+        for (int i = 1; i <= part.length; i++) {
+          tokens.add(part.substring(0, i));
+        }
+      }
+    }
+
+    addPrefixesFromText(productCode);
+    addPrefixesFromText(productName);
+
+    return tokens.toList()..sort();
   }
 }

@@ -29,10 +29,13 @@ class _ProductionOrderEditScreenState extends State<ProductionOrderEditScreen> {
   DateTime? _scheduledEndAt;
   bool _isSaving = false;
 
-  String get _companyId => widget.companyData['companyId'];
-  String get _plantKey => widget.companyData['plantKey'];
-  String get _userId => widget.companyData['userId'];
-  String get _userRole => widget.companyData['role'] ?? 'user'; // fallback
+  String get _companyId => (widget.companyData['companyId'] ?? '').toString();
+
+  String get _plantKey => (widget.companyData['plantKey'] ?? '').toString();
+
+  String get _userId => (widget.companyData['userId'] ?? '').toString();
+
+  String get _userRole => (widget.companyData['role'] ?? '').toString();
 
   @override
   void initState() {
@@ -92,6 +95,19 @@ class _ProductionOrderEditScreenState extends State<ProductionOrderEditScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Neispravni podaci')));
+      return;
+    }
+
+    final originalQty = widget.order.plannedQty;
+    final originalDate = widget.order.scheduledEndAt;
+
+    final hasChanges =
+        plannedQty != originalQty || _scheduledEndAt != originalDate;
+
+    if (!hasChanges) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nema izmjena za spremanje')),
+      );
       return;
     }
 

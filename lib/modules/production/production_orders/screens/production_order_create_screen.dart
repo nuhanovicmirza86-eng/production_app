@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
@@ -21,6 +23,8 @@ class _ProductionOrderCreateScreenState
   final ProductionOrderService _service = ProductionOrderService();
   final ProductLookupService _productLookupService = ProductLookupService();
 
+  final TextEditingController _productSearchController =
+      TextEditingController();
   final TextEditingController _productCodeController = TextEditingController();
   final TextEditingController _productNameController = TextEditingController();
   final TextEditingController _customerNameController = TextEditingController();
@@ -29,19 +33,47 @@ class _ProductionOrderCreateScreenState
     text: 'pcs',
   );
 
+  final FocusNode _productSearchFocusNode = FocusNode();
+
   DateTime? _scheduledEndAt;
 
   bool _isLoading = false;
+  bool _isSearchingProducts = false;
+  bool _showProductSuggestions = false;
 
   String? _productId;
   String? _customerId;
 
-  // 🔥 NOVO – snapshot proizvoda
   Map<String, dynamic>? _productData;
+  List<ProductLookupItem> _productSuggestions = <ProductLookupItem>[];
+
+  Timer? _productSearchDebounce;
 
   String get _companyId => (widget.companyData['companyId'] ?? '').toString();
   String get _plantKey => (widget.companyData['plantKey'] ?? '').toString();
   String get _userId => (widget.companyData['userId'] ?? 'system').toString();
+
+  bool get _hasSelectedProduct => _productId != null && _productId!.isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _productSearchFocusNode.addListener(() {
+      if (!_productSearchFocusNode.hasFocus) {
+        Future.delayed(const Duration(milliseconds: 120), () {
+          if (!mounted) return;
+          setState(() {
+            _showProductSuggestions = false;
+          });
+        });
+      } else if (_productSuggestions.isNotEmpty) {
+        setState(() {
+          _showProductSuggestions = true;
+        });
+      }
+    });
+  }
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
@@ -60,78 +92,110 @@ class _ProductionOrderCreateScreenState
     }
   }
 
-  Future<void> _lookupProduct() async {
-    final code = _productCodeController.text.trim();
+  void _clearSelectedProduct() {
+    _productId = null;
+    _customerId = null;
+    _productData = null;
+    _productCodeController.clear();
+    _productNameController.clear();
+    _customerNameController.clear();
+  }
 
-    if (code.isEmpty) {
+  void _clearSelectedProductAndSearch() {
+    _productSearchController.clear();
+    _clearSelectedProduct();
+    _productSuggestions = <ProductLookupItem>[];
+    _showProductSuggestions = false;
+    _isSearchingProducts = false;
+  }
+
+  void _onProductSearchChanged(String value) {
+    _productSearchDebounce?.cancel();
+
+    _clearSelectedProduct();
+
+    final query = value.trim();
+
+    if (query.isEmpty) {
       setState(() {
-        _productId = null;
-        _customerId = null;
-        _productData = null;
-        _productNameController.clear();
-        _customerNameController.clear();
+        _productSuggestions = <ProductLookupItem>[];
+        _showProductSuggestions = false;
+        _isSearchingProducts = false;
       });
       return;
     }
 
     setState(() {
-      _isLoading = true;
+      _isSearchingProducts = true;
+      _showProductSuggestions = true;
     });
 
-    try {
-      final product = await _productLookupService.getByCode(
-        companyId: _companyId,
-        productCode: code,
-      );
+    _productSearchDebounce = Timer(const Duration(milliseconds: 250), () async {
+      try {
+        final results = await _productLookupService.searchProducts(
+          companyId: _companyId,
+          query: query,
+          limit: 10,
+        );
 
-      if (!mounted) return;
+        if (!mounted) return;
 
-      if (product == null) {
+        final stillSameQuery = _productSearchController.text.trim() == query;
+        if (!stillSameQuery) return;
+
         setState(() {
-          _productId = null;
-          _customerId = null;
-          _productData = null;
-          _productNameController.clear();
-          _customerNameController.clear();
+          _productSuggestions = results;
+          _showProductSuggestions = true;
+          _isSearchingProducts = false;
+        });
+      } catch (e) {
+        if (!mounted) return;
+
+        setState(() {
+          _productSuggestions = <ProductLookupItem>[];
+          _showProductSuggestions = false;
+          _isSearchingProducts = false;
         });
 
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Proizvod nije pronađen')));
-        return;
+        ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
       }
+    });
+  }
 
-      setState(() {
-        _productData = product;
+  void _selectProduct(ProductLookupItem product) {
+    setState(() {
+      _productId = product.productId;
+      _customerId = product.customerId;
 
-        _productId = (product['productId'] ?? '').toString();
+      _productSearchController.text =
+          '${product.productCode} - ${product.productName}';
+      _productCodeController.text = product.productCode;
+      _productNameController.text = product.productName;
+      _customerNameController.text = product.customerName ?? '';
+      _unitController.text = (product.unit ?? '').trim().isEmpty
+          ? _unitController.text
+          : product.unit!.trim();
 
-        _productNameController.text = (product['productName'] ?? '').toString();
+      _productData = <String, dynamic>{
+        'productId': product.productId,
+        'productCode': product.productCode,
+        'productName': product.productName,
+        'customerId': product.customerId,
+        'customerName': product.customerName,
+        'unit': product.unit,
+        'bomId': product.bomId,
+        'bomVersion': product.bomVersion,
+        'routingId': product.routingId,
+        'routingVersion': product.routingVersion,
+      };
 
-        final productType = (product['productType'] ?? '').toString();
+      _productSuggestions = <ProductLookupItem>[];
+      _showProductSuggestions = false;
+    });
 
-        if (productType == 'single_customer') {
-          _customerId = product['defaultCustomerId']?.toString();
-          _customerNameController.text = (product['customerName'] ?? '')
-              .toString();
-        } else {
-          _customerId = null;
-          _customerNameController.clear();
-        }
-      });
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
-    } finally {
-      if (!mounted) return;
-
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    _productSearchFocusNode.unfocus();
   }
 
   Future<void> _createOrder() async {
@@ -146,14 +210,7 @@ class _ProductionOrderCreateScreenState
 
     if (_productId == null || _productId!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Prvo učitaj proizvod po šifri')),
-      );
-      return;
-    }
-
-    if (_productNameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Naziv proizvoda nije učitan')),
+        const SnackBar(content: Text('Odaberi proizvod iz šifrarnika')),
       );
       return;
     }
@@ -161,6 +218,29 @@ class _ProductionOrderCreateScreenState
     if (_productData == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Podaci proizvoda nisu učitani')),
+      );
+      return;
+    }
+
+    final bomId = (_productData!['bomId'] ?? '').toString().trim();
+    final bomVersion = (_productData!['bomVersion'] ?? '').toString().trim();
+    final routingId = (_productData!['routingId'] ?? '').toString().trim();
+    final routingVersion = (_productData!['routingVersion'] ?? '')
+        .toString()
+        .trim();
+
+    if (bomId.isEmpty || bomVersion.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Odabrani proizvod nema aktivan BOM.')),
+      );
+      return;
+    }
+
+    if (routingId.isEmpty || routingVersion.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Odabrani proizvod nema aktivan Routing.'),
+        ),
       );
       return;
     }
@@ -178,10 +258,10 @@ class _ProductionOrderCreateScreenState
         productName: _productNameController.text.trim(),
         plannedQty: double.parse(_qtyController.text.trim()),
         unit: _unitController.text.trim(),
-        bomId: (_productData!['bomId'] ?? '').toString(),
-        bomVersion: (_productData!['bomVersion'] ?? '').toString(),
-        routingId: (_productData!['routingId'] ?? '').toString(),
-        routingVersion: (_productData!['routingVersion'] ?? '').toString(),
+        bomId: bomId,
+        bomVersion: bomVersion,
+        routingId: routingId,
+        routingVersion: routingVersion,
         createdBy: _userId,
         scheduledEndAt: _scheduledEndAt!,
         customerId: _customerId,
@@ -215,13 +295,93 @@ class _ProductionOrderCreateScreenState
     );
   }
 
+  Widget _buildProductSuggestions() {
+    if (!_showProductSuggestions) {
+      return const SizedBox.shrink();
+    }
+
+    if (_isSearchingProducts) {
+      return Container(
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Expanded(child: Text('Pretraga proizvoda...')),
+          ],
+        ),
+      );
+    }
+
+    if (_productSuggestions.isEmpty &&
+        _productSearchController.text.trim().isNotEmpty) {
+      return Container(
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Text('Nema rezultata za unesenu šifru ili naziv.'),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: _productSuggestions.length,
+        separatorBuilder: (_, _) =>
+            Divider(height: 1, color: Colors.grey.shade300),
+        itemBuilder: (context, index) {
+          final product = _productSuggestions[index];
+
+          return ListTile(
+            dense: true,
+            title: Text(
+              product.productCode,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            subtitle: Text(product.productName),
+            trailing:
+                product.customerName != null &&
+                    product.customerName!.trim().isNotEmpty
+                ? Text(
+                    product.customerName!,
+                    style: const TextStyle(fontSize: 12),
+                  )
+                : null,
+            onTap: () => _selectProduct(product),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   void dispose() {
+    _productSearchDebounce?.cancel();
+    _productSearchController.dispose();
     _productCodeController.dispose();
     _productNameController.dispose();
     _customerNameController.dispose();
     _qtyController.dispose();
     _unitController.dispose();
+    _productSearchFocusNode.dispose();
     super.dispose();
   }
 
@@ -245,29 +405,61 @@ class _ProductionOrderCreateScreenState
             child: ListView(
               children: [
                 TextFormField(
-                  controller: _productCodeController,
-                  decoration: _dec('Šifra proizvoda'),
+                  controller: _productSearchController,
+                  focusNode: _productSearchFocusNode,
+                  decoration: _dec('Šifra / naziv proizvoda').copyWith(
+                    suffixIcon: _hasSelectedProduct
+                        ? IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () {
+                              setState(() {
+                                _clearSelectedProductAndSearch();
+                              });
+                            },
+                          )
+                        : null,
+                  ),
                   textInputAction: TextInputAction.search,
-                  onFieldSubmitted: (_) => _lookupProduct(),
-                  onChanged: (_) {
-                    _productId = null;
-                    _customerId = null;
-                    _productData = null;
-                    _productNameController.clear();
-                    _customerNameController.clear();
-                  },
+                  onChanged: _onProductSearchChanged,
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Obavezno polje';
+                    if (_productId == null || _productId!.isEmpty) {
+                      return 'Odaberi proizvod iz liste';
                     }
                     return null;
                   },
                 ),
+                _buildProductSuggestions(),
+                if (_hasSelectedProduct) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.green.withOpacity(0.3)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.green),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text('Proizvod je odabran iz šifrarnika'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _lookupProduct,
-                  icon: const Icon(Icons.search),
-                  label: const Text('Učitaj proizvod'),
+                TextFormField(
+                  controller: _productCodeController,
+                  decoration: _dec('Šifra proizvoda'),
+                  readOnly: true,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Proizvod nije odabran';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -276,7 +468,7 @@ class _ProductionOrderCreateScreenState
                   readOnly: true,
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'Prvo učitaj proizvod po šifri';
+                      return 'Proizvod nije odabran';
                     }
                     return null;
                   },
@@ -285,7 +477,7 @@ class _ProductionOrderCreateScreenState
                 TextFormField(
                   controller: _customerNameController,
                   decoration: _dec('Kupac'),
-                  readOnly: _customerId != null && _customerId!.isNotEmpty,
+                  readOnly: true,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(

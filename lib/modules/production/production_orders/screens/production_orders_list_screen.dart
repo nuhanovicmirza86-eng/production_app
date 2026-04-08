@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/access/production_access_helper.dart';
 import '../models/production_order_model.dart';
 import '../services/production_order_service.dart';
 import 'production_order_create_screen.dart';
@@ -42,6 +43,13 @@ class _ProductionOrdersListScreenState
 
   String get _companyId => (widget.companyData['companyId'] ?? '').toString();
   String get _plantKey => (widget.companyData['plantKey'] ?? '').toString();
+  String get _role =>
+      (widget.companyData['role'] ?? '').toString().trim().toLowerCase();
+
+  bool get _canCreateOrder => ProductionAccessHelper.canManage(
+    role: _role,
+    card: ProductionDashboardCard.productionOrders,
+  );
 
   @override
   void initState() {
@@ -115,7 +123,7 @@ class _ProductionOrdersListScreenState
   }
 
   Future<void> _openDetailsScreen(ProductionOrderModel order) async {
-    final changed = await Navigator.push<bool>(
+    await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => ProductionOrderDetailsScreen(
@@ -125,11 +133,7 @@ class _ProductionOrdersListScreenState
       ),
     );
 
-    if (changed == true) {
-      await _loadOrders();
-    } else {
-      await _loadOrders();
-    }
+    await _loadOrders();
   }
 
   void _onStatusChanged(String? value) {
@@ -220,7 +224,7 @@ class _ProductionOrdersListScreenState
             SizedBox(
               width: 220,
               child: DropdownButtonFormField<String>(
-                initialValue: _selectedStatus,
+                value: _selectedStatus,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   isDense: true,
@@ -444,10 +448,12 @@ class _ProductionOrdersListScreenState
           Expanded(child: _buildContent(context)),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openCreateScreen,
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: _canCreateOrder
+          ? FloatingActionButton(
+              onPressed: _openCreateScreen,
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 }

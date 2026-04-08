@@ -1,0 +1,287 @@
+import 'package:flutter/material.dart';
+
+import '../../../../core/errors/app_error_mapper.dart';
+import '../services/product_service.dart';
+
+class ProductCreateScreen extends StatefulWidget {
+  final Map<String, dynamic> companyData;
+
+  const ProductCreateScreen({super.key, required this.companyData});
+
+  @override
+  State<ProductCreateScreen> createState() => _ProductCreateScreenState();
+}
+
+class _ProductCreateScreenState extends State<ProductCreateScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final ProductService _productService = ProductService();
+
+  final TextEditingController _productCodeController = TextEditingController();
+  final TextEditingController _productNameController = TextEditingController();
+  final TextEditingController _unitController = TextEditingController(
+    text: 'pcs',
+  );
+  final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _customerIdController = TextEditingController();
+  final TextEditingController _customerNameController = TextEditingController();
+  final TextEditingController _defaultPlantKeyController =
+      TextEditingController();
+  final TextEditingController _bomIdController = TextEditingController();
+  final TextEditingController _bomVersionController = TextEditingController();
+  final TextEditingController _routingIdController = TextEditingController();
+  final TextEditingController _routingVersionController =
+      TextEditingController();
+
+  bool _isLoading = false;
+  bool _isActive = true;
+  String _status = 'active';
+
+  String get _companyId =>
+      (widget.companyData['companyId'] ?? '').toString().trim();
+  String get _plantKey =>
+      (widget.companyData['plantKey'] ?? '').toString().trim();
+  String get _userId =>
+      (widget.companyData['userId'] ?? widget.companyData['uid'] ?? 'system')
+          .toString()
+          .trim();
+
+  InputDecoration _dec(String label, {String? hint}) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      border: const OutlineInputBorder(),
+    );
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    if (_companyId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nedostaje companyData.companyId')),
+      );
+      return;
+    }
+
+    if (_userId.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Nedostaje userId')));
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await _productService.createProduct(
+        companyId: _companyId,
+        productCode: _productCodeController.text.trim(),
+        productName: _productNameController.text.trim(),
+        createdBy: _userId,
+        status: _status,
+        unit: _unitController.text.trim().isEmpty
+            ? null
+            : _unitController.text.trim(),
+        description: _descriptionController.text.trim().isEmpty
+            ? null
+            : _descriptionController.text.trim(),
+        customerId: _customerIdController.text.trim().isEmpty
+            ? null
+            : _customerIdController.text.trim(),
+        customerName: _customerNameController.text.trim().isEmpty
+            ? null
+            : _customerNameController.text.trim(),
+        defaultPlantKey: _defaultPlantKeyController.text.trim().isEmpty
+            ? (_plantKey.isEmpty ? null : _plantKey)
+            : _defaultPlantKeyController.text.trim(),
+        bomId: _bomIdController.text.trim().isEmpty
+            ? null
+            : _bomIdController.text.trim(),
+        bomVersion: _bomVersionController.text.trim().isEmpty
+            ? null
+            : _bomVersionController.text.trim(),
+        routingId: _routingIdController.text.trim().isEmpty
+            ? null
+            : _routingIdController.text.trim(),
+        routingVersion: _routingVersionController.text.trim().isEmpty
+            ? null
+            : _routingVersionController.text.trim(),
+        isActive: _isActive,
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
+    } finally {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _productCodeController.dispose();
+    _productNameController.dispose();
+    _unitController.dispose();
+    _descriptionController.dispose();
+    _customerIdController.dispose();
+    _customerNameController.dispose();
+    _defaultPlantKeyController.dispose();
+    _bomIdController.dispose();
+    _bomVersionController.dispose();
+    _routingIdController.dispose();
+    _routingVersionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_companyId.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Novi proizvod')),
+        body: const Center(child: Text('Nedostaje companyData')),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Novi proizvod')),
+      body: AbsorbPointer(
+        absorbing: _isLoading,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              children: [
+                TextFormField(
+                  controller: _productCodeController,
+                  decoration: _dec(
+                    'Šifra proizvoda',
+                    hint: 'Obavezno, mora biti jedinstvena',
+                  ),
+                  textCapitalization: TextCapitalization.characters,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Šifra proizvoda je obavezna';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _productNameController,
+                  decoration: _dec('Naziv proizvoda'),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Naziv proizvoda je obavezan';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _status,
+                  decoration: _dec('Status'),
+                  items: const [
+                    DropdownMenuItem(value: 'active', child: Text('Aktivan')),
+                    DropdownMenuItem(
+                      value: 'inactive',
+                      child: Text('Neaktivan'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() {
+                      _status = value;
+                      _isActive = value == 'active';
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _unitController,
+                  decoration: _dec('Jedinica'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _descriptionController,
+                  decoration: _dec('Opis'),
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _customerIdController,
+                  decoration: _dec('Customer ID'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _customerNameController,
+                  decoration: _dec('Kupac'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _defaultPlantKeyController,
+                  decoration: _dec(
+                    'Default plantKey',
+                    hint: _plantKey.isEmpty ? null : 'Trenutni: $_plantKey',
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Aktivni BOM i Routing',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Ova polja su privremeno ovdje dok ne napravimo Product Details i verzionisanje kroz UI.',
+                  style: TextStyle(color: Colors.black54),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _bomIdController,
+                  decoration: _dec('Aktivni BOM ID'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _bomVersionController,
+                  decoration: _dec('Aktivna BOM verzija'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _routingIdController,
+                  decoration: _dec('Aktivni Routing ID'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _routingVersionController,
+                  decoration: _dec('Aktivna Routing verzija'),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: _save,
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2.2),
+                        )
+                      : const Text('Sačuvaj proizvod'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

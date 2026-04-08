@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/access/production_access_helper.dart';
 import '../../../auth/register/screens/pending_users_screen.dart';
+import '../../products/screens/products_list_screen.dart';
 import '../../production_orders/screens/production_orders_list_screen.dart';
 
 class ProductionDashboardScreen extends StatelessWidget {
@@ -8,29 +10,39 @@ class ProductionDashboardScreen extends StatelessWidget {
 
   const ProductionDashboardScreen({super.key, required this.companyData});
 
-  String get _companyId => (companyData['companyId'] ?? '').toString();
-  String get _plantKey => (companyData['plantKey'] ?? '').toString();
-  String get _role => (companyData['role'] ?? '').toString().toLowerCase();
+  String get _companyId => (companyData['companyId'] ?? '').toString().trim();
+  String get _plantKey => (companyData['plantKey'] ?? '').toString().trim();
+  String get _role =>
+      (companyData['role'] ?? '').toString().trim().toLowerCase();
 
   List<String> get _enabledModules {
     final raw = companyData['enabledModules'];
 
     if (raw is List) {
-      return raw.map((e) => e.toString()).toList();
+      return raw.map((e) => e.toString().trim().toLowerCase()).toList();
     }
 
     return const [];
   }
 
   bool _hasModule(String moduleKey) {
+    final normalized = moduleKey.trim().toLowerCase();
+
     if (_enabledModules.isEmpty) {
-      return moduleKey == 'production';
+      return normalized == 'production';
     }
 
-    return _enabledModules.contains(moduleKey);
+    return _enabledModules.contains(normalized);
   }
 
-  bool get _isAdmin => _role == 'admin';
+  bool _canViewCard(ProductionDashboardCard card) {
+    return ProductionAccessHelper.canView(role: _role, card: card);
+  }
+
+  bool _canShowReportsCard() {
+    return _canViewCard(ProductionDashboardCard.reports) &&
+        ProductionAccessHelper.hasAnyReports(companyData);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,9 +53,96 @@ class ProductionDashboardScreen extends StatelessWidget {
       );
     }
 
-    final showProduction = _hasModule('production');
-    final showQuality = _hasModule('quality');
-    final showLogistics = _hasModule('logistics');
+    final showProductionModule = _hasModule('production');
+    final showAdminSection = _canViewCard(
+      ProductionDashboardCard.registrations,
+    );
+
+    final productionCards = <Widget>[
+      if (_canViewCard(ProductionDashboardCard.products))
+        _DashboardCard(
+          title: 'Proizvodi',
+          icon: Icons.inventory_2_outlined,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ProductsListScreen(companyData: companyData),
+              ),
+            );
+          },
+        ),
+      if (_canViewCard(ProductionDashboardCard.productionOrders))
+        _DashboardCard(
+          title: 'Proizvodni nalozi',
+          icon: Icons.assignment,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    ProductionOrdersListScreen(companyData: companyData),
+              ),
+            );
+          },
+        ),
+      if (_canViewCard(ProductionDashboardCard.productionTracking))
+        _DashboardCard(
+          title: 'Praćenje proizvodnje',
+          icon: Icons.play_circle_outline,
+          onTap: () {
+            _notImplemented(context);
+          },
+        ),
+      if (_canViewCard(ProductionDashboardCard.workCenters))
+        _DashboardCard(
+          title: 'Radni centri',
+          icon: Icons.precision_manufacturing_outlined,
+          onTap: () {
+            _notImplemented(context);
+          },
+        ),
+      if (_canViewCard(ProductionDashboardCard.shifts))
+        _DashboardCard(
+          title: 'Smjene',
+          icon: Icons.schedule,
+          onTap: () {
+            _notImplemented(context);
+          },
+        ),
+      if (_canViewCard(ProductionDashboardCard.downtime))
+        _DashboardCard(
+          title: 'Zastoji',
+          icon: Icons.warning_amber_outlined,
+          onTap: () {
+            _notImplemented(context);
+          },
+        ),
+      if (_canViewCard(ProductionDashboardCard.problemReporting))
+        _DashboardCard(
+          title: 'Prijava problema',
+          icon: Icons.report_problem_outlined,
+          onTap: () {
+            _notImplemented(context);
+          },
+        ),
+      if (_canViewCard(ProductionDashboardCard.processExecution))
+        _DashboardCard(
+          title: 'Evidencija procesa',
+          icon: Icons.science_outlined,
+          onTap: () {
+            _notImplemented(context);
+          },
+        ),
+      if (_canShowReportsCard())
+        _DashboardCard(
+          title: 'Izvještaji',
+          icon: Icons.assessment_outlined,
+          onTap: () {
+            _notImplemented(context);
+          },
+        ),
+    ];
 
     return Scaffold(
       appBar: AppBar(title: const Text('Proizvodnja')),
@@ -53,7 +152,7 @@ class ProductionDashboardScreen extends StatelessWidget {
           _ContextCard(companyId: _companyId, plantKey: _plantKey),
           const SizedBox(height: 16),
 
-          if (_isAdmin) ...[
+          if (showAdminSection) ...[
             const _SectionTitle(title: 'Administracija'),
             const SizedBox(height: 12),
             GridView.count(
@@ -81,8 +180,8 @@ class ProductionDashboardScreen extends StatelessWidget {
             const SizedBox(height: 24),
           ],
 
-          if (showProduction) ...[
-            _SectionTitle(title: 'Proizvodnja'),
+          if (showProductionModule && productionCards.isNotEmpty) ...[
+            const _SectionTitle(title: 'Proizvodnja'),
             const SizedBox(height: 12),
             GridView.count(
               crossAxisCount: 2,
@@ -91,142 +190,11 @@ class ProductionDashboardScreen extends StatelessWidget {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               childAspectRatio: 1.15,
-              children: [
-                _DashboardCard(
-                  title: 'Proizvodni nalozi',
-                  icon: Icons.assignment,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ProductionOrdersListScreen(
-                          companyData: companyData,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                _DashboardCard(
-                  title: 'Praćenje proizvodnje',
-                  icon: Icons.play_circle_outline,
-                  onTap: () {
-                    _notImplemented(context);
-                  },
-                ),
-                _DashboardCard(
-                  title: 'Radni centri',
-                  icon: Icons.precision_manufacturing_outlined,
-                  onTap: () {
-                    _notImplemented(context);
-                  },
-                ),
-                _DashboardCard(
-                  title: 'Smjene',
-                  icon: Icons.schedule,
-                  onTap: () {
-                    _notImplemented(context);
-                  },
-                ),
-                _DashboardCard(
-                  title: 'Zastoji',
-                  icon: Icons.warning_amber_outlined,
-                  onTap: () {
-                    _notImplemented(context);
-                  },
-                ),
-                _DashboardCard(
-                  title: 'Proizvodi',
-                  icon: Icons.inventory_2_outlined,
-                  onTap: () {
-                    _notImplemented(context);
-                  },
-                ),
-                _DashboardCard(
-                  title: 'BOM',
-                  icon: Icons.account_tree_outlined,
-                  onTap: () {
-                    _notImplemented(context);
-                  },
-                ),
-                _DashboardCard(
-                  title: 'Routing',
-                  icon: Icons.alt_route,
-                  onTap: () {
-                    _notImplemented(context);
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-          ],
-
-          if (showQuality) ...[
-            _SectionTitle(title: 'Kvalitet'),
-            const SizedBox(height: 12),
-            GridView.count(
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              childAspectRatio: 1.15,
-              children: [
-                _DashboardCard(
-                  title: 'Događaji kvaliteta',
-                  icon: Icons.fact_check_outlined,
-                  onTap: () {
-                    _notImplemented(context);
-                  },
-                ),
-                _DashboardCard(
-                  title: 'Zadržavanja kvaliteta',
-                  icon: Icons.rule_folder_outlined,
-                  onTap: () {
-                    _notImplemented(context);
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-          ],
-
-          if (showLogistics) ...[
-            _SectionTitle(title: 'Logistika'),
-            const SizedBox(height: 12),
-            GridView.count(
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              childAspectRatio: 1.15,
-              children: [
-                _DashboardCard(
-                  title: 'Lotovi zaliha',
-                  icon: Icons.qr_code_2,
-                  onTap: () {
-                    _notImplemented(context);
-                  },
-                ),
-                _DashboardCard(
-                  title: 'Kretanja zaliha',
-                  icon: Icons.swap_horiz,
-                  onTap: () {
-                    _notImplemented(context);
-                  },
-                ),
-                _DashboardCard(
-                  title: 'Skladišta',
-                  icon: Icons.warehouse_outlined,
-                  onTap: () {
-                    _notImplemented(context);
-                  },
-                ),
-              ],
+              children: productionCards,
             ),
           ],
 
-          if (!showProduction && !showQuality && !showLogistics)
+          if (!showProductionModule || productionCards.isEmpty)
             const Padding(
               padding: EdgeInsets.only(top: 32),
               child: Center(

@@ -34,6 +34,13 @@ class _ProductionOrderDetailsScreenState
   String get _plantKey => (widget.companyData['plantKey'] ?? '').toString();
   String get _userId => (widget.companyData['userId'] ?? 'system').toString();
 
+  String get _role =>
+      (widget.companyData['role'] ?? '').toString().toLowerCase();
+
+  bool get _canEdit => _role == 'admin' || _role == 'production_manager';
+
+  bool get _canRelease => _role == 'admin' || _role == 'production_manager';
+
   @override
   void initState() {
     super.initState();
@@ -378,27 +385,28 @@ class _ProductionOrderDetailsScreenState
         const SizedBox(height: 16),
 
         // ================= EDIT BUTTON =================
-        ElevatedButton.icon(
-          onPressed: () async {
-            final result = await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ProductionOrderEditScreen(
-                  companyData: widget.companyData,
-                  order: order,
+        if (_canEdit)
+          ElevatedButton.icon(
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ProductionOrderEditScreen(
+                    companyData: widget.companyData,
+                    order: order,
+                  ),
                 ),
-              ),
-            );
+              );
 
-            if (result == true) {
-              await _loadOrder();
-            }
-          },
-          icon: const Icon(Icons.edit),
-          label: const Text('Izmijeni nalog'),
-        ),
+              if (result == true) {
+                await _loadOrder();
+              }
+            },
+            icon: const Icon(Icons.edit),
+            label: const Text('Izmijeni nalog'),
+          ),
 
-        if (order.status == 'draft') ...[
+        if (_canRelease && order.status == 'draft') ...[
           const SizedBox(height: 12),
           ElevatedButton.icon(
             onPressed: _isReleasing ? null : _releaseOrder,
