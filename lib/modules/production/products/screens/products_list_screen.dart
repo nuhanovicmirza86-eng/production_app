@@ -1,9 +1,13 @@
+import 'dart:typed_data';
+
+import 'package:excel/excel.dart' as excel_pkg;
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../services/product_service.dart';
 import 'product_create_screen.dart';
 import 'product_details_screen.dart';
-import '../services/product_service.dart';
 
 class ProductsListScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
@@ -18,6 +22,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   final ProductService _productService = ProductService();
 
   bool _isLoading = true;
+  bool _isImporting = false;
+
   String? _errorMessage;
   List<Map<String, dynamic>> _products = <Map<String, dynamic>>[];
 
@@ -25,11 +31,49 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
       (widget.companyData['companyId'] ?? '').toString().trim();
   String get _role =>
       (widget.companyData['role'] ?? '').toString().trim().toLowerCase();
+  String get _userId => (widget.companyData['userId'] ?? '').toString().trim();
 
   bool get _canCreateProduct =>
       _role == 'admin' || _role == 'production_manager';
 
   String _s(dynamic value) => (value ?? '').toString().trim();
+
+  double? _parseDouble(dynamic value) {
+    final text = _s(value).replaceAll(',', '.');
+    if (text.isEmpty) return null;
+    return double.tryParse(text);
+  }
+
+  String _normalizeHeader(String value) {
+    return value.trim().toLowerCase().replaceAll(' ', '').replaceAll('_', '');
+  }
+
+  String _cellText(dynamic cell) {
+    try {
+      final value = cell?.value;
+      if (value == null) return '';
+      return value.toString().trim();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  String _readRowValue(
+    List<dynamic> row,
+    Map<String, int> headerIndex,
+    List<String> aliases,
+  ) {
+    for (final alias in aliases) {
+      final index = headerIndex[_normalizeHeader(alias)];
+      if (index == null) continue;
+      if (index < 0 || index >= row.length) continue;
+
+      final text = _cellText(row[index]);
+      if (text.isNotEmpty) return text;
+    }
+
+    return '';
+  }
 
   Future<void> _loadProducts() async {
     if (_companyId.isEmpty) {
@@ -104,6 +148,266 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
     await _loadProducts();
   }
 
+  Future<void> _showImportInfo() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Excel import proizvoda'),
+          content: const SizedBox(
+            width: 520,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Obavezne kolone:',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  SizedBox(height: 8),
+                  Text('• productCode'),
+                  Text('• productName'),
+                  SizedBox(height: 12),
+                  Text(
+                    'Opcione kolone:',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  SizedBox(height: 8),
+                  Text('• unit'),
+                  Text('• description'),
+                  Text('• packagingQty'),
+                  Text('• status'),
+                  SizedBox(height: 12),
+                  Text(
+                    'Primjer reda:',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  SizedBox(height: 8),
+                  Text('CAP-001 | Čep 28 mm | KOM | 12 | active'),
+                  SizedBox(height: 12),
+                  Text('🛈 Ako status nije unesen, koristi se active.'),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('U redu'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _importProductsFromExcel() async {
+    if (!_canCreateProduct) return;
+
+    if (_companyId.isEmpty || _userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nedostaje companyId ili userId za import.'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      setState(() {
+        _isImporting = true;
+      });
+
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['xlsx'],
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _isImporting = false;
+        });
+        return;
+      }
+
+      final PlatformFile pickedFile = result.files.first;
+      final Uint8List? bytes = pickedFile.bytes;
+
+      if (bytes == null || bytes.isEmpty) {
+        throw Exception('Nije moguće učitati sadržaj Excel fajla.');
+      }
+
+      final excel = excel_pkg.Excel.decodeBytes(bytes);
+
+      if (excel.tables.isEmpty) {
+        throw Exception('Excel fajl nema nijedan sheet.');
+      }
+
+      final excel_pkg.Sheet table = excel.tables.values.first;
+      final List<List<dynamic>> rows = table.rows
+          .map((row) => row.cast<dynamic>())
+          .toList();
+
+      if (rows.isEmpty) {
+        throw Exception('Excel fajl je prazan.');
+      }
+
+      final headerRow = rows.first;
+      final Map<String, int> headerIndex = <String, int>{};
+
+      for (int i = 0; i < headerRow.length; i++) {
+        final header = _normalizeHeader(_cellText(headerRow[i]));
+        if (header.isNotEmpty) {
+          headerIndex[header] = i;
+        }
+      }
+
+      final hasProductCode = headerIndex.containsKey('productcode');
+      final hasProductName = headerIndex.containsKey('productname');
+
+      if (!hasProductCode || !hasProductName) {
+        throw Exception('Excel mora imati kolone productCode i productName.');
+      }
+
+      int createdCount = 0;
+      int skippedCount = 0;
+      final List<String> skippedRows = <String>[];
+
+      for (int rowIndex = 1; rowIndex < rows.length; rowIndex++) {
+        final row = rows[rowIndex];
+
+        final productCode = _readRowValue(row, headerIndex, const [
+          'productCode',
+        ]);
+        final productName = _readRowValue(row, headerIndex, const [
+          'productName',
+        ]);
+        final unit = _readRowValue(row, headerIndex, const ['unit']);
+        final description = _readRowValue(row, headerIndex, const [
+          'description',
+        ]);
+        final statusRaw = _readRowValue(row, headerIndex, const ['status']);
+        final packagingQtyRaw = _readRowValue(row, headerIndex, const [
+          'packagingQty',
+        ]);
+
+        if (productCode.isEmpty && productName.isEmpty) {
+          continue;
+        }
+
+        if (productCode.isEmpty || productName.isEmpty) {
+          skippedCount++;
+          skippedRows.add(
+            'Red ${rowIndex + 1}: nedostaje productCode ili productName.',
+          );
+          continue;
+        }
+
+        final normalizedStatus = statusRaw.isEmpty
+            ? 'active'
+            : statusRaw.toLowerCase().trim();
+
+        if (normalizedStatus != 'active' && normalizedStatus != 'inactive') {
+          skippedCount++;
+          skippedRows.add(
+            'Red ${rowIndex + 1}: status mora biti active ili inactive.',
+          );
+          continue;
+        }
+
+        final packagingQty = _parseDouble(packagingQtyRaw);
+
+        try {
+          await _productService.createProduct(
+            companyId: _companyId,
+            productCode: productCode,
+            productName: productName,
+            createdBy: _userId,
+            status: normalizedStatus,
+            unit: unit.isEmpty ? null : unit,
+            description: description.isEmpty ? null : description,
+            packagingQty: packagingQty,
+          );
+          createdCount++;
+        } catch (e) {
+          skippedCount++;
+          skippedRows.add(
+            'Red ${rowIndex + 1}: ${AppErrorMapper.toMessage(e)}',
+          );
+        }
+      }
+
+      if (!mounted) return;
+
+      await _loadProducts();
+
+      if (!mounted) return;
+
+      final StringBuffer message = StringBuffer()
+        ..write('Import završen. Kreirano: $createdCount');
+
+      if (skippedCount > 0) {
+        message.write(', preskočeno: $skippedCount');
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message.toString())));
+
+      if (skippedRows.isNotEmpty) {
+        await showDialog<void>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              title: const Text('Rezultat importa'),
+              content: SizedBox(
+                width: 560,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(message.toString()),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Preskočeni redovi:',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 8),
+                      ...skippedRows.map(
+                        (rowMessage) => Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Text('• $rowMessage'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Zatvori'),
+                ),
+              ],
+            );
+          },
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isImporting = false;
+      });
+    }
+  }
+
   String _statusLabel(String status) {
     switch (status.toLowerCase()) {
       case 'active':
@@ -145,16 +449,38 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
       appBar: AppBar(
         title: const Text('Proizvodi'),
         actions: [
+          if (_canCreateProduct)
+            IconButton(
+              tooltip: 'Info za Excel import',
+              onPressed: _isImporting ? null : _showImportInfo,
+              icon: const Icon(Icons.info_outline),
+            ),
+          if (_canCreateProduct)
+            IconButton(
+              tooltip: 'Excel import',
+              onPressed: (_isLoading || _isImporting)
+                  ? null
+                  : _importProductsFromExcel,
+              icon: _isImporting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.upload_file_outlined),
+            ),
           IconButton(
             tooltip: 'Osvježi',
-            onPressed: _isLoading ? null : _loadProducts,
+            onPressed: (_isLoading || _isImporting) ? null : _loadProducts,
             icon: const Icon(Icons.refresh),
           ),
         ],
       ),
       floatingActionButton: _canCreateProduct
           ? FloatingActionButton.extended(
-              onPressed: _openCreateProduct,
+              onPressed: (_isImporting || _isLoading)
+                  ? null
+                  : _openCreateProduct,
               icon: const Icon(Icons.add),
               label: const Text('Novi proizvod'),
             )
@@ -206,7 +532,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
 
         final productCode = _s(product['productCode']);
         final productName = _s(product['productName']);
-        final customerName = _s(product['customerName']);
+        final packagingQty = _s(product['packagingQty']);
         final status = _s(product['status']);
 
         return Card(
@@ -261,10 +587,10 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                       fontSize: 15,
                     ),
                   ),
-                  if (customerName.isNotEmpty) ...[
+                  if (packagingQty.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
-                      'Kupac: $customerName',
+                      'Pakovanje: $packagingQty',
                       style: const TextStyle(color: Colors.black87),
                     ),
                   ],

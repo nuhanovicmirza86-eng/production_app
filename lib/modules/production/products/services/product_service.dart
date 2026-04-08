@@ -55,6 +55,7 @@ class ProductService {
     String? bomVersion,
     String? routingId,
     String? routingVersion,
+    double? packagingQty,
     bool isActive = true,
   }) {
     final now = DateTime.now();
@@ -129,6 +130,10 @@ class ProductService {
       payload['routingVersion'] = normalizedRoutingVersion;
     }
 
+    if (packagingQty != null && packagingQty > 0) {
+      payload['packagingQty'] = packagingQty;
+    }
+
     return payload;
   }
 
@@ -147,6 +152,7 @@ class ProductService {
     String? bomVersion,
     String? routingId,
     String? routingVersion,
+    double? packagingQty,
     bool isActive = true,
   }) async {
     final normalizedCompanyId = companyId.trim();
@@ -198,6 +204,7 @@ class ProductService {
       bomVersion: bomVersion,
       routingId: routingId,
       routingVersion: routingVersion,
+      packagingQty: packagingQty,
       isActive: isActive,
     );
 
@@ -222,6 +229,7 @@ class ProductService {
     String? bomVersion,
     String? routingId,
     String? routingVersion,
+    double? packagingQty,
     bool? isActive,
   }) async {
     final normalizedProductId = productId.trim();
@@ -386,6 +394,14 @@ class ProductService {
       }
     }
 
+    if (packagingQty != null) {
+      if (packagingQty <= 0) {
+        updates['packagingQty'] = FieldValue.delete();
+      } else {
+        updates['packagingQty'] = packagingQty;
+      }
+    }
+
     final currentUnit = _s(current['unit']);
     final currentDescription = _s(current['description']);
     final currentCustomerId = _s(current['customerId']);
@@ -395,6 +411,7 @@ class ProductService {
     final currentBomVersion = _s(current['bomVersion']);
     final currentRoutingId = _s(current['routingId']);
     final currentRoutingVersion = _s(current['routingVersion']);
+    final currentPackagingQty = current['packagingQty'];
     final currentStatus = _s(current['status']).toLowerCase();
     final currentIsActive = (current['isActive'] as bool?) ?? true;
 
@@ -412,7 +429,12 @@ class ProductService {
         (bomId == null || _s(bomId) == currentBomId) &&
         (bomVersion == null || _s(bomVersion) == currentBomVersion) &&
         (routingId == null || _s(routingId) == currentRoutingId) &&
-        (routingVersion == null || _s(routingVersion) == currentRoutingVersion);
+        (routingVersion == null ||
+            _s(routingVersion) == currentRoutingVersion) &&
+        (packagingQty == null ||
+            ((currentPackagingQty is num)
+                ? currentPackagingQty.toDouble() == packagingQty
+                : false));
 
     if (nothingChanged) {
       return;

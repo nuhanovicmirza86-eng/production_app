@@ -190,7 +190,7 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: _status,
+                  initialValue: _status,
                   decoration: _dec('Status'),
                   items: const [
                     DropdownMenuItem(value: 'active', child: Text('Aktivan')),
