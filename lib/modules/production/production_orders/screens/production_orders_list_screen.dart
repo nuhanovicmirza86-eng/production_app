@@ -224,7 +224,7 @@ class _ProductionOrdersListScreenState
             SizedBox(
               width: 220,
               child: DropdownButtonFormField<String>(
-                value: _selectedStatus,
+                initialValue: _selectedStatus,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   isDense: true,

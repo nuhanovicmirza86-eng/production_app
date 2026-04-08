@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../execution/screens/production_execution_screen.dart';
+import '../../execution/services/production_execution_service.dart';
 import '../models/production_order_model.dart';
 import '../services/production_order_service.dart';
 import 'production_order_edit_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProductionOrderDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
@@ -24,11 +27,17 @@ class ProductionOrderDetailsScreen extends StatefulWidget {
 class _ProductionOrderDetailsScreenState
     extends State<ProductionOrderDetailsScreen> {
   final ProductionOrderService _service = ProductionOrderService();
+  final ProductionExecutionService _executionService =
+      ProductionExecutionService();
 
   bool _isLoading = true;
   bool _isReleasing = false;
+  bool _isLoadingExecutions = false;
   String? _error;
   ProductionOrderModel? _order;
+
+  List<Map<String, dynamic>> _executions = const [];
+  bool _hasMyActiveExecutionForStep = false;
 
   String get _companyId => (widget.companyData['companyId'] ?? '').toString();
   String get _plantKey => (widget.companyData['plantKey'] ?? '').toString();
@@ -40,6 +49,16 @@ class _ProductionOrderDetailsScreenState
   bool get _canEdit => _role == 'admin' || _role == 'production_manager';
 
   bool get _canRelease => _role == 'admin' || _role == 'production_manager';
+
+  bool get _canExecute =>
+      _role == 'production_operator' ||
+      _role == 'supervisor' ||
+      _role == 'production_manager' ||
+      _role == 'admin';
+
+  static const String _defaultStepId = 'STEP_1';
+  static const String _defaultStepName = 'Glavni proces';
+  static const String _defaultExecutionType = 'discrete';
 
   @override
   void initState() {
@@ -68,6 +87,15 @@ class _ProductionOrderDetailsScreenState
         _order = order;
         _isLoading = false;
       });
+
+      if (order != null) {
+        await _loadExecutions(order.id);
+      } else {
+        setState(() {
+          _executions = const [];
+          _hasMyActiveExecutionForStep = false;
+        });
+      }
     } catch (e) {
       if (!mounted) return;
 
@@ -75,6 +103,51 @@ class _ProductionOrderDetailsScreenState
         _error = AppErrorMapper.toMessage(e);
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadExecutions(String productionOrderId) async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingExecutions = true;
+    });
+
+    try {
+      final executions = await _executionService.getExecutionsForOrder(
+        companyId: _companyId,
+        plantKey: _plantKey,
+        productionOrderId: productionOrderId,
+      );
+
+      final hasMyActive = await _executionService
+          .hasActiveExecutionForOperatorAndStep(
+            companyId: _companyId,
+            plantKey: _plantKey,
+            productionOrderId: productionOrderId,
+            stepId: _defaultStepId,
+            operatorId: _userId,
+          );
+
+      if (!mounted) return;
+
+      setState(() {
+        _executions = executions;
+        _hasMyActiveExecutionForStep = hasMyActive;
+        _isLoadingExecutions = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _executions = const [];
+        _hasMyActiveExecutionForStep = false;
+        _isLoadingExecutions = false;
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     }
   }
 
@@ -115,6 +188,44 @@ class _ProductionOrderDetailsScreenState
       setState(() {
         _isReleasing = false;
       });
+    }
+  }
+
+  Future<void> _openExecutionScreen(ProductionOrderModel order) async {
+    if (_hasMyActiveExecutionForStep) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Već imaš aktivan execution za ovaj nalog i ovaj korak.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProductionExecutionScreen(
+          companyData: widget.companyData,
+          orderData: {
+            'id': order.id,
+            'productionOrderCode': order.productionOrderCode,
+            'productId': order.productId,
+            'productCode': order.productCode,
+            'productName': order.productName,
+            'routingId': order.routingId,
+            'routingVersion': order.routingVersion,
+          },
+          stepId: _defaultStepId,
+          stepName: _defaultStepName,
+          executionType: _defaultExecutionType,
+        ),
+      ),
+    );
+
+    if (result == true) {
+      await _loadOrder();
     }
   }
 
@@ -214,6 +325,138 @@ class _ProductionOrderDetailsScreenState
               onPressed: _loadOrder,
               child: const Text('Pokušaj ponovo'),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExecutionStatusChip(String status, BuildContext context) {
+    final color = _statusColor(status, context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        _statusLabel(status),
+        style: TextStyle(color: color, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
+  Widget _buildExecutionCard(
+    BuildContext context,
+    Map<String, dynamic> execution,
+  ) {
+    final status = (execution['status'] ?? '').toString();
+    final operatorName = (execution['operatorName'] ?? '').toString().trim();
+    final operatorId = (execution['operatorId'] ?? '').toString().trim();
+    final stepName = (execution['stepName'] ?? '').toString().trim();
+    final goodQty = (execution['goodQty'] as num?)?.toDouble() ?? 0;
+    final scrapQty = (execution['scrapQty'] as num?)?.toDouble() ?? 0;
+    final reworkQty = (execution['reworkQty'] as num?)?.toDouble() ?? 0;
+    final startedAt = (execution['startedAt'] as Timestamp?)?.toDate();
+    final endedAt = (execution['endedAt'] as Timestamp?)?.toDate();
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                Text(
+                  stepName.isEmpty ? '-' : stepName,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                _buildExecutionStatusChip(status, context),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildInfoRow(
+              'Operator',
+              operatorName.isNotEmpty ? operatorName : operatorId,
+            ),
+            _buildInfoRow('Start', _formatDateTime(startedAt)),
+            _buildInfoRow('Kraj', _formatDateTime(endedAt)),
+            _buildInfoRow('Good qty', _formatQty(goodQty)),
+            _buildInfoRow('Scrap qty', _formatQty(scrapQty)),
+            _buildInfoRow('Rework qty', _formatQty(reworkQty)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExecutionSection(
+    BuildContext context,
+    ProductionOrderModel order,
+  ) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Execution historija',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '🛈 Isti nalog može imati više execution sesija i više operatora.',
+            ),
+            if (_hasMyActiveExecutionForStep) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Već imaš aktivan execution za ovaj nalog i ovaj korak. Ne možeš pokrenuti novi dok ga ne završiš.',
+                  style: TextStyle(
+                    color: Colors.orange,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            if (_canExecute)
+              ElevatedButton.icon(
+                onPressed: _isLoadingExecutions || _hasMyActiveExecutionForStep
+                    ? null
+                    : () => _openExecutionScreen(order),
+                icon: const Icon(Icons.play_circle_outline),
+                label: const Text('Pokreni rad'),
+              ),
+            if (_canExecute) const SizedBox(height: 16),
+            if (_isLoadingExecutions)
+              const Center(child: CircularProgressIndicator())
+            else if (_executions.isEmpty)
+              const Text('Nema execution zapisa za ovaj nalog.')
+            else
+              Column(
+                children: _executions
+                    .map(
+                      (execution) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildExecutionCard(context, execution),
+                      ),
+                    )
+                    .toList(),
+              ),
           ],
         ),
       ),
@@ -381,11 +624,11 @@ class _ProductionOrderDetailsScreenState
             ),
           ),
         ),
-
         const SizedBox(height: 16),
+        _buildExecutionSection(context, order),
 
-        // ================= EDIT BUTTON =================
-        if (_canEdit)
+        if (_canEdit) ...[
+          const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: () async {
               final result = await Navigator.push(
@@ -405,6 +648,7 @@ class _ProductionOrderDetailsScreenState
             icon: const Icon(Icons.edit),
             label: const Text('Izmijeni nalog'),
           ),
+        ],
 
         if (_canRelease && order.status == 'draft') ...[
           const SizedBox(height: 12),
