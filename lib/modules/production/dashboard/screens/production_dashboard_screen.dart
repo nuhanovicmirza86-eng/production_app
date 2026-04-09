@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
 import '../../../auth/register/screens/pending_users_screen.dart';
+import '../../../commercial/orders/screens/orders_list_screen.dart';
 import '../../products/screens/products_list_screen.dart';
 import '../../production_orders/screens/production_orders_list_screen.dart';
 
@@ -72,6 +73,7 @@ class ProductionDashboardScreen extends StatelessWidget {
             );
           },
         ),
+
       if (_canViewCard(ProductionDashboardCard.productionOrders))
         _DashboardCard(
           title: 'Proizvodni nalozi',
@@ -86,6 +88,21 @@ class ProductionDashboardScreen extends StatelessWidget {
             );
           },
         ),
+
+      // ✅ FIX: Narudžbe više NE zavise od productionOrders permission
+      _DashboardCard(
+        title: 'Narudžbe',
+        icon: Icons.receipt_long_outlined,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => OrdersListScreen(companyData: companyData),
+            ),
+          );
+        },
+      ),
+
       if (_canViewCard(ProductionDashboardCard.productionTracking))
         _DashboardCard(
           title: 'Praćenje proizvodnje',
@@ -94,6 +111,7 @@ class ProductionDashboardScreen extends StatelessWidget {
             _notImplemented(context);
           },
         ),
+
       if (_canViewCard(ProductionDashboardCard.workCenters))
         _DashboardCard(
           title: 'Radni centri',
@@ -102,6 +120,7 @@ class ProductionDashboardScreen extends StatelessWidget {
             _notImplemented(context);
           },
         ),
+
       if (_canViewCard(ProductionDashboardCard.shifts))
         _DashboardCard(
           title: 'Smjene',
@@ -110,6 +129,7 @@ class ProductionDashboardScreen extends StatelessWidget {
             _notImplemented(context);
           },
         ),
+
       if (_canViewCard(ProductionDashboardCard.downtime))
         _DashboardCard(
           title: 'Zastoji',
@@ -118,6 +138,7 @@ class ProductionDashboardScreen extends StatelessWidget {
             _notImplemented(context);
           },
         ),
+
       if (_canViewCard(ProductionDashboardCard.problemReporting))
         _DashboardCard(
           title: 'Prijava problema',
@@ -126,6 +147,7 @@ class ProductionDashboardScreen extends StatelessWidget {
             _notImplemented(context);
           },
         ),
+
       if (_canViewCard(ProductionDashboardCard.processExecution))
         _DashboardCard(
           title: 'Evidencija procesa',
@@ -134,6 +156,7 @@ class ProductionDashboardScreen extends StatelessWidget {
             _notImplemented(context);
           },
         ),
+
       if (_canShowReportsCard())
         _DashboardCard(
           title: 'Izvještaji',
