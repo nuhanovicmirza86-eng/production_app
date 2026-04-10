@@ -35,10 +35,12 @@ class ProductLookupItem {
   factory ProductLookupItem.fromDoc(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
   ) {
-    final data = doc.data();
+    return ProductLookupItem.fromMap(doc.id, doc.data());
+  }
 
+  factory ProductLookupItem.fromMap(String id, Map<String, dynamic> data) {
     return ProductLookupItem(
-      productId: doc.id,
+      productId: id,
       companyId: (data['companyId'] ?? '').toString().trim(),
       productCode: (data['productCode'] ?? '').toString().trim(),
       productName: (data['productName'] ?? '').toString().trim(),
@@ -54,6 +56,16 @@ class ProductLookupItem {
       routingId: _readNullableString(data['routingId']),
       routingVersion: _readNullableString(data['routingVersion']),
     );
+  }
+
+  factory ProductLookupItem.fromDocumentSnapshot(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    if (data == null) {
+      throw StateError('Product dokument nema podataka');
+    }
+    return ProductLookupItem.fromMap(doc.id, data);
   }
 
   Map<String, dynamic> toSelectionMap() {
@@ -184,6 +196,27 @@ class ProductLookupService {
     }
 
     return null;
+  }
+
+  /// Učitava proizvod po Firestore ID-u (npr. `productId` na stavci narudžbe).
+  Future<ProductLookupItem?> getByProductId({
+    required String companyId,
+    required String productId,
+    bool onlyActive = true,
+  }) async {
+    final pid = productId.trim();
+    final cid = companyId.trim();
+    if (pid.isEmpty || cid.isEmpty) return null;
+
+    final doc = await _products.doc(pid).get();
+    if (!doc.exists) return null;
+
+    final item = ProductLookupItem.fromDocumentSnapshot(doc);
+    if (item.companyId != cid) return null;
+    if (onlyActive && (!item.isActive || item.status != 'active')) {
+      return null;
+    }
+    return item;
   }
 
   static String normalizeLookupInput(String value) {

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
-import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/access/production_access_helper.dart';
+import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/ui/standard_list_components.dart';
 import '../models/production_order_model.dart';
 import '../services/production_order_service.dart';
 import 'production_order_create_screen.dart';
@@ -18,31 +18,19 @@ class ProductionOrdersListScreen extends StatefulWidget {
       _ProductionOrdersListScreenState();
 }
 
-class _ProductionOrdersListScreenState
-    extends State<ProductionOrdersListScreen> {
-  final ProductionOrderService _productionOrderService =
-      ProductionOrderService();
-
-  final List<String> _statuses = const [
-    'all',
-    'draft',
-    'released',
-    'in_progress',
-    'paused',
-    'completed',
-    'closed',
-    'cancelled',
-  ];
-
-  String _selectedStatus = 'all';
+class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen> {
+  final ProductionOrderService _service = ProductionOrderService();
+  final TextEditingController _searchController = TextEditingController();
 
   bool _isLoading = true;
   String? _error;
-
+  bool _filtersExpanded = false;
+  ProductionOrderStatusFilter _selectedStatus = ProductionOrderStatusFilter.all;
   List<ProductionOrderModel> _orders = const [];
 
-  String get _companyId => (widget.companyData['companyId'] ?? '').toString();
-  String get _plantKey => (widget.companyData['plantKey'] ?? '').toString();
+  String get _companyId =>
+      (widget.companyData['companyId'] ?? '').toString().trim();
+  String get _plantKey => (widget.companyData['plantKey'] ?? '').toString().trim();
   String get _role =>
       (widget.companyData['role'] ?? '').toString().trim().toLowerCase();
 
@@ -54,24 +42,25 @@ class _ProductionOrdersListScreenState
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _loadOrders();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadOrders() async {
-    if (!mounted) return;
-
-    if (_companyId.isEmpty) {
+    if (_companyId.isEmpty || _plantKey.isEmpty) {
       setState(() {
-        _error = 'Nedostaje companyId u companyData.';
         _isLoading = false;
-      });
-      return;
-    }
-
-    if (_plantKey.isEmpty) {
-      setState(() {
-        _error = 'Nedostaje plantKey u companyData.';
-        _isLoading = false;
+        _error = _companyId.isEmpty
+            ? 'Nedostaje companyId u companyData.'
+            : 'Nedostaje plantKey u companyData.';
       });
       return;
     }
@@ -82,21 +71,14 @@ class _ProductionOrdersListScreenState
     });
 
     try {
-      final orders = await _productionOrderService.getOrders(
-        companyId: _companyId,
-        plantKey: _plantKey,
-        status: _selectedStatus == 'all' ? null : _selectedStatus,
-      );
-
+      final orders = await _service.getOrders(companyId: _companyId, plantKey: _plantKey);
       if (!mounted) return;
-
       setState(() {
         _orders = orders;
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
-
       setState(() {
         _error = AppErrorMapper.toMessage(e);
         _isLoading = false;
@@ -104,20 +86,14 @@ class _ProductionOrdersListScreenState
     }
   }
 
-  Future<void> _onRefresh() async {
-    await _loadOrders();
-  }
-
   Future<void> _openCreateScreen() async {
     final created = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            ProductionOrderCreateScreen(companyData: widget.companyData),
+        builder: (_) => ProductionOrderCreateScreen(companyData: widget.companyData),
       ),
     );
-
-    if (created == true) {
+    if (created == true && mounted) {
       await _loadOrders();
     }
   }
@@ -132,41 +108,34 @@ class _ProductionOrdersListScreenState
         ),
       ),
     );
-
-    await _loadOrders();
+    if (mounted) await _loadOrders();
   }
 
-  void _onStatusChanged(String? value) {
-    if (value == null || value == _selectedStatus) return;
-
-    setState(() {
-      _selectedStatus = value;
-    });
-
-    _loadOrders();
+  List<ProductionOrderModel> get _filteredOrders {
+    final q = _searchController.text.trim().toLowerCase();
+    return _orders.where((o) {
+      final matchesSearch = q.isEmpty ||
+          o.productionOrderCode.toLowerCase().contains(q) ||
+          o.productCode.toLowerCase().contains(q) ||
+          o.productName.toLowerCase().contains(q) ||
+          (o.customerName ?? '').toLowerCase().contains(q);
+      final matchesStatus = _selectedStatus.matches(o.status);
+      return matchesSearch && matchesStatus;
+    }).toList();
   }
 
-  String _formatDateTime(DateTime? dateTime) {
-    if (dateTime == null) return '-';
+  int get _activeFiltersCount => _selectedStatus == ProductionOrderStatusFilter.all ? 0 : 1;
 
-    final day = dateTime.day.toString().padLeft(2, '0');
-    final month = dateTime.month.toString().padLeft(2, '0');
-    final year = dateTime.year.toString();
-
-    final hour = dateTime.hour.toString().padLeft(2, '0');
-    final minute = dateTime.minute.toString().padLeft(2, '0');
-
-    return '$day.$month.$year $hour:$minute';
+  String _formatDate(DateTime? d) {
+    if (d == null) return '-';
+    return '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
   }
 
-  String _formatQty(double value) {
-    if (value == value.roundToDouble()) {
-      return value.toInt().toString();
-    }
-    return value.toStringAsFixed(2);
+  String _formatQty(double v) {
+    return v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2);
   }
 
-  Color _statusColor(String status, BuildContext context) {
+  Color _statusColor(String status) {
     switch (status) {
       case 'draft':
         return Colors.grey;
@@ -183,7 +152,7 @@ class _ProductionOrdersListScreenState
       case 'cancelled':
         return Colors.red;
       default:
-        return Theme.of(context).colorScheme.primary;
+        return Colors.black54;
     }
   }
 
@@ -208,252 +177,375 @@ class _ProductionOrdersListScreenState
     }
   }
 
-  Widget _buildFilterCard(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'Filter statusa',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+  Widget _buildHeader() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 700;
+
+        void infoAction() {
+          showDialog(
+            context: context,
+            builder: (_) => AlertDialog(
+              title: const Text('Proizvodni nalozi'),
+              content: const Text(
+                'Ovaj ekran služi za upravljanje proizvodnim nalozima.\n\n'
+                '• Pregled i pretraga naloga\n'
+                '• KPI praćenje statusa izvršenja\n'
+                '• Filtriranje po statusu\n'
+                '• Ulaz u detalje naloga i izvršenje\n\n'
+                'Ovdje pratiš operativni tok proizvodnje od planiranog do završenog naloga.',
               ),
-            ),
-            const SizedBox(width: 12),
-            SizedBox(
-              width: 220,
-              child: DropdownButtonFormField<String>(
-                initialValue: _selectedStatus,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  isDense: true,
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Zatvori'),
                 ),
-                items: _statuses
-                    .map(
-                      (status) => DropdownMenuItem<String>(
-                        value: status,
-                        child: Text(
-                          status == 'all' ? 'Svi' : _statusLabel(status),
-                        ),
-                      ),
-                    )
-                    .toList(),
-                onChanged: _onStatusChanged,
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
+          );
+        }
 
-  Widget _buildErrorState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 48),
-            const SizedBox(height: 12),
-            Text(_error ?? 'Došlo je do greške.', textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadOrders,
-              child: const Text('Pokušaj ponovo'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(24),
-        child: Text(
-          'Nema proizvodnih naloga za odabrani filter.',
-          textAlign: TextAlign.center,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOrderCard(BuildContext context, ProductionOrderModel order) {
-    final statusColor = _statusColor(order.status, context);
-
-    return Card(
-      child: InkWell(
-        onTap: () => _openDetailsScreen(order),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
+        if (compact) {
+          return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              QrImageView(data: order.productionOrderCode, size: 72),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            order.productionOrderCode,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            _statusLabel(order.status),
-                            style: TextStyle(
-                              color: statusColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      order.productName,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text('Šifra: ${order.productCode}'),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Planirano: ${_formatQty(order.plannedQty)} ${order.unit}',
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Proizvedeno: ${_formatQty(order.producedGoodQty)} ${order.unit}',
-                    ),
-                    const SizedBox(height: 4),
-                    Text('Pogon: ${order.plantKey}'),
-                    if ((order.customerName ?? '').trim().isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text('Kupac: ${order.customerName}'),
-                    ],
-                    const SizedBox(height: 12),
-                    const Divider(height: 1),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 16,
-                      runSpacing: 8,
-                      children: [
-                        Text('Kreirano: ${_formatDateTime(order.createdAt)}'),
-                        Text('Ažurirano: ${_formatDateTime(order.updatedAt)}'),
-                        if (order.releasedAt != null)
-                          Text('Pušten: ${_formatDateTime(order.releasedAt)}'),
-                      ],
-                    ),
-                  ],
-                ),
+              StandardScreenHeader(
+                title: 'Proizvodni nalozi',
+                onBack: () => Navigator.of(context).pop(),
+                onInfo: infoAction,
               ),
+              if (_canCreateOrder) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _openCreateScreen,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Novi nalog'),
+                  ),
+                ),
+              ],
             ],
-          ),
+          );
+        }
+
+        return StandardScreenHeader(
+          title: 'Proizvodni nalozi',
+          onBack: () => Navigator.of(context).pop(),
+          onInfo: infoAction,
+          action: _canCreateOrder
+              ? ElevatedButton.icon(
+                  onPressed: _openCreateScreen,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Novi nalog'),
+                )
+              : null,
+        );
+      },
+    );
+  }
+
+  Widget _buildKpis() {
+    final total = _orders.length;
+    final open = _orders
+        .where((o) => !['completed', 'closed', 'cancelled'].contains(o.status))
+        .length;
+    final inProgress = _orders.where((o) => o.status == 'in_progress').length;
+    final done = _orders.where((o) => o.status == 'completed' || o.status == 'closed').length;
+
+    return StandardKpiGrid(
+      metrics: [
+        KpiMetric(
+          label: 'Ukupno',
+          value: total,
+          color: Colors.blue,
+          icon: Icons.assignment_outlined,
         ),
+        KpiMetric(
+          label: 'Otvoreni',
+          value: open,
+          color: Colors.orange,
+          icon: Icons.pending_actions_outlined,
+        ),
+        KpiMetric(
+          label: 'U toku',
+          value: inProgress,
+          color: Colors.deepOrange,
+          icon: Icons.play_circle_outline,
+        ),
+        KpiMetric(
+          label: 'Završeni',
+          value: done,
+          color: Colors.green,
+          icon: Icons.task_alt_rounded,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearch() {
+    return StandardSearchField(
+      controller: _searchController,
+      hintText: 'Pretraga po kodu naloga, proizvodu ili kupcu',
+      onChanged: (_) => setState(() {}),
+    );
+  }
+
+  Widget _buildFilters() {
+    Widget chip({
+      required String label,
+      required bool selected,
+      required VoidCallback onTap,
+    }) {
+      return Padding(
+        padding: const EdgeInsets.only(right: 8, bottom: 8),
+        child: ChoiceChip(
+          label: Text(label, overflow: TextOverflow.ellipsis),
+          selected: selected,
+          onSelected: (_) => onTap(),
+        ),
+      );
+    }
+
+    return StandardFilterPanel(
+      expanded: _filtersExpanded,
+      activeCount: _activeFiltersCount,
+      onToggle: () => setState(() => _filtersExpanded = !_filtersExpanded),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Status', style: TextStyle(fontSize: 12, color: Colors.black54)),
+          const SizedBox(height: 8),
+          Wrap(
+            children: ProductionOrderStatusFilter.values.map((status) {
+              return chip(
+                label: status.label,
+                selected: _selectedStatus == status,
+                onTap: () => setState(() => _selectedStatus = status),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildContent(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+  Widget _buildMetaPill({required IconData icon, required String label}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F8FA),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.black54),
+          const SizedBox(width: 6),
+          Text(label, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+        ],
+      ),
+    );
+  }
 
-    if (_error != null) {
-      return _buildErrorState();
-    }
+  Widget _buildOrderCard(ProductionOrderModel o) {
+    final color = _statusColor(o.status);
 
-    if (_orders.isEmpty) {
-      return _buildEmptyState();
-    }
-
-    return RefreshIndicator(
-      onRefresh: _onRefresh,
-      child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        itemCount: _orders.length,
-        itemBuilder: (context, index) {
-          final order = _orders[index];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _buildOrderCard(context, order),
-          );
-        },
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => _openDetailsScreen(o),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade200),
+          borderRadius: BorderRadius.circular(16),
+          color: Colors.white,
+          boxShadow: const [
+            BoxShadow(
+              blurRadius: 12,
+              offset: Offset(0, 4),
+              color: Color(0x08000000),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    o.productionOrderCode,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    _statusLabel(o.status),
+                    style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(o.productName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 4),
+            Text('Šifra proizvoda: ${o.productCode}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildMetaPill(
+                  icon: Icons.inventory_2_outlined,
+                  label: 'Plan: ${_formatQty(o.plannedQty)} ${o.unit}',
+                ),
+                _buildMetaPill(
+                  icon: Icons.task_alt_outlined,
+                  label: 'Good: ${_formatQty(o.producedGoodQty)} ${o.unit}',
+                ),
+                _buildMetaPill(icon: Icons.factory_outlined, label: 'Pogon: ${o.plantKey}'),
+                _buildMetaPill(icon: Icons.calendar_today_outlined, label: _formatDate(o.createdAt)),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_companyId.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Proizvodni nalozi')),
-        body: const Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Text(
-              'Nedostaje companyId u companyData.',
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (_plantKey.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Proizvodni nalozi')),
-        body: const Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Text(
-              'Nedostaje plantKey u companyData.',
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      );
-    }
+    final list = _filteredOrders;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Proizvodni nalozi')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: _buildFilterCard(context),
+      backgroundColor: const Color(0xFFF5F6FA),
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: _loadOrders,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildHeader(),
+                      const SizedBox(height: 16),
+                      _buildKpis(),
+                      const SizedBox(height: 16),
+                      _buildSearch(),
+                      const SizedBox(height: 12),
+                      _buildFilters(),
+                    ],
+                  ),
+                ),
+              ),
+              if (_isLoading)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32),
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                )
+              else if (_error != null)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Center(child: Text(_error!, textAlign: TextAlign.center)),
+                  ),
+                )
+              else if (list.isEmpty)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 48),
+                      child: Text('Nema proizvodnih naloga'),
+                    ),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, i) => _buildOrderCard(list[i]),
+                      childCount: list.length,
+                    ),
+                  ),
+                ),
+            ],
           ),
-          Expanded(child: _buildContent(context)),
-        ],
+        ),
       ),
-      floatingActionButton: _canCreateOrder
-          ? FloatingActionButton(
-              onPressed: _openCreateScreen,
-              child: const Icon(Icons.add),
-            )
-          : null,
     );
+  }
+}
+
+enum ProductionOrderStatusFilter {
+  all,
+  draft,
+  released,
+  inProgress,
+  paused,
+  completed,
+  closed,
+  cancelled,
+}
+
+extension ProductionOrderStatusFilterX on ProductionOrderStatusFilter {
+  String get label {
+    switch (this) {
+      case ProductionOrderStatusFilter.all:
+        return 'Svi';
+      case ProductionOrderStatusFilter.draft:
+        return 'Nacrt';
+      case ProductionOrderStatusFilter.released:
+        return 'Pušten';
+      case ProductionOrderStatusFilter.inProgress:
+        return 'U toku';
+      case ProductionOrderStatusFilter.paused:
+        return 'Pauziran';
+      case ProductionOrderStatusFilter.completed:
+        return 'Završen';
+      case ProductionOrderStatusFilter.closed:
+        return 'Zatvoren';
+      case ProductionOrderStatusFilter.cancelled:
+        return 'Otkazan';
+    }
+  }
+
+  bool matches(String status) {
+    switch (this) {
+      case ProductionOrderStatusFilter.all:
+        return true;
+      case ProductionOrderStatusFilter.draft:
+        return status == 'draft';
+      case ProductionOrderStatusFilter.released:
+        return status == 'released';
+      case ProductionOrderStatusFilter.inProgress:
+        return status == 'in_progress';
+      case ProductionOrderStatusFilter.paused:
+        return status == 'paused';
+      case ProductionOrderStatusFilter.completed:
+        return status == 'completed';
+      case ProductionOrderStatusFilter.closed:
+        return status == 'closed';
+      case ProductionOrderStatusFilter.cancelled:
+        return status == 'cancelled';
+    }
   }
 }

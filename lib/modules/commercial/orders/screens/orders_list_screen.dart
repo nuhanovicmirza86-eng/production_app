@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
 import '../models/order_model.dart';
+import '../order_status_ui.dart';
 import '../services/orders_service.dart';
+import 'order_create_screen.dart';
 import 'order_details_screen.dart';
 
 class OrdersListScreen extends StatefulWidget {
@@ -118,9 +120,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
           o.partnerName.toLowerCase().contains(q) ||
           ((o.partnerCode ?? '').toLowerCase().contains(q));
 
-      final matchesStatus = _selectedStatus == OrderStatusFilter.all
-          ? true
-          : o.status == _selectedStatus.toOrderStatus();
+      final matchesStatus = _selectedStatus.matches(o);
 
       final matchesType = _selectedType == OrderTypeFilter.all
           ? true
@@ -141,39 +141,6 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
         : value.toStringAsFixed(2);
   }
 
-  String _statusLabel(OrderStatus status) {
-    switch (status) {
-      case OrderStatus.draft:
-        return 'Draft';
-      case OrderStatus.confirmed:
-        return 'Potvrđena';
-      case OrderStatus.inProduction:
-        return 'U proizvodnji';
-      case OrderStatus.fulfilled:
-        return 'Realizovana';
-      case OrderStatus.cancelled:
-        return 'Otkazana';
-      case OrderStatus.closed:
-        return 'Zatvorena';
-    }
-  }
-
-  Color _statusColor(OrderStatus status) {
-    switch (status) {
-      case OrderStatus.draft:
-        return Colors.grey;
-      case OrderStatus.confirmed:
-        return Colors.blue;
-      case OrderStatus.inProduction:
-        return Colors.orange;
-      case OrderStatus.fulfilled:
-      case OrderStatus.closed:
-        return Colors.green;
-      case OrderStatus.cancelled:
-        return Colors.red;
-    }
-  }
-
   String _typeLabel(OrderType type) {
     switch (type) {
       case OrderType.customer:
@@ -183,14 +150,20 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
     }
   }
 
-  bool _isOpen(OrderStatus status) {
-    return status != OrderStatus.fulfilled &&
-        status != OrderStatus.closed &&
-        status != OrderStatus.cancelled;
+  bool _isOpen(OrderModel order) {
+    switch (order.status) {
+      case OrderStatus.fulfilled:
+      case OrderStatus.closed:
+      case OrderStatus.cancelled:
+      case OrderStatus.received:
+        return false;
+      default:
+        return true;
+    }
   }
 
   bool _isLate(OrderModel order) {
-    return order.status == OrderStatus.inProduction;
+    return order.isLate || order.status == OrderStatus.late;
   }
 
   int get _activeFiltersCount {
@@ -259,7 +232,19 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () {},
+                    onPressed: () async {
+                      final created = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => OrderCreateScreen(
+                            companyData: widget.companyData,
+                          ),
+                        ),
+                      );
+                      if (created == true && mounted) {
+                        await _loadOrders();
+                      }
+                    },
                     icon: const Icon(Icons.add),
                     label: const Text('Nova narudžba'),
                   ),
@@ -312,7 +297,18 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
             ),
             if (_canCreateOrder)
               ElevatedButton.icon(
-                onPressed: () {},
+                onPressed: () async {
+                  final created = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          OrderCreateScreen(companyData: widget.companyData),
+                    ),
+                  );
+                  if (created == true && mounted) {
+                    await _loadOrders();
+                  }
+                },
                 icon: const Icon(Icons.add),
                 label: const Text('Nova narudžba'),
               ),
@@ -376,13 +372,14 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
 
   Widget _buildKpis() {
     final total = _orders.length;
-    final open = _orders.where((o) => _isOpen(o.status)).length;
+    final open = _orders.where(_isOpen).length;
     final late = _orders.where(_isLate).length;
     final completed = _orders
         .where(
           (o) =>
               o.status == OrderStatus.fulfilled ||
-              o.status == OrderStatus.closed,
+              o.status == OrderStatus.closed ||
+              o.status == OrderStatus.received,
         )
         .length;
 
@@ -591,14 +588,19 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
   }
 
   Widget _buildOrderCard(OrderModel o) {
-    final color = _statusColor(o.status);
+    final color = orderStatusColor(o.status);
 
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => OrderDetailsScreen(order: o)),
+          MaterialPageRoute(
+            builder: (_) => OrderDetailsScreen(
+              companyData: widget.companyData,
+              order: o,
+            ),
+          ),
         );
       },
       child: Container(
@@ -645,7 +647,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
-                          _statusLabel(o.status),
+                          orderStatusLabel(o.status),
                           style: TextStyle(
                             color: color,
                             fontSize: 12,
@@ -679,7 +681,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        _statusLabel(o.status),
+                        orderStatusLabel(o.status),
                         style: TextStyle(
                           color: color,
                           fontSize: 12,
@@ -749,49 +751,78 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
     );
   }
 
-  Widget _buildList() {
-    if (_isLoading) {
-      return const Expanded(child: Center(child: CircularProgressIndicator()));
-    }
-
-    if (_errorMessage != null) {
-      return Expanded(
-        child: Center(child: Text(_errorMessage!, textAlign: TextAlign.center)),
-      );
-    }
-
-    final list = _filteredOrders;
-
-    if (list.isEmpty) {
-      return const Expanded(child: Center(child: Text('Nema narudžbi')));
-    }
-
-    return Expanded(
-      child: ListView.builder(
-        itemCount: list.length,
-        itemBuilder: (_, i) => _buildOrderCard(list[i]),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final list = _filteredOrders;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 16),
-              _buildKpis(),
-              const SizedBox(height: 16),
-              _buildSearch(),
-              const SizedBox(height: 12),
-              _buildFilters(),
-              const SizedBox(height: 12),
-              _buildList(),
+        child: RefreshIndicator(
+          onRefresh: _loadOrders,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildHeader(),
+                      const SizedBox(height: 16),
+                      _buildKpis(),
+                      const SizedBox(height: 16),
+                      _buildSearch(),
+                      const SizedBox(height: 12),
+                      _buildFilters(),
+                    ],
+                  ),
+                ),
+              ),
+              if (_isLoading)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32),
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                )
+              else if (_errorMessage != null)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Center(
+                      child: Text(
+                        _errorMessage!,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                )
+              else if (list.isEmpty)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 48),
+                      child: Text('Nema narudžbi'),
+                    ),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, i) => _buildOrderCard(list[i]),
+                      childCount: list.length,
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -800,7 +831,16 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
   }
 }
 
-enum OrderStatusFilter { all, draft, confirmed, inProduction, closed }
+enum OrderStatusFilter {
+  all,
+  draft,
+  confirmed,
+  inProduction,
+  partial,
+  late,
+  done,
+  cancelled,
+}
 
 extension OrderStatusFilterX on OrderStatusFilter {
   String get label {
@@ -813,23 +853,39 @@ extension OrderStatusFilterX on OrderStatusFilter {
         return 'Potvrđena';
       case OrderStatusFilter.inProduction:
         return 'U proizvodnji';
-      case OrderStatusFilter.closed:
-        return 'Zatvorena';
+      case OrderStatusFilter.partial:
+        return 'Djelomično';
+      case OrderStatusFilter.late:
+        return 'Kasni';
+      case OrderStatusFilter.done:
+        return 'Završene';
+      case OrderStatusFilter.cancelled:
+        return 'Otkazane';
     }
   }
 
-  OrderStatus? toOrderStatus() {
+  bool matches(OrderModel o) {
     switch (this) {
       case OrderStatusFilter.all:
-        return null;
+        return true;
       case OrderStatusFilter.draft:
-        return OrderStatus.draft;
+        return o.status == OrderStatus.draft;
       case OrderStatusFilter.confirmed:
-        return OrderStatus.confirmed;
+        return o.status == OrderStatus.confirmed;
       case OrderStatusFilter.inProduction:
-        return OrderStatus.inProduction;
-      case OrderStatusFilter.closed:
-        return OrderStatus.closed;
+        return o.status == OrderStatus.inProduction ||
+            (o.orderType == OrderType.supplier && o.status == OrderStatus.open);
+      case OrderStatusFilter.partial:
+        return o.status == OrderStatus.partiallyFulfilled ||
+            o.status == OrderStatus.partiallyReceived;
+      case OrderStatusFilter.late:
+        return o.status == OrderStatus.late || o.isLate;
+      case OrderStatusFilter.done:
+        return o.status == OrderStatus.fulfilled ||
+            o.status == OrderStatus.received ||
+            o.status == OrderStatus.closed;
+      case OrderStatusFilter.cancelled:
+        return o.status == OrderStatus.cancelled;
     }
   }
 }

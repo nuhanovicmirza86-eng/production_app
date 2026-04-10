@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
 import '../../../auth/register/screens/pending_users_screen.dart';
+import '../../../commercial/partners/screens/partners_screen.dart';
 import '../../../commercial/orders/screens/orders_list_screen.dart';
 import '../../products/screens/products_list_screen.dart';
 import '../../production_orders/screens/production_orders_list_screen.dart';
@@ -98,6 +99,19 @@ class ProductionDashboardScreen extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (_) => OrdersListScreen(companyData: companyData),
+            ),
+          );
+        },
+      ),
+
+      _DashboardCard(
+        title: 'Kupci / dobavljači',
+        icon: Icons.groups_outlined,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PartnersScreen(companyData: companyData),
             ),
           );
         },

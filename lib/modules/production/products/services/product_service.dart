@@ -13,12 +13,6 @@ class ProductService {
 
   String _s(dynamic value) => (value ?? '').toString().trim();
 
-  bool _isSameNullableString(String? a, String? b) {
-    final left = (a ?? '').trim();
-    final right = (b ?? '').trim();
-    return left == right;
-  }
-
   Future<void> _ensureUniqueProductCode({
     required String companyId,
     required String productCode,

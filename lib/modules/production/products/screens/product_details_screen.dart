@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../logistics/inventory/widgets/product_warehouse_stock_section.dart';
 import '../../bom/services/bom_service.dart';
 import '../services/product_lookup_service.dart';
 import '../services/product_service.dart';
@@ -49,6 +50,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
       (widget.companyData['companyId'] ?? '').toString().trim();
 
   String get _productId => widget.productId.trim();
+
+  String get _plantKeyHint =>
+      (widget.companyData['plantKey'] ?? '').toString().trim();
 
   String get _role =>
       (widget.companyData['role'] ?? '').toString().trim().toLowerCase();
@@ -1166,6 +1170,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
             _infoRow('Default plantKey', _s(product['defaultPlantKey'])),
             _infoRow('Opis', _s(product['description'])),
           ],
+        ),
+        const SizedBox(height: 12),
+        ProductWarehouseStockSection(
+          companyId: _companyId,
+          productId: _productId,
+          plantKey: _plantKeyHint.isNotEmpty ? _plantKeyHint : null,
+          fallbackUnit: _s(product['unit']),
         ),
       ],
     );

@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/ui/standard_list_components.dart';
 import '../services/product_service.dart';
 import 'product_create_screen.dart';
 import 'product_details_screen.dart';
@@ -20,9 +21,12 @@ class ProductsListScreen extends StatefulWidget {
 
 class _ProductsListScreenState extends State<ProductsListScreen> {
   final ProductService _productService = ProductService();
+  final TextEditingController _searchController = TextEditingController();
 
   bool _isLoading = true;
   bool _isImporting = false;
+  bool _filtersExpanded = false;
+  ProductStatusFilter _selectedStatus = ProductStatusFilter.all;
 
   String? _errorMessage;
   List<Map<String, dynamic>> _products = <Map<String, dynamic>>[];
@@ -36,7 +40,31 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   bool get _canCreateProduct =>
       _role == 'admin' || _role == 'production_manager';
 
+  @override
+  void initState() {
+    super.initState();
+    _loadProducts();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   String _s(dynamic value) => (value ?? '').toString().trim();
+
+  List<Map<String, dynamic>> get _filteredProducts {
+    final q = _searchController.text.trim().toLowerCase();
+    return _products.where((p) {
+      final code = _s(p['productCode']).toLowerCase();
+      final name = _s(p['productName']).toLowerCase();
+      final status = _s(p['status']).toLowerCase();
+      final matchesSearch = q.isEmpty || code.contains(q) || name.contains(q);
+      final matchesStatus = _selectedStatus.matches(status);
+      return matchesSearch && matchesStatus;
+    }).toList();
+  }
 
   double? _parseDouble(dynamic value) {
     final text = _s(value).replaceAll(',', '.');
@@ -401,10 +429,11 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _isImporting = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isImporting = false;
+        });
+      }
     }
   }
 
@@ -430,10 +459,86 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _loadProducts();
+  Widget _buildKpis() {
+    final active = _products.where((e) => _s(e['status']).toLowerCase() == 'active').length;
+    final inactive = _products.where((e) => _s(e['status']).toLowerCase() == 'inactive').length;
+    return StandardKpiGrid(
+      metrics: [
+        KpiMetric(
+          label: 'Ukupno',
+          value: _products.length,
+          color: Colors.blue,
+          icon: Icons.inventory_2_outlined,
+        ),
+        KpiMetric(
+          label: 'Aktivni',
+          value: active,
+          color: Colors.green,
+          icon: Icons.check_circle_outline,
+        ),
+        KpiMetric(
+          label: 'Neaktivni',
+          value: inactive,
+          color: Colors.grey,
+          icon: Icons.pause_circle_outline,
+        ),
+        KpiMetric(
+          label: 'Prikaz',
+          value: _filteredProducts.length,
+          color: Colors.orange,
+          icon: Icons.filter_alt_outlined,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearch() {
+    return StandardSearchField(
+      controller: _searchController,
+      hintText: 'Pretraga po šifri ili nazivu proizvoda',
+      onChanged: (_) => setState(() {}),
+    );
+  }
+
+  Widget _buildFilters() {
+    Widget chip({
+      required String label,
+      required bool selected,
+      required VoidCallback onTap,
+    }) {
+      return Padding(
+        padding: const EdgeInsets.only(right: 8, bottom: 8),
+        child: ChoiceChip(
+          label: Text(label),
+          selected: selected,
+          onSelected: (_) => onTap(),
+        ),
+      );
+    }
+
+    final activeCount = _selectedStatus == ProductStatusFilter.all ? 0 : 1;
+
+    return StandardFilterPanel(
+      expanded: _filtersExpanded,
+      activeCount: activeCount,
+      onToggle: () => setState(() => _filtersExpanded = !_filtersExpanded),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Status', style: TextStyle(fontSize: 12, color: Colors.black54)),
+          const SizedBox(height: 8),
+          Wrap(
+            children: ProductStatusFilter.values.map((status) {
+              return chip(
+                label: status.label,
+                selected: _selectedStatus == status,
+                onTap: () => setState(() => _selectedStatus = status),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -449,6 +554,30 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
       appBar: AppBar(
         title: const Text('Proizvodi'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline_rounded),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: const Text('Proizvodi'),
+                  content: const Text(
+                    'Master šifrarnik proizvoda za planiranje i izvršenje.\n\n'
+                    '• Kreiranje i uređivanje proizvoda\n'
+                    '• Status active/inactive\n'
+                    '• Excel import\n'
+                    '• Ulaz u BOM, routing i povezane naloge',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Zatvori'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
           if (_canCreateProduct)
             IconButton(
               tooltip: 'Info za Excel import',
@@ -514,6 +643,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
       );
     }
 
+    final list = _filteredProducts;
+
     if (_products.isEmpty) {
       return const Center(
         child: Padding(
@@ -523,83 +654,143 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: _products.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final product = _products[index];
-
-        final productCode = _s(product['productCode']);
-        final productName = _s(product['productName']);
-        final packagingQty = _s(product['packagingQty']);
-        final status = _s(product['status']);
-
-        return Card(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () => _openProductDetails(product),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+    return RefreshIndicator(
+      onRefresh: _loadProducts,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            sliver: SliverToBoxAdapter(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(
-                        productCode.isEmpty ? '-' : productCode,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _statusColor(status).withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: _statusColor(status).withOpacity(0.35),
-                          ),
-                        ),
-                        child: Text(
-                          _statusLabel(status),
-                          style: TextStyle(
-                            color: _statusColor(status),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    productName.isEmpty ? '-' : productName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
-                  ),
-                  if (packagingQty.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'Pakovanje: $packagingQty',
-                      style: const TextStyle(color: Colors.black87),
-                    ),
-                  ],
+                  _buildKpis(),
+                  const SizedBox(height: 16),
+                  _buildSearch(),
+                  const SizedBox(height: 12),
+                  _buildFilters(),
                 ],
               ),
             ),
           ),
-        );
-      },
+          if (list.isEmpty)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 48),
+                  child: Text('Nema proizvoda za odabrani filter.'),
+                ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              sliver: SliverList.separated(
+                itemCount: list.length,
+                itemBuilder: (context, index) {
+                  final product = list[index];
+
+                  final productCode = _s(product['productCode']);
+                  final productName = _s(product['productName']);
+                  final packagingQty = _s(product['packagingQty']);
+                  final status = _s(product['status']);
+
+                  return Card(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => _openProductDetails(product),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  productCode.isEmpty ? '-' : productCode,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _statusColor(status).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: _statusColor(status).withValues(alpha: 0.35),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _statusLabel(status),
+                                    style: TextStyle(
+                                      color: _statusColor(status),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              productName.isEmpty ? '-' : productName,
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                            ),
+                            if (packagingQty.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                'Pakovanje: $packagingQty',
+                                style: const TextStyle(color: Colors.black87),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
+              ),
+            ),
+        ],
+      ),
     );
+  }
+}
+
+enum ProductStatusFilter { all, active, inactive }
+
+extension ProductStatusFilterX on ProductStatusFilter {
+  String get label {
+    switch (this) {
+      case ProductStatusFilter.all:
+        return 'Svi';
+      case ProductStatusFilter.active:
+        return 'Aktivni';
+      case ProductStatusFilter.inactive:
+        return 'Neaktivni';
+    }
+  }
+
+  bool matches(String status) {
+    final s = status.toLowerCase().trim();
+    switch (this) {
+      case ProductStatusFilter.all:
+        return true;
+      case ProductStatusFilter.active:
+        return s == 'active';
+      case ProductStatusFilter.inactive:
+        return s == 'inactive';
+    }
   }
 }

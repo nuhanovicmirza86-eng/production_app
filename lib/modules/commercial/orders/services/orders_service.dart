@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../production/production_orders/services/production_order_service.dart';
 import '../models/order_model.dart';
 import 'order_audit_service.dart';
 import 'order_status_engine.dart';
@@ -163,6 +164,28 @@ class OrdersService {
       final data = d.data() as Map<String, dynamic>;
       return OrderModel.fromMap(d.id, data);
     }).toList();
+  }
+
+  /// Učitava zaglavlje narudžbe i stavke iz kolekcije `order_items` (izvor istine za linije).
+  Future<OrderModel?> loadOrderModelWithItems({
+    required String companyId,
+    required String orderId,
+  }) async {
+    final header = await getOrderById(companyId: companyId, orderId: orderId);
+    if (header == null) return null;
+
+    final rawItems = await getOrderItems(companyId: companyId, orderId: orderId);
+    rawItems.sort((a, b) {
+      final la = (a['lineId'] ?? '').toString();
+      final lb = (b['lineId'] ?? '').toString();
+      return la.compareTo(lb);
+    });
+
+    final items = rawItems
+        .map((m) => OrderItemModel.fromOrderItemRow(m))
+        .toList();
+
+    return OrderModel.fromOrderDocument(orderId, header, items: items);
   }
 
   Future<void> updateOrderStatus({
@@ -418,10 +441,85 @@ class OrdersService {
       orderId: orderId,
       updatedBy: linkedBy,
     );
+  }
 
-    // TODO: update production order side with:
-    // sourceOrderId, sourceOrderItemId, sourceOrderNumber,
-    // sourceCustomerId, sourceCustomerName
+  /// Kreira draft proizvodni nalog sa poljima sljedljivosti (narudžba → PN) i povezuje stavku narudžbe.
+  Future<String> createAndLinkProductionOrderFromOrderItem({
+    required Map<String, dynamic> companyData,
+    required String orderId,
+    required String orderNumber,
+    required OrderType orderType,
+    required String partnerId,
+    required String partnerName,
+    required String orderItemDocId,
+    required String productId,
+    required String productCode,
+    required String productName,
+    required String unit,
+    required String plantKey,
+    required DateTime scheduledEndAt,
+    required double plannedQty,
+    required String bomId,
+    required String bomVersion,
+    required String routingId,
+    required String routingVersion,
+  }) async {
+    final companyId = _requireCompanyId(companyData);
+    final userId = _requireUserId(companyData);
+
+    if (orderItemDocId.trim().isEmpty) {
+      throw Exception('Nedostaje ID stavke narudžbe (order_items)');
+    }
+
+    final sourceCustomerId =
+        orderType == OrderType.customer ? partnerId.trim() : null;
+    final sourceCustomerName =
+        orderType == OrderType.customer ? partnerName.trim() : null;
+
+    final prodService = ProductionOrderService(firestore: _firestore);
+
+    final productionOrderId = await prodService.createProductionOrder(
+      companyId: companyId,
+      plantKey: plantKey.trim(),
+      productId: productId,
+      productCode: productCode,
+      productName: productName,
+      plannedQty: plannedQty,
+      unit: unit,
+      bomId: bomId,
+      bomVersion: bomVersion,
+      routingId: routingId,
+      routingVersion: routingVersion,
+      createdBy: userId,
+      scheduledEndAt: scheduledEndAt,
+      customerId: sourceCustomerId?.isEmpty ?? true ? null : sourceCustomerId,
+      customerName:
+          sourceCustomerName?.isEmpty ?? true ? null : sourceCustomerName,
+      sourceOrderId: orderId,
+      sourceOrderItemId: orderItemDocId,
+      sourceOrderNumber: orderNumber,
+      sourceCustomerId: sourceCustomerId?.isEmpty ?? true ? null : sourceCustomerId,
+      sourceCustomerName:
+          sourceCustomerName?.isEmpty ?? true ? null : sourceCustomerName,
+    );
+
+    final poSnap = await _firestore.collection('production_orders').doc(productionOrderId).get();
+    final productionOrderCode =
+        (poSnap.data()?['productionOrderCode'] ?? '').toString().trim();
+    if (productionOrderCode.isEmpty) {
+      throw Exception('Proizvodni nalog nema orderCode nakon kreiranja');
+    }
+
+    await linkOrderToProduction(
+      companyId: companyId,
+      orderId: orderId,
+      orderItemId: orderItemDocId,
+      productionOrderId: productionOrderId,
+      productionOrderCode: productionOrderCode,
+      linkedBy: userId,
+    );
+
+    return productionOrderId;
   }
 
   // ============================================================
@@ -601,6 +699,8 @@ class OrdersService {
       'plantKey': plantKey,
       'lineId': item['lineId'],
       'itemType': item['itemType'],
+      if ((item['productId'] ?? '').toString().trim().isNotEmpty)
+        'productId': item['productId'].toString().trim(),
       'code': item['code'],
       'name': item['name'],
       'orderedQty': _orderStatusEngine.toDouble(item['orderedQty']),

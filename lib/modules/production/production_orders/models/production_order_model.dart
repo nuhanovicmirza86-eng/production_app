@@ -19,6 +19,13 @@ class ProductionOrderModel {
   final String? customerId;
   final String? customerName;
 
+  /// Sljedljivost: komercijalna narudžba → proizvodni nalog (IATF).
+  final String? sourceOrderId;
+  final String? sourceOrderItemId;
+  final String? sourceOrderNumber;
+  final String? sourceCustomerId;
+  final String? sourceCustomerName;
+
   final double plannedQty;
   final double producedGoodQty;
   final double producedScrapQty;
@@ -65,6 +72,11 @@ class ProductionOrderModel {
     required this.productName,
     this.customerId,
     this.customerName,
+    this.sourceOrderId,
+    this.sourceOrderItemId,
+    this.sourceOrderNumber,
+    this.sourceCustomerId,
+    this.sourceCustomerName,
     required this.plannedQty,
     required this.producedGoodQty,
     required this.producedScrapQty,
@@ -103,6 +115,11 @@ class ProductionOrderModel {
       productName: map['productName'] ?? '',
       customerId: map['customerId'],
       customerName: map['customerName'],
+      sourceOrderId: map['sourceOrderId']?.toString(),
+      sourceOrderItemId: map['sourceOrderItemId']?.toString(),
+      sourceOrderNumber: map['sourceOrderNumber']?.toString(),
+      sourceCustomerId: map['sourceCustomerId']?.toString(),
+      sourceCustomerName: map['sourceCustomerName']?.toString(),
       plannedQty: (map['plannedQty'] ?? 0).toDouble(),
       producedGoodQty: (map['producedGoodQty'] ?? 0).toDouble(),
       producedScrapQty: (map['producedScrapQty'] ?? 0).toDouble(),
@@ -143,6 +160,16 @@ class ProductionOrderModel {
       'productName': productName,
       'customerId': customerId,
       'customerName': customerName,
+      if (sourceOrderId != null && sourceOrderId!.isNotEmpty)
+        'sourceOrderId': sourceOrderId,
+      if (sourceOrderItemId != null && sourceOrderItemId!.isNotEmpty)
+        'sourceOrderItemId': sourceOrderItemId,
+      if (sourceOrderNumber != null && sourceOrderNumber!.isNotEmpty)
+        'sourceOrderNumber': sourceOrderNumber,
+      if (sourceCustomerId != null && sourceCustomerId!.isNotEmpty)
+        'sourceCustomerId': sourceCustomerId,
+      if (sourceCustomerName != null && sourceCustomerName!.isNotEmpty)
+        'sourceCustomerName': sourceCustomerName,
       'plannedQty': plannedQty,
       'producedGoodQty': producedGoodQty,
       'producedScrapQty': producedScrapQty,

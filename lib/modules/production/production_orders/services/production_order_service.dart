@@ -19,6 +19,11 @@ class ProductionOrderService {
 
   // ================= PRIVATE =================
 
+  static String? _trimOrNull(String? v) {
+    final t = (v ?? '').trim();
+    return t.isEmpty ? null : t;
+  }
+
   String _generateOrderCode({required String plantKey, required DateTime now}) {
     final year = now.year.toString().substring(2);
     final month = now.month.toString().padLeft(2, '0');
@@ -65,6 +70,11 @@ class ProductionOrderService {
     String? customerName,
     String? productionPlanId,
     String? productionPlanLineId,
+    String? sourceOrderId,
+    String? sourceOrderItemId,
+    String? sourceOrderNumber,
+    String? sourceCustomerId,
+    String? sourceCustomerName,
   }) async {
     final docRef = _orders.doc();
     final now = DateTime.now();
@@ -84,6 +94,11 @@ class ProductionOrderService {
       productName: productName.trim(),
       customerId: customerId,
       customerName: customerName?.trim(),
+      sourceOrderId: _trimOrNull(sourceOrderId),
+      sourceOrderItemId: _trimOrNull(sourceOrderItemId),
+      sourceOrderNumber: _trimOrNull(sourceOrderNumber),
+      sourceCustomerId: _trimOrNull(sourceCustomerId),
+      sourceCustomerName: _trimOrNull(sourceCustomerName),
       plannedQty: plannedQty,
       producedGoodQty: 0,
       producedScrapQty: 0,

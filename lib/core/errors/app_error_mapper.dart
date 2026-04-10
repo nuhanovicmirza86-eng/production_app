@@ -1,11 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 class AppErrorMapper {
   static String toMessage(Object error) {
     if (error is FirebaseException) {
       switch (error.code) {
         case 'permission-denied':
-          return 'Nemate dozvolu za ovu akciju.';
+          return _permissionDeniedMessage(error);
         case 'unauthenticated':
           return 'Morate biti prijavljeni da biste nastavili.';
         case 'unavailable':
@@ -15,7 +16,7 @@ class AppErrorMapper {
         case 'already-exists':
           return 'Podatak već postoji.';
         case 'failed-precondition':
-          return 'Akcija trenutno nije dozvoljena zbog stanja podataka.';
+          return _failedPreconditionMessage(error);
         case 'deadline-exceeded':
           return 'Zahtjev je istekao. Pokušajte ponovo.';
         case 'cancelled':
@@ -64,5 +65,35 @@ class AppErrorMapper {
     }
 
     return 'Došlo je do greške. Pokušajte ponovo.';
+  }
+
+  /// Jasno razlikuje Firestore security rules od ostalih uzroka.
+  static String _permissionDeniedMessage(FirebaseException error) {
+    const base =
+        'Pristup podacima u bazi je odbijen (Firestore: permission-denied). '
+        'To su sigurnosna pravila, ne greška aplikacije. '
+        'Provjerite ulogu korisnika, da je nalog aktivan i da su deployana '
+        'ažurna firestore.rules na istom Firebase projektu.';
+    if (kDebugMode) {
+      final m = error.message?.trim();
+      if (m != null && m.isNotEmpty) {
+        return '$base\n\nTehnički detalj (debug): $m';
+      }
+    }
+    return base;
+  }
+
+  static String _failedPreconditionMessage(FirebaseException error) {
+    final m = (error.message ?? '').toLowerCase();
+    if (m.contains('index') || m.contains('indexes')) {
+      return 'Upit zahtijeva Firestore indeks ili indeks se još gradi. '
+          'U konzoli provjeri Indexes za kolekciju (npr. orders) ili '
+          'pokreni firebase deploy --only firestore:indexes.';
+    }
+    final raw = error.message?.trim();
+    if (raw != null && raw.isNotEmpty) {
+      return 'Zahtjev nije ispunjen (failed-precondition): $raw';
+    }
+    return 'Zahtjev nije ispunjen zbog stanja podataka ili konfiguracije baze.';
   }
 }
