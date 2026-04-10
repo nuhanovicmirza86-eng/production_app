@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../products/services/product_service.dart';
+
 class BomService {
   BomService();
 
@@ -367,5 +369,48 @@ class BomService {
     });
 
     await batch.commit();
+  }
+
+  /// Pantheon-stil: jedna glavna sastavnica = aktivna PRIMARY u `boms`; na `products`
+  /// upisuje se `bomId` / `bomVersion` kao keš za šifarnik i proizvodne naloge.
+  Future<void> syncActivePrimaryBomToProduct({
+    required String companyId,
+    required String productId,
+    required String updatedBy,
+  }) async {
+    final cid = companyId.trim();
+    final pid = productId.trim();
+    final uid = updatedBy.trim();
+    if (cid.isEmpty || pid.isEmpty || uid.isEmpty) return;
+
+    final active = await getActiveBomForProductAndClassification(
+      companyId: cid,
+      productId: pid,
+      classification: 'PRIMARY',
+    );
+
+    final productService = ProductService(firestore: _firestore);
+
+    if (active == null) {
+      await productService.updateProduct(
+        productId: pid,
+        companyId: cid,
+        updatedBy: uid,
+        bomId: '',
+        bomVersion: '',
+      );
+      return;
+    }
+
+    var ver = _s(active['version']);
+    if (ver.isEmpty) ver = 'v1';
+
+    await productService.updateProduct(
+      productId: pid,
+      companyId: cid,
+      updatedBy: uid,
+      bomId: _s(active['id']),
+      bomVersion: ver,
+    );
   }
 }

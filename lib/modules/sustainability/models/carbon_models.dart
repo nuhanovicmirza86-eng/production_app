@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class CarbonCompanySetup {
   final String companyId;
   final int reportingYear;
@@ -302,6 +304,42 @@ class CarbonActivityLine {
       ownerDept: _s(m['ownerDept']),
       status: _s(m['status']),
       notes: _s(m['notes']),
+    );
+  }
+}
+
+/// Jedan zapis u povijesti izmjena karbonskog izvještaja (append-only u Firestore).
+class CarbonAuditLogEntry {
+  final String id;
+  final String companyId;
+  final int reportingYear;
+  final String action;
+  final String userId;
+  final String detail;
+  final DateTime? createdAt;
+
+  const CarbonAuditLogEntry({
+    required this.id,
+    required this.companyId,
+    required this.reportingYear,
+    required this.action,
+    required this.userId,
+    this.detail = '',
+    this.createdAt,
+  });
+
+  factory CarbonAuditLogEntry.fromDoc(String id, Map<String, dynamic> m) {
+    final ts = m['createdAt'];
+    DateTime? at;
+    if (ts is Timestamp) at = ts.toDate();
+    return CarbonAuditLogEntry(
+      id: id,
+      companyId: _s(m['companyId']),
+      reportingYear: _i(m['reportingYear'], 0),
+      action: _s(m['action']),
+      userId: _s(m['userId']),
+      detail: _s(m['detail']),
+      createdAt: at,
     );
   }
 }

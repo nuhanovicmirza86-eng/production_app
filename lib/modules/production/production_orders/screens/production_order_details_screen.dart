@@ -1,9 +1,10 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/user_display_label.dart';
 import '../../execution/screens/production_execution_screen.dart';
 import '../../execution/services/production_execution_service.dart';
 import '../../products/services/product_service.dart';
@@ -13,7 +14,6 @@ import '../printing/production_order_pdf.dart';
 import '../printing/production_order_qr_payload.dart';
 import '../services/production_order_service.dart';
 import 'production_order_edit_screen.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProductionOrderDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
@@ -39,6 +39,7 @@ class _ProductionOrderDetailsScreenState
 
   bool _isLoading = true;
   bool _isReleasing = false;
+  bool _isLifecycleBusy = false;
   bool _isLoadingExecutions = false;
   String? _error;
   ProductionOrderModel? _order;
@@ -50,24 +51,9 @@ class _ProductionOrderDetailsScreenState
   String get _plantKey => (widget.companyData['plantKey'] ?? '').toString();
   String get _userId => (widget.companyData['userId'] ?? 'system').toString();
 
-  /// Ime za etikete / ispis: profil firme, pa Firebase, pa ID.
-  String get _operatorDisplayName {
-    final fromProfile =
-        (widget.companyData['userDisplayName'] ?? '').toString().trim();
-    if (fromProfile.isNotEmpty) return fromProfile;
-
-    final nick = (widget.companyData['nickname'] ?? '').toString().trim();
-    if (nick.isNotEmpty) return nick;
-
-    final u = FirebaseAuth.instance.currentUser;
-    final dn = u?.displayName?.trim();
-    if (dn != null && dn.isNotEmpty) return dn;
-
-    final em = u?.email?.trim();
-    if (em != null && em.isNotEmpty) return em;
-
-    return _userId;
-  }
+  /// Ime za etikete / ispis (nikad sirovi UID u UI).
+  String get _operatorDisplayName =>
+      UserDisplayLabel.fromSessionMap(widget.companyData);
 
   String get _role =>
       (widget.companyData['role'] ?? '').toString().toLowerCase();
@@ -75,6 +61,9 @@ class _ProductionOrderDetailsScreenState
   bool get _canEdit => _role == 'admin' || _role == 'production_manager';
 
   bool get _canRelease => _role == 'admin' || _role == 'production_manager';
+
+  bool get _canManageLifecycle =>
+      _role == 'admin' || _role == 'production_manager';
 
   bool get _canExecute =>
       _role == 'production_operator' ||
@@ -116,6 +105,7 @@ class _ProductionOrderDetailsScreenState
 
       if (order != null) {
         await _loadExecutions(order.id);
+        if (mounted) await _prefetchActorLabels(order);
       } else {
         setState(() {
           _executions = const [];
@@ -177,6 +167,32 @@ class _ProductionOrderDetailsScreenState
     }
   }
 
+  Future<void> _prefetchActorLabels(ProductionOrderModel order) async {
+    final fs = FirebaseFirestore.instance;
+    final ids = <String>{};
+
+    void collect(String? v) {
+      final s = (v ?? '').trim();
+      if (s.isEmpty || s == '-') return;
+      if (s.contains('@')) return;
+      if (!UserDisplayLabel.looksLikeFirebaseUid(s)) return;
+      ids.add(s);
+    }
+
+    collect(order.createdBy);
+    collect(order.updatedBy);
+    collect(order.releasedBy);
+    collect(order.lastChangedBy);
+
+    for (final e in _executions) {
+      final name = (e['operatorName'] ?? '').toString().trim();
+      if (name.isEmpty) collect((e['operatorId'] ?? '').toString());
+    }
+
+    await UserDisplayLabel.prefetchUids(fs, ids);
+    if (mounted) setState(() {});
+  }
+
   Future<void> _releaseOrder() async {
     final order = _order;
     if (order == null) return;
@@ -217,16 +233,48 @@ class _ProductionOrderDetailsScreenState
     }
   }
 
-  Future<void> _openExecutionScreen(ProductionOrderModel order) async {
-    if (_hasMyActiveExecutionForStep) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Već imaš aktivan execution za ovaj nalog i ovaj korak.',
+  String? _resumeExecutionIdForMyStep() {
+    for (final e in _executions) {
+      final st = (e['status'] ?? '').toString().toLowerCase();
+      if (st != 'started' && st != 'paused') continue;
+      if ((e['stepId'] ?? '').toString() != _defaultStepId) continue;
+      if ((e['operatorId'] ?? '').toString().trim() != _userId.trim()) continue;
+      final id = (e['id'] ?? '').toString().trim();
+      if (id.isNotEmpty) return id;
+    }
+    return null;
+  }
+
+  Future<void> _openExecutionScreen(
+    ProductionOrderModel order, {
+    String? resumeExecutionId,
+  }) async {
+    final canRunWork =
+        order.status == 'released' || order.status == 'in_progress';
+
+    if (resumeExecutionId == null || resumeExecutionId.isEmpty) {
+      if (!canRunWork) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Nalog mora biti pušten prije pokretanja rada (status: nacrt → pusti nalog).',
+            ),
           ),
-        ),
-      );
-      return;
+        );
+        return;
+      }
+      if (_hasMyActiveExecutionForStep) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Već imaš aktivan rad za ovaj korak — koristi „Nastavi rad“.',
+            ),
+          ),
+        );
+        return;
+      }
     }
 
     final result = await Navigator.push<bool>(
@@ -236,22 +284,163 @@ class _ProductionOrderDetailsScreenState
           companyData: widget.companyData,
           orderData: {
             'id': order.id,
+            'status': order.status,
             'productionOrderCode': order.productionOrderCode,
             'productId': order.productId,
             'productCode': order.productCode,
             'productName': order.productName,
+            'customerName': order.customerName ?? '',
             'routingId': order.routingId,
             'routingVersion': order.routingVersion,
           },
           stepId: _defaultStepId,
           stepName: _defaultStepName,
           executionType: _defaultExecutionType,
+          resumeExecutionId: resumeExecutionId,
         ),
       ),
     );
 
     if (result == true) {
       await _loadOrder();
+    }
+  }
+
+  Future<void> _confirmCompleteOrder(ProductionOrderModel order) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Završi nalog'),
+        content: const Text(
+          'Nalog će dobiti status „Završen“. Nastavak izvršenja i dalje je moguć po potrebi; zatvaranje je odvojen korak.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Odustani'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Završi'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _isLifecycleBusy = true);
+    try {
+      await _service.completeProductionOrder(
+        productionOrderId: order.id,
+        companyId: _companyId,
+        plantKey: _plantKey,
+        actorUserId: _userId,
+      );
+      if (!mounted) return;
+      await _loadOrder();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nalog je označen kao završen.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _isLifecycleBusy = false);
+    }
+  }
+
+  Future<void> _confirmCloseOrder(ProductionOrderModel order) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Zatvori nalog'),
+        content: const Text(
+          'Zatvoreni nalog se smatra arhiviranim za operativu. Nastavak izmjena treba biti izuzetak (admin).',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Odustani'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Zatvori'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _isLifecycleBusy = true);
+    try {
+      await _service.closeProductionOrder(
+        productionOrderId: order.id,
+        companyId: _companyId,
+        plantKey: _plantKey,
+        actorUserId: _userId,
+      );
+      if (!mounted) return;
+      await _loadOrder();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nalog je zatvoren.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _isLifecycleBusy = false);
+    }
+  }
+
+  Future<void> _confirmCancelOrder(ProductionOrderModel order) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Otkaži nalog'),
+        content: const Text(
+          'Otkazani nalog više nije dio aktivnog plana. Jeste li sigurni?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Ne'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Otkaži nalog'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _isLifecycleBusy = true);
+    try {
+      await _service.cancelProductionOrder(
+        productionOrderId: order.id,
+        companyId: _companyId,
+        plantKey: _plantKey,
+        actorUserId: _userId,
+      );
+      if (!mounted) return;
+      await _loadOrder();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nalog je otkazan.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _isLifecycleBusy = false);
     }
   }
 
@@ -543,7 +732,9 @@ class _ProductionOrderDetailsScreenState
             const SizedBox(height: 12),
             _buildInfoRow(
               'Operator',
-              operatorName.isNotEmpty ? operatorName : operatorId,
+              operatorName.isNotEmpty
+                  ? operatorName
+                  : UserDisplayLabel.labelForStored(operatorId),
             ),
             _buildInfoRow('Start', _formatDateTime(startedAt)),
             _buildInfoRow('Kraj', _formatDateTime(endedAt)),
@@ -583,7 +774,7 @@ class _ProductionOrderDetailsScreenState
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text(
-                  'Već imaš aktivan execution za ovaj nalog i ovaj korak. Ne možeš pokrenuti novi dok ga ne završiš.',
+                  'Imaš aktivnu sesiju rada za ovaj korak. Nastavi je ili je završi na ekranu izvršenja.',
                   style: TextStyle(
                     color: Colors.orange,
                     fontWeight: FontWeight.w600,
@@ -592,14 +783,48 @@ class _ProductionOrderDetailsScreenState
               ),
             ],
             const SizedBox(height: 16),
-            if (_canExecute)
-              ElevatedButton.icon(
-                onPressed: _isLoadingExecutions || _hasMyActiveExecutionForStep
-                    ? null
-                    : () => _openExecutionScreen(order),
-                icon: const Icon(Icons.play_circle_outline),
-                label: const Text('Pokreni rad'),
-              ),
+            Builder(
+              builder: (ctx) {
+                final canRunWork =
+                    order.status == 'released' || order.status == 'in_progress';
+                final resumeId = _resumeExecutionIdForMyStep();
+                if (!_canExecute) return const SizedBox.shrink();
+                if (!canRunWork) {
+                  return Text(
+                    order.status == 'draft'
+                        ? 'Pušti nalog prije pokretanja rada.'
+                        : 'Rad se može pokrenuti samo za puštene naloge ili naloge u toku.',
+                    style: TextStyle(color: Colors.grey.shade800, fontSize: 13),
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_hasMyActiveExecutionForStep &&
+                        resumeId != null) ...[
+                      ElevatedButton.icon(
+                        onPressed: _isLoadingExecutions
+                            ? null
+                            : () => _openExecutionScreen(
+                                  order,
+                                  resumeExecutionId: resumeId,
+                                ),
+                        icon: const Icon(Icons.play_circle_outline),
+                        label: const Text('Nastavi rad'),
+                      ),
+                    ] else if (!_hasMyActiveExecutionForStep) ...[
+                      ElevatedButton.icon(
+                        onPressed: _isLoadingExecutions
+                            ? null
+                            : () => _openExecutionScreen(order),
+                        icon: const Icon(Icons.play_circle_outline),
+                        label: const Text('Pokreni rad'),
+                      ),
+                    ],
+                  ],
+                );
+              },
+            ),
             if (_canExecute) const SizedBox(height: 16),
             if (_isLoadingExecutions)
               const Center(child: CircularProgressIndicator())
@@ -638,67 +863,116 @@ class _ProductionOrderDetailsScreenState
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.black26, width: 1),
-                    borderRadius: BorderRadius.circular(12),
-                    color: Colors.white,
-                  ),
-                  child: QrImageView(
-                    data: qrData,
-                    size: 180,
-                    backgroundColor: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  order.productionOrderCode,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    _statusLabel(order.status),
-                    style: TextStyle(
-                      color: statusColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                if (order.hasCriticalChanges) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: const Text(
-                      'Nalog izmijenjen',
-                      style: TextStyle(
-                        color: Colors.orange,
-                        fontWeight: FontWeight.w600,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.black26, width: 1),
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white,
+                      ),
+                      child: QrImageView(
+                        data: qrData,
+                        size: 132,
+                        backgroundColor: Colors.white,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            order.productName,
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.2,
+                                ) ??
+                                const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            (order.customerName ?? '').trim().isEmpty
+                                ? 'Kupac nije naveden'
+                                : order.customerName!.trim(),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Šifra: ${order.productCode}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Referenca naloga: ${order.productionOrderCode}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        _statusLabel(order.status),
+                        style: TextStyle(
+                          color: statusColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    if (order.hasCriticalChanges)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Text(
+                          'Nalog izmijenjen',
+                          style: TextStyle(
+                            color: Colors.orange,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -715,8 +989,14 @@ class _ProductionOrderDetailsScreenState
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 16),
-                _buildInfoRow('Šifra proizvoda', order.productCode),
                 _buildInfoRow('Naziv proizvoda', order.productName),
+                _buildInfoRow(
+                  'Kupac',
+                  (order.customerName ?? '').trim().isEmpty
+                      ? '—'
+                      : order.customerName!.trim(),
+                ),
+                _buildInfoRow('Šifra proizvoda', order.productCode),
                 _buildInfoRow(
                   'Planirana količina',
                   '${_formatQty(order.plannedQty)} ${order.unit}',
@@ -737,7 +1017,6 @@ class _ProductionOrderDetailsScreenState
                   'Proizvedeno dorada',
                   '${_formatQty(order.producedReworkQty)} ${order.unit}',
                 ),
-                _buildInfoRow('Kupac', order.customerName ?? '-'),
                 _buildInfoRow('Pogon', order.plantKey),
               ],
             ),
@@ -745,16 +1024,21 @@ class _ProductionOrderDetailsScreenState
         ),
         const SizedBox(height: 16),
         Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          clipBehavior: Clip.antiAlias,
+          child: Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              initiallyExpanded: false,
+              title: const Text(
+                'Tehnički podaci (BOM / linija)',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+              subtitle: Text(
+                'ID-evi u bazi — nisu potrebni za rad; otvori samo ako trebaš podršci',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              ),
+              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               children: [
-                const Text(
-                  'Tehničke reference',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 16),
                 _buildInfoRow('BOM ID', order.bomId),
                 _buildInfoRow('BOM verzija', order.bomVersion),
                 _buildInfoRow('Routing ID', order.routingId),
@@ -778,11 +1062,20 @@ class _ProductionOrderDetailsScreenState
                 ),
                 const SizedBox(height: 16),
                 _buildInfoRow('Kreirano', _formatDateTime(order.createdAt)),
-                _buildInfoRow('Kreirao', order.createdBy),
+                _buildInfoRow(
+                  'Kreirao',
+                  UserDisplayLabel.labelForStored(order.createdBy),
+                ),
                 _buildInfoRow('Ažurirano', _formatDateTime(order.updatedAt)),
-                _buildInfoRow('Ažurirao', order.updatedBy),
+                _buildInfoRow(
+                  'Ažurirao',
+                  UserDisplayLabel.labelForStored(order.updatedBy),
+                ),
                 _buildInfoRow('Pušteno', _formatDateTime(order.releasedAt)),
-                _buildInfoRow('Pustio', order.releasedBy ?? '-'),
+                _buildInfoRow(
+                  'Pustio',
+                  UserDisplayLabel.labelForStored(order.releasedBy ?? ''),
+                ),
                 _buildInfoRow(
                   'Kritične izmjene',
                   order.hasCriticalChanges ? 'Da' : 'Ne',
@@ -793,7 +1086,7 @@ class _ProductionOrderDetailsScreenState
                 ),
                 _buildInfoRow(
                   'Zadnju izmjenu uradio',
-                  order.lastChangedBy ?? '-',
+                  UserDisplayLabel.labelForStored(order.lastChangedBy ?? ''),
                 ),
               ],
             ),
@@ -801,6 +1094,64 @@ class _ProductionOrderDetailsScreenState
         ),
         const SizedBox(height: 16),
         _buildExecutionSection(context, order),
+
+        if (_canManageLifecycle) ...[
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Životni ciklus naloga',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Završi kada je proizvodnja operativno gotova; zatvori nakon knjiženja / revizije.',
+                    style: TextStyle(fontSize: 13, color: Colors.black54),
+                  ),
+                  const SizedBox(height: 16),
+                  if (order.status == 'released' ||
+                      order.status == 'in_progress') ...[
+                    OutlinedButton.icon(
+                      onPressed: _isLifecycleBusy
+                          ? null
+                          : () => _confirmCompleteOrder(order),
+                      icon: const Icon(Icons.done_all_outlined),
+                      label: const Text('Završi nalog'),
+                    ),
+                  ],
+                  if (order.status == 'completed') ...[
+                    OutlinedButton.icon(
+                      onPressed: _isLifecycleBusy
+                          ? null
+                          : () => _confirmCloseOrder(order),
+                      icon: const Icon(Icons.lock_outline),
+                      label: const Text('Zatvori nalog'),
+                    ),
+                  ],
+                  if (!['completed', 'closed', 'cancelled'].contains(
+                    order.status,
+                  )) ...[
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: _isLifecycleBusy
+                          ? null
+                          : () => _confirmCancelOrder(order),
+                      icon: Icon(Icons.cancel_outlined, color: Colors.red.shade700),
+                      label: Text(
+                        'Otkaži nalog',
+                        style: TextStyle(color: Colors.red.shade700),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
 
         if (_canEdit) ...[
           const SizedBox(height: 16),

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/carbon_models.dart';
 import 'carbon_defaults.dart';
@@ -28,6 +29,111 @@ class CarbonFirestoreService {
   CollectionReference<Map<String, dynamic>> _activitiesCol() =>
       _db.collection('carbon_activities');
 
+  CollectionReference<Map<String, dynamic>> _auditCol() =>
+      _db.collection('carbon_audit_log');
+
+  bool _canWriteAuditEntry(String userId) {
+    final u = userId.trim();
+    if (u.isEmpty) return false;
+    final me = FirebaseAuth.instance.currentUser?.uid ?? '';
+    return me.isNotEmpty && me == u;
+  }
+
+  String _truncateDetail(String s, int max) {
+    final t = s.trim();
+    if (t.length <= max) return t;
+    return '${t.substring(0, max - 1)}…';
+  }
+
+  void _addAuditToBatch(
+    WriteBatch batch, {
+    required String companyId,
+    required int reportingYear,
+    required String userId,
+    required String action,
+    String detail = '',
+  }) {
+    if (!_canWriteAuditEntry(userId)) return;
+    batch.set(_auditCol().doc(), {
+      'companyId': companyId,
+      'reportingYear': reportingYear,
+      'action': action,
+      'userId': userId.trim(),
+      'detail': _truncateDetail(detail, 500),
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Samostalni zapis (npr. izvoz) — ne koristi batch s drugim dokumentom.
+  Future<void> logReportEvent({
+    required String companyId,
+    required int reportingYear,
+    required String userId,
+    required String action,
+    String detail = '',
+  }) async {
+    if (!_canWriteAuditEntry(userId)) return;
+    await _auditCol().doc().set({
+      'companyId': companyId,
+      'reportingYear': reportingYear,
+      'action': action,
+      'userId': userId.trim(),
+      'detail': _truncateDetail(detail, 500),
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Stream<List<CarbonAuditLogEntry>> watchAuditLog({
+    required String companyId,
+    required int reportingYear,
+    int limit = 200,
+  }) {
+    return _auditCol()
+        .where('companyId', isEqualTo: companyId)
+        .where('reportingYear', isEqualTo: reportingYear)
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (s) => s.docs
+              .map((d) => CarbonAuditLogEntry.fromDoc(d.id, d.data()))
+              .toList(),
+        );
+  }
+
+  /// Zadnji `updatedAt` / `updatedBy` na glavnim dokumentima perioda (prije audit kolekcije).
+  Future<
+      ({
+        DateTime? settingsUpdatedAt,
+        String settingsUpdatedBy,
+        DateTime? quotasUpdatedAt,
+        String quotasUpdatedBy,
+      })> loadPeriodDocumentUpdateHints({
+    required String companyId,
+    required int reportingYear,
+  }) async {
+    final sSnap = await _settingsRef(companyId, reportingYear).get();
+    final qSnap = await _quotasRef(companyId, reportingYear).get();
+
+    DateTime? ts(dynamic v) {
+      if (v is Timestamp) return v.toDate();
+      return null;
+    }
+
+    String by(Map<String, dynamic>? m, String key) =>
+        (m == null ? '' : (m[key] ?? '').toString()).trim();
+
+    final sd = sSnap.data();
+    final qd = qSnap.data();
+
+    return (
+      settingsUpdatedAt: sd == null ? null : ts(sd['updatedAt']),
+      settingsUpdatedBy: by(sd, 'updatedBy'),
+      quotasUpdatedAt: qd == null ? null : ts(qd['updatedAt']),
+      quotasUpdatedBy: by(qd, 'updatedBy'),
+    );
+  }
+
   Future<CarbonCompanySetup?> loadSettings({
     required String companyId,
     required int reportingYear,
@@ -55,11 +161,21 @@ class CarbonFirestoreService {
     required CarbonCompanySetup setup,
     required String userId,
   }) async {
-    await _settingsRef(setup.companyId, setup.reportingYear).set({
+    final batch = _db.batch();
+    final ref = _settingsRef(setup.companyId, setup.reportingYear);
+    batch.set(ref, {
       ...setup.toMap(),
       'updatedAt': FieldValue.serverTimestamp(),
       'updatedBy': userId,
     }, SetOptions(merge: true));
+    _addAuditToBatch(
+      batch,
+      companyId: setup.companyId,
+      reportingYear: setup.reportingYear,
+      userId: userId,
+      action: 'settings_saved',
+    );
+    await batch.commit();
   }
 
   Future<CarbonQuotaSettings> loadQuotas({
@@ -83,11 +199,21 @@ class CarbonFirestoreService {
     required CarbonQuotaSettings quotas,
     required String userId,
   }) async {
-    await _quotasRef(quotas.companyId, quotas.reportingYear).set({
+    final batch = _db.batch();
+    final ref = _quotasRef(quotas.companyId, quotas.reportingYear);
+    batch.set(ref, {
       ...quotas.toMap(),
       'updatedAt': FieldValue.serverTimestamp(),
       'updatedBy': userId,
     }, SetOptions(merge: true));
+    _addAuditToBatch(
+      batch,
+      companyId: quotas.companyId,
+      reportingYear: quotas.reportingYear,
+      userId: userId,
+      action: 'quotas_saved',
+    );
+    await batch.commit();
   }
 
   Stream<List<CarbonActivityLine>> watchActivities({
@@ -113,11 +239,22 @@ class CarbonFirestoreService {
     final ref = line.id.isEmpty
         ? _activitiesCol().doc()
         : _activitiesCol().doc(line.id);
-    await ref.set({
+    final batch = _db.batch();
+    batch.set(ref, {
       ...line.toMap(),
       'updatedAt': FieldValue.serverTimestamp(),
       'updatedBy': userId,
     }, SetOptions(merge: true));
+    final isNew = line.id.isEmpty;
+    _addAuditToBatch(
+      batch,
+      companyId: line.companyId,
+      reportingYear: line.reportingYear,
+      userId: userId,
+      action: isNew ? 'activity_created' : 'activity_updated',
+      detail: '${line.rowId}: ${line.description}',
+    );
+    await batch.commit();
   }
 
   Future<void> deleteActivity(String activityDocId) async {
@@ -154,14 +291,26 @@ class CarbonFirestoreService {
     required String companyId,
     required CarbonEmissionFactor factor,
     required String userId,
+    required int reportingYear,
   }) async {
     final id = factorDocId(companyId, factor.factorKey);
-    await _db.collection('carbon_emission_factors').doc(id).set({
+    final batch = _db.batch();
+    final docRef = _db.collection('carbon_emission_factors').doc(id);
+    batch.set(docRef, {
       'companyId': companyId,
       ...factor.toMap(),
       'updatedAt': FieldValue.serverTimestamp(),
       'updatedBy': userId,
     }, SetOptions(merge: true));
+    _addAuditToBatch(
+      batch,
+      companyId: companyId,
+      reportingYear: reportingYear,
+      userId: userId,
+      action: 'factor_override_saved',
+      detail: factor.factorKey,
+    );
+    await batch.commit();
   }
 
   Future<void> deleteFactorOverride(String companyId, String factorKey) async {

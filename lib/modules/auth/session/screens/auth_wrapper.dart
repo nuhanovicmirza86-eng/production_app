@@ -163,6 +163,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         'role': role,
         'plantKey': plantKey,
         'userDisplayName': _s(data['displayName']),
+        'nickname': _s(data['nickname']),
         'userEmail': _s(data['email'] ?? user.email ?? ''),
       };
 

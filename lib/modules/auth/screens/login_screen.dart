@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -119,10 +120,11 @@ class _LoginScreenState extends State<LoginScreen> {
         _error = e.toString().replaceFirst('Exception: ', '');
       });
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -160,6 +162,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      Image.asset(
+                        'branding/operonix_production_icon.PNG',
+                        height: kIsWeb ? 56 : 64,
+                        filterQuality: FilterQuality.medium,
+                        errorBuilder: (context, error, stackTrace) => Icon(
+                          Icons.precision_manufacturing_outlined,
+                          size: kIsWeb ? 48 : 56,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Operonix Production',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: 16),
                       TextField(
                         controller: _emailCtrl,
                         enabled: !_loading,

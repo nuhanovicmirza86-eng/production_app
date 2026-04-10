@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../products/services/product_lookup_service.dart';
 import '../services/production_order_service.dart';
+import '../services/production_order_technical_refs_resolver.dart';
 
 class ProductionOrderCreateScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
@@ -22,6 +23,8 @@ class _ProductionOrderCreateScreenState
 
   final ProductionOrderService _service = ProductionOrderService();
   final ProductLookupService _productLookupService = ProductLookupService();
+  final ProductionOrderTechnicalRefsResolver _refsResolver =
+      ProductionOrderTechnicalRefsResolver();
 
   final TextEditingController _productSearchController =
       TextEditingController();
@@ -40,6 +43,8 @@ class _ProductionOrderCreateScreenState
   bool _isLoading = false;
   bool _isSearchingProducts = false;
   bool _showProductSuggestions = false;
+  bool _technicalRefsLoading = false;
+  String? _technicalRefsSummary;
 
   String? _productId;
   String? _customerId;
@@ -96,6 +101,8 @@ class _ProductionOrderCreateScreenState
     _productId = null;
     _customerId = null;
     _productData = null;
+    _technicalRefsLoading = false;
+    _technicalRefsSummary = null;
     _productCodeController.clear();
     _productNameController.clear();
     _customerNameController.clear();
@@ -196,6 +203,59 @@ class _ProductionOrderCreateScreenState
     });
 
     _productSearchFocusNode.unfocus();
+    _syncTechnicalRefsAfterProductSelect();
+  }
+
+  Future<void> _syncTechnicalRefsAfterProductSelect() async {
+    if (_productId == null || _productId!.isEmpty) return;
+
+    setState(() {
+      _technicalRefsLoading = true;
+      _technicalRefsSummary = null;
+    });
+
+    try {
+      final r = await _refsResolver.resolve(
+        companyId: _companyId,
+        productId: _productId!,
+        productBomId: _productData?['bomId']?.toString(),
+        productBomVersion: _productData?['bomVersion']?.toString(),
+        productRoutingId: _productData?['routingId']?.toString(),
+        productRoutingVersion: _productData?['routingVersion']?.toString(),
+      );
+
+      if (!mounted) return;
+
+      if (r == null) {
+        setState(() {
+          _technicalRefsLoading = false;
+          _technicalRefsSummary =
+              'Nema aktivne sastavnice (PRIMARY / SECONDARY / TRANSPORT) u bazi. Otvori proizvod → BOM i aktiviraj barem jednu.';
+        });
+        return;
+      }
+
+      setState(() {
+        _technicalRefsLoading = false;
+        _productData = <String, dynamic>{
+          ...?_productData,
+          'bomId': r['bomId'],
+          'bomVersion': r['bomVersion'],
+          'routingId': r['routingId'],
+          'routingVersion': r['routingVersion'],
+        };
+        final routingIsPlaceholder = r['routingId'] == 'unspecified';
+        _technicalRefsSummary = routingIsPlaceholder
+            ? 'Aktivna je sastavnica s proizvoda. Routing još nije u šifrarniku — koristi se privremena oznaka dok ga ne popuniš.'
+            : 'Aktivna je sastavnica i routing s odabranog proizvoda — možeš kreirati nalog.';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _technicalRefsLoading = false;
+        _technicalRefsSummary = AppErrorMapper.toMessage(e);
+      });
+    }
   }
 
   Future<void> _createOrder() async {
@@ -222,34 +282,33 @@ class _ProductionOrderCreateScreenState
       return;
     }
 
-    final bomId = (_productData!['bomId'] ?? '').toString().trim();
-    final bomVersion = (_productData!['bomVersion'] ?? '').toString().trim();
-    final routingId = (_productData!['routingId'] ?? '').toString().trim();
-    final routingVersion = (_productData!['routingVersion'] ?? '')
-        .toString()
-        .trim();
-
-    if (bomId.isEmpty || bomVersion.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Odabrani proizvod nema aktivan BOM.')),
-      );
-      return;
-    }
-
-    if (routingId.isEmpty || routingVersion.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Odabrani proizvod nema aktivan Routing.'),
-        ),
-      );
-      return;
-    }
-
     setState(() {
       _isLoading = true;
     });
 
     try {
+      final refs = await _refsResolver.resolve(
+        companyId: _companyId,
+        productId: _productId!,
+        productBomId: _productData!['bomId']?.toString(),
+        productBomVersion: _productData!['bomVersion']?.toString(),
+        productRoutingId: _productData!['routingId']?.toString(),
+        productRoutingVersion: _productData!['routingVersion']?.toString(),
+      );
+
+      if (refs == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Nema aktivne sastavnice (PRIMARY / SECONDARY / TRANSPORT) za ovaj proizvod. '
+              'Na proizvodu otvori BOM i aktiviraj barem jednu klasifikaciju.',
+            ),
+          ),
+        );
+        return;
+      }
+
       await _service.createProductionOrder(
         companyId: _companyId,
         plantKey: _plantKey,
@@ -258,10 +317,10 @@ class _ProductionOrderCreateScreenState
         productName: _productNameController.text.trim(),
         plannedQty: double.parse(_qtyController.text.trim()),
         unit: _unitController.text.trim(),
-        bomId: bomId,
-        bomVersion: bomVersion,
-        routingId: routingId,
-        routingVersion: routingVersion,
+        bomId: refs['bomId']!,
+        bomVersion: refs['bomVersion']!,
+        routingId: refs['routingId']!,
+        routingVersion: refs['routingVersion']!,
         createdBy: _userId,
         scheduledEndAt: _scheduledEndAt!,
         customerId: _customerId,
@@ -448,6 +507,42 @@ class _ProductionOrderCreateScreenState
                       ],
                     ),
                   ),
+                  if (_technicalRefsLoading) ...[
+                    const SizedBox(height: 10),
+                    const LinearProgressIndicator(minHeight: 3),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Provjera aktivne sastavnice na proizvodu…',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                    ),
+                  ],
+                  if (!_technicalRefsLoading &&
+                      _technicalRefsSummary != null) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: _technicalRefsSummary!.contains('Nema aktivne')
+                            ? Colors.orange.shade50
+                            : Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _technicalRefsSummary!.contains('Nema aktivne')
+                              ? Colors.orange.shade200
+                              : Colors.blue.shade200,
+                        ),
+                      ),
+                      child: Text(
+                        _technicalRefsSummary!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade900,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
                 const SizedBox(height: 12),
                 TextFormField(

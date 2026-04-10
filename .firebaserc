@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "prod": "plamingo-maintenance"
+  },
+  "targets": {
+    "plamingo-maintenance": {
+      "hosting": {
+        "production": [
+          "operonix-production"
+        ],
+        "maintenance": [
+          "operonix-maintenance"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

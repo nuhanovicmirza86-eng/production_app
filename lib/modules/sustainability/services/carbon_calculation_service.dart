@@ -72,7 +72,8 @@ class CarbonCalculationService {
     if (q.baselineEmissionsTCO2e <= 0 || q.reductionTargetPercent <= 0) {
       return 0;
     }
-    final f = 1.0 - (q.reductionTargetPercent / 100.0);
+    var f = 1.0 - (q.reductionTargetPercent / 100.0);
+    if (f < 0) f = 0;
     return q.baselineEmissionsTCO2e * f;
   }
 

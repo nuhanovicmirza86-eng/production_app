@@ -9,6 +9,9 @@ class ProductionExecutionService {
   CollectionReference<Map<String, dynamic>> get _execution =>
       _firestore.collection('production_execution');
 
+  CollectionReference<Map<String, dynamic>> get _productionOrders =>
+      _firestore.collection('production_orders');
+
   String _s(dynamic value) => (value ?? '').toString().trim();
 
   double _d(dynamic value) {
@@ -228,7 +231,7 @@ class ProductionExecutionService {
     }
 
     final now = DateTime.now();
-    final docRef = _execution.doc();
+    final execRef = _execution.doc();
 
     final payload = <String, dynamic>{
       'companyId': normalizedCompanyId,
@@ -272,9 +275,40 @@ class ProductionExecutionService {
       'updatedBy': normalizedCreatedBy,
     };
 
-    await docRef.set(payload);
+    final orderRef = _productionOrders.doc(normalizedOrderId);
 
-    return docRef.id;
+    await _firestore.runTransaction((tx) async {
+      final orderSnap = await tx.get(orderRef);
+      if (!orderSnap.exists) {
+        throw Exception('Proizvodni nalog ne postoji.');
+      }
+      final od = orderSnap.data();
+      if (od == null) {
+        throw Exception('Proizvodni nalog nema podatke.');
+      }
+      if (_s(od['companyId']) != normalizedCompanyId ||
+          _s(od['plantKey']) != normalizedPlantKey) {
+        throw Exception('Nalog ne pripada ovoj kompaniji / pogonu.');
+      }
+      final orderStatus = _s(od['status']).toLowerCase();
+      if (orderStatus != 'released' && orderStatus != 'in_progress') {
+        throw Exception(
+          'Nalog mora biti pušten (released) ili u toku da bi se pokrenuo rad.',
+        );
+      }
+
+      tx.set(execRef, payload);
+
+      if (orderStatus == 'released') {
+        tx.update(orderRef, {
+          'status': 'in_progress',
+          'updatedAt': now,
+          'updatedBy': normalizedCreatedBy,
+        });
+      }
+    });
+
+    return execRef.id;
   }
 
   Future<void> saveProgress({
@@ -545,20 +579,8 @@ class ProductionExecutionService {
       throw Exception('updatedBy je obavezan.');
     }
 
-    final current = await _requireExecutionDoc(
-      executionId: normalizedExecutionId,
-      companyId: normalizedCompanyId,
-      plantKey: normalizedPlantKey,
-    );
-
-    final currentStatus = _s(current['status']).toLowerCase();
-    _validateStatus(currentStatus);
-
-    if (currentStatus == 'completed') {
-      throw Exception('Execution je već završen.');
-    }
-
     final now = DateTime.now();
+    final execRef = _execution.doc(normalizedExecutionId);
 
     final updates = <String, dynamic>{
       'status': 'completed',
@@ -605,7 +627,60 @@ class ProductionExecutionService {
       updates['materialsUsed'] = _cleanMaterialsUsed(materialsUsed);
     }
 
-    await _execution.doc(normalizedExecutionId).update(updates);
+    await _firestore.runTransaction((tx) async {
+      final execSnap = await tx.get(execRef);
+      if (!execSnap.exists) {
+        throw Exception('Execution zapis ne postoji.');
+      }
+      final ex = execSnap.data();
+      if (ex == null) {
+        throw Exception('Execution zapis nema podatke.');
+      }
+      if (_s(ex['companyId']) != normalizedCompanyId ||
+          _s(ex['plantKey']) != normalizedPlantKey) {
+        throw Exception('Nemaš pristup ovom execution zapisu.');
+      }
+      final currentStatus = _s(ex['status']).toLowerCase();
+      _validateStatus(currentStatus);
+      if (currentStatus == 'completed') {
+        throw Exception('Execution je već završen.');
+      }
+
+      final orderId = _s(ex['productionOrderId']);
+      if (orderId.isEmpty) {
+        throw Exception('productionOrderId nedostaje na execution zapisu.');
+      }
+      final orderRef = _productionOrders.doc(orderId);
+      final orderSnap = await tx.get(orderRef);
+      if (!orderSnap.exists) {
+        throw Exception('Proizvodni nalog ne postoji.');
+      }
+      final od = orderSnap.data();
+      if (od == null) {
+        throw Exception('Proizvodni nalog nema podatke.');
+      }
+      if (_s(od['companyId']) != normalizedCompanyId ||
+          _s(od['plantKey']) != normalizedPlantKey) {
+        throw Exception('Nalog ne pripada ovoj kompaniji / pogonu.');
+      }
+
+      final finalGood = goodQty ?? _d(ex['goodQty']);
+      final finalScrap = scrapQty ?? _d(ex['scrapQty']);
+      final finalRework = reworkQty ?? _d(ex['reworkQty']);
+
+      final curG = _d(od['producedGoodQty']);
+      final curS = _d(od['producedScrapQty']);
+      final curR = _d(od['producedReworkQty']);
+
+      tx.update(execRef, updates);
+      tx.update(orderRef, {
+        'producedGoodQty': curG + finalGood,
+        'producedScrapQty': curS + finalScrap,
+        'producedReworkQty': curR + finalRework,
+        'updatedAt': now,
+        'updatedBy': normalizedUpdatedBy,
+      });
+    });
   }
 
   Future<Map<String, dynamic>?> getById({

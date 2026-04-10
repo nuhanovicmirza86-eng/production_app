@@ -129,8 +129,13 @@ class ProductionOrderPdf {
     doc.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(40),
+        margin: const pw.EdgeInsets.all(36),
         build: (ctx) {
+          final customer =
+              (order.customerName ?? '').trim().isEmpty
+                  ? '—'
+                  : order.customerName!.trim();
+
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
@@ -138,23 +143,32 @@ class ProductionOrderPdf {
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   pw.Expanded(
+                    flex: 2,
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
                         pw.Text(
-                          'PROIZVODNI NALOG',
+                          'RADNI NALOG',
                           style: pw.TextStyle(
                             font: fontBold,
-                            fontSize: 18,
+                            fontSize: 16,
                             color: PdfColors.grey900,
                           ),
                         ),
-                        pw.SizedBox(height: 4),
+                        pw.SizedBox(height: 10),
+                        pw.Text(
+                          'Broj naloga',
+                          style: pw.TextStyle(
+                            font: fontBold,
+                            fontSize: 8,
+                            color: PdfColors.grey700,
+                          ),
+                        ),
                         pw.Text(
                           order.productionOrderCode,
                           style: pw.TextStyle(
                             font: fontBold,
-                            fontSize: 14,
+                            fontSize: 20,
                             color: PdfColors.black,
                           ),
                         ),
@@ -162,11 +176,11 @@ class ProductionOrderPdf {
                         pw.Container(
                           padding: const pw.EdgeInsets.symmetric(
                             horizontal: 10,
-                            vertical: 5,
+                            vertical: 4,
                           ),
                           decoration: pw.BoxDecoration(
                             color: statusColor,
-                            borderRadius: pw.BorderRadius.circular(20),
+                            borderRadius: pw.BorderRadius.circular(16),
                           ),
                           child: pw.Text(
                             _statusLabelBs(order.status),
@@ -181,12 +195,12 @@ class ProductionOrderPdf {
                     ),
                   ),
                   pw.Container(
-                    width: 112,
-                    height: 112,
-                    padding: const pw.EdgeInsets.all(6),
+                    width: 96,
+                    height: 96,
+                    padding: const pw.EdgeInsets.all(5),
                     decoration: pw.BoxDecoration(
                       border: pw.Border.all(color: PdfColors.grey600, width: 1),
-                      borderRadius: pw.BorderRadius.circular(8),
+                      borderRadius: pw.BorderRadius.circular(6),
                     ),
                     child: pw.BarcodeWidget(
                       barcode: pw.Barcode.qrCode(),
@@ -196,59 +210,125 @@ class ProductionOrderPdf {
                   ),
                 ],
               ),
-              pw.SizedBox(height: 18),
+              pw.SizedBox(height: 14),
+              pw.Divider(color: PdfColors.grey500, thickness: 0.8),
+              pw.SizedBox(height: 12),
               pw.Text(
-                'Obavezni podaci',
+                'Naručitelj',
                 style: pw.TextStyle(
                   font: fontBold,
-                  fontSize: 11,
-                  color: PdfColors.grey900,
+                  fontSize: 9,
+                  color: PdfColors.grey800,
                 ),
               ),
-              pw.SizedBox(height: 8),
-              kv('Šifra proizvoda', order.productCode),
-              kv('Naziv proizvoda', order.productName),
-              kv('Kupac', order.customerName ?? ''),
+              pw.SizedBox(height: 2),
+              pw.Text(
+                customer,
+                style: pw.TextStyle(
+                  font: fontBold,
+                  fontSize: 13,
+                  color: PdfColors.black,
+                ),
+              ),
+              pw.SizedBox(height: 12),
+              pw.Text(
+                'Proizvod',
+                style: pw.TextStyle(
+                  font: fontBold,
+                  fontSize: 9,
+                  color: PdfColors.grey800,
+                ),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Text(
+                order.productName,
+                style: pw.TextStyle(
+                  font: fontBold,
+                  fontSize: 11.5,
+                  lineSpacing: 1.15,
+                  color: PdfColors.black,
+                ),
+              ),
+              pw.SizedBox(height: 6),
+              pw.Text(
+                'Šifra: ${order.productCode}',
+                style: pw.TextStyle(
+                  font: fontRegular,
+                  fontSize: 9,
+                  color: PdfColors.grey800,
+                ),
+              ),
+              pw.SizedBox(height: 14),
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Expanded(
+                    child: kv(
+                      'Datum kreiranja',
+                      _formatDateTime(order.createdAt),
+                    ),
+                  ),
+                  pw.Expanded(
+                    child: kv(
+                      'Rok izrade',
+                      _formatDateTime(order.scheduledEndAt),
+                    ),
+                  ),
+                ],
+              ),
+              if (order.scheduledStartAt != null)
+                kv(
+                  'Planirani početak',
+                  _formatDateTime(order.scheduledStartAt),
+                ),
               kv(
                 'Planirana količina',
                 '${_formatQty(order.plannedQty)} ${order.unit}',
               ),
-              kv('Planirani početak', _formatDateTime(order.scheduledStartAt)),
-              kv('Rok izrade', _formatDateTime(order.scheduledEndAt)),
-              kv('Pogon (plantKey)', order.plantKey),
-              kv('BOM ID', order.bomId),
-              kv('BOM verzija', order.bomVersion),
-              kv('Routing ID', order.routingId),
-              kv('Routing verzija', order.routingVersion),
-              kv('Linija', order.lineId ?? ''),
-              kv('Mašina', order.machineId ?? ''),
+              kv('Pogon', order.plantKey),
               if (order.sourceOrderNumber != null &&
                   order.sourceOrderNumber!.trim().isNotEmpty) ...[
-                kv('Izvorna narudžba', order.sourceOrderNumber!.trim()),
-                kv(
-                  'Kupac (narudžba)',
-                  order.sourceCustomerName ?? '',
-                ),
+                kv('Veza (narudžba)', order.sourceOrderNumber!.trim()),
+                if ((order.sourceCustomerName ?? '').trim().isNotEmpty)
+                  kv('Kupac (narudžba)', order.sourceCustomerName!.trim()),
               ],
               if (order.hasCriticalChanges)
-                kv('Napomena', 'Nalog ima kritične izmjene nakon kreiranja.'),
-              pw.SizedBox(height: 12),
+                kv(
+                  'Napomena',
+                  'Nalog ima kritične izmjene nakon kreiranja.',
+                ),
+              pw.SizedBox(height: 14),
               pw.Text(
-                'Referenca uputstava',
+                'Komentari',
                 style: pw.TextStyle(
                   font: fontBold,
-                  fontSize: 11,
-                  color: PdfColors.grey900,
+                  fontSize: 9,
+                  color: PdfColors.grey800,
                 ),
               ),
-              pw.SizedBox(height: 6),
-              kv('Verzija uputstva za rad', '—'),
-              kv('Verzija uputstva za pakovanje', '—'),
+              pw.SizedBox(height: 4),
+              pw.Container(
+                height: 72,
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.grey500, width: 0.8),
+                  borderRadius: pw.BorderRadius.circular(4),
+                ),
+              ),
               pw.Spacer(),
               pw.Divider(color: PdfColors.grey400),
               pw.SizedBox(height: 6),
               pw.Text(
-                'Ispis: ${_formatDateTime(now)} · QR: po:v1 (id + broj naloga).',
+                'Tehnički podaci (BOM / routing) nisu na ovom radnom listu — '
+                'dostupni su u aplikaciji za inženjering i podršku.',
+                style: pw.TextStyle(
+                  font: fontRegular,
+                  fontSize: 7,
+                  color: PdfColors.grey600,
+                ),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Text(
+                'Ispis: ${_formatDateTime(now)} · QR sadrži referencu naloga (po:v1).',
                 style: pw.TextStyle(
                   font: fontRegular,
                   fontSize: 7.5,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../logistics/inventory/widgets/product_warehouse_stock_section.dart';
 import '../../../production/products/services/product_lookup_service.dart';
+import '../../../production/production_orders/services/production_order_technical_refs_resolver.dart';
 import '../models/order_model.dart';
 import '../services/orders_service.dart';
 
@@ -29,6 +30,7 @@ class _OrderLineProductionCreateScreenState
   final _formKey = GlobalKey<FormState>();
   final _ordersService = OrdersService();
   final _productLookup = ProductLookupService();
+  final _refsResolver = ProductionOrderTechnicalRefsResolver();
 
   late final TextEditingController _qtyController;
   DateTime? _scheduledEndAt;
@@ -137,23 +139,28 @@ class _OrderLineProductionCreateScreenState
       return;
     }
 
-    final bomId = (p.bomId ?? '').trim();
-    final bomVersion = (p.bomVersion ?? '').trim();
-    final routingId = (p.routingId ?? '').trim();
-    final routingVersion = (p.routingVersion ?? '').trim();
+    final refs = await _refsResolver.resolve(
+      companyId: _companyId,
+      productId: p.productId,
+      productBomId: p.bomId,
+      productBomVersion: p.bomVersion,
+      productRoutingId: p.routingId,
+      productRoutingVersion: p.routingVersion,
+    );
 
-    if (bomId.isEmpty || bomVersion.isEmpty) {
+    if (refs == null) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Proizvod nema BOM u šifrarniku')),
+        const SnackBar(
+          content: Text(
+            'Nema aktivne sastavnice (PRIMARY / SECONDARY / TRANSPORT) za ovaj proizvod.',
+          ),
+        ),
       );
       return;
     }
-    if (routingId.isEmpty || routingVersion.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Proizvod nema Routing u šifrarniku')),
-      );
-      return;
-    }
+
+    if (!mounted) return;
 
     if (_plantKey.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -203,10 +210,10 @@ class _OrderLineProductionCreateScreenState
         plantKey: _plantKey,
         scheduledEndAt: _scheduledEndAt!,
         plannedQty: plannedQty,
-        bomId: bomId,
-        bomVersion: bomVersion,
-        routingId: routingId,
-        routingVersion: routingVersion,
+        bomId: refs['bomId']!,
+        bomVersion: refs['bomVersion']!,
+        routingId: refs['routingId']!,
+        routingVersion: refs['routingVersion']!,
       );
       if (!mounted) return;
       Navigator.pop(context, true);

@@ -55,3 +55,7 @@ firestore.indexes.json
 # ================= SYMBOLS =================
 app.*.symbols
 app.*.map.json
+
+# ================= LOCAL / CI =================
+.firebase/
+Operonix-Production-local.url

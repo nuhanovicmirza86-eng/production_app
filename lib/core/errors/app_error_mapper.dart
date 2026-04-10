@@ -84,14 +84,21 @@ class AppErrorMapper {
   }
 
   static String _failedPreconditionMessage(FirebaseException error) {
-    final m = (error.message ?? '').toLowerCase();
+    final raw = (error.message ?? '').trim();
+    final m = raw.toLowerCase();
     if (m.contains('index') || m.contains('indexes')) {
-      return 'Upit zahtijeva Firestore indeks ili indeks se još gradi. '
-          'U konzoli provjeri Indexes za kolekciju (npr. orders) ili '
-          'pokreni firebase deploy --only firestore:indexes.';
+      final base =
+          'Baza traži sastavljeni indeks za ovaj prikaz (ili se indeks još gradi 1–5 min). '
+          'Administrator: iz maintenance_app repozitorija pokreni '
+          '`firebase deploy --only firestore:indexes`, ili u Firebase konzoli '
+          'otvori Firestore → Indexes i koristi link „create composite index” '
+          'iz poruke greške u pregledniku (Network / Console).';
+      if (kDebugMode && raw.isNotEmpty) {
+        return '$base\n\nTehnički detalj:\n$raw';
+      }
+      return base;
     }
-    final raw = error.message?.trim();
-    if (raw != null && raw.isNotEmpty) {
+    if (raw.isNotEmpty) {
       return 'Zahtjev nije ispunjen (failed-precondition): $raw';
     }
     return 'Zahtjev nije ispunjen zbog stanja podataka ili konfiguracije baze.';

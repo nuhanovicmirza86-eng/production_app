@@ -11,7 +11,14 @@ import 'production_order_details_screen.dart';
 class ProductionOrdersListScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
 
-  const ProductionOrdersListScreen({super.key, required this.companyData});
+  /// Kad je postavljen (npr. s dashboarda „Praćenje“), lista otvara taj status filter.
+  final ProductionOrderStatusFilter? initialStatusFilter;
+
+  const ProductionOrdersListScreen({
+    super.key,
+    required this.companyData,
+    this.initialStatusFilter,
+  });
 
   @override
   State<ProductionOrdersListScreen> createState() =>
@@ -42,6 +49,9 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
   @override
   void initState() {
     super.initState();
+    if (widget.initialStatusFilter != null) {
+      _selectedStatus = widget.initialStatusFilter!;
+    }
     _searchController.addListener(() {
       if (mounted) setState(() {});
     });

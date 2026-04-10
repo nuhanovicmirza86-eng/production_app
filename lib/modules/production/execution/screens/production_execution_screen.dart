@@ -14,6 +14,9 @@ class ProductionExecutionScreen extends StatefulWidget {
   final String stepName;
   final String executionType;
 
+  /// Nastavak postojeće sesije (started/paused) umjesto novog Start-a.
+  final String? resumeExecutionId;
+
   const ProductionExecutionScreen({
     super.key,
     required this.companyData,
@@ -21,6 +24,7 @@ class ProductionExecutionScreen extends StatefulWidget {
     required this.stepId,
     required this.stepName,
     required this.executionType,
+    this.resumeExecutionId,
   });
 
   @override
@@ -32,6 +36,7 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
   final _service = ProductionExecutionService();
 
   bool _isLoading = false;
+  bool _initializingResume = false;
   String? _executionId;
 
   final _goodController = TextEditingController();
@@ -45,12 +50,22 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
 
   String get _userId => (widget.companyData['userId'] ?? '').toString();
 
-  String get _userName => (widget.companyData['displayName'] ?? '').toString();
+  String get _userName {
+    final a = (widget.companyData['userDisplayName'] ?? '').toString().trim();
+    if (a.isNotEmpty) return a;
+    final b = (widget.companyData['nickname'] ?? '').toString().trim();
+    if (b.isNotEmpty) return b;
+    return (widget.companyData['displayName'] ?? '').toString().trim();
+  }
 
   String get _role =>
       (widget.companyData['role'] ?? '').toString().toLowerCase();
 
-  bool get _canExecute => _role == 'production_operator';
+  bool get _canMutateExecution =>
+      _role == 'production_operator' ||
+      _role == 'supervisor' ||
+      _role == 'production_manager' ||
+      _role == 'admin';
 
   Map<String, dynamic> get _order => widget.orderData;
 
@@ -58,9 +73,65 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
     return double.tryParse(value.trim());
   }
 
+  static String _formatQtyField(dynamic v) {
+    if (v is! num) return '';
+    final d = v.toDouble();
+    if (d == d.roundToDouble()) return d.toInt().toString();
+    return d.toString();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final r = widget.resumeExecutionId?.trim();
+    if (r != null && r.isNotEmpty) {
+      _initializingResume = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _tryLoadResumeExecution(r);
+      });
+    }
+  }
+
+  Future<void> _tryLoadResumeExecution(String rid) async {
+    try {
+      final doc = await _service.getById(
+        executionId: rid,
+        companyId: _companyId,
+        plantKey: _plantKey,
+      );
+      if (!mounted) return;
+      if (doc == null) {
+        _show('Sesija rada nije pronađena.');
+        return;
+      }
+      final st = (doc['status'] ?? '').toString().toLowerCase();
+      if (st == 'completed') {
+        _show('Ova sesija je već završena.');
+        return;
+      }
+      setState(() {
+        _executionId = rid;
+        _goodController.text = _formatQtyField(doc['goodQty']);
+        _scrapController.text = _formatQtyField(doc['scrapQty']);
+        _reworkController.text = _formatQtyField(doc['reworkQty']);
+        _notesController.text = (doc['notes'] ?? '').toString();
+      });
+    } catch (e) {
+      if (mounted) _show(AppErrorMapper.toMessage(e));
+    } finally {
+      if (mounted) setState(() => _initializingResume = false);
+    }
+  }
+
   Future<void> _start() async {
-    if (!_canExecute) {
-      _show('Nemaš pravo pokretanja execution-a');
+    if (!_canMutateExecution) {
+      _show('Nemaš pravo pokretanja izvršenja.');
+      return;
+    }
+
+    final st = (_order['status'] ?? '').toString().toLowerCase();
+    if (st != 'released' && st != 'in_progress') {
+      _show('Nalog mora biti pušten ili u toku da bi se pokrenuo rad.');
       return;
     }
 
@@ -81,7 +152,7 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
         stepName: widget.stepName,
         executionType: widget.executionType,
         operatorId: _userId,
-        operatorName: _userName,
+        operatorName: _userName.isEmpty ? null : _userName,
         createdBy: _userId,
       );
 
@@ -89,7 +160,7 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
         _executionId = id;
       });
 
-      _show('Execution pokrenut');
+      _show('Rad je pokrenut');
     } catch (e) {
       _show(AppErrorMapper.toMessage(e));
     } finally {
@@ -98,6 +169,7 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
   }
 
   Future<void> _pause() async {
+    if (!_canMutateExecution) return;
     if (_executionId == null) return;
 
     setState(() => _isLoading = true);
@@ -114,7 +186,7 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
         notes: _notesController.text,
       );
 
-      _show('Execution pauziran');
+      _show('Pauzirano');
     } catch (e) {
       _show(AppErrorMapper.toMessage(e));
     } finally {
@@ -123,6 +195,7 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
   }
 
   Future<void> _resume() async {
+    if (!_canMutateExecution) return;
     if (_executionId == null) return;
 
     setState(() => _isLoading = true);
@@ -135,7 +208,7 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
         updatedBy: _userId,
       );
 
-      _show('Execution nastavljen');
+      _show('Nastavljeno');
     } catch (e) {
       _show(AppErrorMapper.toMessage(e));
     } finally {
@@ -144,6 +217,7 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
   }
 
   Future<void> _complete() async {
+    if (!_canMutateExecution) return;
     if (_executionId == null) return;
 
     setState(() => _isLoading = true);
@@ -160,8 +234,8 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
         notes: _notesController.text,
       );
 
-      _show('Execution završen');
-      Navigator.pop(context, true);
+      _show('Sesija završena');
+      if (mounted) Navigator.pop(context, true);
     } catch (e) {
       _show(AppErrorMapper.toMessage(e));
     } finally {
@@ -178,7 +252,7 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
       padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
         controller: controller,
-        keyboardType: TextInputType.number,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
         decoration: InputDecoration(labelText: label),
       ),
     );
@@ -195,27 +269,67 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_initializingResume) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final started = _executionId != null;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Execution')),
+      appBar: AppBar(title: const Text('Izvršenje proizvodnje')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: ListView(
           children: [
             Text(
               widget.stepName,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 12),
+            Text(
+              (_order['productName'] ?? '').toString().trim().isEmpty
+                  ? 'Proizvod'
+                  : (_order['productName'] ?? '').toString(),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    height: 1.2,
+                  ) ??
+                  const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              (_order['customerName'] ?? '').toString().trim().isEmpty
+                  ? 'Kupac nije naveden'
+                  : (_order['customerName'] ?? '').toString().trim(),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Šifra: ${(_order['productCode'] ?? '').toString()}',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Referenca naloga: ${(_order['productionOrderCode'] ?? '').toString()}',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Tip procesa: ${widget.executionType}',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+            ),
 
-            Text('🛈 Tip procesa: ${widget.executionType}'),
+            const SizedBox(height: 20),
 
-            const SizedBox(height: 16),
-
-            _buildField('Good qty', _goodController),
-            _buildField('Scrap qty', _scrapController),
-            _buildField('Rework qty', _reworkController),
+            _buildField('Dobra količina', _goodController),
+            _buildField('Škart', _scrapController),
+            _buildField('Dorada', _reworkController),
 
             TextField(
               controller: _notesController,
@@ -227,22 +341,24 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
 
             if (!started)
               ElevatedButton(
-                onPressed: _isLoading ? null : _start,
+                onPressed: (_isLoading || !_canMutateExecution) ? null : _start,
                 child: const Text('Start'),
               ),
 
             if (started) ...[
               ElevatedButton(
                 onPressed: _isLoading ? null : _pause,
-                child: const Text('Pause'),
+                child: const Text('Pauza'),
               ),
+              const SizedBox(height: 8),
               ElevatedButton(
                 onPressed: _isLoading ? null : _resume,
-                child: const Text('Resume'),
+                child: const Text('Nastavi'),
               ),
+              const SizedBox(height: 8),
               ElevatedButton(
                 onPressed: _isLoading ? null : _complete,
-                child: const Text('Complete'),
+                child: const Text('Završi sesiju'),
               ),
             ],
           ],

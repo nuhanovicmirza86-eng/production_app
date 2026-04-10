@@ -152,6 +152,23 @@ class _ProductionOrderEditScreenState extends State<ProductionOrderEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final st = widget.order.status;
+    if (st == 'completed' || st == 'closed' || st == 'cancelled') {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Izmjena naloga')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              'Kritične izmjene (plan / rok) nisu dozvoljene za nalog u statusu '
+              '„$st“.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Izmjena naloga')),
       body: Padding(

@@ -1,0 +1,12 @@
+Operonix Production — linkovi
+================================
+
+1) LOKALNO (razvoj)
+   powershell -ExecutionPolicy Bypass -File .\scripts\run_web.ps1
+   → http://localhost:54888/
+   (ili dvoklik Operonix-Production-local.url dok server radi.)
+
+2) JAVNO (nakon deploya — vidi ../portal/DEPLOY_HOSTING.txt)
+   - Portal s dvije kartice (Production + Maintenance): postavi u portal/config.js
+     npr. https://app.TVOJ-DOMEN.com kad povežeš domen na Hosting site „operonix-portal“.
+   - Firebase konzola: https://console.firebase.google.com/

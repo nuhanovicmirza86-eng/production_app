@@ -337,4 +337,95 @@ class ProductionOrderService {
 
     return ProductionOrderModel.fromMap(doc.id, data);
   }
+
+  // ================= COMPLETE / CLOSE / CANCEL (LIFECYCLE) =================
+
+  Future<void> completeProductionOrder({
+    required String productionOrderId,
+    required String companyId,
+    required String plantKey,
+    required String actorUserId,
+  }) async {
+    final docRef = _orders.doc(productionOrderId);
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(docRef);
+      if (!snap.exists) throw Exception('Proizvodni nalog ne postoji');
+      final data = snap.data();
+      if (data == null) throw Exception('Podaci naloga nedostaju');
+      if (data['companyId'] != companyId || data['plantKey'] != plantKey) {
+        throw Exception('Nemaš pristup ovom nalogu');
+      }
+      final st = (data['status'] ?? '').toString();
+      if (st != 'released' && st != 'in_progress') {
+        throw Exception(
+          'Nalog se može završiti samo iz statusa Pušten ili U toku.',
+        );
+      }
+      final now = DateTime.now();
+      tx.update(docRef, {
+        'status': 'completed',
+        'updatedAt': now,
+        'updatedBy': actorUserId.trim(),
+      });
+    });
+  }
+
+  Future<void> closeProductionOrder({
+    required String productionOrderId,
+    required String companyId,
+    required String plantKey,
+    required String actorUserId,
+  }) async {
+    final docRef = _orders.doc(productionOrderId);
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(docRef);
+      if (!snap.exists) throw Exception('Proizvodni nalog ne postoji');
+      final data = snap.data();
+      if (data == null) throw Exception('Podaci naloga nedostaju');
+      if (data['companyId'] != companyId || data['plantKey'] != plantKey) {
+        throw Exception('Nemaš pristup ovom nalogu');
+      }
+      final st = (data['status'] ?? '').toString();
+      if (st != 'completed') {
+        throw Exception('Zatvaranje je moguće samo za završene naloge.');
+      }
+      final now = DateTime.now();
+      tx.update(docRef, {
+        'status': 'closed',
+        'updatedAt': now,
+        'updatedBy': actorUserId.trim(),
+      });
+    });
+  }
+
+  Future<void> cancelProductionOrder({
+    required String productionOrderId,
+    required String companyId,
+    required String plantKey,
+    required String actorUserId,
+  }) async {
+    final docRef = _orders.doc(productionOrderId);
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(docRef);
+      if (!snap.exists) throw Exception('Proizvodni nalog ne postoji');
+      final data = snap.data();
+      if (data == null) throw Exception('Podaci naloga nedostaju');
+      if (data['companyId'] != companyId || data['plantKey'] != plantKey) {
+        throw Exception('Nemaš pristup ovom nalogu');
+      }
+      final st = (data['status'] ?? '').toString();
+      if (st == 'completed' || st == 'closed' || st == 'cancelled') {
+        throw Exception('Nalog se ne može otkazati u ovom statusu.');
+      }
+      final now = DateTime.now();
+      tx.update(docRef, {
+        'status': 'cancelled',
+        'updatedAt': now,
+        'updatedBy': actorUserId.trim(),
+      });
+    });
+  }
 }

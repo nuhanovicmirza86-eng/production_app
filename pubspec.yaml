@@ -36,10 +36,11 @@ flutter:
   assets:
     - assets/fonts/NotoSans-Regular.ttf
     - assets/fonts/NotoSans-Bold.ttf
+    - branding/operonix_production_icon.PNG
 
 flutter_launcher_icons:
   android: true
   ios: false
-  image_path: "branding/operonix_production_icon.png"
+  image_path: "branding/operonix_production_icon.PNG"
   adaptive_icon_background: "#164344"
-  adaptive_icon_foreground: "branding/operonix_production_icon.png"
+  adaptive_icon_foreground: "branding/operonix_production_icon.PNG"

@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/access/production_access_helper.dart';
+import '../../../core/user_display_label.dart';
 import '../models/carbon_models.dart';
 import '../services/carbon_calculation_service.dart';
 import '../services/carbon_export_service.dart';
@@ -58,7 +59,7 @@ class _CarbonFootprintScreenState extends State<CarbonFootprintScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 6, vsync: this);
+    _tabs = TabController(length: 7, vsync: this);
     if (!ProductionAccessHelper.canView(
           role: _role,
           card: ProductionDashboardCard.carbonFootprint,
@@ -191,6 +192,7 @@ class _CarbonFootprintScreenState extends State<CarbonFootprintScreen>
             Tab(text: '4. Faktori'),
             Tab(text: '5. Pregled'),
             Tab(text: '6. Izvoz'),
+            Tab(text: '7. Audit'),
           ],
         ),
         actions: [
@@ -243,6 +245,7 @@ class _CarbonFootprintScreenState extends State<CarbonFootprintScreen>
                 ),
                 _FactorsTab(
                   companyId: _cid,
+                  reportingYear: _year,
                   factors: _factors,
                   isAdmin: _isAdmin,
                   userId: _userId.isEmpty ? 'system' : _userId,
@@ -256,6 +259,14 @@ class _CarbonFootprintScreenState extends State<CarbonFootprintScreen>
                   factors: _factors,
                   quotas: _quotas!,
                   summary: _summary,
+                  userId: _userId,
+                  auditService: _svc,
+                ),
+                _AuditLogTab(
+                  key: ValueKey('carbon_audit_${_cid}_$_year'),
+                  companyId: _cid,
+                  reportingYear: _year,
+                  service: _svc,
                 ),
               ],
             ),
@@ -1304,14 +1315,18 @@ class _ActivitiesTab extends StatelessWidget {
       },
     );
 
-    plantC.dispose();
-    dateC.dispose();
-    typeC.dispose();
-    descC.dispose();
-    qtyC.dispose();
-    unitC.dispose();
-    evC.dispose();
-    notesC.dispose();
+    // Ne dispose-ati odmah: zatvoreni sheet još uklanja dependente s kontrolera
+    // (InputDecorator/TextField) pa assert '_dependents.isEmpty' puca. Čekaj sljedeći frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      plantC.dispose();
+      dateC.dispose();
+      typeC.dispose();
+      descC.dispose();
+      qtyC.dispose();
+      unitC.dispose();
+      evC.dispose();
+      notesC.dispose();
+    });
   }
 
   @override
@@ -1380,6 +1395,7 @@ class _ActivitiesTab extends StatelessWidget {
 // --- Tab 4 ---
 class _FactorsTab extends StatelessWidget {
   final String companyId;
+  final int reportingYear;
   final Map<String, CarbonEmissionFactor> factors;
   final bool isAdmin;
   final String userId;
@@ -1388,6 +1404,7 @@ class _FactorsTab extends StatelessWidget {
 
   const _FactorsTab({
     required this.companyId,
+    required this.reportingYear,
     required this.factors,
     required this.isAdmin,
     required this.userId,
@@ -1505,6 +1522,7 @@ class _FactorsTab extends StatelessWidget {
         companyId: companyId,
         factor: next,
         userId: userId,
+        reportingYear: reportingYear,
       );
       await onSaved();
       valC.dispose();
@@ -1609,6 +1627,8 @@ class _ExportTab extends StatelessWidget {
   final Map<String, CarbonEmissionFactor> factors;
   final CarbonQuotaSettings quotas;
   final CarbonDashboardSummary? summary;
+  final String userId;
+  final CarbonFirestoreService auditService;
 
   const _ExportTab({
     required this.setup,
@@ -1616,6 +1636,8 @@ class _ExportTab extends StatelessWidget {
     required this.factors,
     required this.quotas,
     required this.summary,
+    required this.userId,
+    required this.auditService,
   });
 
   @override
@@ -1625,6 +1647,11 @@ class _ExportTab extends StatelessWidget {
       children: [
         const Text(
           'Izvezite podatke za arhivu ili daljnju obradu. CSV odgovara “flat” strukturi za uvoz.',
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'PDF: prvo se otvara pregled (štampa / dijeljenje / spremanje) — ne šalje se odmah.',
+          style: TextStyle(fontSize: 13, color: Colors.black54),
         ),
         const SizedBox(height: 20),
         FilledButton.icon(
@@ -1640,6 +1667,13 @@ class _ExportTab extends StatelessWidget {
               await CarbonExportService.shareCsv(
                 fileName: fn,
                 csvContent: csv,
+              );
+              await auditService.logReportEvent(
+                companyId: setup.companyId,
+                reportingYear: setup.reportingYear,
+                userId: userId,
+                action: 'export_csv_shared',
+                detail: fn,
               );
             } catch (e) {
               if (context.mounted) {
@@ -1658,10 +1692,17 @@ class _ExportTab extends StatelessWidget {
               ? null
               : () async {
                   try {
-                    await CarbonExportService.shareSummaryPdf(
+                    await CarbonExportService.previewSummaryPdf(
                       setup: setup,
                       summary: summary!,
                       quotas: quotas,
+                    );
+                    await auditService.logReportEvent(
+                      companyId: setup.companyId,
+                      reportingYear: setup.reportingYear,
+                      userId: userId,
+                      action: 'export_pdf_preview',
+                      detail: 'Sažetak PDF',
                     );
                   } catch (e) {
                     if (context.mounted) {
@@ -1672,8 +1713,257 @@ class _ExportTab extends StatelessWidget {
                   }
                 },
           icon: const Icon(Icons.picture_as_pdf),
-          label: const Text('Podijeli PDF sažetak'),
+          label: const Text('PDF pregled (sažetak)'),
         ),
+      ],
+    );
+  }
+}
+
+String _carbonAuditActionLabelHr(String action) {
+  switch (action) {
+    case 'settings_saved':
+      return 'Spremljene postavke izvještaja';
+    case 'quotas_saved':
+      return 'Spremljene kvote i ciljevi';
+    case 'activity_created':
+      return 'Dodana stavka aktivnosti';
+    case 'activity_updated':
+      return 'Ažurirana stavka aktivnosti';
+    case 'factor_override_saved':
+      return 'Izmijenjen faktor emisije';
+    case 'export_csv_shared':
+      return 'Podijeljen CSV izvještaj';
+    case 'export_pdf_preview':
+      return 'Pregled PDF (sažetak)';
+    default:
+      return action;
+  }
+}
+
+String _formatCarbonAuditDateTime(DateTime? t) {
+  if (t == null) return '—';
+  final d = t.day.toString().padLeft(2, '0');
+  final m = t.month.toString().padLeft(2, '0');
+  final y = t.year;
+  final hh = t.hour.toString().padLeft(2, '0');
+  final mm = t.minute.toString().padLeft(2, '0');
+  return '$d.$m.$y $hh:$mm';
+}
+
+class _AuditLogTab extends StatefulWidget {
+  final String companyId;
+  final int reportingYear;
+  final CarbonFirestoreService service;
+
+  const _AuditLogTab({
+    super.key,
+    required this.companyId,
+    required this.reportingYear,
+    required this.service,
+  });
+
+  @override
+  State<_AuditLogTab> createState() => _AuditLogTabState();
+}
+
+class _AuditLogTabState extends State<_AuditLogTab> {
+  StreamSubscription<List<CarbonAuditLogEntry>>? _sub;
+  List<CarbonAuditLogEntry> _entries = [];
+
+  ({
+    DateTime? settingsUpdatedAt,
+    String settingsUpdatedBy,
+    DateTime? quotasUpdatedAt,
+    String quotasUpdatedBy,
+  })? _docHints;
+
+  bool _metaLoading = true;
+  String? _metaError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDocHints();
+    _sub = widget.service
+        .watchAuditLog(
+          companyId: widget.companyId,
+          reportingYear: widget.reportingYear,
+        )
+        .listen(_onEntries);
+  }
+
+  Future<void> _loadDocHints() async {
+    try {
+      final h = await widget.service.loadPeriodDocumentUpdateHints(
+        companyId: widget.companyId,
+        reportingYear: widget.reportingYear,
+      );
+      if (!mounted) return;
+      final ids = <String>{};
+      for (final s in [h.settingsUpdatedBy, h.quotasUpdatedBy]) {
+        if (UserDisplayLabel.looksLikeFirebaseUid(s)) ids.add(s);
+      }
+      await UserDisplayLabel.prefetchUids(FirebaseFirestore.instance, ids);
+      if (!mounted) return;
+      setState(() {
+        _docHints = h;
+        _metaLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _metaError = e.toString();
+        _metaLoading = false;
+      });
+    }
+  }
+
+  Future<void> _onEntries(List<CarbonAuditLogEntry> list) async {
+    final ids = list
+        .map((e) => e.userId)
+        .where(UserDisplayLabel.looksLikeFirebaseUid)
+        .toSet();
+    await UserDisplayLabel.prefetchUids(FirebaseFirestore.instance, ids);
+    if (!mounted) return;
+    setState(() => _entries = list);
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  Widget _metaCard(BuildContext context, ThemeData theme) {
+    if (_metaLoading) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+    if (_metaError != null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(_metaError!, style: const TextStyle(color: Colors.red)),
+        ),
+      );
+    }
+    final h = _docHints!;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Zadnje izmjene dokumenata (Firestore)',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Na dokumentima postavki i kvota i dalje postoje polja zadnjeg '
+              'uređivanja; detaljni dnevnik ispod bilježi svaku radnju od '
+              'uvođenja ove funkcije.',
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            _metaRow(
+              theme,
+              'Postavke (carbon_settings)',
+              h.settingsUpdatedAt,
+              h.settingsUpdatedBy,
+            ),
+            const SizedBox(height: 8),
+            _metaRow(
+              theme,
+              'Kvote (carbon_quotas)',
+              h.quotasUpdatedAt,
+              h.quotasUpdatedBy,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _metaRow(
+    ThemeData theme,
+    String title,
+    DateTime? at,
+    String by,
+  ) {
+    final label = UserDisplayLabel.labelForStored(by);
+    return Text(
+      '$title\n'
+      '${_formatCarbonAuditDateTime(at)} • $label',
+      style: theme.textTheme.bodyMedium,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(
+          'Povijest za godinu ${widget.reportingYear}',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Svaka spremljena promjena postavki, kvota, aktivnosti, faktora ili '
+          'izvoz generiše zapis s vremenom i korisnikom (ime ili email).',
+          style: theme.textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 16),
+        _metaCard(context, theme),
+        const SizedBox(height: 24),
+        Text(
+          'Dnevnik događaja',
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (_entries.isEmpty)
+          Text(
+            'Još nema zapisa u dnevniku za ovu godinu. Nakon prve izmjene ili '
+            'izvoza pojavit će se ovdje.',
+            style: theme.textTheme.bodyMedium,
+          )
+        else
+          ..._entries.map((e) {
+            final who = UserDisplayLabel.labelForStored(e.userId);
+            final when = _formatCarbonAuditDateTime(e.createdAt);
+            final title = _carbonAuditActionLabelHr(e.action);
+            final detail = e.detail.trim().isEmpty ? null : e.detail.trim();
+            final longDetail = detail != null && detail.length > 48;
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                title: Text(title),
+                subtitle: Text(
+                  [
+                    when,
+                    who,
+                    ?detail,
+                  ].join(' • '),
+                ),
+                isThreeLine: longDetail,
+              ),
+            );
+          }),
       ],
     );
   }

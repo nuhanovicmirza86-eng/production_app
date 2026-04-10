@@ -297,6 +297,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
       });
 
       await _loadBomHistory();
+      await _syncPrimaryBomToProductDoc();
     } catch (e) {
       if (!mounted) return;
 
@@ -307,6 +308,21 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
         _bomHistory = [];
         _isBomLoading = false;
       });
+    }
+  }
+
+  /// Jedna glavna sastavnica (PRIMARY u `boms`) — keš `bomId`/`bomVersion` na `products`
+  /// za šifarnik i PN, bez ručnog održavanja.
+  Future<void> _syncPrimaryBomToProductDoc() async {
+    if (_companyId.isEmpty || _productId.isEmpty || _userId.isEmpty) return;
+    try {
+      await _bomService.syncActivePrimaryBomToProduct(
+        companyId: _companyId,
+        productId: _productId,
+        updatedBy: _userId,
+      );
+    } catch (e) {
+      debugPrint('syncPrimaryBomToProduct: $e');
     }
   }
 
@@ -1356,6 +1372,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
         _sectionCard(
           title: 'Sastavnica',
           subtitle:
+              'Primarna (PRIMARY) sastavnica je glavna za ovaj proizvod: nakon učitavanja ili izmjene, '
+              'njen ID i verzija automatski se upisuju na proizvod (za naloge i pretragu), bez posebnog koraka.\n\n'
               '🛈 Sastavnica prikazuje šta je potrebno za proizvodnju 1 komada gotovog proizvoda. Svaka klasifikacija ima svoju sastavnicu.',
           children: [
             Row(
