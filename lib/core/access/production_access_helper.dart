@@ -9,6 +9,7 @@ enum ProductionDashboardCard {
   processExecution,
   reports,
   registrations,
+  carbonFootprint,
 }
 
 enum ProductionAccessLevel { hidden, view, manage }
@@ -19,6 +20,7 @@ class ProductionAccessHelper {
   static const String roleProductionOperator = 'production_operator';
   static const String roleSupervisor = 'supervisor';
   static const String roleProductionManager = 'production_manager';
+  static const String roleMaintenanceManager = 'maintenance_manager';
   static const String roleAdmin = 'admin';
 
   static String normalizeRole(dynamic role) {
@@ -89,6 +91,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.processExecution: ProductionAccessLevel.manage,
       ProductionDashboardCard.reports: ProductionAccessLevel.view,
       ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
     },
     roleSupervisor: {
       ProductionDashboardCard.products: ProductionAccessLevel.view,
@@ -101,6 +104,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.processExecution: ProductionAccessLevel.manage,
       ProductionDashboardCard.reports: ProductionAccessLevel.view,
       ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
     },
     roleProductionManager: {
       ProductionDashboardCard.products: ProductionAccessLevel.manage,
@@ -113,6 +117,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.processExecution: ProductionAccessLevel.manage,
       ProductionDashboardCard.reports: ProductionAccessLevel.manage,
       ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.manage,
     },
     roleAdmin: {
       ProductionDashboardCard.products: ProductionAccessLevel.manage,
@@ -125,6 +130,28 @@ class ProductionAccessHelper {
       ProductionDashboardCard.processExecution: ProductionAccessLevel.manage,
       ProductionDashboardCard.reports: ProductionAccessLevel.manage,
       ProductionDashboardCard.registrations: ProductionAccessLevel.manage,
+      ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.manage,
+    },
+    roleMaintenanceManager: {
+      ProductionDashboardCard.products: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionOrders: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionTracking: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.workCenters: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.shifts: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.downtime: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.problemReporting: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.processExecution: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.reports: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.manage,
     },
   };
+
+  static bool isAdminRole(String role) {
+    return normalizeRole(role) == roleAdmin;
+  }
+
+  static bool isMaintenanceManagerRole(String role) {
+    return normalizeRole(role) == roleMaintenanceManager;
+  }
 }

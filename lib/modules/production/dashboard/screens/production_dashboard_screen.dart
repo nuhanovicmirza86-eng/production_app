@@ -6,6 +6,7 @@ import '../../../commercial/partners/screens/partners_screen.dart';
 import '../../../commercial/orders/screens/orders_list_screen.dart';
 import '../../products/screens/products_list_screen.dart';
 import '../../../logistics/receipt/screens/production_label_receipt_screen.dart';
+import '../../../sustainability/screens/carbon_footprint_screen.dart';
 import '../../production_orders/screens/production_order_details_screen.dart';
 import '../../production_orders/screens/production_orders_list_screen.dart';
 import '../../qr/production_qr_resolver.dart';
@@ -125,6 +126,21 @@ class ProductionDashboardScreen extends StatelessWidget {
           );
         },
       ),
+
+      if (_canViewCard(ProductionDashboardCard.carbonFootprint))
+        _DashboardCard(
+          title: 'Karbonski otisak',
+          icon: Icons.eco_outlined,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    CarbonFootprintScreen(companyData: companyData),
+              ),
+            );
+          },
+        ),
 
       if (_canViewCard(ProductionDashboardCard.productionTracking))
         _DashboardCard(
