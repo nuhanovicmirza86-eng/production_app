@@ -5,7 +5,11 @@ import '../../../auth/register/screens/pending_users_screen.dart';
 import '../../../commercial/partners/screens/partners_screen.dart';
 import '../../../commercial/orders/screens/orders_list_screen.dart';
 import '../../products/screens/products_list_screen.dart';
+import '../../../logistics/receipt/screens/production_label_receipt_screen.dart';
+import '../../production_orders/screens/production_order_details_screen.dart';
 import '../../production_orders/screens/production_orders_list_screen.dart';
+import '../../qr/production_qr_resolver.dart';
+import '../../qr/screens/production_qr_scan_screen.dart';
 
 class ProductionDashboardScreen extends StatelessWidget {
   final Map<String, dynamic> companyData;
@@ -61,6 +65,11 @@ class ProductionDashboardScreen extends StatelessWidget {
     );
 
     final productionCards = <Widget>[
+      _DashboardCard(
+        title: 'Skeniraj QR',
+        icon: Icons.qr_code_scanner,
+        onTap: () => _openProductionQrScan(context),
+      ),
       if (_canViewCard(ProductionDashboardCard.products))
         _DashboardCard(
           title: 'Proizvodi',
@@ -250,6 +259,65 @@ class ProductionDashboardScreen extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Ovaj ekran još nije implementiran.')),
     );
+  }
+
+  Future<void> _openProductionQrScan(BuildContext context) async {
+    final resolution = await Navigator.push<ProductionQrScanResolution>(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => ProductionQrScanScreen(companyData: companyData),
+      ),
+    );
+
+    if (!context.mounted || resolution == null) return;
+
+    switch (resolution.intent) {
+      case ProductionQrIntent.productionOrderReferenceV1:
+        final id = resolution.productionOrderId?.trim();
+        if (id == null || id.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'QR ne sadrži ID naloga. Koristite noviji ispis (po:v1 sa poljem id).',
+              ),
+            ),
+          );
+          return;
+        }
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProductionOrderDetailsScreen(
+              companyData: companyData,
+              productionOrderId: id,
+            ),
+          ),
+        );
+        break;
+
+      case ProductionQrIntent.printedClassificationLabelV1:
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProductionLabelReceiptScreen(
+              companyData: companyData,
+              resolution: resolution,
+            ),
+          ),
+        );
+        break;
+
+      case ProductionQrIntent.nepoznat:
+        final raw = resolution.rawPayload;
+        final preview = raw.length > 120 ? '${raw.substring(0, 120)}…' : raw;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Nepoznat QR. Sadržaj: $preview'),
+          ),
+        );
+        break;
+    }
   }
 }
 

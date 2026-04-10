@@ -45,6 +45,9 @@ ios/Runner/GeneratedPluginRegistrant.*
 # ================= FIREBASE =================
 firebase_options.dart
 firebase.json
+# Indeksi se održavaju u zajedničkom Firebase deploy repou (npr. maintenance_app);
+# production_app dijeli isti Firebase projekat s drugom aplikacijom.
+firestore.indexes.json
 # ================= ENV =================
 .env
 .env.*

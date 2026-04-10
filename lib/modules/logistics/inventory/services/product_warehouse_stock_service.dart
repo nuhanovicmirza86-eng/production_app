@@ -73,6 +73,53 @@ class ProductWarehouseStockService {
     return defaultValue;
   }
 
+  /// Aktivni magacini za odabir (npr. prijem s etikete) — bez čitanja stanja zaliha.
+  Future<List<WarehouseRef>> listActiveWarehouses({
+    required String companyId,
+    String? plantKey,
+  }) async {
+    final cid = companyId.trim();
+    if (cid.isEmpty) return const [];
+
+    final warehousesSnap = await _warehouses
+        .where('companyId', isEqualTo: cid)
+        .get();
+
+    final plant = plantKey?.trim() ?? '';
+    final warehouses = <WarehouseRef>[];
+
+    for (final doc in warehousesSnap.docs) {
+      final d = doc.data();
+      if (_s(d['companyId']) != cid) continue;
+      if (!_bool(d['isActive'], defaultValue: true)) continue;
+
+      final whPlant = _s(d['plantKey']);
+      if (plant.isNotEmpty) {
+        final shared = whPlant.isEmpty;
+        if (!shared && whPlant != plant) continue;
+      }
+
+      warehouses.add(
+        WarehouseRef(
+          id: doc.id,
+          code: _s(d['code']).isEmpty ? doc.id : _s(d['code']),
+          name: _s(d['name']).isEmpty ? doc.id : _s(d['name']),
+          plantKey: whPlant.isEmpty ? null : whPlant,
+          displayOrder: _i(d['displayOrder']),
+          isActive: true,
+        ),
+      );
+    }
+
+    warehouses.sort((a, b) {
+      final c = a.displayOrder.compareTo(b.displayOrder);
+      if (c != 0) return c;
+      return a.code.toLowerCase().compareTo(b.code.toLowerCase());
+    });
+
+    return warehouses;
+  }
+
   /// Ako je [plantKey] zadan, prikazuju se aktivni magacini: dijeljeni (bez pogona)
   /// ili vezani za taj pogon. Ako je null/prazan — svi aktivni magacini kompanije.
   Future<List<ProductWarehouseStockLine>> loadStockLinesForProduct({

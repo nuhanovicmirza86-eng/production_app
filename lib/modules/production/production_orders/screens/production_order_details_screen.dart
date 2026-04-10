@@ -1,10 +1,16 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../execution/screens/production_execution_screen.dart';
 import '../../execution/services/production_execution_service.dart';
+import '../../products/services/product_service.dart';
 import '../models/production_order_model.dart';
+import '../printing/bom_classification_catalog.dart';
+import '../printing/production_order_pdf.dart';
+import '../printing/production_order_qr_payload.dart';
 import '../services/production_order_service.dart';
 import 'production_order_edit_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -29,6 +35,7 @@ class _ProductionOrderDetailsScreenState
   final ProductionOrderService _service = ProductionOrderService();
   final ProductionExecutionService _executionService =
       ProductionExecutionService();
+  final ProductService _productService = ProductService();
 
   bool _isLoading = true;
   bool _isReleasing = false;
@@ -42,6 +49,25 @@ class _ProductionOrderDetailsScreenState
   String get _companyId => (widget.companyData['companyId'] ?? '').toString();
   String get _plantKey => (widget.companyData['plantKey'] ?? '').toString();
   String get _userId => (widget.companyData['userId'] ?? 'system').toString();
+
+  /// Ime za etikete / ispis: profil firme, pa Firebase, pa ID.
+  String get _operatorDisplayName {
+    final fromProfile =
+        (widget.companyData['userDisplayName'] ?? '').toString().trim();
+    if (fromProfile.isNotEmpty) return fromProfile;
+
+    final nick = (widget.companyData['nickname'] ?? '').toString().trim();
+    if (nick.isNotEmpty) return nick;
+
+    final u = FirebaseAuth.instance.currentUser;
+    final dn = u?.displayName?.trim();
+    if (dn != null && dn.isNotEmpty) return dn;
+
+    final em = u?.email?.trim();
+    if (em != null && em.isNotEmpty) return em;
+
+    return _userId;
+  }
 
   String get _role =>
       (widget.companyData['role'] ?? '').toString().toLowerCase();
@@ -270,6 +296,139 @@ class _ProductionOrderDetailsScreenState
     }
   }
 
+  Future<void> _printWorkOrder(ProductionOrderModel order) async {
+    try {
+      await Printing.layoutPdf(
+        name: order.productionOrderCode,
+        onLayout: (_) => ProductionOrderPdf.buildWorkOrderPdf(order: order),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
+      );
+    }
+  }
+
+  Future<void> _printClassificationLabels(
+    ProductionOrderModel order,
+    List<String> classifications,
+  ) async {
+    double? packagingQty;
+    try {
+      final product = await _productService.getProductById(
+        productId: order.productId,
+        companyId: _companyId,
+      );
+      if (product != null) {
+        final p = product['packagingQty'];
+        if (p is num && p > 0) {
+          packagingQty = p.toDouble();
+        }
+      }
+    } catch (_) {
+      packagingQty = null;
+    }
+
+    if (!mounted) return;
+
+    final confirmedQty = await showDialog<double>(
+      context: context,
+      builder: (ctx) => _PackagingQtyForLabelDialog(
+        order: order,
+        suggestedFromProduct: packagingQty,
+      ),
+    );
+
+    if (!mounted) return;
+    if (confirmedQty == null) return;
+
+    final printedAt = DateTime.now();
+
+    try {
+      await Printing.layoutPdf(
+        name: '${order.productionOrderCode}_etikete',
+        onLayout: (_) => ProductionOrderPdf.buildClassificationLabelsPdf(
+          order: order,
+          classifications: classifications,
+          packagingQty: confirmedQty,
+          operatorName: _operatorDisplayName,
+          printedAt: printedAt,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
+      );
+    }
+  }
+
+  void _openPrintMenu(BuildContext context, ProductionOrderModel order) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const ListTile(
+                  title: Text(
+                    'Ispis',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    'A4 radni nalog i etikete po klasifikaciji sastavnice',
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.description_outlined),
+                  title: const Text('Radni nalog (A4)'),
+                  subtitle: const Text(
+                    'Kod, proizvod, količine, BOM/routing, QR s brojem naloga',
+                  ),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await _printWorkOrder(order);
+                  },
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.qr_code_2_outlined),
+                  title: const Text('Etikete — sve klasifikacije'),
+                  subtitle: const Text(
+                    'Potvrda količine u pakovanju, zatim primarna / sekundarna / transportna (jedan PDF)',
+                  ),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await _printClassificationLabels(
+                      order,
+                      List<String>.from(kBomClassificationCodes),
+                    );
+                  },
+                ),
+                ...kBomClassificationCodes.map(
+                  (code) => ListTile(
+                    leading: const Icon(Icons.label_outline),
+                    title: Text('Etiketa: ${bomClassificationTitleBs(code)}'),
+                    subtitle: Text(bomClassificationLogisticsLabelBs(code)),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await _printClassificationLabels(order, [code]);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Color _statusColor(String status, BuildContext context) {
     switch (status) {
       case 'draft':
@@ -465,8 +624,12 @@ class _ProductionOrderDetailsScreenState
 
   Widget _buildContent(BuildContext context, ProductionOrderModel order) {
     final statusColor = _statusColor(order.status, context);
-    final qrData =
-        '${order.companyId}|${order.plantKey}|${order.productionOrderCode}';
+    final qrData = buildProductionOrderQrPayload(
+      companyId: order.companyId,
+      plantKey: order.plantKey,
+      productionOrderId: order.id,
+      productionOrderCode: order.productionOrderCode,
+    );
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -476,7 +639,19 @@ class _ProductionOrderDetailsScreenState
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                QrImageView(data: qrData, size: 180),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.black26, width: 1),
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white,
+                  ),
+                  child: QrImageView(
+                    data: qrData,
+                    size: 180,
+                    backgroundColor: Colors.white,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 Text(
                   order.productionOrderCode,
@@ -673,7 +848,17 @@ class _ProductionOrderDetailsScreenState
     final order = _order;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Detalji proizvodnog naloga')),
+      appBar: AppBar(
+        title: const Text('Detalji proizvodnog naloga'),
+        actions: [
+          if (_order != null)
+            IconButton(
+              tooltip: 'Ispis',
+              onPressed: () => _openPrintMenu(context, _order!),
+              icon: const Icon(Icons.print_outlined),
+            ),
+        ],
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -681,6 +866,110 @@ class _ProductionOrderDetailsScreenState
           : order == null
           ? const Center(child: Text('Proizvodni nalog nije pronađen.'))
           : _buildContent(context, order),
+    );
+  }
+}
+
+/// Potvrda ili ručni unos količine u pakovanju prije ispisa etiketa.
+class _PackagingQtyForLabelDialog extends StatefulWidget {
+  final ProductionOrderModel order;
+  final double? suggestedFromProduct;
+
+  const _PackagingQtyForLabelDialog({
+    required this.order,
+    this.suggestedFromProduct,
+  });
+
+  @override
+  State<_PackagingQtyForLabelDialog> createState() =>
+      _PackagingQtyForLabelDialogState();
+}
+
+class _PackagingQtyForLabelDialogState
+    extends State<_PackagingQtyForLabelDialog> {
+  late final TextEditingController _controller;
+  String? _error;
+
+  static String _formatInitial(double s) {
+    if (s <= 0) return '';
+    if (s == s.roundToDouble()) return s.toInt().toString();
+    return s.toString();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final s = widget.suggestedFromProduct;
+    _controller = TextEditingController(
+      text: s != null && s > 0 ? _formatInitial(s) : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final p = double.tryParse(_controller.text.replaceAll(',', '.'));
+    if (p == null || p <= 0) {
+      setState(() => _error = 'Unesite broj veći od 0.');
+      return;
+    }
+    Navigator.pop(context, p);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasSuggestion =
+        widget.suggestedFromProduct != null &&
+        widget.suggestedFromProduct! > 0;
+
+    return AlertDialog(
+      title: const Text('Količina za etiketu'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              hasSuggestion
+                  ? 'Proizvod ima definisanu količinu pakovanja. Potvrdite je ili '
+                      'izmijenite (npr. manje komada u ovom pakovanju).'
+                  : 'Količina pakovanja nije postavljena na proizvodu. Unesite '
+                      'količinu koja vrijedi za ovu etiketu.',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _controller,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              autofocus: !hasSuggestion,
+              decoration: InputDecoration(
+                labelText: 'Količina u pakovanju',
+                suffixText: widget.order.unit.isEmpty ? null : widget.order.unit,
+                errorText: _error,
+                border: const OutlineInputBorder(),
+              ),
+              onChanged: (_) => setState(() => _error = null),
+              onSubmitted: (_) => _submit(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Otkaži'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('Potvrdi i ispiši'),
+        ),
+      ],
     );
   }
 }

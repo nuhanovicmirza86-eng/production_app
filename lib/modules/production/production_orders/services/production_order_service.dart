@@ -299,6 +299,26 @@ class ProductionOrderService {
 
   // ================= SINGLE =================
 
+  Future<ProductionOrderModel?> getByProductionOrderCode({
+    required String companyId,
+    required String plantKey,
+    required String productionOrderCode,
+  }) async {
+    final code = productionOrderCode.trim();
+    if (code.isEmpty) return null;
+
+    final snapshot = await _orders
+        .where('companyId', isEqualTo: companyId)
+        .where('plantKey', isEqualTo: plantKey)
+        .where('productionOrderCode', isEqualTo: code)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isEmpty) return null;
+    final doc = snapshot.docs.first;
+    return ProductionOrderModel.fromMap(doc.id, doc.data());
+  }
+
   Future<ProductionOrderModel?> getById({
     required String id,
     required String companyId,
