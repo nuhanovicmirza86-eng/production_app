@@ -148,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Prijava')),
+      appBar: kIsWeb ? null : AppBar(title: const Text('Prijava')),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -164,13 +164,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       Image.asset(
                         'branding/operonix_production_icon.PNG',
-                        height: kIsWeb ? 56 : 64,
+                        height: kIsWeb ? 72 : 64,
+                        semanticLabel: 'Operonix Production',
                         filterQuality: FilterQuality.medium,
-                        errorBuilder: (context, error, stackTrace) => Icon(
-                          Icons.precision_manufacturing_outlined,
-                          size: kIsWeb ? 48 : 56,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+                        errorBuilder: (context, error, stackTrace) {
+                          debugPrint('Branding asset failed: $error');
+                          return Icon(
+                            Icons.precision_manufacturing_outlined,
+                            size: kIsWeb ? 56 : 56,
+                            color: Theme.of(context).colorScheme.primary,
+                          );
+                        },
                       ),
                       const SizedBox(height: 8),
                       Text(

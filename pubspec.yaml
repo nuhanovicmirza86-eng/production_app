@@ -20,7 +20,6 @@ dependencies:
   mobile_scanner: ^7.0.0
   pdf: ^3.11.0
   printing: ^5.13.0
-  flutter_launcher_icons: ^0.14.4
   file_picker: ^8.1.2
   excel: ^4.0.6
   share_plus: ^10.1.4
@@ -30,6 +29,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
@@ -41,6 +41,10 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: false
+  web:
+    generate: true
+    background_color: "#164344"
+    theme_color: "#164344"
   image_path: "branding/operonix_production_icon.PNG"
   adaptive_icon_background: "#164344"
   adaptive_icon_foreground: "branding/operonix_production_icon.PNG"
