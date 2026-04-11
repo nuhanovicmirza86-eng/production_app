@@ -680,8 +680,11 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
   /// Širina kolone „Broj nar.“ — dovoljno za `SO-2026-000002` u jednom redu.
   static const double _colOrderNumber = 132;
 
+  /// Status (npr. „U proizvodnji”, „Djelomično isporučeno”) u jednom redu.
+  static const double _colStatus = 168;
+
   static const double _orderTableWidth =
-      1180 - 92 + _colOrderNumber; // zamjena stare širine prve kolone
+      1180 - 92 + _colOrderNumber - 76 + _colStatus;
 
   DateTime _deadlineSortKey(OrderModel o, OrderItemModel? it) {
     final lineDue = it?.dueDate;
@@ -806,7 +809,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
           th('Ref.', 84),
           th('Rok isporuke', 88),
           th('Tip', 52),
-          th('Status', 76),
+          th('Status', _colStatus),
           th('Šifra', 84),
           thExp('Naziv'),
           th('MJ', 44),
@@ -899,7 +902,12 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
               td(ref ?? '—', 84),
               td(rok, 88),
               td(_typeLabel(o.orderType), 52),
-              td(orderStatusLabel(o.status), 76),
+              td(
+                orderStatusLabel(o.status),
+                _colStatus,
+                maxLines: 1,
+                softWrap: false,
+              ),
               td(it?.productCode ?? '—', 84),
               tdExp(it?.productName ?? 'Nema učitanih stavki'),
               td(() {
