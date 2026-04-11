@@ -151,36 +151,46 @@ class StandardSearchField extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
   final ValueChanged<String>? onChanged;
+  /// Kompaktniji unos (npr. unutar sklopivog filter panela).
+  final bool compact;
 
   const StandardSearchField({
     super.key,
     required this.controller,
     required this.hintText,
     this.onChanged,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final outline = cs.outlineVariant;
+    final pad = compact
+        ? const EdgeInsets.symmetric(horizontal: 12, vertical: 10)
+        : const EdgeInsets.symmetric(horizontal: 14, vertical: 14);
     return TextField(
       controller: controller,
       onChanged: onChanged,
+      style: TextStyle(fontSize: compact ? 14 : 16),
       decoration: InputDecoration(
         hintText: hintText,
-        prefixIcon: const Icon(Icons.search),
+        isDense: compact,
+        prefixIcon: Icon(Icons.search, size: compact ? 20 : 24),
         filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        fillColor: cs.surface,
+        contentPadding: pad,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.grey.shade200),
+          borderRadius: BorderRadius.circular(compact ? 12 : 14),
+          borderSide: BorderSide(color: outline),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.grey.shade200),
+          borderRadius: BorderRadius.circular(compact ? 12 : 14),
+          borderSide: BorderSide(color: outline),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.blue.shade300),
+          borderRadius: BorderRadius.circular(compact ? 12 : 14),
+          borderSide: BorderSide(color: cs.primary, width: 1.5),
         ),
       ),
     );
@@ -192,6 +202,7 @@ class StandardFilterPanel extends StatelessWidget {
   final int activeCount;
   final VoidCallback onToggle;
   final Widget child;
+  final String title;
 
   const StandardFilterPanel({
     super.key,
@@ -199,16 +210,19 @@ class StandardFilterPanel extends StatelessWidget {
     required this.activeCount,
     required this.onToggle,
     required this.child,
+    this.title = 'Filteri',
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: cs.surface,
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade200),
+        side: BorderSide(color: cs.outlineVariant),
       ),
       child: Column(
         children: [
@@ -216,13 +230,17 @@ class StandardFilterPanel extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             onTap: onToggle,
             child: Padding(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Filteri',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      title,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurface,
+                      ),
                     ),
                   ),
                   if (activeCount > 0)
@@ -230,15 +248,15 @@ class StandardFilterPanel extends StatelessWidget {
                       margin: const EdgeInsets.only(right: 10),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withValues(alpha: 0.10),
+                        color: cs.primaryContainer,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        'Aktivni: $activeCount',
-                        style: const TextStyle(
+                        '$activeCount',
+                        style: TextStyle(
                           fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.blue,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onPrimaryContainer,
                         ),
                       ),
                     ),
@@ -246,6 +264,7 @@ class StandardFilterPanel extends StatelessWidget {
                     expanded
                         ? Icons.keyboard_arrow_up_rounded
                         : Icons.keyboard_arrow_down_rounded,
+                    color: cs.onSurfaceVariant,
                   ),
                 ],
               ),
@@ -254,12 +273,12 @@ class StandardFilterPanel extends StatelessWidget {
           AnimatedCrossFade(
             firstChild: const SizedBox.shrink(),
             secondChild: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Divider(height: 1),
-                  const SizedBox(height: 12),
+                  Divider(height: 1, thickness: 1, color: cs.outlineVariant),
+                  const SizedBox(height: 10),
                   child,
                 ],
               ),

@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class OrderModel {
   final String id;
   final String companyId;
@@ -33,6 +35,10 @@ class OrderModel {
   final String? currency;
   final String? plantKey;
 
+  /// Broj narudžbe kupca / dobavljača (referenca partnera).
+  final String? customerReference;
+  final String? supplierReference;
+
   const OrderModel({
     required this.id,
     required this.companyId,
@@ -55,6 +61,8 @@ class OrderModel {
     this.notes,
     this.currency,
     this.plantKey,
+    this.customerReference,
+    this.supplierReference,
   });
 
   OrderModel copyWith({
@@ -69,6 +77,8 @@ class OrderModel {
     String? currency,
     String? plantKey,
     DateTime? updatedAt,
+    String? customerReference,
+    String? supplierReference,
   }) {
     return OrderModel(
       id: id,
@@ -94,6 +104,8 @@ class OrderModel {
       notes: notes ?? this.notes,
       currency: currency ?? this.currency,
       plantKey: plantKey ?? this.plantKey,
+      customerReference: customerReference ?? this.customerReference,
+      supplierReference: supplierReference ?? this.supplierReference,
     );
   }
 
@@ -123,15 +135,17 @@ class OrderModel {
       totalQty: _d(map['totalOrderedQty'] ?? map['totalQty']),
       createdAt: _toDate(map['createdAt']),
       updatedAt: _toDate(map['updatedAt']),
-      createdBy: map['createdBy']?.toString(),
-      updatedBy: map['updatedBy']?.toString(),
+      createdBy: map['createdBy']?.toString().trim(),
+      updatedBy: map['updatedBy']?.toString().trim(),
       isLate: map['isLate'] == true,
-      orderDate: _toDate(map['orderDate']),
+      orderDate: _toDate(map['orderDate']) ?? _toDate(map['createdAt']),
       requestedDeliveryDate: _toDate(map['requestedDeliveryDate']),
       confirmedDeliveryDate: _toDate(map['confirmedDeliveryDate']),
       notes: _nullableString(map['notes']),
       currency: _nullableString(map['currency']),
       plantKey: _nullableString(map['plantKey']),
+      customerReference: _nullableString(map['customerReference']),
+      supplierReference: _nullableString(map['supplierReference']),
     );
   }
 
@@ -166,14 +180,9 @@ class OrderModel {
   }
 
   static DateTime? _toDate(dynamic v) {
-    try {
-      if (v.runtimeType.toString() == 'Timestamp') {
-        return (v as dynamic).toDate();
-      }
-    } catch (_) {}
-
+    if (v == null) return null;
+    if (v is Timestamp) return v.toDate();
     if (v is DateTime) return v;
-
     return DateTime.tryParse(_s(v));
   }
 }
@@ -196,6 +205,10 @@ class OrderItemModel {
 
   final List<String> linkedProductionOrderCodes;
 
+  final double deliveredQty;
+  final double receivedQty;
+  final double openQty;
+
   const OrderItemModel({
     this.orderItemDocId,
     required this.productId,
@@ -207,6 +220,9 @@ class OrderItemModel {
     this.lineId,
     this.lineStatus,
     this.linkedProductionOrderCodes = const [],
+    this.deliveredQty = 0,
+    this.receivedQty = 0,
+    this.openQty = 0,
   });
 
   factory OrderItemModel.fromMap(Map<String, dynamic> map) {
@@ -221,6 +237,9 @@ class OrderItemModel {
       lineId: _nullableString(map['lineId']),
       lineStatus: _nullableString(map['status']),
       linkedProductionOrderCodes: _stringList(map['linkedProductionOrderCodes']),
+      deliveredQty: _d(map['deliveredQty']),
+      receivedQty: _d(map['receivedQty']),
+      openQty: _d(map['openQty']),
     );
   }
 
@@ -237,6 +256,9 @@ class OrderItemModel {
       lineStatus: _nullableString(map['status']),
       linkedProductionOrderCodes:
           _stringList(map['linkedProductionOrderCodes']),
+      deliveredQty: _d(map['deliveredQty']),
+      receivedQty: _d(map['receivedQty']),
+      openQty: _d(map['openQty']),
     );
   }
 
@@ -273,14 +295,9 @@ class OrderItemModel {
   }
 
   static DateTime? _toDate(dynamic v) {
-    try {
-      if (v.runtimeType.toString() == 'Timestamp') {
-        return (v as dynamic).toDate();
-      }
-    } catch (_) {}
-
+    if (v == null) return null;
+    if (v is Timestamp) return v.toDate();
     if (v is DateTime) return v;
-
     return DateTime.tryParse(_s(v));
   }
 }

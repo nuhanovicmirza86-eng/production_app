@@ -31,6 +31,17 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
   final TextEditingController _routingIdController = TextEditingController();
   final TextEditingController _routingVersionController =
       TextEditingController();
+  final TextEditingController _secondaryClassCodeController =
+      TextEditingController();
+  final TextEditingController _secondaryClassDescController =
+      TextEditingController();
+  final TextEditingController _packagingQtyController =
+      TextEditingController();
+  final TextEditingController _standardUnitPriceController =
+      TextEditingController();
+  final TextEditingController _currencyController = TextEditingController(
+    text: 'KM',
+  );
 
   bool _isLoading = false;
   bool _isActive = true;
@@ -51,6 +62,22 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
       hintText: hint,
       border: const OutlineInputBorder(),
     );
+  }
+
+  double? _optionalPositiveDouble(String text) {
+    final s = text.trim().replaceAll(',', '.');
+    if (s.isEmpty) return null;
+    final v = double.tryParse(s);
+    if (v == null || v <= 0) return null;
+    return v;
+  }
+
+  double? _optionalUnitPrice(String text) {
+    final s = text.trim().replaceAll(',', '.');
+    if (s.isEmpty) return null;
+    final v = double.tryParse(s);
+    if (v == null || v <= 0) return null;
+    return v;
   }
 
   Future<void> _save() async {
@@ -108,6 +135,20 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
         routingVersion: _routingVersionController.text.trim().isEmpty
             ? null
             : _routingVersionController.text.trim(),
+        packagingQty: _optionalPositiveDouble(_packagingQtyController.text),
+        secondaryClassificationCode:
+            _secondaryClassCodeController.text.trim().isEmpty
+                ? null
+                : _secondaryClassCodeController.text.trim(),
+        secondaryClassificationDescription:
+            _secondaryClassDescController.text.trim().isEmpty
+                ? null
+                : _secondaryClassDescController.text.trim(),
+        standardUnitPrice:
+            _optionalUnitPrice(_standardUnitPriceController.text),
+        currency: _currencyController.text.trim().isEmpty
+            ? null
+            : _currencyController.text.trim(),
         isActive: _isActive,
       );
 
@@ -141,6 +182,11 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
     _bomVersionController.dispose();
     _routingIdController.dispose();
     _routingVersionController.dispose();
+    _secondaryClassCodeController.dispose();
+    _secondaryClassDescController.dispose();
+    _packagingQtyController.dispose();
+    _standardUnitPriceController.dispose();
+    _currencyController.dispose();
     super.dispose();
   }
 
@@ -235,6 +281,52 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
                     'Default plantKey',
                     hint: _plantKey.isEmpty ? null : 'Trenutni: $_plantKey',
                   ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Sekundarna klasifikacija i cijena (lista)',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _secondaryClassCodeController,
+                  decoration: _dec(
+                    'Šifra sek. klasifikacije',
+                    hint: 'npr. PP09',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _secondaryClassDescController,
+                  decoration: _dec(
+                    'Opis sek. klasifikacije',
+                    hint: 'npr. POLUPROIZVOD – …',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _packagingQtyController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: _dec(
+                    'Količina pakovanja',
+                    hint: 'Za kolonu „Kol.“ na listi',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _standardUnitPriceController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: _dec(
+                    'Jedinična cijena',
+                    hint: 'Za listu / izvještaje',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _currencyController,
+                  decoration: _dec('Valuta', hint: 'npr. KM, EUR'),
                 ),
                 const SizedBox(height: 24),
                 const Text(

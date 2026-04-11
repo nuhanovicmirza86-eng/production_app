@@ -24,13 +24,21 @@ class ProductionOrderService {
     return t.isEmpty ? null : t;
   }
 
-  String _generateOrderCode({required String plantKey, required DateTime now}) {
+  /// Prefiks u broju naloga: [plantCode] ako je zadan, inače [plantKey] (kompatibilnost).
+  String _generateOrderCode({
+    required String plantKey,
+    String? plantCode,
+    required DateTime now,
+  }) {
     final year = now.year.toString().substring(2);
     final month = now.month.toString().padLeft(2, '0');
     final day = now.day.toString().padLeft(2, '0');
     final millis = now.millisecondsSinceEpoch.toString().substring(8);
+    final prefix = (plantCode != null && plantCode.trim().isNotEmpty)
+        ? plantCode.trim()
+        : plantKey.trim();
 
-    return '$plantKey-$year$month$day-$millis';
+    return '$prefix-$year$month$day-$millis';
   }
 
   bool _canChangeCriticalFields(String actorRole) {
@@ -55,6 +63,8 @@ class ProductionOrderService {
   Future<String> createProductionOrder({
     required String companyId,
     required String plantKey,
+    /// Šifra pogona za prefiks u `productionOrderCode` (npr. iz companyData). Ako je prazno, koristi se [plantKey].
+    String? plantCode,
     required String productId,
     required String productCode,
     required String productName,
@@ -75,11 +85,17 @@ class ProductionOrderService {
     String? sourceOrderNumber,
     String? sourceCustomerId,
     String? sourceCustomerName,
+    DateTime? sourceOrderDate,
+    DateTime? requestedDeliveryDate,
   }) async {
     final docRef = _orders.doc();
     final now = DateTime.now();
 
-    final orderCode = _generateOrderCode(plantKey: plantKey, now: now);
+    final orderCode = _generateOrderCode(
+      plantKey: plantKey,
+      plantCode: plantCode,
+      now: now,
+    );
 
     final order = ProductionOrderModel(
       id: docRef.id,
@@ -99,6 +115,8 @@ class ProductionOrderService {
       sourceOrderNumber: _trimOrNull(sourceOrderNumber),
       sourceCustomerId: _trimOrNull(sourceCustomerId),
       sourceCustomerName: _trimOrNull(sourceCustomerName),
+      sourceOrderDate: sourceOrderDate,
+      requestedDeliveryDate: requestedDeliveryDate,
       plannedQty: plannedQty,
       producedGoodQty: 0,
       producedScrapQty: 0,
@@ -121,6 +139,14 @@ class ProductionOrderService {
       hasCriticalChanges: false,
       lastChangedAt: null,
       lastChangedBy: null,
+      workOrderDate: null,
+      workOrderNumber: null,
+      plannedLeadDays: null,
+      pantheonCode: null,
+      palletCount: null,
+      piecesPerPallet: null,
+      notes: null,
+      operationName: null,
     );
 
     await docRef.set(order.toMap());

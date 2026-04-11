@@ -43,11 +43,9 @@ class _OrderLineProductionCreateScreenState
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
 
-  String get _plantKey {
-    final fromOrder = (widget.order.plantKey ?? '').toString().trim();
-    if (fromOrder.isNotEmpty) return fromOrder;
-    return (widget.companyData['plantKey'] ?? '').toString().trim();
-  }
+  /// PN je vezan za pogon iz sesije (`companyData`), ne za narudžbu (firma).
+  String get _plantKeyForProduction =>
+      (widget.companyData['plantKey'] ?? '').toString().trim();
 
   @override
   void initState() {
@@ -162,9 +160,13 @@ class _OrderLineProductionCreateScreenState
 
     if (!mounted) return;
 
-    if (_plantKey.isEmpty) {
+    if (_plantKeyForProduction.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nedostaje plantKey (pogon)')),
+        const SnackBar(
+          content: Text(
+            'Nedostaje plantKey u sesiji (pogon) — potreban za kreiranje proizvodnog naloga.',
+          ),
+        ),
       );
       return;
     }
@@ -207,13 +209,16 @@ class _OrderLineProductionCreateScreenState
         productCode: p.productCode,
         productName: p.productName,
         unit: unit,
-        plantKey: _plantKey,
+        plantKey: _plantKeyForProduction,
         scheduledEndAt: _scheduledEndAt!,
         plannedQty: plannedQty,
         bomId: refs['bomId']!,
         bomVersion: refs['bomVersion']!,
         routingId: refs['routingId']!,
         routingVersion: refs['routingVersion']!,
+        sourceOrderDate: widget.order.orderDate ?? widget.order.createdAt,
+        requestedDeliveryDate:
+            widget.order.requestedDeliveryDate ?? widget.item.dueDate,
       );
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -289,7 +294,9 @@ class _OrderLineProductionCreateScreenState
               ProductWarehouseStockSection(
                 companyId: _companyId,
                 productId: _product!.productId,
-                plantKey: _plantKey.isNotEmpty ? _plantKey : null,
+                plantKey: _plantKeyForProduction.isNotEmpty
+                    ? _plantKeyForProduction
+                    : null,
                 fallbackUnit: _product!.unit ?? widget.item.unit,
               ),
               const SizedBox(height: 16),
@@ -330,7 +337,7 @@ class _OrderLineProductionCreateScreenState
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Pogon: $_plantKey',
+                      'Pogon (za PN): $_plantKeyForProduction',
                       style: const TextStyle(color: Colors.black54),
                     ),
                     const SizedBox(height: 16),

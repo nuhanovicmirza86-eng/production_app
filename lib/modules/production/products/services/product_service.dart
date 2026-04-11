@@ -13,6 +13,20 @@ class ProductService {
 
   String _s(dynamic value) => (value ?? '').toString().trim();
 
+  double? _readDouble(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    return double.tryParse(_s(v).replaceAll(',', '.'));
+  }
+
+  /// Usporedba za update (uključuje „prazno“: [next] ≤ 0 tretira kao brisanje).
+  bool _almostEqualDouble(double? cur, double? next) {
+    if (next == null) return true;
+    if (next <= 0) return cur == null || cur <= 0;
+    if (cur == null) return false;
+    return (cur - next).abs() < 1e-9;
+  }
+
   Future<void> _ensureUniqueProductCode({
     required String companyId,
     required String productCode,
@@ -50,6 +64,10 @@ class ProductService {
     String? routingId,
     String? routingVersion,
     double? packagingQty,
+    String? secondaryClassificationCode,
+    String? secondaryClassificationDescription,
+    double? standardUnitPrice,
+    String? currency,
     bool isActive = true,
   }) {
     final now = DateTime.now();
@@ -70,6 +88,9 @@ class ProductService {
     final normalizedBomVersion = _s(bomVersion);
     final normalizedRoutingId = _s(routingId);
     final normalizedRoutingVersion = _s(routingVersion);
+    final secCode = _s(secondaryClassificationCode);
+    final secDesc = _s(secondaryClassificationDescription);
+    final cur = _s(currency);
 
     final payload = <String, dynamic>{
       'companyId': normalizedCompanyId,
@@ -128,6 +149,19 @@ class ProductService {
       payload['packagingQty'] = packagingQty;
     }
 
+    if (secCode.isNotEmpty) {
+      payload['secondaryClassificationCode'] = secCode;
+    }
+    if (secDesc.isNotEmpty) {
+      payload['secondaryClassificationDescription'] = secDesc;
+    }
+    if (standardUnitPrice != null && standardUnitPrice > 0) {
+      payload['standardUnitPrice'] = standardUnitPrice;
+    }
+    if (cur.isNotEmpty) {
+      payload['currency'] = cur;
+    }
+
     return payload;
   }
 
@@ -147,6 +181,10 @@ class ProductService {
     String? routingId,
     String? routingVersion,
     double? packagingQty,
+    String? secondaryClassificationCode,
+    String? secondaryClassificationDescription,
+    double? standardUnitPrice,
+    String? currency,
     bool isActive = true,
   }) async {
     final normalizedCompanyId = companyId.trim();
@@ -199,6 +237,10 @@ class ProductService {
       routingId: routingId,
       routingVersion: routingVersion,
       packagingQty: packagingQty,
+      secondaryClassificationCode: secondaryClassificationCode,
+      secondaryClassificationDescription: secondaryClassificationDescription,
+      standardUnitPrice: standardUnitPrice,
+      currency: currency,
       isActive: isActive,
     );
 
@@ -224,6 +266,10 @@ class ProductService {
     String? routingId,
     String? routingVersion,
     double? packagingQty,
+    String? secondaryClassificationCode,
+    String? secondaryClassificationDescription,
+    double? standardUnitPrice,
+    String? currency,
     bool? isActive,
   }) async {
     final normalizedProductId = productId.trim();
@@ -396,6 +442,41 @@ class ProductService {
       }
     }
 
+    if (secondaryClassificationCode != null) {
+      final value = secondaryClassificationCode.trim();
+      if (value.isEmpty) {
+        updates['secondaryClassificationCode'] = FieldValue.delete();
+      } else {
+        updates['secondaryClassificationCode'] = value;
+      }
+    }
+
+    if (secondaryClassificationDescription != null) {
+      final value = secondaryClassificationDescription.trim();
+      if (value.isEmpty) {
+        updates['secondaryClassificationDescription'] = FieldValue.delete();
+      } else {
+        updates['secondaryClassificationDescription'] = value;
+      }
+    }
+
+    if (standardUnitPrice != null) {
+      if (standardUnitPrice <= 0) {
+        updates['standardUnitPrice'] = FieldValue.delete();
+      } else {
+        updates['standardUnitPrice'] = standardUnitPrice;
+      }
+    }
+
+    if (currency != null) {
+      final value = currency.trim();
+      if (value.isEmpty) {
+        updates['currency'] = FieldValue.delete();
+      } else {
+        updates['currency'] = value;
+      }
+    }
+
     final currentUnit = _s(current['unit']);
     final currentDescription = _s(current['description']);
     final currentCustomerId = _s(current['customerId']);
@@ -406,6 +487,10 @@ class ProductService {
     final currentRoutingId = _s(current['routingId']);
     final currentRoutingVersion = _s(current['routingVersion']);
     final currentPackagingQty = current['packagingQty'];
+    final currentSecCode = _s(current['secondaryClassificationCode']);
+    final currentSecDesc = _s(current['secondaryClassificationDescription']);
+    final currentStdPrice = _readDouble(current['standardUnitPrice']);
+    final currentCurrency = _s(current['currency']);
     final currentStatus = _s(current['status']).toLowerCase();
     final currentIsActive = (current['isActive'] as bool?) ?? true;
 
@@ -426,9 +511,17 @@ class ProductService {
         (routingVersion == null ||
             _s(routingVersion) == currentRoutingVersion) &&
         (packagingQty == null ||
-            ((currentPackagingQty is num)
-                ? currentPackagingQty.toDouble() == packagingQty
-                : false));
+            _almostEqualDouble(
+              _readDouble(currentPackagingQty),
+              packagingQty,
+            )) &&
+        (secondaryClassificationCode == null ||
+            _s(secondaryClassificationCode) == currentSecCode) &&
+        (secondaryClassificationDescription == null ||
+            _s(secondaryClassificationDescription) == currentSecDesc) &&
+        (standardUnitPrice == null ||
+            _almostEqualDouble(currentStdPrice, standardUnitPrice)) &&
+        (currency == null || _s(currency) == currentCurrency);
 
     if (nothingChanged) {
       return;

@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/date/date_range_utils.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/ui/date_range_filter_controls.dart';
+import '../../../../core/ui/standard_list_components.dart';
+import '../../../logistics/inventory/services/product_warehouse_stock_service.dart';
 import '../export/orders_list_pdf_export.dart';
 import '../models/order_model.dart';
 import '../order_status_ui.dart';
@@ -21,12 +25,16 @@ class OrdersListScreen extends StatefulWidget {
 
 class _OrdersListScreenState extends State<OrdersListScreen> {
   final OrdersService _ordersService = OrdersService();
+  final ProductWarehouseStockService _stockService = ProductWarehouseStockService();
 
   bool _isLoading = true;
   String? _errorMessage;
-  bool _filtersExpanded = false;
+  bool _searchStripExpanded = false;
 
   List<OrderModel> _orders = [];
+  final Map<String, double> _stockByProductId = {};
+  bool _stockLoading = false;
+  Timer? _stockDebounce;
 
   final TextEditingController _searchController = TextEditingController();
 
@@ -41,6 +49,9 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
 
   String get _role =>
       (widget.companyData['role'] ?? '').toString().trim().toLowerCase();
+
+  String get _plantKey =>
+      (widget.companyData['plantKey'] ?? '').toString().trim();
 
   bool get _canCreateOrder =>
       _role == 'admin' ||
@@ -57,6 +68,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
 
   @override
   void dispose() {
+    _stockDebounce?.cancel();
     _searchController
       ..removeListener(_onSearchChanged)
       ..dispose();
@@ -66,6 +78,59 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
   void _onSearchChanged() {
     if (!mounted) return;
     setState(() {});
+    _scheduleStockRefresh();
+  }
+
+  void _scheduleStockRefresh() {
+    _stockDebounce?.cancel();
+    _stockDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (mounted) _refreshStockForFiltered();
+    });
+  }
+
+  Future<void> _refreshStockForFiltered() async {
+    final ids = <String>{};
+    for (final o in _filteredOrders) {
+      for (final it in o.items) {
+        final pid = it.productId.trim();
+        if (pid.isNotEmpty) ids.add(pid);
+      }
+    }
+    if (ids.isEmpty) {
+      if (mounted) setState(() => _stockByProductId.clear());
+      return;
+    }
+
+    setState(() => _stockLoading = true);
+
+    final next = <String, double>{};
+    const batch = 8;
+    final list = ids.toList();
+    for (var i = 0; i < list.length; i += batch) {
+      final end = i + batch > list.length ? list.length : i + batch;
+      final chunk = list.sublist(i, end);
+      await Future.wait(chunk.map((pid) async {
+        try {
+          final lines = await _stockService.loadStockLinesForProduct(
+            companyId: _companyId,
+            productId: pid,
+            plantKey: _plantKey.isEmpty ? null : _plantKey,
+          );
+          final sum = lines.fold<double>(0, (a, b) => a + b.quantityOnHand);
+          next[pid] = sum;
+        } catch (_) {
+          next[pid] = 0;
+        }
+      }));
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _stockByProductId
+        ..clear()
+        ..addAll(next);
+      _stockLoading = false;
+    });
   }
 
   Future<void> _loadOrders() async {
@@ -100,12 +165,26 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
           return bDate.compareTo(aDate);
         });
 
+      final itemsByOrder =
+          await _ordersService.loadOrderItemsGroupedByOrderId(
+        companyId: _companyId,
+      );
+
+      final withItems = merged.map((o) {
+        final fromCol = itemsByOrder[o.id];
+        if (fromCol != null && fromCol.isNotEmpty) {
+          return o.copyWith(items: fromCol);
+        }
+        return o;
+      }).toList();
+
       if (!mounted) return;
 
       setState(() {
-        _orders = merged;
+        _orders = withItems;
         _isLoading = false;
       });
+      _scheduleStockRefresh();
     } catch (e) {
       if (!mounted) return;
 
@@ -120,11 +199,15 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
     final q = _searchController.text.trim().toLowerCase();
 
     return _orders.where((o) {
-      final matchesSearch =
-          q.isEmpty ||
+      final matchesSearch = q.isEmpty ||
           o.orderNumber.toLowerCase().contains(q) ||
           o.partnerName.toLowerCase().contains(q) ||
-          ((o.partnerCode ?? '').toLowerCase().contains(q));
+          ((o.partnerCode ?? '').toLowerCase().contains(q)) ||
+          o.items.any(
+            (it) =>
+                it.productCode.toLowerCase().contains(q) ||
+                it.productName.toLowerCase().contains(q),
+          );
 
       final matchesStatus = _selectedStatus.matches(o);
 
@@ -184,6 +267,9 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
     return count;
   }
 
+  int get _searchStripActiveCount =>
+      _activeFiltersCount + (_searchController.text.trim().isNotEmpty ? 1 : 0);
+
   String _companyDisplayName() {
     final n = (widget.companyData['companyName'] ??
             widget.companyData['name'] ??
@@ -227,6 +313,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
         if (b.isBefore(a)) _dateTo = d;
       }
     });
+    _scheduleStockRefresh();
   }
 
   Future<void> _pickDateTo() async {
@@ -246,12 +333,16 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
         if (a.isAfter(b)) _dateFrom = d;
       }
     });
+    _scheduleStockRefresh();
   }
 
-  void _clearDateRange() => setState(() {
-        _dateFrom = null;
-        _dateTo = null;
-      });
+  void _clearDateRange() {
+    setState(() {
+      _dateFrom = null;
+      _dateTo = null;
+    });
+    _scheduleStockRefresh();
+  }
 
   Future<void> _exportPdf() async {
     final list = _filteredOrders;
@@ -265,11 +356,16 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
       return;
     }
     try {
+      await _refreshStockForFiltered();
+      if (!mounted) return;
       await OrdersListPdfExport.preview(
         orders: list,
-        reportTitle: 'Pregled narudžbi',
+        reportTitle: 'Pregled narudžbi (detaljno)',
         companyLine: _companyDisplayName(),
         filterDescription: _filterDescriptionForPdf(),
+        stockByProductId: _stockByProductId.isEmpty
+            ? null
+            : Map<String, double>.from(_stockByProductId),
       );
     } catch (e) {
       if (!mounted) return;
@@ -307,7 +403,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Export PDF (filtrirani pregled)',
+                    tooltip: 'Export PDF — detaljno po stavkama (zalihe ako su učitane)',
                     icon: const Icon(Icons.picture_as_pdf_outlined),
                     onPressed: _isLoading ? null : _exportPdf,
                   ),
@@ -323,7 +419,8 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                             '• Kreiranje i pregled narudžbi\n'
                             '• Praćenje statusa\n'
                             '• Filtriranje po statusu, tipu i datumu (od–do)\n'
-                            '• Export trenutnog pregleda u PDF\n'
+                            '• Tabularni pregled po partneru (stavke, zalihe, zeleno = spremno)\n'
+                            '• Export u PDF (isti raspored; zalihe ako su učitane)\n'
                             '• Povezivanje sa proizvodnim nalozima\n\n'
                             'Ovdje pratiš komercijalni tok prije realizacije i proizvodnje.',
                           ),
@@ -383,7 +480,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
               ),
             ),
             IconButton(
-              tooltip: 'Export PDF (filtrirani pregled)',
+              tooltip: 'Export PDF — detaljno po stavkama (zalihe ako su učitane)',
               icon: const Icon(Icons.picture_as_pdf_outlined),
               onPressed: _isLoading ? null : _exportPdf,
             ),
@@ -399,7 +496,8 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                       '• Kreiranje i pregled narudžbi\n'
                       '• Praćenje statusa\n'
                       '• Filtriranje po statusu, tipu i datumu (od–do)\n'
-                      '• Export trenutnog pregleda u PDF\n'
+                      '• Tabularni pregled po partneru (stavke, zalihe, zeleno = spremno)\n'
+                      '• Export u PDF (isti raspored; zalihe ako su učitane)\n'
                       '• Povezivanje sa proizvodnim nalozima\n\n'
                       'Ovdje pratiš komercijalni tok prije realizacije i proizvodnje.',
                     ),
@@ -436,60 +534,9 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
     );
   }
 
-  Widget _buildKpiCard({
-    required String label,
-    required int value,
-    required Color color,
-    required IconData icon,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$value',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: color,
-                    height: 1.0,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  label,
-                  style: const TextStyle(fontSize: 12, color: Colors.black54),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildKpis() {
-    final total = _orders.length;
+    final total =
+        _orders.where((o) => o.status != OrderStatus.cancelled).length;
     final open = _orders.where(_isOpen).length;
     final late = _orders.where(_isLate).length;
     final completed = _orders
@@ -501,84 +548,46 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
         )
         .length;
 
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildKpiCard(
-                label: 'Ukupno',
-                value: total,
-                color: Colors.blue,
-                icon: Icons.receipt_long_outlined,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildKpiCard(
-                label: 'Otvorene',
-                value: open,
-                color: Colors.orange,
-                icon: Icons.pending_actions_outlined,
-              ),
-            ),
-          ],
+    return StandardKpiGrid(
+      metrics: [
+        KpiMetric(
+          label: 'Ukupno',
+          value: total,
+          color: Colors.blue,
+          icon: Icons.receipt_long_outlined,
         ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: _buildKpiCard(
-                label: 'Kasne',
-                value: late,
-                color: Colors.red,
-                icon: Icons.warning_amber_rounded,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildKpiCard(
-                label: 'Završene',
-                value: completed,
-                color: Colors.green,
-                icon: Icons.task_alt_rounded,
-              ),
-            ),
-          ],
+        KpiMetric(
+          label: 'Otvorene',
+          value: open,
+          color: Colors.orange,
+          icon: Icons.pending_actions_outlined,
+        ),
+        KpiMetric(
+          label: 'Kasne',
+          value: late,
+          color: Colors.red,
+          icon: Icons.warning_amber_rounded,
+        ),
+        KpiMetric(
+          label: 'Završene',
+          value: completed,
+          color: Colors.green,
+          icon: Icons.task_alt_rounded,
         ),
       ],
     );
   }
 
-  Widget _buildSearch() {
-    return TextField(
+  Widget _buildSearch({bool compact = false}) {
+    return StandardSearchField(
       controller: _searchController,
-      decoration: InputDecoration(
-        hintText: 'Pretraga po broju, partneru ili šifri partnera',
-        prefixIcon: const Icon(Icons.search),
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 14,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.grey.shade200),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.grey.shade200),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.blue.shade300),
-        ),
-      ),
+      hintText: 'Broj narudžbe, partner, šifra partnera, šifra/naziv proizvoda…',
+      compact: compact,
     );
   }
 
-  Widget _buildFilters() {
+  Widget _buildStatusTypeDateFilters() {
+    final cs = Theme.of(context).colorScheme;
     Widget chip({
       required String label,
       required bool selected,
@@ -594,289 +603,420 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
       );
     }
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Status',
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          children: OrderStatusFilter.values.map((status) {
+            return chip(
+              label: status.label,
+              selected: _selectedStatus == status,
+              onTap: () {
+                setState(() => _selectedStatus = status);
+                _scheduleStockRefresh();
+              },
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Tip',
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          children: OrderTypeFilter.values.map((type) {
+            return chip(
+              label: type.label,
+              selected: _selectedType == type,
+              onTap: () {
+                setState(() => _selectedType = type);
+                _scheduleStockRefresh();
+              },
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 12),
+        DateRangeFilterControls(
+          sectionTitle: 'Datum (narudžbe ili kreiranje)',
+          helpText:
+              'Filtar se odnosi na datum narudžbe ako postoji, inače na datum kreiranja zapisa.',
+          from: _dateFrom,
+          to: _dateTo,
+          onPickFrom: _pickDateFrom,
+          onPickTo: _pickDateTo,
+          onClear: _clearDateRange,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchAndFiltersStrip() {
+    return StandardFilterPanel(
+      title: 'Pretraga i filteri',
+      expanded: _searchStripExpanded,
+      activeCount: _searchStripActiveCount,
+      onToggle: () => setState(() => _searchStripExpanded = !_searchStripExpanded),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: () {
-              setState(() {
-                _filtersExpanded = !_filtersExpanded;
-              });
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Filteri',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  if (_activeFiltersCount > 0)
-                    Container(
-                      margin: const EdgeInsets.only(right: 10),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        'Aktivni: $_activeFiltersCount',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.blue,
-                        ),
-                      ),
-                    ),
-                  Icon(
-                    _filtersExpanded
-                        ? Icons.keyboard_arrow_up_rounded
-                        : Icons.keyboard_arrow_down_rounded,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          AnimatedCrossFade(
-            firstChild: const SizedBox.shrink(),
-            secondChild: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Divider(height: 1),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Status',
-                    style: TextStyle(fontSize: 12, color: Colors.black54),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    children: OrderStatusFilter.values.map((status) {
-                      return chip(
-                        label: status.label,
-                        selected: _selectedStatus == status,
-                        onTap: () => setState(() => _selectedStatus = status),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Tip',
-                    style: TextStyle(fontSize: 12, color: Colors.black54),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    children: OrderTypeFilter.values.map((type) {
-                      return chip(
-                        label: type.label,
-                        selected: _selectedType == type,
-                        onTap: () => setState(() => _selectedType = type),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 16),
-                  DateRangeFilterControls(
-                    sectionTitle: 'Datum (narudžbe ili kreiranje)',
-                    helpText:
-                        'Filtar se odnosi na datum narudžbe ako postoji, inače na datum kreiranja zapisa.',
-                    from: _dateFrom,
-                    to: _dateTo,
-                    onPickFrom: _pickDateFrom,
-                    onPickTo: _pickDateTo,
-                    onClear: _clearDateRange,
-                  ),
-                ],
-              ),
-            ),
-            crossFadeState: _filtersExpanded
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 180),
-            sizeCurve: Curves.easeInOut,
-            alignment: Alignment.topCenter,
-          ),
+          _buildSearch(compact: true),
+          const SizedBox(height: 10),
+          _buildStatusTypeDateFilters(),
         ],
       ),
     );
   }
 
-  Widget _buildOrderCard(OrderModel o) {
-    final color = orderStatusColor(o.status);
+  /// Širina kolone „Broj nar.“ — dovoljno za `SO-2026-000002` u jednom redu.
+  static const double _colOrderNumber = 132;
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => OrderDetailsScreen(
-              companyData: widget.companyData,
-              order: o,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade200),
-          borderRadius: BorderRadius.circular(16),
-          color: Colors.white,
-          boxShadow: const [
-            BoxShadow(
-              blurRadius: 12,
-              offset: Offset(0, 4),
-              color: Color(0x08000000),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final isCompact = constraints.maxWidth < 420;
+  static const double _orderTableWidth =
+      1180 - 92 + _colOrderNumber; // zamjena stare širine prve kolone
 
-                if (isCompact) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        o.orderNumber,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.10),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          orderStatusLabel(o.status),
-                          style: TextStyle(
-                            color: color,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                }
+  DateTime _deadlineSortKey(OrderModel o, OrderItemModel? it) {
+    final lineDue = it?.dueDate;
+    if (lineDue != null) return lineDue;
+    return o.requestedDeliveryDate ??
+        o.orderDate ??
+        o.createdAt ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+  }
 
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        o.orderNumber,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        orderStatusLabel(o.status),
-                        style: TextStyle(
-                          color: color,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 10),
-            Text(
-              o.partnerName,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-            ),
-            if ((o.partnerCode ?? '').isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                'Šifra partnera: ${o.partnerCode}',
-                style: const TextStyle(fontSize: 12, color: Colors.black54),
-              ),
-            ],
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _buildMetaPill(
-                  icon: Icons.swap_horiz_rounded,
-                  label: _typeLabel(o.orderType),
-                ),
-                _buildMetaPill(
-                  icon: Icons.inventory_2_outlined,
-                  label: 'Qty: ${_formatQty(o.totalQty)}',
-                ),
-                _buildMetaPill(
-                  icon: Icons.calendar_today_outlined,
-                  label: _formatDate(o.createdAt),
-                ),
-              ],
-            ),
-          ],
+  String? _partnerRef(OrderModel o) {
+    switch (o.orderType) {
+      case OrderType.customer:
+        final r = o.customerReference?.trim();
+        return (r == null || r.isEmpty) ? null : r;
+      case OrderType.supplier:
+        final r = o.supplierReference?.trim();
+        return (r == null || r.isEmpty) ? null : r;
+    }
+  }
+
+  double _remainingQty(OrderModel o, OrderItemModel? it) {
+    if (it == null) return 0;
+    if (it.openQty > 0) return it.openQty;
+    if (o.orderType == OrderType.customer) {
+      final v = it.qty - it.deliveredQty;
+      return v > 0 ? v : 0;
+    }
+    final v = it.qty - it.receivedQty;
+    return v > 0 ? v : 0;
+  }
+
+  double _fulfilledQty(OrderModel o, OrderItemModel? it) {
+    if (it == null) return 0;
+    return o.orderType == OrderType.customer ? it.deliveredQty : it.receivedQty;
+  }
+
+  bool _rowReady(OrderModel o, OrderItemModel? it) {
+    if (it == null) return false;
+    if (o.status == OrderStatus.cancelled) return false;
+    final rem = _remainingQty(o, it);
+    if (rem <= 0) return false;
+    final pid = it.productId.trim();
+    if (pid.isEmpty) return false;
+    final stock = _stockByProductId[pid] ?? 0;
+    return stock + 1e-9 >= rem;
+  }
+
+  List<({OrderModel o, OrderItemModel? it})> _sortedLinesForOrders(
+    List<OrderModel> orders,
+  ) {
+    final lines = <({OrderModel o, OrderItemModel? it})>[];
+    for (final o in orders) {
+      if (o.items.isEmpty) {
+        lines.add((o: o, it: null));
+      } else {
+        for (final it in o.items) {
+          lines.add((o: o, it: it));
+        }
+      }
+    }
+    lines.sort((a, b) {
+      final c = _deadlineSortKey(a.o, a.it).compareTo(_deadlineSortKey(b.o, b.it));
+      if (c != 0) return c;
+      final n = a.o.orderNumber.compareTo(b.o.orderNumber);
+      if (n != 0) return n;
+      return (a.it?.productCode ?? '').compareTo(b.it?.productCode ?? '');
+    });
+    return lines;
+  }
+
+  Future<void> _openOrder(OrderModel o) async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OrderDetailsScreen(
+          companyData: widget.companyData,
+          order: o,
         ),
       ),
     );
+    if (mounted) await _loadOrders();
   }
 
-  Widget _buildMetaPill({required IconData icon, required String label}) {
+  Widget _orderTableHeaderRow() {
+    final cs = Theme.of(context).colorScheme;
+    final headerStyle = TextStyle(
+      color: cs.onSurface,
+      fontSize: 11,
+      fontWeight: FontWeight.w700,
+    );
+    Widget th(String text, double w) {
+      return SizedBox(
+        width: w,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          child: Text(text, style: headerStyle),
+        ),
+      );
+    }
+
+    Widget thExp(String text) {
+      return Expanded(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          child: Text(text, style: headerStyle),
+        ),
+      );
+    }
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      width: _orderTableWidth,
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
-        borderRadius: BorderRadius.circular(999),
+        color: cs.surfaceContainerHighest,
+        border: Border.all(color: cs.outlineVariant, width: 1),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 14, color: Colors.black54),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, color: Colors.black87),
-          ),
+          th('Broj nar.', _colOrderNumber),
+          th('Datum nar.', 82),
+          th('Ref.', 84),
+          th('Rok isporuke', 88),
+          th('Tip', 52),
+          th('Status', 76),
+          th('Šifra', 84),
+          thExp('Naziv'),
+          th('MJ', 44),
+          th('Naručeno', 72),
+          th('Isp./Prim.', 72),
+          th('Ostalo', 64),
+          th('Stanje', 72),
         ],
       ),
+    );
+  }
+
+  Widget _orderDataRow(OrderModel o, OrderItemModel? it) {
+    final cs = Theme.of(context).colorScheme;
+    final ready = _rowReady(o, it);
+    final bg = ready
+        ? Color.alphaBlend(
+            const Color(0xFFC8E6C9).withValues(alpha: 0.85),
+            cs.surface,
+          )
+        : cs.surface;
+    final border = Border.all(color: cs.outlineVariant, width: 1);
+    final cellTextStyle = TextStyle(fontSize: 11, color: cs.onSurface);
+
+    Widget td(
+      String text,
+      double w, {
+      bool right = false,
+      int maxLines = 3,
+      bool softWrap = true,
+    }) {
+      return Container(
+        width: w,
+        decoration: BoxDecoration(color: bg, border: border),
+        alignment: right ? Alignment.centerRight : Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: Text(
+          text,
+          style: cellTextStyle,
+          maxLines: maxLines,
+          softWrap: softWrap,
+          overflow: TextOverflow.ellipsis,
+        ),
+      );
+    }
+
+    Widget tdExp(String text) {
+      return Expanded(
+        child: Container(
+          decoration: BoxDecoration(color: bg, border: border),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          child: Text(
+            text,
+            style: cellTextStyle,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      );
+    }
+
+    final ref = _partnerRef(o);
+    final rok = _formatDate(
+      it?.dueDate ?? o.requestedDeliveryDate ?? o.confirmedDeliveryDate,
+    );
+    final pid = (it?.productId ?? '').trim();
+    final stock = pid.isEmpty ? null : (_stockByProductId[pid]);
+
+    final nar = it == null ? '—' : _formatQty(it.qty);
+    final isp = it == null ? '—' : _formatQty(_fulfilledQty(o, it));
+    final ost = it == null ? '—' : _formatQty(_remainingQty(o, it));
+    final stText = stock == null ? '—' : _formatQty(stock);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _openOrder(o),
+        child: SizedBox(
+          width: _orderTableWidth,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              td(
+                o.orderNumber,
+                _colOrderNumber,
+                maxLines: 1,
+                softWrap: false,
+              ),
+              td(_formatDate(o.orderDate ?? o.createdAt), 82),
+              td(ref ?? '—', 84),
+              td(rok, 88),
+              td(_typeLabel(o.orderType), 52),
+              td(orderStatusLabel(o.status), 76),
+              td(it?.productCode ?? '—', 84),
+              tdExp(it?.productName ?? 'Nema učitanih stavki'),
+              td(() {
+                final u = (it?.unit ?? '').trim();
+                return u.isEmpty ? '—' : u;
+              }(), 44),
+              td(nar, 72, right: true),
+              td(isp, 72, right: true),
+              td(ost, 64, right: true),
+              td(stText, 72, right: true),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _orderPartnerFooter(String partner, List<OrderModel> orders) {
+    final cs = Theme.of(context).colorScheme;
+    final lines = _sortedLinesForOrders(orders);
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Text(
+        'Ukupno za $partner: narudžbi ${orders.length}, '
+        'redova (stavki) ${lines.length}.',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: cs.onSurface,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGroupedOrderTables(List<OrderModel> list) {
+    final byPartner = <String, List<OrderModel>>{};
+    for (final o in list) {
+      final k =
+          o.partnerName.trim().isEmpty ? 'Nepoznat partner' : o.partnerName.trim();
+      byPartner.putIfAbsent(k, () => []).add(o);
+    }
+    final keys = byPartner.keys.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final scrollW = constraints.maxWidth < _orderTableWidth
+            ? _orderTableWidth
+            : constraints.maxWidth;
+        final cs = Theme.of(context).colorScheme;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Pregled po kupcu / partneru — redovi sortirani po roku isporuke. '
+              'Zelena pozadina: dovoljno zalihe za ostatak.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            for (var pi = 0; pi < keys.length; pi++) ...[
+              if (pi > 0) const SizedBox(height: 14),
+              Material(
+                color: cs.primaryContainer,
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Text(
+                    keys[pi],
+                    style: TextStyle(
+                      color: cs.onPrimaryContainer,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Material(
+                color: cs.surface,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: cs.outlineVariant),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.only(bottom: 2, right: 4),
+                  child: SizedBox(
+                    width: scrollW,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _orderTableHeaderRow(),
+                        for (final line
+                            in _sortedLinesForOrders(byPartner[keys[pi]]!))
+                          _orderDataRow(line.o, line.it),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              _orderPartnerFooter(keys[pi], byPartner[keys[pi]]!),
+            ],
+          ],
+        );
+      },
     );
   }
 
@@ -902,9 +1042,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                       const SizedBox(height: 16),
                       _buildKpis(),
                       const SizedBox(height: 16),
-                      _buildSearch(),
-                      const SizedBox(height: 12),
-                      _buildFilters(),
+                      _buildSearchAndFiltersStrip(),
                     ],
                   ),
                 ),
@@ -945,10 +1083,17 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
               else
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, i) => _buildOrderCard(list[i]),
-                      childCount: list.length,
+                  sliver: SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (_stockLoading)
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 8),
+                            child: LinearProgressIndicator(minHeight: 3),
+                          ),
+                        _buildGroupedOrderTables(list),
+                      ],
                     ),
                   ),
                 ),
@@ -996,7 +1141,8 @@ extension OrderStatusFilterX on OrderStatusFilter {
   bool matches(OrderModel o) {
     switch (this) {
       case OrderStatusFilter.all:
-        return true;
+        // Operativni pregled: otkazane su na filteru "Otkazane".
+        return o.status != OrderStatus.cancelled;
       case OrderStatusFilter.draft:
         return o.status == OrderStatus.draft;
       case OrderStatusFilter.confirmed:

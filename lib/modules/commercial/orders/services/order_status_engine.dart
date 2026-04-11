@@ -76,6 +76,27 @@ class OrderStatusEngine {
     }
   }
 
+  /// Provjera bez bacanja iznimke (npr. vidljivost dugmadi Zatvori / Otkaži).
+  bool canManualTransition({
+    required String orderType,
+    required String currentStatus,
+    required String newStatus,
+  }) {
+    final from = currentStatus.trim().toLowerCase();
+    final to = newStatus.trim().toLowerCase();
+    if (from.isEmpty || to.isEmpty || from == to) return false;
+    try {
+      validateManualStatusTransition(
+        orderType: orderType,
+        currentStatus: currentStatus,
+        newStatus: newStatus,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   String calculateCustomerOrderStatus({
     required String currentStatus,
     required int totalItems,

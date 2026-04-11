@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:excel/excel.dart' as excel_pkg;
@@ -6,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/ui/standard_list_components.dart';
+import '../../../logistics/inventory/services/product_warehouse_stock_service.dart';
 import '../services/product_service.dart';
 import 'product_create_screen.dart';
 import 'product_details_screen.dart';
@@ -21,15 +23,32 @@ class ProductsListScreen extends StatefulWidget {
 
 class _ProductsListScreenState extends State<ProductsListScreen> {
   final ProductService _productService = ProductService();
+  final ProductWarehouseStockService _stockService = ProductWarehouseStockService();
   final TextEditingController _searchController = TextEditingController();
 
   bool _isLoading = true;
   bool _isImporting = false;
   bool _filtersExpanded = false;
+  bool _stockLoading = false;
   ProductStatusFilter _selectedStatus = ProductStatusFilter.all;
 
   String? _errorMessage;
   List<Map<String, dynamic>> _products = <Map<String, dynamic>>[];
+  List<WarehouseRef> _warehouses = const [];
+
+  /// null = svi
+  String? _filterCustomerName;
+  /// null = svi tipovi; vrijednosti: GK, PP, SK, MA, PM, __ostalo__
+  String? _filterPieceTypeKey;
+  /// null = sve ukupno (zbir po magacinima u kontekstu pogona)
+  String? _filterWarehouseId;
+
+  Timer? _searchDebounce;
+
+  /// Keš linija zalihe po proizvodu (učitava se za trenutno filtriranu listu).
+  final Map<String, List<ProductWarehouseStockLine>> _stockLinesByProductId = {};
+  Map<String, double> _displayStockQty = <String, double>{};
+  int _stockRequestId = 0;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -43,27 +62,155 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(() {
+      if (!mounted) return;
+      setState(() {});
+      _searchDebounce?.cancel();
+      _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+        if (mounted) unawaited(_refreshStockForFiltered());
+      });
+    });
     _loadProducts();
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
   String _s(dynamic value) => (value ?? '').toString().trim();
 
+  String get _companyPlantKey =>
+      _s(widget.companyData['plantKey']).isEmpty ? '' : _s(widget.companyData['plantKey']);
+
+  static const Set<String> _piecePrefixes = {'GK', 'PP', 'SK', 'MA', 'PM'};
+  static const List<String> _pieceTypeOrder = [
+    'GK',
+    'PP',
+    'SK',
+    'MA',
+    'PM',
+    '__ostalo__',
+  ];
+
+  /// Tip komada po prva 2 znaka šifre (GK/PP/SK/MA/PM), inače „ostalo”.
+  String _pieceTypeKey(Map<String, dynamic> p) {
+    final raw = _s(p['productCode']);
+    if (raw.length < 2) return '__ostalo__';
+    final two = raw.substring(0, 2).toUpperCase();
+    if (_piecePrefixes.contains(two)) return two;
+    return '__ostalo__';
+  }
+
+  String _pieceTypeTitleFromKey(String key) {
+    switch (key) {
+      case 'GK':
+        return 'GK – Gotov komad';
+      case 'PP':
+        return 'PP – Poluproizvod';
+      case 'SK':
+        return 'SK – Sirov komad';
+      case 'MA':
+        return 'MA – Materijali';
+      case 'PM':
+        return 'PM – Potrošni materijal';
+      default:
+        return 'Ostalo (šifra ne počinje sa GK/PP/SK/MA/PM)';
+    }
+  }
+
+  String _customerLabel(Map<String, dynamic> p) =>
+      _s(p['customerName']).isEmpty ? 'Bez kupca' : _s(p['customerName']);
+
   List<Map<String, dynamic>> get _filteredProducts {
     final q = _searchController.text.trim().toLowerCase();
     return _products.where((p) {
       final code = _s(p['productCode']).toLowerCase();
       final name = _s(p['productName']).toLowerCase();
+      final cust = _customerLabel(p).toLowerCase();
       final status = _s(p['status']).toLowerCase();
-      final matchesSearch = q.isEmpty || code.contains(q) || name.contains(q);
+      final ptKey = _pieceTypeKey(p);
+      final ptTitle = _pieceTypeTitleFromKey(ptKey).toLowerCase();
+      final matchesSearch = q.isEmpty ||
+          code.contains(q) ||
+          name.contains(q) ||
+          cust.contains(q) ||
+          ptKey.toLowerCase().contains(q) ||
+          ptTitle.contains(q);
       final matchesStatus = _selectedStatus.matches(status);
-      return matchesSearch && matchesStatus;
+      final matchesCustomer = _filterCustomerName == null ||
+          _customerLabel(p) == _filterCustomerName;
+      final matchesPiece = _filterPieceTypeKey == null ||
+          _pieceTypeKey(p) == _filterPieceTypeKey;
+      return matchesSearch &&
+          matchesStatus &&
+          matchesCustomer &&
+          matchesPiece;
     }).toList();
+  }
+
+  List<String> _distinctCustomers() {
+    final s = <String>{};
+    for (final p in _products) {
+      final n = _customerLabel(p);
+      if (n != 'Bez kupca') s.add(n);
+    }
+    final list = s.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return list;
+  }
+
+  List<String> _distinctPieceTypeKeys() {
+    final s = <String>{};
+    for (final p in _products) {
+      s.add(_pieceTypeKey(p));
+    }
+    final list = s.toList()
+      ..sort((a, b) {
+        final ia = _pieceTypeOrder.indexOf(a);
+        final ib = _pieceTypeOrder.indexOf(b);
+        final va = ia < 0 ? 999 : ia;
+        final vb = ib < 0 ? 999 : ib;
+        final c = va.compareTo(vb);
+        if (c != 0) return c;
+        return a.compareTo(b);
+      });
+    return list;
+  }
+
+  String _fmtNum(double? v, {bool emptyAsDash = true}) {
+    if (v == null) return emptyAsDash ? '—' : '0,00';
+    if (v.isNaN) return '—';
+    final t = v == v.roundToDouble()
+        ? v.toInt().toString()
+        : v.toStringAsFixed(2).replaceAll('.', ',');
+    return t;
+  }
+
+  double? _displayQty(Map<String, dynamic> p) {
+    final pq = _parseDouble(p['packagingQty']);
+    if (pq != null && pq > 0) return pq;
+    return null;
+  }
+
+  double? _unitPrice(Map<String, dynamic> p) {
+    return _parseDouble(
+      p['standardUnitPrice'] ?? p['unitPrice'] ?? p['listPrice'],
+    );
+  }
+
+  String _currency(Map<String, dynamic> p) {
+    final c = _s(p['currency']);
+    return c.isEmpty ? 'KM' : c;
+  }
+
+  double? _lineTotal(Map<String, dynamic> p) {
+    final q = _displayQty(p);
+    final u = _unitPrice(p);
+    if (q == null || u == null) return null;
+    return q * u;
   }
 
   double? _parseDouble(dynamic value) {
@@ -120,13 +267,33 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
 
     try {
       final items = await _productService.getProducts(companyId: _companyId);
+      final wh = await _stockService.listActiveWarehouses(
+        companyId: _companyId,
+        plantKey: _companyPlantKey.isEmpty ? null : _companyPlantKey,
+      );
 
       if (!mounted) return;
 
       setState(() {
         _products = items;
+        _warehouses = wh;
         _isLoading = false;
+        _stockLinesByProductId.clear();
+        _displayStockQty = <String, double>{};
+        if (_filterCustomerName != null &&
+            !_distinctCustomers().contains(_filterCustomerName)) {
+          _filterCustomerName = null;
+        }
+        if (_filterPieceTypeKey != null &&
+            !_distinctPieceTypeKeys().contains(_filterPieceTypeKey)) {
+          _filterPieceTypeKey = null;
+        }
+        if (_filterWarehouseId != null &&
+            !_warehouses.any((w) => w.id == _filterWarehouseId)) {
+          _filterWarehouseId = null;
+        }
       });
+      await _refreshStockForFiltered();
     } catch (e) {
       if (!mounted) return;
 
@@ -135,6 +302,84 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
         _isLoading = false;
         _products = <Map<String, dynamic>>[];
       });
+    }
+  }
+
+  void _applyStockDisplay() {
+    final wid = _filterWarehouseId;
+    final next = <String, double>{};
+    for (final p in _filteredProducts) {
+      final id = _s(p['productId']);
+      if (id.isEmpty) continue;
+      final lines = _stockLinesByProductId[id];
+      if (lines == null) continue;
+      if (wid == null) {
+        next[id] = lines.fold<double>(
+          0,
+          (a, b) => a + b.quantityOnHand,
+        );
+      } else {
+        next[id] = lines
+            .where((l) => l.warehouseId == wid)
+            .fold<double>(0, (a, b) => a + b.quantityOnHand);
+      }
+    }
+    if (!mounted) return;
+    setState(() => _displayStockQty = next);
+  }
+
+  Future<void> _refreshStockForFiltered() async {
+    if (_companyId.isEmpty) return;
+
+    final req = ++_stockRequestId;
+
+    final ids = _filteredProducts
+        .map((p) => _s(p['productId']))
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
+    if (ids.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _displayStockQty = <String, double>{};
+          _stockLoading = false;
+        });
+      }
+      return;
+    }
+
+    _stockLinesByProductId.removeWhere((k, _) => !ids.contains(k));
+
+    if (mounted) setState(() => _stockLoading = true);
+
+    final plant = _companyPlantKey.isEmpty ? null : _companyPlantKey;
+    const batchSize = 6;
+
+    try {
+      final idList = ids.toList();
+      for (var i = 0; i < idList.length; i += batchSize) {
+        if (!mounted || req != _stockRequestId) return;
+        final chunk = idList.sublist(
+          i,
+          i + batchSize > idList.length ? idList.length : i + batchSize,
+        );
+        await Future.wait(chunk.map((id) async {
+          if (_stockLinesByProductId.containsKey(id)) return;
+          final lines = await _stockService.loadStockLinesForProduct(
+            companyId: _companyId,
+            productId: id,
+            plantKey: plant,
+          );
+          if (req != _stockRequestId) return;
+          _stockLinesByProductId[id] = lines;
+        }));
+      }
+      if (!mounted || req != _stockRequestId) return;
+      _applyStockDisplay();
+    } finally {
+      if (mounted && req == _stockRequestId) {
+        setState(() => _stockLoading = false);
+      }
     }
   }
 
@@ -201,19 +446,30 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                   SizedBox(height: 8),
-                  Text('• unit'),
-                  Text('• description'),
-                  Text('• packagingQty'),
-                  Text('• status'),
+                  Text('• unit, description, status, packagingQty'),
+                  Text('• customerId, customerName (ili kupac)'),
+                  Text('• defaultPlantKey (ili plantKey, pogon)'),
+                  Text(
+                    '• secondaryClassificationCode, secondaryClassificationDescription',
+                  ),
+                  Text('• secondaryClassification (jedna kolona → opis)'),
+                  Text('• standardUnitPrice (ili unitPrice, listPrice, jedinicnaCijena)'),
+                  Text('• currency (ili valuta, npr. KM)'),
                   SizedBox(height: 12),
                   Text(
                     'Primjer reda:',
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                   SizedBox(height: 8),
-                  Text('CAP-001 | Čep 28 mm | KOM | 12 | active'),
+                  Text(
+                    'CAP-001 | Čep 28 mm | KOM | opis… | active | 12 | CUST1 | Kupac d.o.o. | '
+                    'PLANT1 | PP09 | POLUPROIZVOD… | 0,42 | KM',
+                  ),
                   SizedBox(height: 12),
-                  Text('🛈 Ako status nije unesen, koristi se active.'),
+                  Text(
+                    '🛈 Ako status nije unesen, koristi se active. Neispravni brojevi '
+                    '(cijena, packaging) preskaču red.',
+                  ),
                 ],
               ),
             ),
@@ -319,6 +575,54 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
         final statusRaw = _readRowValue(row, headerIndex, const ['status']);
         final packagingQtyRaw = _readRowValue(row, headerIndex, const [
           'packagingQty',
+          'kolicinaPakovanja',
+          'kolPakovanja',
+        ]);
+        final customerId = _readRowValue(row, headerIndex, const [
+          'customerId',
+          'kupacId',
+        ]);
+        final customerName = _readRowValue(row, headerIndex, const [
+          'customerName',
+          'kupac',
+          'nazivKupca',
+        ]);
+        final defaultPlantKey = _readRowValue(row, headerIndex, const [
+          'defaultPlantKey',
+          'plantKey',
+          'pogon',
+        ]);
+        final secCode = _readRowValue(row, headerIndex, const [
+          'secondaryClassificationCode',
+          'secondaryclassificationcode',
+          'sekundarnaklasifikacijasifra',
+          'sekklasifsifra',
+          'sekklasifkod',
+        ]);
+        final secDesc = _readRowValue(row, headerIndex, const [
+          'secondaryClassificationDescription',
+          'secondaryclassificationdescription',
+          'sekundarnaklasifikacijaopis',
+          'sekklasifopis',
+        ]);
+        final secCombined = _readRowValue(row, headerIndex, const [
+          'secondaryClassification',
+          'secondaryclassification',
+          'sekundarnaklasifikacija',
+        ]);
+        final standardPriceRaw = _readRowValue(row, headerIndex, const [
+          'standardUnitPrice',
+          'standardunitprice',
+          'unitPrice',
+          'unitprice',
+          'listPrice',
+          'listprice',
+          'jedinicnacijena',
+          'cijena',
+        ]);
+        final currencyRaw = _readRowValue(row, headerIndex, const [
+          'currency',
+          'valuta',
         ]);
 
         if (productCode.isEmpty && productName.isEmpty) {
@@ -346,6 +650,30 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
         }
 
         final packagingQty = _parseDouble(packagingQtyRaw);
+        if (packagingQtyRaw.trim().isNotEmpty && packagingQty == null) {
+          skippedCount++;
+          skippedRows.add(
+            'Red ${rowIndex + 1}: neispravan packagingQty („$packagingQtyRaw”).',
+          );
+          continue;
+        }
+
+        final standardUnitPrice = _parseDouble(standardPriceRaw);
+        if (standardPriceRaw.trim().isNotEmpty && standardUnitPrice == null) {
+          skippedCount++;
+          skippedRows.add(
+            'Red ${rowIndex + 1}: neispravan standardUnitPrice („$standardPriceRaw”).',
+          );
+          continue;
+        }
+
+        var outSecCode = secCode.trim();
+        var outSecDesc = secDesc.trim();
+        if (outSecCode.isEmpty &&
+            outSecDesc.isEmpty &&
+            secCombined.trim().isNotEmpty) {
+          outSecDesc = secCombined.trim();
+        }
 
         try {
           await _productService.createProduct(
@@ -357,6 +685,15 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
             unit: unit.isEmpty ? null : unit,
             description: description.isEmpty ? null : description,
             packagingQty: packagingQty,
+            customerId: customerId.isEmpty ? null : customerId,
+            customerName: customerName.isEmpty ? null : customerName,
+            defaultPlantKey: defaultPlantKey.isEmpty ? null : defaultPlantKey,
+            secondaryClassificationCode:
+                outSecCode.isEmpty ? null : outSecCode,
+            secondaryClassificationDescription:
+                outSecDesc.isEmpty ? null : outSecDesc,
+            standardUnitPrice: standardUnitPrice,
+            currency: currencyRaw.trim().isEmpty ? null : currencyRaw.trim(),
           );
           createdCount++;
         } catch (e) {
@@ -495,8 +832,192 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   Widget _buildSearch() {
     return StandardSearchField(
       controller: _searchController,
-      hintText: 'Pretraga po šifri ili nazivu proizvoda',
-      onChanged: (_) => setState(() {}),
+      hintText: 'Šifra, naziv, kupac, tip komada (GK, PP…)…',
+    );
+  }
+
+  int get _axisFilterActiveCount =>
+      (_filterCustomerName != null ? 1 : 0) +
+      (_filterPieceTypeKey != null ? 1 : 0) +
+      (_filterWarehouseId != null ? 1 : 0);
+
+  Widget _buildAxisFilters() {
+    final customers = _distinctCustomers();
+    final pieceKeys = _distinctPieceTypeKeys();
+
+    Widget axisDropdown<T>({
+      required String label,
+      required T? value,
+      required List<DropdownMenuItem<T?>> items,
+      required ValueChanged<T?> onChanged,
+    }) {
+      return DropdownButtonFormField<T?>(
+        isExpanded: true,
+        decoration: InputDecoration(
+          labelText: label,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 8,
+          ),
+        ),
+        value: value,
+        items: items,
+        onChanged: onChanged,
+      );
+    }
+
+    List<DropdownMenuItem<String?>> customerItems() => [
+          const DropdownMenuItem<String?>(
+            value: null,
+            child: Text('Svi'),
+          ),
+          ...customers.map(
+            (n) => DropdownMenuItem<String?>(
+              value: n,
+              child: Text(n, overflow: TextOverflow.ellipsis),
+            ),
+          ),
+        ];
+
+    List<DropdownMenuItem<String?>> pieceItems() => [
+          const DropdownMenuItem<String?>(
+            value: null,
+            child: Text('Sve'),
+          ),
+          ...pieceKeys.map(
+            (k) => DropdownMenuItem<String?>(
+              value: k,
+              child: Text(
+                _pieceTypeTitleFromKey(k),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        ];
+
+    List<DropdownMenuItem<String?>> warehouseItems() => [
+          const DropdownMenuItem<String?>(
+            value: null,
+            child: Text('Sve ukupno'),
+          ),
+          ..._warehouses.map(
+            (w) => DropdownMenuItem<String?>(
+              value: w.id,
+              child: Text(
+                '${w.code} – ${w.name}',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LayoutBuilder(
+          builder: (context, c) {
+            if (c.maxWidth < 560) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: axisDropdown<String?>(
+                      label: 'Kupac',
+                      value: _filterCustomerName,
+                      items: customerItems(),
+                      onChanged: (v) {
+                        setState(() => _filterCustomerName = v);
+                        unawaited(_refreshStockForFiltered());
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: axisDropdown<String?>(
+                      label: 'Klasifikacija (tip komada)',
+                      value: _filterPieceTypeKey,
+                      items: pieceItems(),
+                      onChanged: (v) {
+                        setState(() => _filterPieceTypeKey = v);
+                        unawaited(_refreshStockForFiltered());
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: axisDropdown<String?>(
+                      label: 'Magacin',
+                      value: _filterWarehouseId,
+                      items: warehouseItems(),
+                      onChanged: (v) {
+                        setState(() => _filterWarehouseId = v);
+                        _applyStockDisplay();
+                      },
+                    ),
+                  ),
+                ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8, bottom: 8),
+                    child: axisDropdown<String?>(
+                      label: 'Kupac',
+                      value: _filterCustomerName,
+                      items: customerItems(),
+                      onChanged: (v) {
+                        setState(() => _filterCustomerName = v);
+                        unawaited(_refreshStockForFiltered());
+                      },
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8, bottom: 8),
+                    child: axisDropdown<String?>(
+                      label: 'Klasifikacija (tip komada)',
+                      value: _filterPieceTypeKey,
+                      items: pieceItems(),
+                      onChanged: (v) {
+                        setState(() => _filterPieceTypeKey = v);
+                        unawaited(_refreshStockForFiltered());
+                      },
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8, bottom: 8),
+                    child: axisDropdown<String?>(
+                      label: 'Magacin',
+                      value: _filterWarehouseId,
+                      items: warehouseItems(),
+                      onChanged: (v) {
+                        setState(() => _filterWarehouseId = v);
+                        _applyStockDisplay();
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+        Text(
+          'Tip komada: prva 2 znaka šifre (GK gotov komad, PP poluproizvod, SK sirov komad, '
+          'MA materijali, PM potrošni materijal). Zaliha: odabrani magacin ili „Sve ukupno“ '
+          '(magacini u kontekstu pogona iz companyData).',
+          style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+        ),
+      ],
     );
   }
 
@@ -516,7 +1037,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
       );
     }
 
-    final activeCount = _selectedStatus == ProductStatusFilter.all ? 0 : 1;
+    final activeCount =
+        _axisFilterActiveCount + (_selectedStatus == ProductStatusFilter.all ? 0 : 1);
 
     return StandardFilterPanel(
       expanded: _filtersExpanded,
@@ -532,12 +1054,343 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
               return chip(
                 label: status.label,
                 selected: _selectedStatus == status,
-                onTap: () => setState(() => _selectedStatus = status),
+                onTap: () {
+                  setState(() => _selectedStatus = status);
+                  unawaited(_refreshStockForFiltered());
+                },
               );
             }).toList(),
           ),
         ],
       ),
+    );
+  }
+
+  static const double _reportTableWidth = 1060;
+
+  Widget _reportHeaderRow() {
+    final cs = Theme.of(context).colorScheme;
+    final border = BorderSide(color: cs.outlineVariant, width: 1);
+    Widget cell(String t, double? w,
+        {bool exp = false, bool right = false, bool bold = true}) {
+      final child = Text(
+        t,
+        textAlign: right ? TextAlign.right : TextAlign.left,
+        style: TextStyle(
+          fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
+          fontSize: 11,
+          color: cs.onSurface,
+        ),
+      );
+      final box = Container(
+        width: w,
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest,
+          border: Border.all(color: border.color, width: border.width),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 7),
+        alignment: right ? Alignment.centerRight : Alignment.centerLeft,
+        child: child,
+      );
+      if (exp) {
+        return Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest,
+              border: Border.all(
+                color: border.color,
+                width: border.width,
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 7),
+            alignment: right ? Alignment.centerRight : Alignment.centerLeft,
+            child: child,
+          ),
+        );
+      }
+      return box;
+    }
+
+    return SizedBox(
+      width: _reportTableWidth,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          cell('Šifra', 104),
+          cell('Naziv', null, exp: true),
+          cell('Pakovanje', 76, right: true),
+          cell('MJ', 44),
+          cell('Zaliha', 72, right: true),
+          cell('Jed. cij.', 78, right: true),
+          cell('Ukupno', 78, right: true),
+          cell('Val', 40),
+          cell('Stat.', 64),
+        ],
+      ),
+    );
+  }
+
+  Widget _reportDataRow(Map<String, dynamic> p) {
+    final cs = Theme.of(context).colorScheme;
+    final border = BorderSide(color: cs.outlineVariant, width: 1);
+    final pid = _s(p['productId']);
+    final code = _s(p['productCode']);
+    final name = _s(p['productName']);
+    final qty = _displayQty(p);
+    final unit = _s(p['unit']).isEmpty ? 'KOM' : _s(p['unit']);
+    final stock = _displayStockQty[pid];
+    final up = _unitPrice(p);
+    final tot = _lineTotal(p);
+    final cur = _currency(p);
+    final st = _s(p['status']);
+
+    Widget cell(Widget child, double? w, {bool exp = false}) {
+      final box = Container(
+        width: w,
+        decoration: BoxDecoration(
+          border: Border.all(color: border.color, width: border.width),
+          color: cs.surface,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+        alignment: Alignment.centerLeft,
+        child: DefaultTextStyle.merge(
+          style: TextStyle(fontSize: 11, color: cs.onSurface),
+          child: child,
+        ),
+      );
+      if (exp) {
+        return Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: border.color,
+                width: border.width,
+              ),
+              color: cs.surface,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+            alignment: Alignment.centerLeft,
+            child: DefaultTextStyle.merge(
+              style: TextStyle(fontSize: 11, color: cs.onSurface),
+              child: child,
+            ),
+          ),
+        );
+      }
+      return box;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _openProductDetails(p),
+        child: SizedBox(
+          width: _reportTableWidth,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              cell(Text(code.isEmpty ? '—' : code), 104),
+              cell(
+                Text(
+                  name.isEmpty ? '—' : name,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                null,
+                exp: true,
+              ),
+              cell(
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(_fmtNum(qty)),
+                ),
+                76,
+              ),
+              cell(Text(unit), 44),
+              cell(
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    _stockLoading && !_displayStockQty.containsKey(pid)
+                        ? '…'
+                        : _fmtNum(stock),
+                  ),
+                ),
+                72,
+              ),
+              cell(
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(_fmtNum(up)),
+                ),
+                78,
+              ),
+              cell(
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(_fmtNum(tot)),
+                ),
+                78,
+              ),
+              cell(Text(cur), 40),
+              cell(
+                Text(
+                  _statusLabel(st),
+                  style: TextStyle(
+                    color: _statusColor(st),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                64,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _productGroupFooter(List<Map<String, dynamic>> rows) {
+    final cs = Theme.of(context).colorScheme;
+    final n = rows.length;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Text(
+        'Ukupno u ovoj grupi: $n stavki.',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: cs.onSurface,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGroupedProductReport(List<Map<String, dynamic>> list) {
+    final sorted = List<Map<String, dynamic>>.from(list)
+      ..sort((a, b) {
+        var c = _customerLabel(a).toLowerCase().compareTo(
+              _customerLabel(b).toLowerCase());
+        if (c != 0) return c;
+        final ka = _pieceTypeKey(a);
+        final kb = _pieceTypeKey(b);
+        final ia = _pieceTypeOrder.indexOf(ka);
+        final ib = _pieceTypeOrder.indexOf(kb);
+        c = (ia < 0 ? 999 : ia).compareTo(ib < 0 ? 999 : ib);
+        if (c != 0) return c;
+        return _s(a['productCode']).compareTo(_s(b['productCode']));
+      });
+
+    final nested = <String, Map<String, List<Map<String, dynamic>>>>{};
+    final custOrder = <String>[];
+    final clsOrderByCust = <String, List<String>>{};
+
+    for (final p in sorted) {
+      final cust = _customerLabel(p);
+      final cls = _pieceTypeKey(p);
+      nested.putIfAbsent(cust, () => {});
+      nested[cust]!.putIfAbsent(cls, () => []).add(p);
+      clsOrderByCust.putIfAbsent(cust, () => []);
+      if (!clsOrderByCust[cust]!.contains(cls)) {
+        clsOrderByCust[cust]!.add(cls);
+      }
+      if (!custOrder.contains(cust)) {
+        custOrder.add(cust);
+      }
+    }
+
+    final blocks = <Widget>[];
+    final cs = Theme.of(context).colorScheme;
+
+    for (var ci = 0; ci < custOrder.length; ci++) {
+      final cust = custOrder[ci];
+      if (ci > 0) blocks.add(const SizedBox(height: 14));
+
+      blocks.add(
+        Material(
+          color: cs.primaryContainer,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Text(
+              cust,
+              style: TextStyle(
+                color: cs.onPrimaryContainer,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ),
+      );
+      blocks.add(const SizedBox(height: 6));
+
+      for (var ki = 0; ki < clsOrderByCust[cust]!.length; ki++) {
+        final cls = clsOrderByCust[cust]![ki];
+        final rows = nested[cust]![cls]!;
+        if (rows.isEmpty) continue;
+        final title = _pieceTypeTitleFromKey(cls);
+
+        if (ki > 0) blocks.add(const SizedBox(height: 10));
+
+        blocks.add(
+          Material(
+            color: cs.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: cs.onSurface,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12.5,
+                ),
+              ),
+            ),
+          ),
+        );
+        blocks.add(const SizedBox(height: 6));
+
+        blocks.add(
+          Material(
+            color: cs.surface,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: cs.outlineVariant),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.only(bottom: 2, right: 4),
+              child: SizedBox(
+                width: _reportTableWidth,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _reportHeaderRow(),
+                    ...rows.map(_reportDataRow),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+        blocks.add(_productGroupFooter(rows));
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: blocks,
     );
   }
 
@@ -563,9 +1416,10 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                   title: const Text('Proizvodi'),
                   content: const Text(
                     'Master šifrarnik proizvoda za planiranje i izvršenje.\n\n'
-                    '• Kreiranje i uređivanje proizvoda\n'
-                    '• Status active/inactive\n'
-                    '• Excel import\n'
+                    '• Lista po kupcu i tipu komada (prefiks šifre: GK, PP, SK, MA, PM)\n'
+                    '• Filteri: kupac, klasifikacija, magacin (zaliha po magacinu ili sve ukupno)\n'
+                    '• Opcionalno u Firestoreu: standardUnitPrice, currency, sek. klasifikacija (import)\n'
+                    '• Kreiranje i uređivanje proizvoda, status, Excel import\n'
                     '• Ulaz u BOM, routing i povezane naloge',
                   ),
                   actions: [
@@ -669,6 +1523,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                   const SizedBox(height: 16),
                   _buildSearch(),
                   const SizedBox(height: 12),
+                  _buildAxisFilters(),
+                  const SizedBox(height: 12),
                   _buildFilters(),
                 ],
               ),
@@ -686,80 +1542,9 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              sliver: SliverList.separated(
-                itemCount: list.length,
-                itemBuilder: (context, index) {
-                  final product = list[index];
-
-                  final productCode = _s(product['productCode']);
-                  final productName = _s(product['productName']);
-                  final packagingQty = _s(product['packagingQty']);
-                  final status = _s(product['status']);
-
-                  return Card(
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () => _openProductDetails(product),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Text(
-                                  productCode.isEmpty ? '-' : productCode,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _statusColor(status).withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(999),
-                                    border: Border.all(
-                                      color: _statusColor(status).withValues(alpha: 0.35),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    _statusLabel(status),
-                                    style: TextStyle(
-                                      color: _statusColor(status),
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              productName.isEmpty ? '-' : productName,
-                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                            ),
-                            if (packagingQty.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                'Pakovanje: $packagingQty',
-                                style: const TextStyle(color: Colors.black87),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-                separatorBuilder: (_, _) => const SizedBox(height: 12),
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+              sliver: SliverToBoxAdapter(
+                child: _buildGroupedProductReport(list),
               ),
             ),
         ],

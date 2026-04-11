@@ -145,6 +145,35 @@ class OrdersService {
         .toList();
   }
 
+  /// Sve stavke narudžbi za kompaniju (ograničeno) — za tabularni pregled liste.
+  Future<Map<String, List<OrderItemModel>>> loadOrderItemsGroupedByOrderId({
+    required String companyId,
+    int limit = 2000,
+  }) async {
+    final cid = companyId.trim();
+    if (cid.isEmpty) return const {};
+
+    final snap = await _orderItems
+        .where('companyId', isEqualTo: cid)
+        .limit(limit)
+        .get();
+
+    final out = <String, List<OrderItemModel>>{};
+    for (final d in snap.docs) {
+      final m = Map<String, dynamic>.from(d.data() as Map);
+      final oid = _s(m['orderId']);
+      if (oid.isEmpty) continue;
+      final row = <String, dynamic>{'id': d.id, ...m};
+      out.putIfAbsent(oid, () => []).add(OrderItemModel.fromOrderItemRow(row));
+    }
+    for (final list in out.values) {
+      list.sort((a, b) => (a.lineId ?? '').compareTo(b.lineId ?? ''));
+    }
+    return out;
+  }
+
+  static String _s(dynamic v) => (v ?? '').toString().trim();
+
   Future<List<OrderModel>> searchOrders({
     required String companyId,
     String? orderType,
@@ -227,6 +256,163 @@ class OrdersService {
       newStatus: newStatus,
       changedBy: updatedBy,
       reason: reason,
+    );
+  }
+
+  /// Ažurira zaglavlje narudžbe (datumi, napomena, reference, valuta). Nije dozvoljeno za `cancelled` / `closed`.
+  Future<void> updateOrderHeader({
+    required String companyId,
+    required String orderId,
+    required String updatedBy,
+    required DateTime orderDate,
+    DateTime? requestedDeliveryDate,
+    DateTime? confirmedDeliveryDate,
+    String? notes,
+    String? customerReference,
+    String? supplierReference,
+    String? currency,
+  }) async {
+    final order = await getOrderById(companyId: companyId, orderId: orderId);
+    if (order == null) {
+      throw Exception('Narudžba nije pronađena');
+    }
+    final st = (order['status'] ?? '').toString().trim().toLowerCase();
+    if (st == 'cancelled' || st == 'closed') {
+      throw Exception('Narudžba je završena ili otkazana; zaglavlje se ne može mijenjati.');
+    }
+
+    final patch = <String, dynamic>{
+      'orderDate': Timestamp.fromDate(orderDate),
+      'requestedDeliveryDate': requestedDeliveryDate != null
+          ? Timestamp.fromDate(requestedDeliveryDate)
+          : FieldValue.delete(),
+      'confirmedDeliveryDate': confirmedDeliveryDate != null
+          ? Timestamp.fromDate(confirmedDeliveryDate)
+          : FieldValue.delete(),
+      'notes': (notes == null || notes.trim().isEmpty)
+          ? FieldValue.delete()
+          : notes.trim(),
+      'customerReference': () {
+        final t = customerReference?.trim() ?? '';
+        return t.isEmpty ? FieldValue.delete() : t;
+      }(),
+      'supplierReference': () {
+        final t = supplierReference?.trim() ?? '';
+        return t.isEmpty ? FieldValue.delete() : t;
+      }(),
+      'currency': () {
+        final t = currency?.trim() ?? '';
+        return t.isEmpty ? FieldValue.delete() : t;
+      }(),
+      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedBy': updatedBy,
+    };
+
+    await _orders.doc(orderId).update(patch);
+
+    await recalculateOrderStatus(
+      companyId: companyId,
+      orderId: orderId,
+      updatedBy: updatedBy,
+    );
+  }
+
+  /// Mijenja naručenu količinu i rok stavke samo ako nema veze na PN i nema isporuke/primke.
+  Future<void> updateOrderItemOrderedAndDue({
+    required String companyId,
+    required String orderId,
+    required String orderItemId,
+    required String updatedBy,
+    required double orderedQty,
+    DateTime? dueDate,
+  }) async {
+    if (orderedQty <= 0) {
+      throw Exception('Naručena količina mora biti veća od 0');
+    }
+
+    final order = await getOrderById(companyId: companyId, orderId: orderId);
+    if (order == null) {
+      throw Exception('Narudžba nije pronađena');
+    }
+    final orderType = (order['orderType'] ?? '').toString().trim();
+    _validateOrderType(orderType);
+
+    final st = (order['status'] ?? '').toString().trim().toLowerCase();
+    if (st == 'cancelled' || st == 'closed') {
+      throw Exception('Narudžba je završena ili otkazana.');
+    }
+
+    final itemRef = _orderItems.doc(orderItemId);
+    final itemDoc = await itemRef.get();
+    if (!itemDoc.exists) {
+      throw Exception('Stavka nije pronađena');
+    }
+    final item = itemDoc.data() as Map<String, dynamic>;
+    if ((item['orderId'] ?? '').toString().trim() != orderId) {
+      throw Exception('Stavka ne pripada ovoj narudžbi');
+    }
+
+    if ((item['hasProductionLink'] ?? false) == true) {
+      throw Exception(
+        'Stavka je povezana s proizvodnim nalogom — količinu mijenjaj kroz proizvodnju / skidanje veze.',
+      );
+    }
+
+    final delivered = _orderStatusEngine.toDouble(item['deliveredQty']);
+    final received = _orderStatusEngine.toDouble(item['receivedQty']);
+    if (delivered > 0 || received > 0) {
+      throw Exception(
+        'Stavka već ima isporuku ili primku — naručenu količinu nije moguće mijenjati.',
+      );
+    }
+
+    final confirmedQty = _orderStatusEngine.toDouble(item['confirmedQty']);
+    final openQty = _orderStatusEngine.calculateOpenQty(
+      orderType: orderType,
+      orderedQty: orderedQty,
+      deliveredQty: delivered,
+      receivedQty: received,
+    );
+
+    final now = DateTime.now();
+    final isLate = _orderStatusEngine.calculateItemIsLate(
+      orderType: orderType,
+      dueDate: dueDate,
+      now: now,
+      orderedQty: orderedQty,
+      deliveredQty: delivered,
+      receivedQty: received,
+    );
+
+    final itemStatus = orderType == 'customer_order'
+        ? _orderStatusEngine.calculateCustomerOrderItemStatus(
+            orderedQty: orderedQty,
+            confirmedQty: confirmedQty,
+            deliveredQty: delivered,
+            hasProductionLink: false,
+            isLate: isLate,
+          )
+        : _orderStatusEngine.calculateSupplierOrderItemStatus(
+            orderedQty: orderedQty,
+            confirmedQty: confirmedQty,
+            receivedQty: received,
+            isLate: isLate,
+          );
+
+    await itemRef.update({
+      'orderedQty': orderedQty,
+      'openQty': openQty,
+      'dueDate': dueDate != null ? Timestamp.fromDate(dueDate) : FieldValue.delete(),
+      'isLate': isLate,
+      'status': itemStatus,
+      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedBy': updatedBy,
+    });
+
+    await recalculateOrderStatus(
+      companyId: companyId,
+      orderId: orderId,
+      updatedBy: updatedBy,
     );
   }
 
@@ -463,6 +649,8 @@ class OrdersService {
     required String bomVersion,
     required String routingId,
     required String routingVersion,
+    DateTime? sourceOrderDate,
+    DateTime? requestedDeliveryDate,
   }) async {
     final companyId = _requireCompanyId(companyData);
     final userId = _requireUserId(companyData);
@@ -477,10 +665,12 @@ class OrdersService {
         orderType == OrderType.customer ? partnerName.trim() : null;
 
     final prodService = ProductionOrderService(firestore: _firestore);
+    final plantCode = (companyData['plantCode'] ?? '').toString().trim();
 
     final productionOrderId = await prodService.createProductionOrder(
       companyId: companyId,
       plantKey: plantKey.trim(),
+      plantCode: plantCode.isNotEmpty ? plantCode : null,
       productId: productId,
       productCode: productCode,
       productName: productName,
@@ -501,6 +691,8 @@ class OrdersService {
       sourceCustomerId: sourceCustomerId?.isEmpty ?? true ? null : sourceCustomerId,
       sourceCustomerName:
           sourceCustomerName?.isEmpty ?? true ? null : sourceCustomerName,
+      sourceOrderDate: sourceOrderDate,
+      requestedDeliveryDate: requestedDeliveryDate,
     );
 
     final poSnap = await _firestore.collection('production_orders').doc(productionOrderId).get();

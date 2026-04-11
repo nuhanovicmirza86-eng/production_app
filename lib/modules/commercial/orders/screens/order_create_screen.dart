@@ -45,9 +45,6 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
 
-  String get _plantKey =>
-      (widget.companyData['plantKey'] ?? '').toString().trim();
-
   @override
   void dispose() {
     _notesController.dispose();
@@ -212,7 +209,6 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
         partnerName: _partner!.name,
         orderDate: _orderDate,
         requestedDeliveryDate: _requestedDeliveryDate,
-        plantKey: _plantKey.isEmpty ? null : _plantKey,
         notes: _notesController.text.trim().isEmpty
             ? null
             : _notesController.text.trim(),

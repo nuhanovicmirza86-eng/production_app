@@ -514,6 +514,10 @@ class _CompanyHeaderLogoState extends State<_CompanyHeaderLogo> {
             u,
             key: ValueKey<String>(u),
             fit: BoxFit.cover,
+            // Web: canvas/fetch traži CORS; <img> u HTML-u tipično prikaže iste favicon/logo URL-ove kao Android.
+            webHtmlElementStrategy: kIsWeb
+                ? WebHtmlElementStrategy.prefer
+                : WebHtmlElementStrategy.never,
             loadingBuilder: (context, child, loadingProgress) {
               if (loadingProgress == null) return child;
               return Center(

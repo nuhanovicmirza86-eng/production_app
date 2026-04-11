@@ -32,6 +32,11 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
   late final TextEditingController _bomVersionController;
   late final TextEditingController _routingIdController;
   late final TextEditingController _routingVersionController;
+  late final TextEditingController _secondaryClassCodeController;
+  late final TextEditingController _secondaryClassDescController;
+  late final TextEditingController _packagingQtyController;
+  late final TextEditingController _standardUnitPriceController;
+  late final TextEditingController _currencyController;
 
   bool _isLoading = false;
   late bool _isActive;
@@ -49,6 +54,15 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
       (widget.productData['productId'] ?? '').toString().trim();
 
   String _s(dynamic value) => (value ?? '').toString().trim();
+
+  String _formatNumForField(dynamic v) {
+    if (v == null) return '';
+    if (v is num) {
+      final d = v.toDouble();
+      return d == d.roundToDouble() ? d.toInt().toString() : d.toString();
+    }
+    return _s(v);
+  }
 
   @override
   void initState() {
@@ -87,6 +101,23 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     _routingVersionController = TextEditingController(
       text: _s(widget.productData['routingVersion']),
     );
+    _secondaryClassCodeController = TextEditingController(
+      text: _s(widget.productData['secondaryClassificationCode']),
+    );
+    _secondaryClassDescController = TextEditingController(
+      text: _s(widget.productData['secondaryClassificationDescription']),
+    );
+    _packagingQtyController = TextEditingController(
+      text: _formatNumForField(widget.productData['packagingQty']),
+    );
+    _standardUnitPriceController = TextEditingController(
+      text: _formatNumForField(widget.productData['standardUnitPrice']),
+    );
+    _currencyController = TextEditingController(
+      text: _s(widget.productData['currency']).isEmpty
+          ? 'KM'
+          : _s(widget.productData['currency']),
+    );
 
     _status = _s(widget.productData['status']).isEmpty
         ? 'active'
@@ -105,6 +136,31 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+
+    double? parseUpdateDouble(String text, {required String label}) {
+      final s = text.trim().replaceAll(',', '.');
+      if (s.isEmpty) return 0.0;
+      final v = double.tryParse(s);
+      if (v == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Neispravan broj: $label')),
+        );
+        return null;
+      }
+      return v;
+    }
+
+    final priceUp = parseUpdateDouble(
+      _standardUnitPriceController.text,
+      label: 'Jedinična cijena',
+    );
+    if (priceUp == null) return;
+
+    final packUp = parseUpdateDouble(
+      _packagingQtyController.text,
+      label: 'Količina pakovanja',
+    );
+    if (packUp == null) return;
 
     if (_companyId.isEmpty || _productId.isEmpty || _userId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -134,6 +190,12 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
         bomVersion: _bomVersionController.text.trim(),
         routingId: _routingIdController.text.trim(),
         routingVersion: _routingVersionController.text.trim(),
+        packagingQty: packUp,
+        secondaryClassificationCode: _secondaryClassCodeController.text.trim(),
+        secondaryClassificationDescription:
+            _secondaryClassDescController.text.trim(),
+        standardUnitPrice: priceUp,
+        currency: _currencyController.text.trim(),
         isActive: _isActive,
       );
 
@@ -165,6 +227,11 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     _bomVersionController.dispose();
     _routingIdController.dispose();
     _routingVersionController.dispose();
+    _secondaryClassCodeController.dispose();
+    _secondaryClassDescController.dispose();
+    _packagingQtyController.dispose();
+    _standardUnitPriceController.dispose();
+    _currencyController.dispose();
     super.dispose();
   }
 
@@ -253,6 +320,46 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                 TextFormField(
                   controller: _defaultPlantKeyController,
                   decoration: _dec('Default plantKey'),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Sekundarna klasifikacija i cijena (lista)',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _secondaryClassCodeController,
+                  decoration: _dec('Šifra sek. klasifikacije'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _secondaryClassDescController,
+                  decoration: _dec('Opis sek. klasifikacije'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _packagingQtyController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: _dec(
+                    'Količina pakovanja',
+                    hint: 'Prazno = ukloni',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _standardUnitPriceController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: _dec(
+                    'Jedinična cijena',
+                    hint: 'Prazno = ukloni',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _currencyController,
+                  decoration: _dec('Valuta'),
                 ),
                 const SizedBox(height: 24),
                 const Text(

@@ -26,6 +26,12 @@ class ProductionOrderModel {
   final String? sourceCustomerId;
   final String? sourceCustomerName;
 
+  /// Datum komercijalne narudžbe (za izračun dana do isporuke).
+  final DateTime? sourceOrderDate;
+
+  /// Traženi rok isporuke kupcu (prioritet nad planiranim krajem izrade u koloni „Dana“).
+  final DateTime? requestedDeliveryDate;
+
   final double plannedQty;
   final double producedGoodQty;
   final double producedScrapQty;
@@ -59,6 +65,24 @@ class ProductionOrderModel {
   final DateTime? lastChangedAt;
   final String? lastChangedBy;
 
+  /// Radni nalog (RN) — opcionalno iz ERP / poda.
+  final DateTime? workOrderDate;
+  final String? workOrderNumber;
+
+  /// Planirani broj radnih dana (ili izračun iz rokova u UI ako je null).
+  final int? plannedLeadDays;
+
+  /// Šifra u vanjskom ERP (npr. Pantheon); ako je prazno, u izvještaju se može koristiti productCode.
+  final String? pantheonCode;
+
+  /// Paletiranje / komentar (opcionalno).
+  final double? palletCount;
+  final double? piecesPerPallet;
+  final String? notes;
+
+  /// Segment procesa (npr. GALVANIZACIJA) — za filter u pregledu.
+  final String? operationName;
+
   ProductionOrderModel({
     required this.id,
     required this.companyId,
@@ -77,6 +101,8 @@ class ProductionOrderModel {
     this.sourceOrderNumber,
     this.sourceCustomerId,
     this.sourceCustomerName,
+    this.sourceOrderDate,
+    this.requestedDeliveryDate,
     required this.plannedQty,
     required this.producedGoodQty,
     required this.producedScrapQty,
@@ -99,7 +125,38 @@ class ProductionOrderModel {
     required this.hasCriticalChanges,
     this.lastChangedAt,
     this.lastChangedBy,
+    this.workOrderDate,
+    this.workOrderNumber,
+    this.plannedLeadDays,
+    this.pantheonCode,
+    this.palletCount,
+    this.piecesPerPallet,
+    this.notes,
+    this.operationName,
   });
+
+  static int? _readInt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    final t = (v).toString().trim();
+    if (t.isEmpty) return null;
+    return int.tryParse(t);
+  }
+
+  static double? _readDouble(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    final t = (v).toString().trim().replaceAll(',', '.');
+    if (t.isEmpty) return null;
+    return double.tryParse(t);
+  }
+
+  static String? _nullableTrimString(dynamic v) {
+    if (v == null) return null;
+    final t = v.toString().trim();
+    return t.isEmpty ? null : t;
+  }
 
   factory ProductionOrderModel.fromMap(String id, Map<String, dynamic> map) {
     return ProductionOrderModel(
@@ -120,6 +177,11 @@ class ProductionOrderModel {
       sourceOrderNumber: map['sourceOrderNumber']?.toString(),
       sourceCustomerId: map['sourceCustomerId']?.toString(),
       sourceCustomerName: map['sourceCustomerName']?.toString(),
+      sourceOrderDate: (map['sourceOrderDate'] as Timestamp?)?.toDate() ??
+          (map['orderDate'] as Timestamp?)?.toDate(),
+      requestedDeliveryDate:
+          (map['requestedDeliveryDate'] as Timestamp?)?.toDate() ??
+              (map['deliveryDeadline'] as Timestamp?)?.toDate(),
       plannedQty: (map['plannedQty'] ?? 0).toDouble(),
       producedGoodQty: (map['producedGoodQty'] ?? 0).toDouble(),
       producedScrapQty: (map['producedScrapQty'] ?? 0).toDouble(),
@@ -144,6 +206,23 @@ class ProductionOrderModel {
       hasCriticalChanges: map['hasCriticalChanges'] ?? false,
       lastChangedAt: (map['lastChangedAt'] as Timestamp?)?.toDate(),
       lastChangedBy: map['lastChangedBy'],
+
+      workOrderDate: (map['workOrderDate'] as Timestamp?)?.toDate(),
+      workOrderNumber: _nullableTrimString(map['workOrderNumber']),
+      plannedLeadDays: _readInt(map['plannedLeadDays']),
+      pantheonCode: _nullableTrimString(
+        map['pantheonCode'] ?? map['pantheonProductCode'],
+      ),
+      palletCount: _readDouble(map['palletCount']),
+      piecesPerPallet: _readDouble(
+        map['piecesPerPallet'] ?? map['unitPerPallet'] ?? map['komadPoPalici'],
+      ),
+      notes: _nullableTrimString(
+        map['notes'] ?? map['comment'] ?? map['productionComment'],
+      ),
+      operationName: _nullableTrimString(
+        map['operationName'] ?? map['processName'] ?? map['routingSegment'],
+      ),
     );
   }
 
@@ -170,6 +249,9 @@ class ProductionOrderModel {
         'sourceCustomerId': sourceCustomerId,
       if (sourceCustomerName != null && sourceCustomerName!.isNotEmpty)
         'sourceCustomerName': sourceCustomerName,
+      if (sourceOrderDate != null) 'sourceOrderDate': sourceOrderDate,
+      if (requestedDeliveryDate != null)
+        'requestedDeliveryDate': requestedDeliveryDate,
       'plannedQty': plannedQty,
       'producedGoodQty': producedGoodQty,
       'producedScrapQty': producedScrapQty,
@@ -194,6 +276,17 @@ class ProductionOrderModel {
       'hasCriticalChanges': hasCriticalChanges,
       'lastChangedAt': lastChangedAt,
       'lastChangedBy': lastChangedBy,
+      if (workOrderDate != null) 'workOrderDate': workOrderDate,
+      if (workOrderNumber != null && workOrderNumber!.trim().isNotEmpty)
+        'workOrderNumber': workOrderNumber,
+      if (plannedLeadDays != null) 'plannedLeadDays': plannedLeadDays,
+      if (pantheonCode != null && pantheonCode!.trim().isNotEmpty)
+        'pantheonCode': pantheonCode,
+      if (palletCount != null) 'palletCount': palletCount,
+      if (piecesPerPallet != null) 'piecesPerPallet': piecesPerPallet,
+      if (notes != null && notes!.trim().isNotEmpty) 'notes': notes,
+      if (operationName != null && operationName!.trim().isNotEmpty)
+        'operationName': operationName,
     };
   }
 }

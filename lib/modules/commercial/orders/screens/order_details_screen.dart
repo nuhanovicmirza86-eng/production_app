@@ -1,10 +1,14 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/user_display_label.dart';
 import '../models/order_model.dart';
 import '../order_status_ui.dart';
+import '../services/order_status_engine.dart';
 import '../services/orders_service.dart';
+import 'order_edit_screen.dart';
 import 'order_line_production_create_screen.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
@@ -23,10 +27,16 @@ class OrderDetailsScreen extends StatefulWidget {
 
 class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   final OrdersService _ordersService = OrdersService();
+  static const OrderStatusEngine _statusTransitions = OrderStatusEngine();
 
   late OrderModel _order;
   bool _refreshing = false;
   String? _error;
+
+  /// Čitljivi akteri (nikad sirovi UID u UI — vidi [UserDisplayLabel.resolveStored]).
+  late String _actorCreatedLabel;
+  late String _actorUpdatedLabel;
+  int _actorResolveGen = 0;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -39,11 +49,224 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         card: ProductionDashboardCard.productionOrders,
       );
 
+  String get _userId =>
+      (widget.companyData['userId'] ?? '').toString().trim();
+
+  bool get _canManageOrder =>
+      _role == 'admin' ||
+      _role == 'production_manager' ||
+      _role == 'sales' ||
+      _role == 'purchasing';
+
+  bool get _canEditOrder =>
+      _canManageOrder &&
+      _order.status != OrderStatus.cancelled &&
+      _order.status != OrderStatus.closed;
+
+  bool get _canCloseOrder =>
+      _canManageOrder &&
+      _statusTransitions.canManualTransition(
+        orderType: _order.orderType.value,
+        currentStatus: _order.status.value,
+        newStatus: OrderStatus.closed.value,
+      );
+
+  bool get _canCancelOrder =>
+      _canManageOrder &&
+      _statusTransitions.canManualTransition(
+        orderType: _order.orderType.value,
+        currentStatus: _order.status.value,
+        newStatus: OrderStatus.cancelled.value,
+      );
+
+  Future<void> _openEdit() async {
+    final ok = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OrderEditScreen(
+          companyData: widget.companyData,
+          order: _order,
+        ),
+      ),
+    );
+    if (ok == true && mounted) await _load();
+  }
+
+  Future<void> _confirmClose() async {
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Zatvori narudžbu'),
+        content: const Text(
+          'Zatvorena narudžba se više ne smatra aktivnom u operativnom smislu. '
+          'Nastaviti?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Odustani'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Zatvori'),
+          ),
+        ],
+      ),
+    );
+    if (go != true || !mounted) return;
+    if (_companyId.isEmpty || _userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nedostaje companyId ili userId.')),
+      );
+      return;
+    }
+    try {
+      await _ordersService.updateOrderStatus(
+        companyId: _companyId,
+        orderId: _order.id,
+        newStatus: OrderStatus.closed.value,
+        updatedBy: _userId,
+        reason: 'Zatvaranje iz detalja narudžbe',
+      );
+      if (!mounted) return;
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Narudžba je zatvorena.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
+      );
+    }
+  }
+
+  Future<void> _confirmCancel() async {
+    final reasonController = TextEditingController();
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Otkaži narudžbu'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Otkazana narudžba se neće dalje obraditi. Možete unijeti razlog (opcionalno).',
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: 'Razlog',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Odustani'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Otkaži'),
+          ),
+        ],
+      ),
+    );
+    if (go != true) {
+      reasonController.dispose();
+      return;
+    }
+    if (!mounted) {
+      reasonController.dispose();
+      return;
+    }
+    if (_companyId.isEmpty || _userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nedostaje companyId ili userId.')),
+      );
+      reasonController.dispose();
+      return;
+    }
+    final reason = reasonController.text.trim();
+    reasonController.dispose();
+    try {
+      await _ordersService.updateOrderStatus(
+        companyId: _companyId,
+        orderId: _order.id,
+        newStatus: OrderStatus.cancelled.value,
+        updatedBy: _userId,
+        reason: reason.isEmpty ? 'Otkazivanje iz detalja narudžbe' : reason,
+      );
+      if (!mounted) return;
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Narudžba je otkazana.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _order = widget.order;
+    _applySessionActorLabelsSync();
+    _resolveActorLabelsAsync();
     _load();
+  }
+
+  String get _sessionUserId =>
+      (widget.companyData['userId'] ?? '').toString().trim();
+
+  /// Brzo: vlastiti UID → ime/email iz sesije; ostalo privremeno „…“ dok [resolveStored] ne završi.
+  void _applySessionActorLabelsSync() {
+    _actorCreatedLabel = _actorLabelSyncOnly(_order.createdBy);
+    _actorUpdatedLabel = _actorLabelSyncOnly(_order.updatedBy);
+  }
+
+  String _actorLabelSyncOnly(String? raw) {
+    final t = (raw ?? '').trim();
+    if (t.isEmpty) return '—';
+    if (t.contains('@')) return t;
+    final sid = _sessionUserId;
+    if (sid.isNotEmpty && t == sid) {
+      return UserDisplayLabel.fromSessionMap(widget.companyData);
+    }
+    return '…';
+  }
+
+  Future<void> _resolveActorLabelsAsync() async {
+    final gen = ++_actorResolveGen;
+    final order = _order;
+    final fs = FirebaseFirestore.instance;
+    final c = await UserDisplayLabel.resolveStored(
+      fs,
+      (order.createdBy ?? '').trim(),
+    );
+    final u = await UserDisplayLabel.resolveStored(
+      fs,
+      (order.updatedBy ?? '').trim(),
+    );
+    if (!mounted || gen != _actorResolveGen) return;
+    setState(() {
+      _actorCreatedLabel = c;
+      _actorUpdatedLabel = u;
+    });
   }
 
   Future<void> _load() async {
@@ -73,6 +296,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         }
         _refreshing = false;
       });
+      if (fresh != null && mounted) {
+        _applySessionActorLabelsSync();
+        await _resolveActorLabelsAsync();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -83,10 +310,18 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   String _formatDate(DateTime? d) {
-    if (d == null) return '-';
+    if (d == null) return '—';
     return '${d.day.toString().padLeft(2, '0')}.'
         '${d.month.toString().padLeft(2, '0')}.'
         '${d.year}';
+  }
+
+  String _formatDateTime(DateTime? d) {
+    if (d == null) return '—';
+    final date = _formatDate(d);
+    final t =
+        '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+    return '$date, $t';
   }
 
   String _formatQty(double v) {
@@ -180,8 +415,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           ),
           const SizedBox(height: 10),
           _metaRow('Tip', _typeLabel(_order.orderType)),
-          if ((_order.plantKey ?? '').isNotEmpty)
-            _metaRow('Pogon', _order.plantKey!),
           if ((_order.currency ?? '').isNotEmpty)
             _metaRow('Valuta', _order.currency!),
         ],
@@ -254,8 +487,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         children: [
           const Text('Sistem', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          _metaRow('Kreirano', _formatDate(_order.createdAt)),
-          _metaRow('Ažurirano', _formatDate(_order.updatedAt)),
+          _metaRow('Kreirano', _formatDateTime(_order.createdAt)),
+          _metaRow('Kreirao', _actorCreatedLabel),
+          _metaRow('Ažurirano', _formatDateTime(_order.updatedAt)),
+          _metaRow('Ažurirao', _actorUpdatedLabel),
           _metaRow('Ukupno naručeno', _formatQty(_order.totalQty)),
           if ((_order.notes ?? '').isNotEmpty) ...[
             const SizedBox(height: 10),
@@ -383,6 +618,36 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       appBar: AppBar(
         title: const Text('Detalji narudžbe'),
         actions: [
+          if (_canEditOrder)
+            IconButton(
+              tooltip: 'Uredi narudžbu',
+              onPressed: _openEdit,
+              icon: const Icon(Icons.edit_outlined),
+            ),
+          if (_canCloseOrder || _canCancelOrder)
+            PopupMenuButton<String>(
+              tooltip: 'Zatvori ili otkaži',
+              icon: const Icon(Icons.more_vert),
+              itemBuilder: (ctx) => [
+                if (_canCloseOrder)
+                  const PopupMenuItem(
+                    value: 'close',
+                    child: Text('Zatvori narudžbu'),
+                  ),
+                if (_canCancelOrder)
+                  const PopupMenuItem(
+                    value: 'cancel',
+                    child: Text('Otkaži narudžbu'),
+                  ),
+              ],
+              onSelected: (v) {
+                if (v == 'close') {
+                  _confirmClose();
+                } else if (v == 'cancel') {
+                  _confirmCancel();
+                }
+              },
+            ),
           IconButton(
             onPressed: _refreshing ? null : _load,
             icon: const Icon(Icons.refresh),

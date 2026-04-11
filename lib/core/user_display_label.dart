@@ -29,6 +29,20 @@ class UserDisplayLabel {
     return RegExp(r'^[a-zA-Z0-9]+$').hasMatch(s);
   }
 
+  /// Kratki / nestandardni auth id-jevi (npr. custom token) koji ipak trebaju ići kroz `users/{id}`.
+  static bool looksLikeProbableAuthUserKey(String raw) {
+    final s = raw.trim();
+    if (s.contains('@')) return false;
+    if (s.length < 10 || s.length > 128) return false;
+    return RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(s);
+  }
+
+  static bool _shouldLookupUserDocument(String t) {
+    if (t.contains('@')) return false;
+    if (t.toLowerCase() == 'system') return false;
+    return looksLikeFirebaseUid(t) || looksLikeProbableAuthUserKey(t);
+  }
+
   /// After [prefetchUids], returns cached label; otherwise null (still loading).
   static String? peekUidLabel(String uid) {
     final t = uid.trim();
@@ -50,7 +64,7 @@ class UserDisplayLabel {
     if (t.contains('@')) return t;
     final lower = t.toLowerCase();
     if (lower == 'system') return 'Sistem';
-    if (!looksLikeFirebaseUid(t)) return t;
+    if (!_shouldLookupUserDocument(t)) return t;
 
     final cached = _uidCache[t];
     if (cached != null) return cached;
@@ -86,7 +100,7 @@ class UserDisplayLabel {
       final s = v.trim();
       if (s.isEmpty) continue;
       if (s.contains('@')) continue;
-      if (!looksLikeFirebaseUid(s)) continue;
+      if (!_shouldLookupUserDocument(s)) continue;
       if (_uidCache.containsKey(s)) continue;
       ids.add(s);
     }
@@ -99,7 +113,8 @@ class UserDisplayLabel {
     final t = stored.trim();
     if (t.isEmpty || t == '-') return '—';
     if (t.contains('@')) return t;
-    if (!looksLikeFirebaseUid(t)) return t;
+    if (t.toLowerCase() == 'system') return 'Sistem';
+    if (!_shouldLookupUserDocument(t)) return t;
     return _uidCache[t] ?? '…';
   }
 }

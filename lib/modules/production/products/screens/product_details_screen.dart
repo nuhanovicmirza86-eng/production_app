@@ -1185,6 +1185,23 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
             _infoRow('Customer ID', _s(product['customerId'])),
             _infoRow('Default plantKey', _s(product['defaultPlantKey'])),
             _infoRow('Opis', _s(product['description'])),
+            _infoRow(
+              'Sek. klasifikacija (šifra)',
+              _s(product['secondaryClassificationCode']),
+            ),
+            _infoRow(
+              'Sek. klasifikacija (opis)',
+              _s(product['secondaryClassificationDescription']),
+            ),
+            _infoRow(
+              'Količina pakovanja',
+              _s(product['packagingQty']),
+            ),
+            _infoRow(
+              'Jedinična cijena',
+              _s(product['standardUnitPrice']),
+            ),
+            _infoRow('Valuta', _s(product['currency'])),
           ],
         ),
         const SizedBox(height: 12),

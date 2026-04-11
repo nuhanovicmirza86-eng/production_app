@@ -56,6 +56,7 @@ class _ProductionOrderCreateScreenState
 
   String get _companyId => (widget.companyData['companyId'] ?? '').toString();
   String get _plantKey => (widget.companyData['plantKey'] ?? '').toString();
+  String get _plantCode => (widget.companyData['plantCode'] ?? '').toString().trim();
   String get _userId => (widget.companyData['userId'] ?? 'system').toString();
 
   bool get _hasSelectedProduct => _productId != null && _productId!.isNotEmpty;
@@ -312,6 +313,7 @@ class _ProductionOrderCreateScreenState
       await _service.createProductionOrder(
         companyId: _companyId,
         plantKey: _plantKey,
+        plantCode: _plantCode.isNotEmpty ? _plantCode : null,
         productId: _productId!,
         productCode: _productCodeController.text.trim(),
         productName: _productNameController.text.trim(),
