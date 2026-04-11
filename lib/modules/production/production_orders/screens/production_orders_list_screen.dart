@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
+import '../../../../core/date/date_range_utils.dart';
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/ui/date_range_filter_controls.dart';
 import '../../../../core/ui/standard_list_components.dart';
+import '../export/production_orders_list_pdf_export.dart';
 import '../models/production_order_model.dart';
 import '../services/production_order_service.dart';
 import 'production_order_create_screen.dart';
@@ -34,6 +37,9 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
   bool _filtersExpanded = false;
   ProductionOrderStatusFilter _selectedStatus = ProductionOrderStatusFilter.all;
   List<ProductionOrderModel> _orders = const [];
+
+  DateTime? _dateFrom;
+  DateTime? _dateTo;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -130,11 +136,119 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
           o.productName.toLowerCase().contains(q) ||
           (o.customerName ?? '').toLowerCase().contains(q);
       final matchesStatus = _selectedStatus.matches(o.status);
-      return matchesSearch && matchesStatus;
+      final matchesDate =
+          dateInInclusiveRange(o.createdAt, _dateFrom, _dateTo);
+      return matchesSearch && matchesStatus && matchesDate;
     }).toList();
   }
 
-  int get _activeFiltersCount => _selectedStatus == ProductionOrderStatusFilter.all ? 0 : 1;
+  int get _activeFiltersCount {
+    int n = 0;
+    if (_selectedStatus != ProductionOrderStatusFilter.all) n++;
+    if (_dateFrom != null || _dateTo != null) n++;
+    return n;
+  }
+
+  String _companyDisplayName() {
+    final n = (widget.companyData['companyName'] ??
+            widget.companyData['name'] ??
+            '')
+        .toString()
+        .trim();
+    return n.isEmpty ? '—' : n;
+  }
+
+  String? _filterDescriptionForPdf() {
+    final parts = <String>[];
+    if (_dateFrom != null || _dateTo != null) {
+      parts.add(
+        'Datum kreiranja: ${formatCalendarDay(_dateFrom)} – ${formatCalendarDay(_dateTo)}',
+      );
+    }
+    if (_selectedStatus != ProductionOrderStatusFilter.all) {
+      parts.add('Status: ${_selectedStatus.label}');
+    }
+    if (parts.isEmpty) return null;
+    return parts.join('  |  ');
+  }
+
+  Future<void> _pickDateFrom() async {
+    final initial = _dateFrom ?? _dateTo ?? DateTime.now();
+    final d = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (d == null || !mounted) return;
+    setState(() {
+      _dateFrom = d;
+      if (_dateTo != null) {
+        final a = DateTime(d.year, d.month, d.day);
+        final b = DateTime(_dateTo!.year, _dateTo!.month, _dateTo!.day);
+        if (b.isBefore(a)) _dateTo = d;
+      }
+    });
+  }
+
+  Future<void> _pickDateTo() async {
+    final initial = _dateTo ?? _dateFrom ?? DateTime.now();
+    final d = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (d == null || !mounted) return;
+    setState(() {
+      _dateTo = d;
+      if (_dateFrom != null) {
+        final a = DateTime(_dateFrom!.year, _dateFrom!.month, _dateFrom!.day);
+        final b = DateTime(d.year, d.month, d.day);
+        if (a.isAfter(b)) _dateFrom = d;
+      }
+    });
+  }
+
+  void _clearDateRange() => setState(() {
+        _dateFrom = null;
+        _dateTo = null;
+      });
+
+  Future<void> _exportPdf() async {
+    final list = _filteredOrders;
+    if (list.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nema naloga za izvoz (filtrirani pregled je prazan).'),
+        ),
+      );
+      return;
+    }
+    try {
+      await ProductionOrdersListPdfExport.preview(
+        orders: list,
+        reportTitle: 'Pregled proizvodnih naloga',
+        companyLine:
+            '${_companyDisplayName()}  ·  Pogon: ${_plantKey.isEmpty ? "—" : _plantKey}',
+        filterDescription: _filterDescriptionForPdf(),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
+      );
+    }
+  }
+
+  Widget _pdfExportButton() {
+    return IconButton(
+      tooltip: 'Export PDF (filtrirani pregled)',
+      icon: const Icon(Icons.picture_as_pdf_outlined),
+      onPressed: _isLoading ? null : _exportPdf,
+    );
+  }
 
   String _formatDate(DateTime? d) {
     if (d == null) return '-';
@@ -201,7 +315,8 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
                 'Ovaj ekran služi za upravljanje proizvodnim nalozima.\n\n'
                 '• Pregled i pretraga naloga\n'
                 '• KPI praćenje statusa izvršenja\n'
-                '• Filtriranje po statusu\n'
+                '• Filtriranje po statusu i datumu kreiranja (od–do)\n'
+                '• Export trenutnog pregleda u PDF\n'
                 '• Ulaz u detalje naloga i izvršenje\n\n'
                 'Ovdje pratiš operativni tok proizvodnje od planiranog do završenog naloga.',
               ),
@@ -222,6 +337,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
               StandardScreenHeader(
                 title: 'Proizvodni nalozi',
                 onBack: () => Navigator.of(context).pop(),
+                beforeInfoAction: _pdfExportButton(),
                 onInfo: infoAction,
               ),
               if (_canCreateOrder) ...[
@@ -242,6 +358,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
         return StandardScreenHeader(
           title: 'Proizvodni nalozi',
           onBack: () => Navigator.of(context).pop(),
+          beforeInfoAction: _pdfExportButton(),
           onInfo: infoAction,
           action: _canCreateOrder
               ? ElevatedButton.icon(
@@ -334,6 +451,16 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
                 onTap: () => setState(() => _selectedStatus = status),
               );
             }).toList(),
+          ),
+          const SizedBox(height: 16),
+          DateRangeFilterControls(
+            sectionTitle: 'Datum kreiranja naloga',
+            helpText: 'Filtar po danu kreiranja proizvodnog naloga (inkluzivno od–do).',
+            from: _dateFrom,
+            to: _dateTo,
+            onPickFrom: _pickDateFrom,
+            onPickTo: _pickDateTo,
+            onClear: _clearDateRange,
           ),
         ],
       ),

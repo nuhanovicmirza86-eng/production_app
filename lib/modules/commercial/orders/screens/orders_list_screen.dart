@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/date/date_range_utils.dart';
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/ui/date_range_filter_controls.dart';
+import '../export/orders_list_pdf_export.dart';
 import '../models/order_model.dart';
 import '../order_status_ui.dart';
 import '../services/orders_service.dart';
@@ -29,6 +32,9 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
 
   OrderStatusFilter _selectedStatus = OrderStatusFilter.all;
   OrderTypeFilter _selectedType = OrderTypeFilter.all;
+
+  DateTime? _dateFrom;
+  DateTime? _dateTo;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -126,7 +132,11 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
           ? true
           : o.orderType == _selectedType.toOrderType();
 
-      return matchesSearch && matchesStatus && matchesType;
+      final refDate = o.orderDate ?? o.createdAt;
+      final matchesDate =
+          dateInInclusiveRange(refDate, _dateFrom, _dateTo);
+
+      return matchesSearch && matchesStatus && matchesType && matchesDate;
     }).toList();
   }
 
@@ -170,7 +180,103 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
     int count = 0;
     if (_selectedStatus != OrderStatusFilter.all) count++;
     if (_selectedType != OrderTypeFilter.all) count++;
+    if (_dateFrom != null || _dateTo != null) count++;
     return count;
+  }
+
+  String _companyDisplayName() {
+    final n = (widget.companyData['companyName'] ??
+            widget.companyData['name'] ??
+            '')
+        .toString()
+        .trim();
+    return n.isEmpty ? '—' : n;
+  }
+
+  String? _filterDescriptionForPdf() {
+    final parts = <String>[];
+    if (_dateFrom != null || _dateTo != null) {
+      parts.add(
+        'Datum narudžbe/kreiranja: ${formatCalendarDay(_dateFrom)} – ${formatCalendarDay(_dateTo)}',
+      );
+    }
+    if (_selectedStatus != OrderStatusFilter.all) {
+      parts.add('Status: ${_selectedStatus.label}');
+    }
+    if (_selectedType != OrderTypeFilter.all) {
+      parts.add('Tip: ${_selectedType.label}');
+    }
+    if (parts.isEmpty) return null;
+    return parts.join('  |  ');
+  }
+
+  Future<void> _pickDateFrom() async {
+    final initial = _dateFrom ?? _dateTo ?? DateTime.now();
+    final d = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (d == null || !mounted) return;
+    setState(() {
+      _dateFrom = d;
+      if (_dateTo != null) {
+        final a = DateTime(d.year, d.month, d.day);
+        final b = DateTime(_dateTo!.year, _dateTo!.month, _dateTo!.day);
+        if (b.isBefore(a)) _dateTo = d;
+      }
+    });
+  }
+
+  Future<void> _pickDateTo() async {
+    final initial = _dateTo ?? _dateFrom ?? DateTime.now();
+    final d = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (d == null || !mounted) return;
+    setState(() {
+      _dateTo = d;
+      if (_dateFrom != null) {
+        final a = DateTime(_dateFrom!.year, _dateFrom!.month, _dateFrom!.day);
+        final b = DateTime(d.year, d.month, d.day);
+        if (a.isAfter(b)) _dateFrom = d;
+      }
+    });
+  }
+
+  void _clearDateRange() => setState(() {
+        _dateFrom = null;
+        _dateTo = null;
+      });
+
+  Future<void> _exportPdf() async {
+    final list = _filteredOrders;
+    if (list.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nema narudžbi za izvoz (filtrirani pregled je prazan).'),
+        ),
+      );
+      return;
+    }
+    try {
+      await OrdersListPdfExport.preview(
+        orders: list,
+        reportTitle: 'Pregled narudžbi',
+        companyLine: _companyDisplayName(),
+        filterDescription: _filterDescriptionForPdf(),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
+      );
+    }
   }
 
   Widget _buildHeader() {
@@ -201,6 +307,11 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                     ),
                   ),
                   IconButton(
+                    tooltip: 'Export PDF (filtrirani pregled)',
+                    icon: const Icon(Icons.picture_as_pdf_outlined),
+                    onPressed: _isLoading ? null : _exportPdf,
+                  ),
+                  IconButton(
                     icon: const Icon(Icons.info_outline_rounded),
                     onPressed: () {
                       showDialog(
@@ -211,7 +322,8 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                             'Ovaj ekran služi za upravljanje narudžbama.\n\n'
                             '• Kreiranje i pregled narudžbi\n'
                             '• Praćenje statusa\n'
-                            '• Filtriranje po statusu i tipu\n'
+                            '• Filtriranje po statusu, tipu i datumu (od–do)\n'
+                            '• Export trenutnog pregleda u PDF\n'
                             '• Povezivanje sa proizvodnim nalozima\n\n'
                             'Ovdje pratiš komercijalni tok prije realizacije i proizvodnje.',
                           ),
@@ -271,6 +383,11 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
               ),
             ),
             IconButton(
+              tooltip: 'Export PDF (filtrirani pregled)',
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              onPressed: _isLoading ? null : _exportPdf,
+            ),
+            IconButton(
               icon: const Icon(Icons.info_outline_rounded),
               onPressed: () {
                 showDialog(
@@ -281,7 +398,8 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                       'Ovaj ekran služi za upravljanje narudžbama.\n\n'
                       '• Kreiranje i pregled narudžbi\n'
                       '• Praćenje statusa\n'
-                      '• Filtriranje po statusu i tipu\n'
+                      '• Filtriranje po statusu, tipu i datumu (od–do)\n'
+                      '• Export trenutnog pregleda u PDF\n'
                       '• Povezivanje sa proizvodnim nalozima\n\n'
                       'Ovdje pratiš komercijalni tok prije realizacije i proizvodnje.',
                     ),
@@ -571,6 +689,17 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                         onTap: () => setState(() => _selectedType = type),
                       );
                     }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                  DateRangeFilterControls(
+                    sectionTitle: 'Datum (narudžbe ili kreiranje)',
+                    helpText:
+                        'Filtar se odnosi na datum narudžbe ako postoji, inače na datum kreiranja zapisa.',
+                    from: _dateFrom,
+                    to: _dateTo,
+                    onPickFrom: _pickDateFrom,
+                    onPickTo: _pickDateTo,
+                    onClear: _clearDateRange,
                   ),
                 ],
               ),

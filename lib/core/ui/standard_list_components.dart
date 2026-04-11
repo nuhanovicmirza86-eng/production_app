@@ -18,6 +18,8 @@ class StandardScreenHeader extends StatelessWidget {
   final String title;
   final VoidCallback? onBack;
   final VoidCallback? onInfo;
+  /// Ikone izvoza itd. — prikazuje se prije info dugmeta.
+  final Widget? beforeInfoAction;
   final Widget? action;
 
   const StandardScreenHeader({
@@ -25,6 +27,7 @@ class StandardScreenHeader extends StatelessWidget {
     required this.title,
     this.onBack,
     this.onInfo,
+    this.beforeInfoAction,
     this.action,
   });
 
@@ -44,6 +47,7 @@ class StandardScreenHeader extends StatelessWidget {
             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
           ),
         ),
+        if (beforeInfoAction != null) beforeInfoAction!,
         if (onInfo != null)
           IconButton(
             icon: const Icon(Icons.info_outline_rounded),
