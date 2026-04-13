@@ -151,7 +151,7 @@ class _OrderLineProductionCreateScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Nema aktivne sastavnice (PRIMARY / SECONDARY / TRANSPORT) za ovaj proizvod.',
+            'Nedostaju podaci za tehničke reference (kompanija / proizvod).',
           ),
         ),
       );
@@ -285,7 +285,13 @@ class _OrderLineProductionCreateScreenState
                 ),
               )
             else if (_product != null) ...[
-              _infoRow('BOM', '${_product!.bomId} / ${_product!.bomVersion}'),
+              _infoRow(
+                'BOM',
+                (_product!.bomId ?? '').trim().isEmpty &&
+                        (_product!.bomVersion ?? '').trim().isEmpty
+                    ? 'Nije na proizvodu — PN koristi privremenu oznaku dok ne aktiviraš sastavnicu'
+                    : '${_product!.bomId ?? '—'} / ${_product!.bomVersion ?? '—'}',
+              ),
               _infoRow(
                 'Routing',
                 '${_product!.routingId} / ${_product!.routingVersion}',

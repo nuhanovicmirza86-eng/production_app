@@ -13,6 +13,10 @@ import '../../../logistics/receipt/screens/production_label_receipt_screen.dart'
 import '../../../sustainability/screens/carbon_footprint_screen.dart';
 import '../../production_orders/screens/production_order_details_screen.dart';
 import '../../production_orders/screens/production_orders_list_screen.dart';
+import '../../tracking/models/production_operator_tracking_entry.dart';
+import '../../tracking/screens/production_operator_tracking_screen.dart';
+import '../../tracking/screens/production_operator_tracking_station_screen.dart';
+import '../../tracking/screens/production_reports_hub_screen.dart';
 import '../../qr/production_qr_resolver.dart';
 import '../../qr/screens/production_qr_scan_screen.dart';
 
@@ -77,9 +81,10 @@ class ProductionDashboardScreen extends StatelessWidget {
     return ProductionAccessHelper.canView(role: _role, card: card);
   }
 
+  /// Izvještaji praćenja proizvodnje dostupni su ulozi koja ima pristup izvještajima
+  /// (ne ovisi o SaaS listi enabledReports — hub sadrži profesionalne kategorije).
   bool _canShowReportsCard() {
-    return _canViewCard(ProductionDashboardCard.reports) &&
-        ProductionAccessHelper.hasAnyReports(companyData);
+    return _canViewCard(ProductionDashboardCard.reports);
   }
 
   static const double _tileGap = 10;
@@ -87,6 +92,19 @@ class ProductionDashboardScreen extends StatelessWidget {
   List<Widget> _buildProductionActions(BuildContext context) {
     void open(Widget screen) {
       Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+    }
+
+    void openTrackingStation(String phase) {
+      Navigator.push<void>(
+        context,
+        MaterialPageRoute<void>(
+          fullscreenDialog: true,
+          builder: (_) => ProductionOperatorTrackingStationScreen(
+            companyData: companyData,
+            phase: phase,
+          ),
+        ),
+      );
     }
 
     return [
@@ -130,18 +148,40 @@ class ProductionDashboardScreen extends StatelessWidget {
           subtitle: 'Praćenje i evidencija utjecaja.',
           onTap: () => open(CarbonFootprintScreen(companyData: companyData)),
         ),
-      if (_canViewCard(ProductionDashboardCard.productionTracking))
+      if (_canViewCard(ProductionDashboardCard.productionTracking)) ...[
         _DashboardActionTile(
           icon: Icons.play_circle_outline,
-          title: 'Praćenje proizvodnje',
-          subtitle: 'Nalozi u tijeku i aktivnosti.',
+          title: 'Praćenje proizvodnje (tabovi)',
+          subtitle: 'Sve tri faze u jednom ekranu s tabovima.',
           onTap: () => open(
-            ProductionOrdersListScreen(
-              companyData: companyData,
-              initialStatusFilter: ProductionOrderStatusFilter.inProgress,
-            ),
+            ProductionOperatorTrackingScreen(companyData: companyData),
           ),
         ),
+        _DashboardActionTile(
+          icon: Icons.fullscreen_outlined,
+          title: 'Stanica: pripremna',
+          subtitle: 'Puni zaslon — samo unos pripreme (jedan monitor).',
+          onTap: () => openTrackingStation(
+            ProductionOperatorTrackingEntry.phasePreparation,
+          ),
+        ),
+        _DashboardActionTile(
+          icon: Icons.fact_check_outlined,
+          title: 'Stanica: prva kontrola',
+          subtitle: 'Puni zaslon — faza u izradi (placeholder do punog unosa).',
+          onTap: () => openTrackingStation(
+            ProductionOperatorTrackingEntry.phaseFirstControl,
+          ),
+        ),
+        _DashboardActionTile(
+          icon: Icons.verified_outlined,
+          title: 'Stanica: završna kontrola',
+          subtitle: 'Puni zaslon — faza u izradi (placeholder do punog unosa).',
+          onTap: () => openTrackingStation(
+            ProductionOperatorTrackingEntry.phaseFinalControl,
+          ),
+        ),
+      ],
       if (_canViewCard(ProductionDashboardCard.workCenters))
         _DashboardActionTile(
           icon: Icons.precision_manufacturing_outlined,
@@ -181,8 +221,8 @@ class ProductionDashboardScreen extends StatelessWidget {
         _DashboardActionTile(
           icon: Icons.assessment_outlined,
           title: 'Izvještaji',
-          subtitle: 'Uskoro u aplikaciji.',
-          onTap: () => _notImplemented(context),
+          subtitle: 'Otpad, dnevna proizvodnja, IATF / CAPA.',
+          onTap: () => open(ProductionReportsHubScreen(companyData: companyData)),
         ),
     ];
   }

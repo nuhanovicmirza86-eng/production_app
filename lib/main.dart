@@ -1,12 +1,23 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'firebase_options.dart';
 import 'modules/auth/session/screens/auth_wrapper.dart';
 
+bool get _isDesktopNative =>
+    !kIsWeb &&
+    (defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.linux ||
+        defaultTargetPlatform == TargetPlatform.macOS);
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (_isDesktopNative) {
+    await windowManager.ensureInitialized();
+  }
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 

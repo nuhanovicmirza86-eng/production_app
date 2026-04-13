@@ -231,7 +231,7 @@ class _ProductionOrderCreateScreenState
         setState(() {
           _technicalRefsLoading = false;
           _technicalRefsSummary =
-              'Nema aktivne sastavnice (PRIMARY / SECONDARY / TRANSPORT) u bazi. Otvori proizvod → BOM i aktiviraj barem jednu.';
+              'Nedostaju ID kompanije ili proizvoda za učitavanje tehničkih referenci.';
         });
         return;
       }
@@ -245,10 +245,22 @@ class _ProductionOrderCreateScreenState
           'routingId': r['routingId'],
           'routingVersion': r['routingVersion'],
         };
-        final routingIsPlaceholder = r['routingId'] == 'unspecified';
-        _technicalRefsSummary = routingIsPlaceholder
-            ? 'Aktivna je sastavnica s proizvoda. Routing još nije u šifrarniku — koristi se privremena oznaka dok ga ne popuniš.'
-            : 'Aktivna je sastavnica i routing s odabranog proizvoda — možeš kreirati nalog.';
+        final bomPh =
+            r['bomId'] == ProductionOrderTechnicalRefsResolver.bomPlaceholderId;
+        final routingPh = r['routingId'] == 'unspecified';
+        if (bomPh && routingPh) {
+          _technicalRefsSummary =
+              'Nema aktivne sastavnice ni routa u šifrarniku — nalog koristi privremene oznake. Možeš kreirati nalog.';
+        } else if (bomPh) {
+          _technicalRefsSummary =
+              'Nema aktivne sastavnice — koristi se privremena oznaka. Routing je s proizvoda (ili privremen).';
+        } else if (routingPh) {
+          _technicalRefsSummary =
+              'Aktivna je sastavnica s proizvoda. Routing još nije u šifrarniku — koristi se privremena oznaka.';
+        } else {
+          _technicalRefsSummary =
+              'Aktivna su BOM i routing s odabranog proizvoda — možeš kreirati nalog.';
+        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -302,8 +314,7 @@ class _ProductionOrderCreateScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Nema aktivne sastavnice (PRIMARY / SECONDARY / TRANSPORT) za ovaj proizvod. '
-              'Na proizvodu otvori BOM i aktiviraj barem jednu klasifikaciju.',
+              'Nedostaju podaci za kreiranje naloga (kompanija / proizvod).',
             ),
           ),
         );

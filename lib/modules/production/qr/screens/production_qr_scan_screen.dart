@@ -45,7 +45,13 @@ class _ProductionQrScanScreenState extends State<ProductionQrScanScreen> {
 
     final resolution = resolveProductionQrScan(raw);
     if (!mounted) return;
-    Navigator.of(context).pop(resolution);
+
+    // Pop u sljedećem frejmu: MobileScanner / overlay završi cleanup prije uklanjanja
+    // rute (smanjuje assert `_dependents.isEmpty` pri back navigaciji).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).pop(resolution);
+    });
   }
 
   void _onManualSubmit() {

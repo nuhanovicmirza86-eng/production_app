@@ -16,8 +16,13 @@ class ProductionOrderTechnicalRefsResolver {
 
   static String _s(dynamic v) => (v ?? '').toString().trim();
 
-  /// Vraća mapu s ključevima `bomId`, `bomVersion`, `routingId`, `routingVersion`,
-  /// ili `null` ako nema aktivne sastavnice ni u jednoj podržanoj klasifikaciji.
+  /// Placeholder kad proizvod nema aktivnu sastavnicu (isti princip kao routing).
+  static const String bomPlaceholderId = 'unspecified';
+  static const String bomPlaceholderVersion = '0';
+
+  /// Vraća mapu s ključevima `bomId`, `bomVersion`, `routingId`, `routingVersion`.
+  /// Ako nema aktivne BOM u bazi, vraća [bomPlaceholderId] / [bomPlaceholderVersion]
+  /// umjesto da blokira kreiranje naloga.
   Future<Map<String, String>?> resolve({
     required String companyId,
     required String productId,
@@ -50,13 +55,20 @@ class ProductionOrderTechnicalRefsResolver {
           break;
         }
       }
-      if (found == null) return null;
-      bomId = _s(found['id']);
-      bomVersion = _s(found['version']);
-      if (bomVersion.isEmpty) bomVersion = 'v1';
+      if (found != null) {
+        bomId = _s(found['id']);
+        bomVersion = _s(found['version']);
+        if (bomVersion.isEmpty) bomVersion = 'v1';
+      } else {
+        bomId = bomPlaceholderId;
+        bomVersion = bomPlaceholderVersion;
+      }
     }
 
-    if (bomId.isEmpty || bomVersion.isEmpty) return null;
+    if (bomId.isEmpty || bomVersion.isEmpty) {
+      bomId = bomPlaceholderId;
+      bomVersion = bomPlaceholderVersion;
+    }
 
     var routingId = _s(productRoutingId);
     var routingVersion = _s(productRoutingVersion);

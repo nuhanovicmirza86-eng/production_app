@@ -25,7 +25,8 @@ class OrdersListScreen extends StatefulWidget {
 
 class _OrdersListScreenState extends State<OrdersListScreen> {
   final OrdersService _ordersService = OrdersService();
-  final ProductWarehouseStockService _stockService = ProductWarehouseStockService();
+  final ProductWarehouseStockService _stockService =
+      ProductWarehouseStockService();
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -109,19 +110,21 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
     for (var i = 0; i < list.length; i += batch) {
       final end = i + batch > list.length ? list.length : i + batch;
       final chunk = list.sublist(i, end);
-      await Future.wait(chunk.map((pid) async {
-        try {
-          final lines = await _stockService.loadStockLinesForProduct(
-            companyId: _companyId,
-            productId: pid,
-            plantKey: _plantKey.isEmpty ? null : _plantKey,
-          );
-          final sum = lines.fold<double>(0, (a, b) => a + b.quantityOnHand);
-          next[pid] = sum;
-        } catch (_) {
-          next[pid] = 0;
-        }
-      }));
+      await Future.wait(
+        chunk.map((pid) async {
+          try {
+            final lines = await _stockService.loadStockLinesForProduct(
+              companyId: _companyId,
+              productId: pid,
+              plantKey: _plantKey.isEmpty ? null : _plantKey,
+            );
+            final sum = lines.fold<double>(0, (a, b) => a + b.quantityOnHand);
+            next[pid] = sum;
+          } catch (_) {
+            next[pid] = 0;
+          }
+        }),
+      );
     }
 
     if (!mounted) return;
@@ -165,8 +168,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
           return bDate.compareTo(aDate);
         });
 
-      final itemsByOrder =
-          await _ordersService.loadOrderItemsGroupedByOrderId(
+      final itemsByOrder = await _ordersService.loadOrderItemsGroupedByOrderId(
         companyId: _companyId,
       );
 
@@ -199,7 +201,8 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
     final q = _searchController.text.trim().toLowerCase();
 
     return _orders.where((o) {
-      final matchesSearch = q.isEmpty ||
+      final matchesSearch =
+          q.isEmpty ||
           o.orderNumber.toLowerCase().contains(q) ||
           o.partnerName.toLowerCase().contains(q) ||
           ((o.partnerCode ?? '').toLowerCase().contains(q)) ||
@@ -216,8 +219,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
           : o.orderType == _selectedType.toOrderType();
 
       final refDate = o.orderDate ?? o.createdAt;
-      final matchesDate =
-          dateInInclusiveRange(refDate, _dateFrom, _dateTo);
+      final matchesDate = dateInInclusiveRange(refDate, _dateFrom, _dateTo);
 
       return matchesSearch && matchesStatus && matchesType && matchesDate;
     }).toList();
@@ -271,11 +273,10 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
       _activeFiltersCount + (_searchController.text.trim().isNotEmpty ? 1 : 0);
 
   String _companyDisplayName() {
-    final n = (widget.companyData['companyName'] ??
-            widget.companyData['name'] ??
-            '')
-        .toString()
-        .trim();
+    final n =
+        (widget.companyData['companyName'] ?? widget.companyData['name'] ?? '')
+            .toString()
+            .trim();
     return n.isEmpty ? '—' : n;
   }
 
@@ -350,7 +351,9 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Nema narudžbi za izvoz (filtrirani pregled je prazan).'),
+          content: Text(
+            'Nema narudžbi za izvoz (filtrirani pregled je prazan).',
+          ),
         ),
       );
       return;
@@ -369,9 +372,9 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     }
   }
 
@@ -403,7 +406,8 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Export PDF — detaljno po stavkama (zalihe ako su učitane)',
+                    tooltip:
+                        'Export PDF — detaljno po stavkama (zalihe ako su učitane)',
                     icon: const Icon(Icons.picture_as_pdf_outlined),
                     onPressed: _isLoading ? null : _exportPdf,
                   ),
@@ -480,7 +484,8 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
               ),
             ),
             IconButton(
-              tooltip: 'Export PDF — detaljno po stavkama (zalihe ako su učitane)',
+              tooltip:
+                  'Export PDF — detaljno po stavkama (zalihe ako su učitane)',
               icon: const Icon(Icons.picture_as_pdf_outlined),
               onPressed: _isLoading ? null : _exportPdf,
             ),
@@ -535,8 +540,9 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
   }
 
   Widget _buildKpis() {
-    final total =
-        _orders.where((o) => o.status != OrderStatus.cancelled).length;
+    final total = _orders
+        .where((o) => o.status != OrderStatus.cancelled)
+        .length;
     final open = _orders.where(_isOpen).length;
     final late = _orders.where(_isLate).length;
     final completed = _orders
@@ -581,7 +587,8 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
   Widget _buildSearch({bool compact = false}) {
     return StandardSearchField(
       controller: _searchController,
-      hintText: 'Broj narudžbe, partner, šifra partnera, šifra/naziv proizvoda…',
+      hintText:
+          'Broj narudžbe, partner, šifra partnera, šifra/naziv proizvoda…',
       compact: compact,
     );
   }
@@ -608,9 +615,9 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
       children: [
         Text(
           'Status',
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: cs.onSurfaceVariant,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(color: cs.onSurfaceVariant),
         ),
         const SizedBox(height: 6),
         Wrap(
@@ -628,9 +635,9 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
         const SizedBox(height: 12),
         Text(
           'Tip',
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: cs.onSurfaceVariant,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(color: cs.onSurfaceVariant),
         ),
         const SizedBox(height: 6),
         Wrap(
@@ -665,7 +672,8 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
       title: 'Pretraga i filteri',
       expanded: _searchStripExpanded,
       activeCount: _searchStripActiveCount,
-      onToggle: () => setState(() => _searchStripExpanded = !_searchStripExpanded),
+      onToggle: () =>
+          setState(() => _searchStripExpanded = !_searchStripExpanded),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -747,7 +755,10 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
       }
     }
     lines.sort((a, b) {
-      final c = _deadlineSortKey(a.o, a.it).compareTo(_deadlineSortKey(b.o, b.it));
+      final c = _deadlineSortKey(
+        a.o,
+        a.it,
+      ).compareTo(_deadlineSortKey(b.o, b.it));
       if (c != 0) return c;
       final n = a.o.orderNumber.compareTo(b.o.orderNumber);
       if (n != 0) return n;
@@ -760,10 +771,8 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
     await Navigator.push<void>(
       context,
       MaterialPageRoute(
-        builder: (_) => OrderDetailsScreen(
-          companyData: widget.companyData,
-          order: o,
-        ),
+        builder: (_) =>
+            OrderDetailsScreen(companyData: widget.companyData, order: o),
       ),
     );
     if (mounted) await _loadOrders();
@@ -813,10 +822,10 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
           th('Šifra', 84),
           thExp('Naziv'),
           th('MJ', 44),
-          th('Naručeno', 72),
-          th('Isp./Prim.', 72),
-          th('Ostalo', 64),
-          th('Stanje', 72),
+          th('Naručeno', 52),
+          th('Isp./Prim.', 52),
+          th('Ostalo', 52),
+          th('Stanje', 52),
         ],
       ),
     );
@@ -892,12 +901,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              td(
-                o.orderNumber,
-                _colOrderNumber,
-                maxLines: 1,
-                softWrap: false,
-              ),
+              td(o.orderNumber, _colOrderNumber, maxLines: 1, softWrap: false),
               td(_formatDate(o.orderDate ?? o.createdAt), 82),
               td(ref ?? '—', 84),
               td(rok, 88),
@@ -952,8 +956,9 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
   Widget _buildGroupedOrderTables(List<OrderModel> list) {
     final byPartner = <String, List<OrderModel>>{};
     for (final o in list) {
-      final k =
-          o.partnerName.trim().isEmpty ? 'Nepoznat partner' : o.partnerName.trim();
+      final k = o.partnerName.trim().isEmpty
+          ? 'Nepoznat partner'
+          : o.partnerName.trim();
       byPartner.putIfAbsent(k, () => []).add(o);
     }
     final keys = byPartner.keys.toList()
@@ -972,9 +977,9 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
             Text(
               'Pregled po kupcu / partneru — redovi sortirani po roku isporuke. '
               'Zelena pozadina: dovoljno zalihe za ostatak.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 12),
             for (var pi = 0; pi < keys.length; pi++) ...[
@@ -983,7 +988,10 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                 color: cs.primaryContainer,
                 borderRadius: BorderRadius.circular(12),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                   child: Text(
                     keys[pi],
                     style: TextStyle(
@@ -1012,8 +1020,9 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _orderTableHeaderRow(),
-                        for (final line
-                            in _sortedLinesForOrders(byPartner[keys[pi]]!))
+                        for (final line in _sortedLinesForOrders(
+                          byPartner[keys[pi]]!,
+                        ))
                           _orderDataRow(line.o, line.it),
                       ],
                     ),
@@ -1071,10 +1080,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Center(
-                      child: Text(
-                        _errorMessage!,
-                        textAlign: TextAlign.center,
-                      ),
+                      child: Text(_errorMessage!, textAlign: TextAlign.center),
                     ),
                   ),
                 )
