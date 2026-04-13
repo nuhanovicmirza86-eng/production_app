@@ -1,48 +1,28 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/partner_models.dart';
 
 class CustomersService {
-  CustomersService({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+  CustomersService({
+    FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _functions =
+            functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
 
   final FirebaseFirestore _firestore;
+  final FirebaseFunctions _functions;
 
   CollectionReference<Map<String, dynamic>> get _customers =>
       _firestore.collection('customers');
-  CollectionReference<Map<String, dynamic>> get _customerCounters =>
-      _firestore.collection('customer_counters');
 
   static String _s(dynamic v) => (v ?? '').toString().trim();
 
-  Future<String> _nextCustomerCode({
-    required String companyId,
-    required String generatedBy,
-  }) async {
-    final year = DateTime.now().year.toString();
-    final yy = year.substring(year.length - 2);
-    final counterId = '${companyId}_$year';
-    final ref = _customerCounters.doc(counterId);
-
-    return _firestore.runTransaction((tx) async {
-      final snap = await tx.get(ref);
-      final existing = snap.data() ?? <String, dynamic>{};
-      final current = (existing['lastNumber'] as num?)?.toInt() ?? 0;
-      final next = current + 1;
-
-      tx.set(ref, {
-        'id': counterId,
-        'companyId': companyId,
-        'year': year,
-        'lastNumber': next,
-        if (!snap.exists) 'createdAt': FieldValue.serverTimestamp(),
-        if (!snap.exists) 'createdBy': generatedBy,
-        'updatedAt': FieldValue.serverTimestamp(),
-        'updatedBy': generatedBy,
-      }, SetOptions(merge: true));
-
-      return 'CUS-$yy-${next.toString().padLeft(4, '0')}';
-    });
+  Map<String, dynamic> _customerPayloadForCallable(CustomerModel customer) {
+    return Map<String, dynamic>.from(
+      customer.toMapForWrite(includeIdFields: false),
+    );
   }
 
   Future<List<CustomerModel>> listCustomers({
@@ -106,18 +86,12 @@ class CustomersService {
     required CustomerModel draft,
   }) async {
     final companyId = _s(companyData['companyId']);
-    final userId = _s(companyData['userId']).isEmpty ? 'system' : _s(companyData['userId']);
     if (companyId.isEmpty) throw Exception('Missing companyId');
 
-    final docRef = _customers.doc();
-    final code = draft.code.trim().isEmpty
-        ? await _nextCustomerCode(companyId: companyId, generatedBy: userId)
-        : draft.code.trim().toUpperCase();
-
-    final model = CustomerModel(
-      id: docRef.id,
+    final payload = CustomerModel(
+      id: '',
       companyId: companyId,
-      code: code,
+      code: draft.code.trim().isEmpty ? '' : draft.code.trim().toUpperCase(),
       name: draft.name.trim(),
       legalName: draft.legalName.trim(),
       status: draft.status.trim(),
@@ -129,15 +103,19 @@ class CustomersService {
       notes: draft.notes,
     );
 
-    await docRef.set({
-      ...model.toMapForWrite(includeIdFields: true),
-      'createdAt': FieldValue.serverTimestamp(),
-      'createdBy': userId,
-      'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': userId,
+    final res = await _functions
+        .httpsCallable('createCommercialCustomer')
+        .call<Map<String, dynamic>>({
+      'companyId': companyId,
+      'customer': _customerPayloadForCallable(payload),
     });
-
-    return docRef.id;
+    final data = res.data;
+    if (data['success'] != true) {
+      throw Exception('Kreiranje kupca nije uspjelo.');
+    }
+    final id = _s(data['customerId']);
+    if (id.isEmpty) throw Exception('Kreiranje kupca: prazan odgovor.');
+    return id;
   }
 
   Future<void> updateCustomer({
@@ -145,15 +123,19 @@ class CustomersService {
     required CustomerModel customer,
   }) async {
     final companyId = _s(companyData['companyId']);
-    final userId = _s(companyData['userId']).isEmpty ? 'system' : _s(companyData['userId']);
     if (companyId.isEmpty) throw Exception('Missing companyId');
     if (customer.id.trim().isEmpty) throw Exception('Missing customerId');
 
-    await _customers.doc(customer.id).update({
-      ...customer.toMapForWrite(includeIdFields: false),
-      'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': userId,
+    final res = await _functions
+        .httpsCallable('updateCommercialCustomer')
+        .call<Map<String, dynamic>>({
+      'companyId': companyId,
+      'customerId': customer.id.trim(),
+      'customer': _customerPayloadForCallable(customer),
     });
+    if (res.data['success'] != true) {
+      throw Exception('Ažuriranje kupca nije uspjelo.');
+    }
   }
 }
 

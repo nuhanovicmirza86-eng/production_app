@@ -1,33 +1,59 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../../../production/production_orders/services/production_order_service.dart';
 import '../models/order_model.dart';
-import 'order_audit_service.dart';
 import 'order_status_engine.dart';
 
 class OrdersService {
   OrdersService({
     FirebaseFirestore? firestore,
-    OrderAuditService? orderAuditService,
+    FirebaseFunctions? functions,
     OrderStatusEngine? orderStatusEngine,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _orderAuditService =
-           orderAuditService ??
-           OrderAuditService(
-             firestore: firestore ?? FirebaseFirestore.instance,
-           ),
+       _functions =
+           functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1'),
        _orderStatusEngine = orderStatusEngine ?? const OrderStatusEngine();
 
   final FirebaseFirestore _firestore;
-  final OrderAuditService _orderAuditService;
+  final FirebaseFunctions _functions;
   final OrderStatusEngine _orderStatusEngine;
-
-  // ================= COLLECTIONS =================
 
   CollectionReference get _orders => _firestore.collection('orders');
   CollectionReference get _orderItems => _firestore.collection('order_items');
-  CollectionReference get _orderCounters =>
-      _firestore.collection('order_counters');
+
+  Future<Map<String, dynamic>> _callCreateCommercialOrder(
+    Map<String, dynamic> payload,
+  ) async {
+    final res = await _functions
+        .httpsCallable('createCommercialOrder')
+        .call<Map<String, dynamic>>(payload);
+    return res.data;
+  }
+
+  Future<Map<String, dynamic>> _callUpdateCommercialOrder(
+    Map<String, dynamic> payload,
+  ) async {
+    final res = await _functions
+        .httpsCallable('updateCommercialOrder')
+        .call<Map<String, dynamic>>(payload);
+    return res.data;
+  }
+
+  static String _s(dynamic v) => (v ?? '').toString().trim();
+
+  static dynamic _jsonSafeDate(dynamic v) {
+    if (v == null) return null;
+    if (v is DateTime) return v.toIso8601String();
+    if (v is Timestamp) return v.toDate().toIso8601String();
+    return v;
+  }
+
+  Map<String, dynamic> _itemForCallable(Map<String, dynamic> item) {
+    final m = Map<String, dynamic>.from(item);
+    m['dueDate'] = _jsonSafeDate(m['dueDate']);
+    return m;
+  }
 
   // ============================================================
   // ======================= PUBLIC API ==========================
@@ -53,71 +79,39 @@ class OrdersService {
     required List<Map<String, dynamic>> items,
   }) async {
     final companyId = _requireCompanyId(companyData);
-    final userId = _requireUserId(companyData);
 
     _validateOrderType(orderType);
     _validateOrderItems(items);
 
-    final orderNumber = await _generateOrderNumber(
-      companyId: companyId,
-      orderType: orderType,
-      generatedBy: userId,
-    );
+    final payload = <String, dynamic>{
+      'companyId': companyId,
+      'orderType': orderType,
+      'partnerId': partnerId,
+      'partnerCode': partnerCode,
+      'partnerName': partnerName,
+      'orderDate': orderDate.toIso8601String(),
+      'requestedDeliveryDate': requestedDeliveryDate?.toIso8601String(),
+      'confirmedDeliveryDate': confirmedDeliveryDate?.toIso8601String(),
+      'customerReference': customerReference,
+      'supplierReference': supplierReference,
+      'plantKey': plantKey,
+      'receiptPlantKey': receiptPlantKey,
+      'deliveryAddress': deliveryAddress,
+      'shippingTerms': shippingTerms,
+      'currency': currency,
+      'notes': notes,
+      'items': items.map(_itemForCallable).toList(),
+    };
 
-    final orderRef = _orders.doc();
-
-    final headerPayload = _buildOrderHeaderPayload(
-      orderId: orderRef.id,
-      companyId: companyId,
-      orderNumber: orderNumber,
-      orderType: orderType,
-      partnerId: partnerId,
-      partnerCode: partnerCode,
-      partnerName: partnerName,
-      orderDate: orderDate,
-      requestedDeliveryDate: requestedDeliveryDate,
-      confirmedDeliveryDate: confirmedDeliveryDate,
-      customerReference: customerReference,
-      supplierReference: supplierReference,
-      plantKey: plantKey,
-      receiptPlantKey: receiptPlantKey,
-      deliveryAddress: deliveryAddress,
-      shippingTerms: shippingTerms,
-      currency: currency,
-      notes: notes,
-      createdBy: userId,
-    );
-
-    final batch = _firestore.batch();
-
-    batch.set(orderRef, headerPayload);
-
-    for (final item in items) {
-      final itemRef = _orderItems.doc();
-
-      final itemPayload = _buildOrderItemPayload(
-        orderItemId: itemRef.id,
-        companyId: companyId,
-        orderId: orderRef.id,
-        orderType: orderType,
-        partnerId: partnerId,
-        plantKey: plantKey,
-        item: item,
-        createdBy: userId,
-      );
-
-      batch.set(itemRef, itemPayload);
+    final data = await _callCreateCommercialOrder(payload);
+    if (data['success'] != true) {
+      throw Exception('Kreiranje narudžbe nije uspjelo.');
     }
-
-    await batch.commit();
-
-    await recalculateOrderStatus(
-      companyId: companyId,
-      orderId: orderRef.id,
-      updatedBy: userId,
-    );
-
-    return orderRef.id;
+    final id = _s(data['orderId']);
+    if (id.isEmpty) {
+      throw Exception('Nedostaje orderId iz odgovora.');
+    }
+    return id;
   }
 
   Future<Map<String, dynamic>?> getOrderById({
@@ -171,8 +165,6 @@ class OrdersService {
     }
     return out;
   }
-
-  static String _s(dynamic v) => (v ?? '').toString().trim();
 
   Future<List<OrderModel>> searchOrders({
     required String companyId,
@@ -232,7 +224,6 @@ class OrdersService {
 
     final orderType = (order['orderType'] ?? '').toString().trim();
     final oldStatus = (order['status'] ?? '').toString().trim();
-    final orderNumber = (order['orderNumber'] ?? '').toString().trim();
 
     _validateOrderType(orderType);
     _orderStatusEngine.validateManualStatusTransition(
@@ -241,25 +232,18 @@ class OrdersService {
       newStatus: newStatus,
     );
 
-    await _orders.doc(orderId).update({
-      'status': newStatus,
-      'lastStatusChangeAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': updatedBy,
+    final data = await _callUpdateCommercialOrder({
+      'companyId': companyId,
+      'op': 'status',
+      'orderId': orderId,
+      'newStatus': newStatus,
+      if (reason != null) 'reason': reason,
     });
-
-    await _orderAuditService.appendOrderStatusHistory(
-      companyId: companyId,
-      orderId: orderId,
-      orderNumber: orderNumber,
-      oldStatus: oldStatus,
-      newStatus: newStatus,
-      changedBy: updatedBy,
-      reason: reason,
-    );
+    if (data['success'] != true) {
+      throw Exception('Ažuriranje statusa nije uspjelo.');
+    }
   }
 
-  /// Ažurira zaglavlje narudžbe (datumi, napomena, reference, valuta). Nije dozvoljeno za `cancelled` / `closed`.
   Future<void> updateOrderHeader({
     required String companyId,
     required String orderId,
@@ -272,52 +256,23 @@ class OrdersService {
     String? supplierReference,
     String? currency,
   }) async {
-    final order = await getOrderById(companyId: companyId, orderId: orderId);
-    if (order == null) {
-      throw Exception('Narudžba nije pronađena');
+    final data = await _callUpdateCommercialOrder({
+      'companyId': companyId,
+      'op': 'header',
+      'orderId': orderId,
+      'orderDate': orderDate.toIso8601String(),
+      'requestedDeliveryDate': requestedDeliveryDate?.toIso8601String(),
+      'confirmedDeliveryDate': confirmedDeliveryDate?.toIso8601String(),
+      'notes': notes,
+      'customerReference': customerReference,
+      'supplierReference': supplierReference,
+      'currency': currency,
+    });
+    if (data['success'] != true) {
+      throw Exception('Ažuriranje zaglavlja nije uspjelo.');
     }
-    final st = (order['status'] ?? '').toString().trim().toLowerCase();
-    if (st == 'cancelled' || st == 'closed') {
-      throw Exception('Narudžba je završena ili otkazana; zaglavlje se ne može mijenjati.');
-    }
-
-    final patch = <String, dynamic>{
-      'orderDate': Timestamp.fromDate(orderDate),
-      'requestedDeliveryDate': requestedDeliveryDate != null
-          ? Timestamp.fromDate(requestedDeliveryDate)
-          : FieldValue.delete(),
-      'confirmedDeliveryDate': confirmedDeliveryDate != null
-          ? Timestamp.fromDate(confirmedDeliveryDate)
-          : FieldValue.delete(),
-      'notes': (notes == null || notes.trim().isEmpty)
-          ? FieldValue.delete()
-          : notes.trim(),
-      'customerReference': () {
-        final t = customerReference?.trim() ?? '';
-        return t.isEmpty ? FieldValue.delete() : t;
-      }(),
-      'supplierReference': () {
-        final t = supplierReference?.trim() ?? '';
-        return t.isEmpty ? FieldValue.delete() : t;
-      }(),
-      'currency': () {
-        final t = currency?.trim() ?? '';
-        return t.isEmpty ? FieldValue.delete() : t;
-      }(),
-      'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': updatedBy,
-    };
-
-    await _orders.doc(orderId).update(patch);
-
-    await recalculateOrderStatus(
-      companyId: companyId,
-      orderId: orderId,
-      updatedBy: updatedBy,
-    );
   }
 
-  /// Mijenja naručenu količinu i rok stavke samo ako nema veze na PN i nema isporuke/primke.
   Future<void> updateOrderItemOrderedAndDue({
     required String companyId,
     required String orderId,
@@ -330,90 +285,17 @@ class OrdersService {
       throw Exception('Naručena količina mora biti veća od 0');
     }
 
-    final order = await getOrderById(companyId: companyId, orderId: orderId);
-    if (order == null) {
-      throw Exception('Narudžba nije pronađena');
-    }
-    final orderType = (order['orderType'] ?? '').toString().trim();
-    _validateOrderType(orderType);
-
-    final st = (order['status'] ?? '').toString().trim().toLowerCase();
-    if (st == 'cancelled' || st == 'closed') {
-      throw Exception('Narudžba je završena ili otkazana.');
-    }
-
-    final itemRef = _orderItems.doc(orderItemId);
-    final itemDoc = await itemRef.get();
-    if (!itemDoc.exists) {
-      throw Exception('Stavka nije pronađena');
-    }
-    final item = itemDoc.data() as Map<String, dynamic>;
-    if ((item['orderId'] ?? '').toString().trim() != orderId) {
-      throw Exception('Stavka ne pripada ovoj narudžbi');
-    }
-
-    if ((item['hasProductionLink'] ?? false) == true) {
-      throw Exception(
-        'Stavka je povezana s proizvodnim nalogom — količinu mijenjaj kroz proizvodnju / skidanje veze.',
-      );
-    }
-
-    final delivered = _orderStatusEngine.toDouble(item['deliveredQty']);
-    final received = _orderStatusEngine.toDouble(item['receivedQty']);
-    if (delivered > 0 || received > 0) {
-      throw Exception(
-        'Stavka već ima isporuku ili primku — naručenu količinu nije moguće mijenjati.',
-      );
-    }
-
-    final confirmedQty = _orderStatusEngine.toDouble(item['confirmedQty']);
-    final openQty = _orderStatusEngine.calculateOpenQty(
-      orderType: orderType,
-      orderedQty: orderedQty,
-      deliveredQty: delivered,
-      receivedQty: received,
-    );
-
-    final now = DateTime.now();
-    final isLate = _orderStatusEngine.calculateItemIsLate(
-      orderType: orderType,
-      dueDate: dueDate,
-      now: now,
-      orderedQty: orderedQty,
-      deliveredQty: delivered,
-      receivedQty: received,
-    );
-
-    final itemStatus = orderType == 'customer_order'
-        ? _orderStatusEngine.calculateCustomerOrderItemStatus(
-            orderedQty: orderedQty,
-            confirmedQty: confirmedQty,
-            deliveredQty: delivered,
-            hasProductionLink: false,
-            isLate: isLate,
-          )
-        : _orderStatusEngine.calculateSupplierOrderItemStatus(
-            orderedQty: orderedQty,
-            confirmedQty: confirmedQty,
-            receivedQty: received,
-            isLate: isLate,
-          );
-
-    await itemRef.update({
+    final data = await _callUpdateCommercialOrder({
+      'companyId': companyId,
+      'op': 'item_ordered',
+      'orderId': orderId,
+      'orderItemId': orderItemId,
       'orderedQty': orderedQty,
-      'openQty': openQty,
-      'dueDate': dueDate != null ? Timestamp.fromDate(dueDate) : FieldValue.delete(),
-      'isLate': isLate,
-      'status': itemStatus,
-      'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': updatedBy,
+      'dueDate': dueDate?.toIso8601String(),
     });
-
-    await recalculateOrderStatus(
-      companyId: companyId,
-      orderId: orderId,
-      updatedBy: updatedBy,
-    );
+    if (data['success'] != true) {
+      throw Exception('Ažuriranje stavke nije uspjelo.');
+    }
   }
 
   Future<void> updateOrderItemExecution({
@@ -425,90 +307,18 @@ class OrdersService {
     double? receivedQty,
     required String updatedBy,
   }) async {
-    final order = await getOrderById(companyId: companyId, orderId: orderId);
-    if (order == null) {
-      throw Exception('Order not found');
+    final data = await _callUpdateCommercialOrder({
+      'companyId': companyId,
+      'op': 'item_execution',
+      'orderId': orderId,
+      'orderItemId': orderItemId,
+      if (confirmedQty != null) 'confirmedQty': confirmedQty,
+      if (deliveredQty != null) 'deliveredQty': deliveredQty,
+      if (receivedQty != null) 'receivedQty': receivedQty,
+    });
+    if (data['success'] != true) {
+      throw Exception('Ažuriranje izvršenja stavke nije uspjelo.');
     }
-
-    final orderType = (order['orderType'] ?? '').toString().trim();
-    _validateOrderType(orderType);
-
-    final itemDoc = await _orderItems.doc(orderItemId).get();
-    if (!itemDoc.exists) {
-      throw Exception('Order item not found');
-    }
-
-    final item = itemDoc.data() as Map<String, dynamic>;
-
-    final orderedQty = _orderStatusEngine.toDouble(item['orderedQty']);
-    final nextConfirmedQty =
-        confirmedQty ?? _orderStatusEngine.toDouble(item['confirmedQty']);
-    final nextDeliveredQty =
-        deliveredQty ?? _orderStatusEngine.toDouble(item['deliveredQty']);
-    final nextReceivedQty =
-        receivedQty ?? _orderStatusEngine.toDouble(item['receivedQty']);
-    final dueDate = _orderStatusEngine.toDateTimeOrNull(item['dueDate']);
-    final hasProductionLink = (item['hasProductionLink'] ?? false) == true;
-
-    final sanitizedConfirmedQty = _orderStatusEngine.sanitizeQty(
-      nextConfirmedQty,
-    );
-    final sanitizedDeliveredQty = _orderStatusEngine.sanitizeQty(
-      nextDeliveredQty,
-    );
-    final sanitizedReceivedQty = _orderStatusEngine.sanitizeQty(
-      nextReceivedQty,
-    );
-
-    final openQty = _orderStatusEngine.calculateOpenQty(
-      orderType: orderType,
-      orderedQty: orderedQty,
-      deliveredQty: sanitizedDeliveredQty,
-      receivedQty: sanitizedReceivedQty,
-    );
-
-    final isLate = _orderStatusEngine.calculateItemIsLate(
-      orderType: orderType,
-      dueDate: dueDate,
-      now: DateTime.now(),
-      orderedQty: orderedQty,
-      deliveredQty: sanitizedDeliveredQty,
-      receivedQty: sanitizedReceivedQty,
-    );
-
-    final itemStatus = orderType == 'customer_order'
-        ? _orderStatusEngine.calculateCustomerOrderItemStatus(
-            orderedQty: orderedQty,
-            confirmedQty: sanitizedConfirmedQty,
-            deliveredQty: sanitizedDeliveredQty,
-            hasProductionLink: hasProductionLink,
-            isLate: isLate,
-          )
-        : _orderStatusEngine.calculateSupplierOrderItemStatus(
-            orderedQty: orderedQty,
-            confirmedQty: sanitizedConfirmedQty,
-            receivedQty: sanitizedReceivedQty,
-            isLate: isLate,
-          );
-
-    final updateData = <String, dynamic>{
-      'confirmedQty': sanitizedConfirmedQty,
-      'deliveredQty': sanitizedDeliveredQty,
-      'receivedQty': sanitizedReceivedQty,
-      'openQty': openQty,
-      'status': itemStatus,
-      'isLate': isLate,
-      'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': updatedBy,
-    };
-
-    await _orderItems.doc(orderItemId).update(updateData);
-
-    await recalculateOrderStatus(
-      companyId: companyId,
-      orderId: orderId,
-      updatedBy: updatedBy,
-    );
   }
 
   Future<void> recalculateOrderStatus({
@@ -516,62 +326,13 @@ class OrdersService {
     required String orderId,
     required String updatedBy,
   }) async {
-    final order = await getOrderById(companyId: companyId, orderId: orderId);
-    if (order == null) {
-      throw Exception('Order not found');
-    }
-
-    final orderType = (order['orderType'] ?? '').toString().trim();
-    _validateOrderType(orderType);
-
-    final items = await getOrderItems(companyId: companyId, orderId: orderId);
-
-    final now = DateTime.now();
-    final totals = _orderStatusEngine.calculateOrderTotals(items, now: now);
-    final oldStatus = (order['status'] ?? '').toString().trim();
-    final orderNumber = (order['orderNumber'] ?? '').toString().trim();
-
-    final status = orderType == 'customer_order'
-        ? _orderStatusEngine.calculateCustomerOrderStatus(
-            currentStatus: oldStatus,
-            totalItems: totals.totalItems,
-            totalOrderedQty: totals.totalOrderedQty,
-            totalConfirmedQty: totals.totalConfirmedQty,
-            totalDeliveredQty: totals.totalDeliveredQty,
-            hasProductionLink: totals.hasProductionLink,
-            isLate: totals.isLate,
-          )
-        : _orderStatusEngine.calculateSupplierOrderStatus(
-            currentStatus: oldStatus,
-            totalItems: totals.totalItems,
-            totalOrderedQty: totals.totalOrderedQty,
-            totalConfirmedQty: totals.totalConfirmedQty,
-            totalReceivedQty: totals.totalReceivedQty,
-            isLate: totals.isLate,
-          );
-
-    await _orders.doc(orderId).update({
-      'status': status,
-      'totalItemsCount': totals.totalItems,
-      'totalOrderedQty': totals.totalOrderedQty,
-      'totalDeliveredQty': totals.totalDeliveredQty,
-      'totalReceivedQty': totals.totalReceivedQty,
-      'hasProductionLink': totals.hasProductionLink,
-      'isLate': totals.isLate,
-      'lastStatusChangeAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': updatedBy,
+    final data = await _callUpdateCommercialOrder({
+      'companyId': companyId,
+      'op': 'recalculate',
+      'orderId': orderId,
     });
-
-    if (oldStatus != status) {
-      await _orderAuditService.appendOrderStatusHistory(
-        companyId: companyId,
-        orderId: orderId,
-        orderNumber: orderNumber,
-        oldStatus: oldStatus,
-        newStatus: status,
-        changedBy: updatedBy,
-      );
+    if (data['success'] != true) {
+      throw Exception('Preračun statusa nije uspio.');
     }
   }
 
@@ -583,50 +344,17 @@ class OrdersService {
     required String productionOrderCode,
     required String linkedBy,
   }) async {
-    final itemRef = _orderItems.doc(orderItemId);
-
-    final itemDoc = await itemRef.get();
-    if (!itemDoc.exists) {
-      throw Exception('Order item not found');
-    }
-
-    final item = itemDoc.data() as Map<String, dynamic>;
-    final order = await getOrderById(companyId: companyId, orderId: orderId);
-    if (order == null) {
-      throw Exception('Order not found');
-    }
-
-    await itemRef.update({
-      'linkedProductionOrderIds': FieldValue.arrayUnion([productionOrderId]),
-      'linkedProductionOrderCodes': FieldValue.arrayUnion([
-        productionOrderCode,
-      ]),
-      'hasProductionLink': true,
-      'status': _orderStatusEngine.calculateCustomerOrderItemStatus(
-        orderedQty: _orderStatusEngine.toDouble(item['orderedQty']),
-        confirmedQty: _orderStatusEngine.toDouble(item['confirmedQty']),
-        deliveredQty: _orderStatusEngine.toDouble(item['deliveredQty']),
-        hasProductionLink: true,
-        isLate: (item['isLate'] ?? false) == true,
-      ),
-      'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': linkedBy,
+    final data = await _callUpdateCommercialOrder({
+      'companyId': companyId,
+      'op': 'link_production',
+      'orderId': orderId,
+      'orderItemId': orderItemId,
+      'productionOrderId': productionOrderId,
+      'productionOrderCode': productionOrderCode,
     });
-
-    await _orderAuditService.appendOrderLinkHistory(
-      companyId: companyId,
-      orderId: orderId,
-      orderItemId: orderItemId,
-      productionOrderId: productionOrderId,
-      productionOrderCode: productionOrderCode,
-      linkedBy: linkedBy,
-    );
-
-    await recalculateOrderStatus(
-      companyId: companyId,
-      orderId: orderId,
-      updatedBy: linkedBy,
-    );
+    if (data['success'] != true) {
+      throw Exception('Povezivanje s proizvodnim nalogom nije uspjelo.');
+    }
   }
 
   /// Kreira draft proizvodni nalog sa poljima sljedljivosti (narudžba → PN) i povezuje stavku narudžbe.
@@ -695,7 +423,10 @@ class OrdersService {
       requestedDeliveryDate: requestedDeliveryDate,
     );
 
-    final poSnap = await _firestore.collection('production_orders').doc(productionOrderId).get();
+    final poSnap = await _firestore
+        .collection('production_orders')
+        .doc(productionOrderId)
+        .get();
     final productionOrderCode =
         (poSnap.data()?['productionOrderCode'] ?? '').toString().trim();
     if (productionOrderCode.isEmpty) {
@@ -751,178 +482,5 @@ class OrdersService {
         throw Exception('Missing lineId');
       }
     }
-  }
-
-  Future<String> _generateOrderNumber({
-    required String companyId,
-    required String orderType,
-    required String generatedBy,
-  }) async {
-    final prefix = orderType == 'customer_order' ? 'SO' : 'PO';
-    final year = DateTime.now().year;
-    final counterDocId = _buildOrderCounterDocId(
-      companyId: companyId,
-      prefix: prefix,
-      year: year,
-    );
-
-    final counterRef = _orderCounters.doc(counterDocId);
-
-    final nextSequence = await _firestore.runTransaction<int>((
-      transaction,
-    ) async {
-      final snapshot = await transaction.get(counterRef);
-
-      if (!snapshot.exists) {
-        transaction.set(counterRef, {
-          'id': counterDocId,
-          'companyId': companyId,
-          'prefix': prefix,
-          'year': year,
-          'lastNumber': 1,
-          'createdAt': FieldValue.serverTimestamp(),
-          'createdBy': generatedBy,
-          'updatedAt': FieldValue.serverTimestamp(),
-          'updatedBy': generatedBy,
-        });
-        return 1;
-      }
-
-      final data = snapshot.data() as Map<String, dynamic>;
-      final currentLastNumber = _toInt(data['lastNumber']);
-      final nextNumber = currentLastNumber + 1;
-
-      transaction.update(counterRef, {
-        'lastNumber': nextNumber,
-        'updatedAt': FieldValue.serverTimestamp(),
-        'updatedBy': generatedBy,
-      });
-
-      return nextNumber;
-    });
-
-    final formattedSequence = nextSequence.toString().padLeft(6, '0');
-    return '$prefix-$year-$formattedSequence';
-  }
-
-  String _buildOrderCounterDocId({
-    required String companyId,
-    required String prefix,
-    required int year,
-  }) {
-    return '${companyId}_${prefix}_$year';
-  }
-
-  Map<String, dynamic> _buildOrderHeaderPayload({
-    required String orderId,
-    required String companyId,
-    required String orderNumber,
-    required String orderType,
-    required String partnerId,
-    required String partnerCode,
-    required String partnerName,
-    required DateTime orderDate,
-    DateTime? requestedDeliveryDate,
-    DateTime? confirmedDeliveryDate,
-    String? customerReference,
-    String? supplierReference,
-    String? plantKey,
-    String? receiptPlantKey,
-    String? deliveryAddress,
-    String? shippingTerms,
-    String? currency,
-    String? notes,
-    required String createdBy,
-  }) {
-    return {
-      'orderId': orderId,
-      'companyId': companyId,
-      'orderNumber': orderNumber,
-      'orderType': orderType,
-      'status': 'confirmed',
-      'partnerId': partnerId,
-      'partnerCode': partnerCode,
-      'partnerName': partnerName,
-      'orderDate': Timestamp.fromDate(orderDate),
-      'requestedDeliveryDate': requestedDeliveryDate != null
-          ? Timestamp.fromDate(requestedDeliveryDate)
-          : null,
-      'confirmedDeliveryDate': confirmedDeliveryDate != null
-          ? Timestamp.fromDate(confirmedDeliveryDate)
-          : null,
-      'customerReference': customerReference,
-      'supplierReference': supplierReference,
-      'plantKey': plantKey,
-      'receiptPlantKey': receiptPlantKey,
-      'deliveryAddress': deliveryAddress,
-      'shippingTerms': shippingTerms,
-      'currency': currency,
-      'notes': notes,
-      'totalItemsCount': 0,
-      'totalOrderedQty': 0.0,
-      'totalDeliveredQty': 0.0,
-      'totalReceivedQty': 0.0,
-      'hasProductionLink': false,
-      'isLate': false,
-      'lastStatusChangeAt': FieldValue.serverTimestamp(),
-      'createdAt': FieldValue.serverTimestamp(),
-      'createdBy': createdBy,
-      'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': createdBy,
-    };
-  }
-
-  Map<String, dynamic> _buildOrderItemPayload({
-    required String orderItemId,
-    required String companyId,
-    required String orderId,
-    required String orderType,
-    required String partnerId,
-    String? plantKey,
-    required Map<String, dynamic> item,
-    required String createdBy,
-  }) {
-    return {
-      'orderItemId': orderItemId,
-      'companyId': companyId,
-      'orderId': orderId,
-      'orderType': orderType,
-      'partnerId': partnerId,
-      'plantKey': plantKey,
-      'lineId': item['lineId'],
-      'itemType': item['itemType'],
-      if ((item['productId'] ?? '').toString().trim().isNotEmpty)
-        'productId': item['productId'].toString().trim(),
-      'code': item['code'],
-      'name': item['name'],
-      'orderedQty': _orderStatusEngine.toDouble(item['orderedQty']),
-      'confirmedQty': 0.0,
-      'deliveredQty': 0.0,
-      'receivedQty': 0.0,
-      'openQty': _orderStatusEngine.toDouble(item['orderedQty']),
-      'unit': item['unit'],
-      'unitPrice': _orderStatusEngine.toDouble(item['unitPrice']),
-      'dueDate': _toTimestampOrNull(item['dueDate']),
-      'status': 'confirmed',
-      'hasProductionLink': false,
-      'isLate': false,
-      'createdAt': FieldValue.serverTimestamp(),
-      'createdBy': createdBy,
-      'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': createdBy,
-    };
-  }
-
-  int _toInt(dynamic value) {
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    if (value == null) return 0;
-    return int.tryParse(value.toString()) ?? 0;
-  }
-
-  Timestamp? _toTimestampOrNull(dynamic value) {
-    final date = _orderStatusEngine.toDateTimeOrNull(value);
-    if (date == null) return null;
-    return Timestamp.fromDate(date);
   }
 }

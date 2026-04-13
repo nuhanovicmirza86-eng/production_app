@@ -1,14 +1,26 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/carbon_models.dart';
 import 'carbon_defaults.dart';
 
 class CarbonFirestoreService {
-  CarbonFirestoreService({FirebaseFirestore? firestore})
-    : _db = firestore ?? FirebaseFirestore.instance;
+  CarbonFirestoreService({
+    FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
+  }) : _db = firestore ?? FirebaseFirestore.instance,
+       _functions =
+           functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
 
   final FirebaseFirestore _db;
+  final FirebaseFunctions _functions;
+
+  Future<Map<String, dynamic>> _carbonWrite(Map<String, dynamic> payload) async {
+    final res = await _functions
+        .httpsCallable('carbonFootprintWrite')
+        .call<Map<String, dynamic>>(payload);
+    return res.data;
+  }
 
   static String periodDocId(String companyId, int reportingYear) =>
       '${companyId}_$reportingYear';
@@ -32,39 +44,7 @@ class CarbonFirestoreService {
   CollectionReference<Map<String, dynamic>> _auditCol() =>
       _db.collection('carbon_audit_log');
 
-  bool _canWriteAuditEntry(String userId) {
-    final u = userId.trim();
-    if (u.isEmpty) return false;
-    final me = FirebaseAuth.instance.currentUser?.uid ?? '';
-    return me.isNotEmpty && me == u;
-  }
-
-  String _truncateDetail(String s, int max) {
-    final t = s.trim();
-    if (t.length <= max) return t;
-    return '${t.substring(0, max - 1)}…';
-  }
-
-  void _addAuditToBatch(
-    WriteBatch batch, {
-    required String companyId,
-    required int reportingYear,
-    required String userId,
-    required String action,
-    String detail = '',
-  }) {
-    if (!_canWriteAuditEntry(userId)) return;
-    batch.set(_auditCol().doc(), {
-      'companyId': companyId,
-      'reportingYear': reportingYear,
-      'action': action,
-      'userId': userId.trim(),
-      'detail': _truncateDetail(detail, 500),
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-  }
-
-  /// Samostalni zapis (npr. izvoz) — ne koristi batch s drugim dokumentom.
+  /// Samostalni zapis (npr. izvoz) — Callable + Admin SDK.
   Future<void> logReportEvent({
     required String companyId,
     required int reportingYear,
@@ -72,15 +52,16 @@ class CarbonFirestoreService {
     required String action,
     String detail = '',
   }) async {
-    if (!_canWriteAuditEntry(userId)) return;
-    await _auditCol().doc().set({
+    final data = await _carbonWrite({
+      'op': 'logReportEvent',
       'companyId': companyId,
       'reportingYear': reportingYear,
       'action': action,
-      'userId': userId.trim(),
-      'detail': _truncateDetail(detail, 500),
-      'createdAt': FieldValue.serverTimestamp(),
+      'detail': detail,
     });
+    if (data['success'] != true) {
+      throw Exception('Audit zapis nije uspio.');
+    }
   }
 
   Stream<List<CarbonAuditLogEntry>> watchAuditLog({
@@ -161,21 +142,14 @@ class CarbonFirestoreService {
     required CarbonCompanySetup setup,
     required String userId,
   }) async {
-    final batch = _db.batch();
-    final ref = _settingsRef(setup.companyId, setup.reportingYear);
-    batch.set(ref, {
-      ...setup.toMap(),
-      'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': userId,
-    }, SetOptions(merge: true));
-    _addAuditToBatch(
-      batch,
-      companyId: setup.companyId,
-      reportingYear: setup.reportingYear,
-      userId: userId,
-      action: 'settings_saved',
-    );
-    await batch.commit();
+    final data = await _carbonWrite({
+      'op': 'saveSettings',
+      'companyId': setup.companyId,
+      'setup': setup.toMap(),
+    });
+    if (data['success'] != true) {
+      throw Exception('Spremanje postavki nije uspjelo.');
+    }
   }
 
   Future<CarbonQuotaSettings> loadQuotas({
@@ -199,21 +173,14 @@ class CarbonFirestoreService {
     required CarbonQuotaSettings quotas,
     required String userId,
   }) async {
-    final batch = _db.batch();
-    final ref = _quotasRef(quotas.companyId, quotas.reportingYear);
-    batch.set(ref, {
-      ...quotas.toMap(),
-      'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': userId,
-    }, SetOptions(merge: true));
-    _addAuditToBatch(
-      batch,
-      companyId: quotas.companyId,
-      reportingYear: quotas.reportingYear,
-      userId: userId,
-      action: 'quotas_saved',
-    );
-    await batch.commit();
+    final data = await _carbonWrite({
+      'op': 'saveQuotas',
+      'companyId': quotas.companyId,
+      'quotas': quotas.toMap(),
+    });
+    if (data['success'] != true) {
+      throw Exception('Spremanje kvota nije uspjelo.');
+    }
   }
 
   Stream<List<CarbonActivityLine>> watchActivities({
@@ -236,29 +203,35 @@ class CarbonFirestoreService {
     required CarbonActivityLine line,
     required String userId,
   }) async {
-    final ref = line.id.isEmpty
-        ? _activitiesCol().doc()
-        : _activitiesCol().doc(line.id);
-    final batch = _db.batch();
-    batch.set(ref, {
+    final linePayload = <String, dynamic>{
       ...line.toMap(),
-      'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': userId,
-    }, SetOptions(merge: true));
-    final isNew = line.id.isEmpty;
-    _addAuditToBatch(
-      batch,
-      companyId: line.companyId,
-      reportingYear: line.reportingYear,
-      userId: userId,
-      action: isNew ? 'activity_created' : 'activity_updated',
-      detail: '${line.rowId}: ${line.description}',
-    );
-    await batch.commit();
+      'id': line.id,
+    };
+    final data = await _carbonWrite({
+      'op': 'upsertActivity',
+      'companyId': line.companyId,
+      'line': linePayload,
+    });
+    if (data['success'] != true) {
+      throw Exception('Spremanje aktivnosti nije uspjelo.');
+    }
   }
 
   Future<void> deleteActivity(String activityDocId) async {
-    await _activitiesCol().doc(activityDocId).delete();
+    final snap = await _activitiesCol().doc(activityDocId).get();
+    if (!snap.exists) return;
+    final cid = (snap.data()?['companyId'] ?? '').toString().trim();
+    if (cid.isEmpty) {
+      throw Exception('Aktivnost nema companyId.');
+    }
+    final data = await _carbonWrite({
+      'op': 'deleteActivity',
+      'companyId': cid,
+      'activityDocId': activityDocId,
+    });
+    if (data['success'] != true) {
+      throw Exception('Brisanje aktivnosti nije uspjelo.');
+    }
   }
 
   /// Spaja ugrađene defaulte s onim iz Firestore (Firestore pobjeđuje).
@@ -293,30 +266,25 @@ class CarbonFirestoreService {
     required String userId,
     required int reportingYear,
   }) async {
-    final id = factorDocId(companyId, factor.factorKey);
-    final batch = _db.batch();
-    final docRef = _db.collection('carbon_emission_factors').doc(id);
-    batch.set(docRef, {
+    final data = await _carbonWrite({
+      'op': 'saveEmissionFactorOverride',
       'companyId': companyId,
-      ...factor.toMap(),
-      'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': userId,
-    }, SetOptions(merge: true));
-    _addAuditToBatch(
-      batch,
-      companyId: companyId,
-      reportingYear: reportingYear,
-      userId: userId,
-      action: 'factor_override_saved',
-      detail: factor.factorKey,
-    );
-    await batch.commit();
+      'reportingYear': reportingYear,
+      'factor': factor.toMap(),
+    });
+    if (data['success'] != true) {
+      throw Exception('Spremanje faktora nije uspjelo.');
+    }
   }
 
   Future<void> deleteFactorOverride(String companyId, String factorKey) async {
-    await _db
-        .collection('carbon_emission_factors')
-        .doc(factorDocId(companyId, factorKey))
-        .delete();
+    final data = await _carbonWrite({
+      'op': 'deleteEmissionFactorOverride',
+      'companyId': companyId,
+      'factorKey': factorKey,
+    });
+    if (data['success'] != true) {
+      throw Exception('Brisanje faktora nije uspjelo.');
+    }
   }
 }

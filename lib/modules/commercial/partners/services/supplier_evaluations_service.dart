@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 class SupplierEvaluationModel {
   final String id;
@@ -63,19 +64,18 @@ class SupplierEvaluationModel {
 }
 
 class SupplierEvaluationsService {
-  SupplierEvaluationsService({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+  SupplierEvaluationsService({
+    FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _functions =
+            functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
 
   final FirebaseFirestore _firestore;
+  final FirebaseFunctions _functions;
 
   CollectionReference<Map<String, dynamic>> get _evaluations =>
       _firestore.collection('supplier_evaluations');
-  CollectionReference<Map<String, dynamic>> get _suppliers =>
-      _firestore.collection('suppliers');
-  CollectionReference<Map<String, dynamic>> get _riskAssessments =>
-      _firestore.collection('supplier_risk_assessments');
-  CollectionReference<Map<String, dynamic>> get _statusHistory =>
-      _firestore.collection('supplier_status_history');
 
   static String _s(dynamic v) => (v ?? '').toString().trim();
 
@@ -138,86 +138,29 @@ class SupplierEvaluationsService {
     String? notes,
   }) async {
     final companyId = _s(companyData['companyId']);
-    final userId = _s(companyData['userId']).isEmpty ? 'system' : _s(companyData['userId']);
     if (companyId.isEmpty) throw Exception('Missing companyId');
 
-    final score = calculateOverall(
-      qualityRating: qualityRating,
-      deliveryRating: deliveryRating,
-      responseRating: responseRating,
-      complianceRating: complianceRating,
-    );
-    final risk = riskLevelFromScore(score);
-    final approval = approvalStatusFromScore(score);
-
-    final evalRef = _evaluations.doc();
-    final riskRef = _riskAssessments.doc();
-
-    await _firestore.runTransaction((tx) async {
-      tx.set(evalRef, {
-        'id': evalRef.id,
-        'companyId': companyId,
-        'supplierId': supplierId.trim(),
-        'supplierCode': supplierCode.trim(),
-        'supplierName': supplierName.trim(),
-        'periodKey': periodKey.trim(),
-        'qualityRating': qualityRating,
-        'deliveryRating': deliveryRating,
-        'responseRating': responseRating,
-        'complianceRating': complianceRating,
-        'overallScore': score,
-        'riskLevel': risk,
-        'approvalStatus': approval,
-        if ((notes ?? '').trim().isNotEmpty) 'notes': notes!.trim(),
-        'createdAt': FieldValue.serverTimestamp(),
-        'createdBy': userId,
-      });
-
-      tx.set(riskRef, {
-        'id': riskRef.id,
-        'companyId': companyId,
-        'supplierId': supplierId.trim(),
-        'supplierCode': supplierCode.trim(),
-        'periodKey': periodKey.trim(),
-        'overallScore': score,
-        'riskLevel': risk,
-        'riskDrivers': <String>[],
-        'createdAt': FieldValue.serverTimestamp(),
-        'createdBy': userId,
-      });
-
-      tx.update(_suppliers.doc(supplierId.trim()), {
-        'qualityRating': qualityRating,
-        'deliveryRating': deliveryRating,
-        'responseRating': responseRating,
-        'overallScore': score,
-        'riskLevel': risk,
-        'approvalStatus': approval,
-        'lastEvaluationDate': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-        'updatedBy': userId,
-      });
-
-      final statusRef = _statusHistory.doc();
-      tx.set(statusRef, {
-        'id': statusRef.id,
-        'companyId': companyId,
-        'supplierId': supplierId.trim(),
-        'supplierCode': supplierCode.trim(),
-        'eventType': 'evaluation_update',
-        'changeReason': 'Automatsko ažuriranje iz evaluacije ${periodKey.trim()}',
-        'changedFields': <String>['overallScore', 'riskLevel', 'approvalStatus'],
-        'after': {
-          'overallScore': score,
-          'riskLevel': risk,
-          'approvalStatus': approval,
-        },
-        'createdAt': FieldValue.serverTimestamp(),
-        'createdBy': userId,
-      });
+    final res = await _functions
+        .httpsCallable('createSupplierEvaluation')
+        .call<Map<String, dynamic>>({
+      'companyId': companyId,
+      'supplierId': supplierId.trim(),
+      'supplierCode': supplierCode.trim(),
+      'supplierName': supplierName.trim(),
+      'periodKey': periodKey.trim(),
+      'qualityRating': qualityRating,
+      'deliveryRating': deliveryRating,
+      'responseRating': responseRating,
+      'complianceRating': complianceRating,
+      if ((notes ?? '').trim().isNotEmpty) 'notes': notes!.trim(),
     });
-
-    return evalRef.id;
+    final data = res.data;
+    if (data['success'] != true) {
+      throw Exception('Evaluacija nije uspjela.');
+    }
+    final id = _s(data['evaluationId']);
+    if (id.isEmpty) throw Exception('Evaluacija: prazan odgovor.');
+    return id;
   }
 }
 

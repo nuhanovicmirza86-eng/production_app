@@ -1,9 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseFunctions _functions =
+      FirebaseFunctions.instanceFor(region: 'europe-west1');
 
   Future<User?> signIn(String email, String password) async {
     final cred = await _auth.signInWithEmailAndPassword(
@@ -47,6 +50,22 @@ class AuthService {
     return RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+\$').hasMatch(x);
   }
 
+  String _mapResolveCompanyFunctionsError(FirebaseFunctionsException e) {
+    final m = (e.message ?? '').trim();
+    switch (e.code) {
+      case 'not-found':
+        return 'Šifra firme nije pronađena.';
+      case 'failed-precondition':
+        return m.isNotEmpty ? m : 'Operacija nije dozvoljena.';
+      case 'invalid-argument':
+        return m.isNotEmpty ? m : 'Neispravna šifra firme.';
+      case 'unauthenticated':
+        return 'Nisi prijavljen. Pokušaj ponovo registraciju.';
+      default:
+        return m.isNotEmpty ? m : 'Greška pri provjeri šifre firme (${e.code}).';
+    }
+  }
+
   Future<_CompanyBinding> _resolveCompanyByCode(String companyCode) async {
     final code = _safeCode(companyCode);
 
@@ -54,29 +73,28 @@ class AuthService {
       throw Exception('Šifra firme je obavezna.');
     }
 
-    final query = await _db
-        .collection('companies')
-        .where('code', isEqualTo: code)
-        .limit(1)
-        .get();
-
-    if (query.docs.isEmpty) {
-      throw Exception('Šifra firme nije pronađena.');
+    try {
+      final callable = _functions.httpsCallable('resolveCompanyByCode');
+      final res = await callable.call(<String, dynamic>{
+        'companyCode': code,
+      });
+      final raw = res.data;
+      if (raw is! Map) {
+        throw Exception('Nepotpuni odgovor servera.');
+      }
+      final data = Map<String, dynamic>.from(raw);
+      final companyId = (data['companyId'] ?? '').toString().trim();
+      if (companyId.isEmpty) {
+        throw Exception('Nepotpuni odgovor servera.');
+      }
+      return _CompanyBinding(
+        companyId: companyId,
+        companyCode: _safeCode((data['companyCode'] ?? code).toString()),
+        companyName: _safeText((data['companyName'] ?? '').toString()),
+      );
+    } on FirebaseFunctionsException catch (e) {
+      throw Exception(_mapResolveCompanyFunctionsError(e));
     }
-
-    final doc = query.docs.first;
-    final data = doc.data();
-
-    final active = data['active'] == true;
-    if (!active) {
-      throw Exception('Firma nije aktivna. Registracija nije dozvoljena.');
-    }
-
-    return _CompanyBinding(
-      companyId: doc.id,
-      companyCode: code,
-      companyName: _safeText((data['name'] ?? '').toString()),
-    );
   }
 
   Future<User?> registerUser({

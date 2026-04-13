@@ -1,50 +1,36 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/partner_models.dart';
 
 class SuppliersService {
-  SuppliersService({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+  SuppliersService({
+    FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _functions =
+            functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
 
   final FirebaseFirestore _firestore;
+  final FirebaseFunctions _functions;
 
   CollectionReference<Map<String, dynamic>> get _suppliers =>
       _firestore.collection('suppliers');
-  CollectionReference<Map<String, dynamic>> get _supplierCounters =>
-      _firestore.collection('supplier_counters');
-  CollectionReference<Map<String, dynamic>> get _supplierStatusHistory =>
-      _firestore.collection('supplier_status_history');
 
   static String _s(dynamic v) => (v ?? '').toString().trim();
 
-  Future<String> _nextSupplierCode({
-    required String companyId,
-    required String generatedBy,
-  }) async {
-    final year = DateTime.now().year.toString();
-    final yy = year.substring(year.length - 2);
-    final counterId = '${companyId}_$year';
-    final ref = _supplierCounters.doc(counterId);
-
-    return _firestore.runTransaction((tx) async {
-      final snap = await tx.get(ref);
-      final existing = snap.data() ?? <String, dynamic>{};
-      final current = (existing['lastNumber'] as num?)?.toInt() ?? 0;
-      final next = current + 1;
-
-      tx.set(ref, {
-        'id': counterId,
-        'companyId': companyId,
-        'year': year,
-        'lastNumber': next,
-        if (!snap.exists) 'createdAt': FieldValue.serverTimestamp(),
-        if (!snap.exists) 'createdBy': generatedBy,
-        'updatedAt': FieldValue.serverTimestamp(),
-        'updatedBy': generatedBy,
-      }, SetOptions(merge: true));
-
-      return 'SUP-$yy-${next.toString().padLeft(4, '0')}';
-    });
+  /// Datumi za Callable (ISO string).
+  Map<String, dynamic> _supplierPayloadForCallable(SupplierModel supplier) {
+    final m = Map<String, dynamic>.from(
+      supplier.toMapForWrite(includeIdFields: false),
+    );
+    for (final k in ['approvalDate', 'lastEvaluationDate', 'nextAuditDate']) {
+      final v = m[k];
+      if (v is DateTime) {
+        m[k] = v.toUtc().toIso8601String();
+      }
+    }
+    return m;
   }
 
   Future<List<SupplierModel>> listSuppliers({
@@ -108,18 +94,12 @@ class SuppliersService {
     required SupplierModel draft,
   }) async {
     final companyId = _s(companyData['companyId']);
-    final userId = _s(companyData['userId']).isEmpty ? 'system' : _s(companyData['userId']);
     if (companyId.isEmpty) throw Exception('Missing companyId');
 
-    final docRef = _suppliers.doc();
-    final code = draft.code.trim().isEmpty
-        ? await _nextSupplierCode(companyId: companyId, generatedBy: userId)
-        : draft.code.trim().toUpperCase();
-
-    final model = SupplierModel(
-      id: docRef.id,
+    final payload = SupplierModel(
+      id: '',
       companyId: companyId,
-      code: code,
+      code: draft.code.trim().isEmpty ? '' : draft.code.trim().toUpperCase(),
       name: draft.name.trim(),
       legalName: draft.legalName.trim(),
       status: draft.status.trim(),
@@ -130,17 +110,37 @@ class SuppliersService {
       taxId: draft.taxId,
       notes: draft.notes,
       leadTimeDays: draft.leadTimeDays,
+      supplierCategory: draft.supplierCategory,
+      isStrategic: draft.isStrategic,
+      approvalStatus: draft.approvalStatus,
+      approvalDate: draft.approvalDate,
+      riskLevel: draft.riskLevel,
+      nonconformanceCount: draft.nonconformanceCount,
+      claimCount: draft.claimCount,
+      lastEvaluationDate: draft.lastEvaluationDate,
+      nextAuditDate: draft.nextAuditDate,
+      qualityRating: draft.qualityRating,
+      deliveryRating: draft.deliveryRating,
+      responseRating: draft.responseRating,
+      overallScore: draft.overallScore,
+      approvedMaterialGroups: draft.approvedMaterialGroups,
+      approvedProcesses: draft.approvedProcesses,
+      certificates: draft.certificates,
     );
 
-    await docRef.set({
-      ...model.toMapForWrite(includeIdFields: true),
-      'createdAt': FieldValue.serverTimestamp(),
-      'createdBy': userId,
-      'updatedAt': FieldValue.serverTimestamp(),
-      'updatedBy': userId,
+    final res = await _functions
+        .httpsCallable('createCommercialSupplier')
+        .call<Map<String, dynamic>>({
+      'companyId': companyId,
+      'supplier': _supplierPayloadForCallable(payload),
     });
-
-    return docRef.id;
+    final data = res.data;
+    if (data['success'] != true) {
+      throw Exception('Kreiranje dobavljača nije uspjelo.');
+    }
+    final id = _s(data['supplierId']);
+    if (id.isEmpty) throw Exception('Kreiranje dobavljača: prazan odgovor.');
+    return id;
   }
 
   Future<void> updateSupplier({
@@ -149,71 +149,20 @@ class SuppliersService {
     String? changeReason,
   }) async {
     final companyId = _s(companyData['companyId']);
-    final userId = _s(companyData['userId']).isEmpty ? 'system' : _s(companyData['userId']);
     if (companyId.isEmpty) throw Exception('Missing companyId');
     if (supplier.id.trim().isEmpty) throw Exception('Missing supplierId');
 
-    final supplierRef = _suppliers.doc(supplier.id);
-    await _firestore.runTransaction((tx) async {
-      final currentSnap = await tx.get(supplierRef);
-      final current = currentSnap.data() ?? <String, dynamic>{};
-
-      final oldApprovalStatus = _s(current['approvalStatus']);
-      final oldRiskLevel = _s(current['riskLevel']);
-      final oldSupplierCategory = _s(current['supplierCategory']);
-      final oldIsStrategic = (current['isStrategic'] == true);
-
-      final hasCriticalChange =
-          oldApprovalStatus != supplier.approvalStatus ||
-          oldRiskLevel != supplier.riskLevel ||
-          oldSupplierCategory != supplier.supplierCategory ||
-          oldIsStrategic != supplier.isStrategic;
-
-      final reason = (changeReason ?? '').trim();
-      if (hasCriticalChange && reason.isEmpty) {
-        throw Exception(
-          'Razlog promjene je obavezan za approval/risk/strategic izmjene.',
-        );
-      }
-
-      tx.update(supplierRef, {
-        ...supplier.toMapForWrite(includeIdFields: false),
-        'updatedAt': FieldValue.serverTimestamp(),
-        'updatedBy': userId,
-      });
-
-      if (hasCriticalChange) {
-        final histRef = _supplierStatusHistory.doc();
-        tx.set(histRef, {
-          'id': histRef.id,
-          'companyId': companyId,
-          'supplierId': supplier.id,
-          'supplierCode': supplier.code,
-          'eventType': 'critical_status_change',
-          'changeReason': reason,
-          'changedFields': <String>[
-            if (oldApprovalStatus != supplier.approvalStatus) 'approvalStatus',
-            if (oldRiskLevel != supplier.riskLevel) 'riskLevel',
-            if (oldSupplierCategory != supplier.supplierCategory) 'supplierCategory',
-            if (oldIsStrategic != supplier.isStrategic) 'isStrategic',
-          ],
-          'before': {
-            'approvalStatus': oldApprovalStatus,
-            'riskLevel': oldRiskLevel,
-            'supplierCategory': oldSupplierCategory,
-            'isStrategic': oldIsStrategic,
-          },
-          'after': {
-            'approvalStatus': supplier.approvalStatus,
-            'riskLevel': supplier.riskLevel,
-            'supplierCategory': supplier.supplierCategory,
-            'isStrategic': supplier.isStrategic,
-          },
-          'createdAt': FieldValue.serverTimestamp(),
-          'createdBy': userId,
-        });
-      }
+    final res = await _functions
+        .httpsCallable('updateCommercialSupplier')
+        .call<Map<String, dynamic>>({
+      'companyId': companyId,
+      'supplierId': supplier.id.trim(),
+      'changeReason': changeReason,
+      'supplier': _supplierPayloadForCallable(supplier),
     });
+    if (res.data['success'] != true) {
+      throw Exception('Ažuriranje dobavljača nije uspjelo.');
+    }
   }
 }
 

@@ -4,6 +4,7 @@ import '../../../../core/errors/app_error_mapper.dart';
 import '../../../production/production_orders/models/production_order_model.dart';
 import '../../../production/production_orders/services/production_order_service.dart';
 import '../../../production/qr/production_qr_resolver.dart';
+import '../../inventory/services/inventory_callable_service.dart';
 import '../../inventory/services/product_warehouse_stock_service.dart';
 import '../services/production_label_receipt_service.dart';
 
@@ -28,6 +29,7 @@ class _ProductionLabelReceiptScreenState
   final _orderService = ProductionOrderService();
   final _stockService = ProductWarehouseStockService();
   final _receiptService = ProductionLabelReceiptService();
+  final _inventoryCallable = InventoryCallableService();
   final _notesController = TextEditingController();
 
   bool _loading = true;
@@ -42,8 +44,6 @@ class _ProductionLabelReceiptScreenState
       (widget.companyData['companyId'] ?? '').toString().trim();
   String get _plantKey =>
       (widget.companyData['plantKey'] ?? '').toString().trim();
-  String get _userId =>
-      (widget.companyData['userId'] ?? 'system').toString().trim();
 
   Map<String, dynamic> get _label =>
       widget.resolution.labelFields ?? const {};
@@ -123,10 +123,9 @@ class _ProductionLabelReceiptScreenState
     setState(() => _submitting = true);
 
     try {
-      await _receiptService.createPendingMovementFromLabel(
+      final movementId = await _receiptService.createPendingMovementFromLabel(
         companyId: _companyId,
         plantKey: _plantKey,
-        userId: _userId,
         toWarehouseId: whId,
         order: order,
         labelFields: Map<String, dynamic>.from(_label),
@@ -135,12 +134,31 @@ class _ProductionLabelReceiptScreenState
             : _notesController.text.trim(),
       );
 
+      try {
+        await _inventoryCallable.confirmInventoryMovement(
+          companyId: _companyId,
+          movementId: movementId,
+        );
+      } catch (e2) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Pending kretanje snimljeno, ali knjiženje zalihe nije uspjelo '
+              '(ID: $movementId). ${AppErrorMapper.toMessage(e2)}',
+            ),
+          ),
+        );
+        Navigator.of(context).pop(true);
+        return;
+      }
+
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Prijem zabilježen (pending). Sljedeći korak: potvrda zalihe u logistici.',
+            'Prijem potvrđen — kretanje knjiženo i zaliha u magacinu ažurirana.',
           ),
         ),
       );
@@ -248,7 +266,7 @@ class _ProductionLabelReceiptScreenState
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.inventory_2_outlined),
-                  label: Text(_submitting ? 'Snimam…' : 'Potvrdi prijem (pending)'),
+                  label: Text(_submitting ? 'Snimam…' : 'Snimi i knjiži u magacin'),
                 ),
               ],
             ),
