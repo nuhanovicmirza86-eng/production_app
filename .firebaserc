@@ -7,9 +7,6 @@
       "hosting": {
         "production": [
           "operonix-production"
-        ],
-        "maintenance": [
-          "operonix-maintenance"
         ]
       }
     }
