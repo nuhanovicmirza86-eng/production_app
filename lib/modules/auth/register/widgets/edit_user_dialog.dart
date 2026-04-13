@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 class EditUserDialog extends StatefulWidget {
@@ -18,6 +18,8 @@ class EditUserDialog extends StatefulWidget {
 
 class _EditUserDialogState extends State<EditUserDialog> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseFunctions _functions =
+      FirebaseFunctions.instanceFor(region: 'europe-west1');
 
   static const List<String> _productionRoles = <String>[
     'production_operator',
@@ -211,31 +213,28 @@ class _EditUserDialogState extends State<EditUserDialog> {
     });
 
     try {
-      final me = FirebaseAuth.instance.currentUser;
-      final meUid = me?.uid ?? '';
-      final meEmail = me?.email ?? '';
-
-      final plantData = selectedPlantDoc.data();
-      final plantKey = _s(plantData['plantKey']).isNotEmpty
-          ? _s(plantData['plantKey'])
-          : selectedPlantDoc.id;
-      final plantId = selectedPlantDoc.id;
-
-      await _db.collection('users').doc(uid).set({
-        'role': _selectedRole,
-        'status': _selectedStatus,
-        'active': _selectedStatus == 'active',
-        'plantKey': plantKey,
-        'homePlantKey': plantKey,
-        'plantId': plantId,
-        'homePlantId': plantId,
-        'updatedAt': FieldValue.serverTimestamp(),
-        'updatedByUid': meUid,
-        'updatedByEmail': meEmail,
-      }, SetOptions(merge: true));
+      final callable = _functions.httpsCallable('updateUserAccessAssignment');
+      final result = await callable.call(<String, dynamic>{
+        'companyId': widget.companyId,
+        'targetUid': uid,
+        'selectedRole': _selectedRole,
+        'selectedStatus': _selectedStatus,
+        'companyPlantDocId': selectedPlantDoc.id,
+      });
+      final raw = result.data;
+      if (raw is! Map || raw['success'] != true) {
+        throw StateError('Neuspjelo spremanje.');
+      }
 
       if (!mounted) return;
+      setState(() => _saving = false);
       Navigator.of(context).pop(true);
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message ?? 'Greška (${e.code}).';
+        _saving = false;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {

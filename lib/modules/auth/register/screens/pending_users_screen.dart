@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -13,6 +14,8 @@ class PendingUsersScreen extends StatefulWidget {
 
 class _PendingUsersScreenState extends State<PendingUsersScreen> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseFunctions _functions =
+      FirebaseFunctions.instanceFor(region: 'europe-west1');
 
   bool _loadingMe = true;
   String? _error;
@@ -277,10 +280,11 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
     } catch (e) {
       _snack('Greška pri učitavanju pogona: $e');
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _loadingPlantsFor.remove(requestId);
-      });
+      if (mounted) {
+        setState(() {
+          _loadingPlantsFor.remove(requestId);
+        });
+      }
     }
   }
 
@@ -307,12 +311,6 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
 
     final requestData = requestDoc.data() ?? <String, dynamic>{};
     final companyId = _s(requestData['companyId']);
-    final email = _s(requestData['email']);
-    final workEmail = _s(requestData['workEmail']);
-    final fullName = _s(requestData['fullName']);
-    final displayName = _s(requestData['displayName']);
-    final companyCode = _s(requestData['companyCode']);
-    final companyName = _s(requestData['companyName']);
 
     final uid = _s(requestData['uid']);
     if (uid.isEmpty) {
@@ -337,83 +335,36 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
     });
 
     try {
-      final me = FirebaseAuth.instance.currentUser;
-      final meUid = me?.uid ?? '';
-      final meEmail = me?.email ?? '';
-
-      final plantData = selectedPlantDoc.data();
-
-      final plantKey = _s(plantData['plantKey']).isNotEmpty
-          ? _s(plantData['plantKey'])
-          : selectedPlantDoc.id;
-
-      final plantId = selectedPlantDoc.id;
-
-      final userRef = _db.collection('users').doc(uid);
-      final userSnap = await userRef.get();
-
+      final userSnap = await _db.collection('users').doc(uid).get();
       if (!userSnap.exists) {
         _snack('Korisnik ne postoji.');
         return;
       }
 
-      final userData = userSnap.data() ?? <String, dynamic>{};
-
-      final existingAppAccess =
-          (userData['appAccess'] as Map<String, dynamic>? ??
-          <String, dynamic>{});
-
-      final requestRef = _db.collection('registration_requests').doc(requestId);
-
-      final batch = _db.batch();
-
-      batch.set(userRef, {
-        'email': email,
-        'workEmail': workEmail,
-        'fullName': fullName,
-        'displayName': displayName,
+      final callable = _functions.httpsCallable('approveProductionUser');
+      final result = await callable.call(<String, dynamic>{
+        'requestId': requestId,
         'companyId': companyId,
-        'companyCode': companyCode,
-        'companyName': companyName,
-        'role': selectedRole,
-        'status': 'active',
-        'active': true,
-        'approved': true,
-        'plantKey': plantKey,
-        'homePlantKey': plantKey,
-        'plantId': plantId,
-        'homePlantId': plantId,
-        'appAccess': {...existingAppAccess, 'production': true},
-        'updatedAt': FieldValue.serverTimestamp(),
-        'updatedByUid': meUid,
-        'updatedByEmail': meEmail,
-        'approvedAt': FieldValue.serverTimestamp(),
-        'approvedByUid': meUid,
-        'approvedByEmail': meEmail,
-      }, SetOptions(merge: true));
-
-      batch.set(requestRef, {
-        'status': 'approved',
-        'role': selectedRole,
-        'requestedHomePlantKey': plantKey,
-        'approvedAt': FieldValue.serverTimestamp(),
-        'approvedByUid': meUid,
-        'approvedByEmail': meEmail,
-        'updatedAt': FieldValue.serverTimestamp(),
-        'updatedByUid': meUid,
-        'updatedByEmail': meEmail,
-      }, SetOptions(merge: true));
-
-      await batch.commit();
+        'targetUid': uid,
+        'selectedRole': selectedRole,
+        'companyPlantDocId': selectedPlantDoc.id,
+      });
+      final raw = result.data;
+      if (raw is! Map || raw['success'] != true) {
+        throw StateError('Neuspjelo odobrenje.');
+      }
 
       _snack('Korisnik je odobren i aktiviran za Production.');
+    } on FirebaseFunctionsException catch (e) {
+      _snack(e.message ?? 'Greška pri odobrenju (${e.code}).');
     } catch (e) {
       _snack('Greška pri odobrenju: $e');
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _busyIds.remove(requestId);
-      });
+      if (mounted) {
+        setState(() {
+          _busyIds.remove(requestId);
+        });
+      }
     }
   }
 
@@ -452,20 +403,30 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
       _busyIds.add(requestId);
     });
 
+    final companyId = _s(requestData['companyId']);
+
     try {
-      await _db.collection('registration_requests').doc(requestId).set({
-        'status': 'rejected',
-        'rejectedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      final callable = _functions.httpsCallable('rejectProductionUser');
+      final result = await callable.call(<String, dynamic>{
+        'requestId': requestId,
+        'companyId': companyId,
+      });
+      final raw = result.data;
+      if (raw is! Map || raw['success'] != true) {
+        throw StateError('Neuspjelo odbijanje.');
+      }
 
       _snack('Zahtjev je odbijen.');
+    } on FirebaseFunctionsException catch (e) {
+      _snack(e.message ?? 'Greška pri odbijanju (${e.code}).');
     } catch (e) {
       _snack('Greška pri odbijanju: $e');
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _busyIds.remove(requestId);
-      });
+      if (mounted) {
+        setState(() {
+          _busyIds.remove(requestId);
+        });
+      }
     }
   }
 
