@@ -11,6 +11,7 @@ import '../export/orders_list_pdf_export.dart';
 import '../models/order_model.dart';
 import '../order_status_ui.dart';
 import '../services/orders_service.dart';
+import '../../assessment/screens/unified_assessment_run_screen.dart';
 import 'order_create_screen.dart';
 import 'order_details_screen.dart';
 
@@ -381,7 +382,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
   Widget _buildHeader() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isCompact = constraints.maxWidth < 700;
+        final isCompact = constraints.maxWidth < _compactListBreakpoint;
 
         if (isCompact) {
           return Column(
@@ -424,6 +425,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                             '• Praćenje statusa\n'
                             '• Filtriranje po statusu, tipu i datumu (od–do)\n'
                             '• Tabularni pregled po partneru (stavke, zalihe, zeleno = spremno)\n'
+                            '• Široki ekran: tablica; uski ekran: kartice. ⋮ ili tap na karticu — detalji / procjena\n'
                             '• Export u PDF (isti raspored; zalihe ako su učitane)\n'
                             '• Povezivanje sa proizvodnim nalozima\n\n'
                             'Ovdje pratiš komercijalni tok prije realizacije i proizvodnje.',
@@ -691,8 +693,14 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
   /// Status (npr. „U proizvodnji”, „Djelomično isporučeno”) u jednom redu.
   static const double _colStatus = 168;
 
+  /// Meni po redu (detalji / procjena) — ne širi red tapom na cijelu širinu.
+  static const double _colActions = 44;
+
+  /// Isto kao kompaktno zaglavlje — ispod ove širine: kartice umjesto široke tabele.
+  static const double _compactListBreakpoint = 700;
+
   static const double _orderTableWidth =
-      1180 - 92 + _colOrderNumber - 76 + _colStatus;
+      1180 - 92 + _colOrderNumber - 76 + _colStatus + _colActions;
 
   DateTime _deadlineSortKey(OrderModel o, OrderItemModel? it) {
     final lineDue = it?.dueDate;
@@ -701,6 +709,17 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
         o.orderDate ??
         o.createdAt ??
         DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  /// Najraniji rok među stavkama (za sort kartičnog prikaza).
+  DateTime _orderCompactSortKey(OrderModel o) {
+    if (o.items.isEmpty) return _deadlineSortKey(o, null);
+    var best = _deadlineSortKey(o, o.items.first);
+    for (var i = 1; i < o.items.length; i++) {
+      final k = _deadlineSortKey(o, o.items[i]);
+      if (k.isBefore(best)) best = k;
+    }
+    return best;
   }
 
   String? _partnerRef(OrderModel o) {
@@ -778,6 +797,24 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
     if (mounted) await _loadOrders();
   }
 
+  Future<void> _openOrderUnifiedAssessment(OrderModel o) async {
+    final pkOrder = (o.plantKey ?? '').toString().trim();
+    final pkCompany = _plantKey;
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UnifiedAssessmentRunScreen(
+          companyId: _companyId,
+          plantKey: pkOrder.isNotEmpty ? pkOrder : pkCompany,
+          entityType: 'production_order',
+          entityId: o.id,
+          entityLabel: '${o.orderNumber} • ${o.partnerName}'.trim(),
+          userRole: _role,
+        ),
+      ),
+    );
+  }
+
   Widget _orderTableHeaderRow() {
     final cs = Theme.of(context).colorScheme;
     final headerStyle = TextStyle(
@@ -826,6 +863,13 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
           th('Isp./Prim.', 52),
           th('Ostalo', 52),
           th('Stanje', 52),
+          SizedBox(
+            width: _colActions,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+              child: Icon(Icons.more_vert, size: 16, color: headerStyle.color),
+            ),
+          ),
         ],
       ),
     );
@@ -892,38 +936,70 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
     final ost = it == null ? '—' : _formatQty(_remainingQty(o, it));
     final stText = stock == null ? '—' : _formatQty(stock);
 
+    Widget rowMenu() {
+      return Container(
+        width: _colActions,
+        decoration: BoxDecoration(color: bg, border: border),
+        alignment: Alignment.center,
+        child: PopupMenuButton<String>(
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          icon: Icon(Icons.more_vert, size: 20, color: cs.onSurface),
+          onSelected: (v) {
+            if (v == 'det') _openOrder(o);
+            if (v == 'asm') _openOrderUnifiedAssessment(o);
+          },
+          itemBuilder: (ctx) => const [
+            PopupMenuItem(value: 'det', child: Text('Detalji narudžbe')),
+            PopupMenuItem(value: 'asm', child: Text('Procjena (šablon)')),
+          ],
+        ),
+      );
+    }
+
+    final innerW = _orderTableWidth - _colActions;
+
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _openOrder(o),
-        child: SizedBox(
-          width: _orderTableWidth,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              td(o.orderNumber, _colOrderNumber, maxLines: 1, softWrap: false),
-              td(_formatDate(o.orderDate ?? o.createdAt), 82),
-              td(ref ?? '—', 84),
-              td(rok, 88),
-              td(_typeLabel(o.orderType), 52),
-              td(
-                orderStatusLabel(o.status),
-                _colStatus,
-                maxLines: 1,
-                softWrap: false,
+      child: SizedBox(
+        width: _orderTableWidth,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: innerW,
+              child: InkWell(
+                onTap: () => _openOrder(o),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    td(o.orderNumber, _colOrderNumber, maxLines: 1, softWrap: false),
+                    td(_formatDate(o.orderDate ?? o.createdAt), 82),
+                    td(ref ?? '—', 84),
+                    td(rok, 88),
+                    td(_typeLabel(o.orderType), 52),
+                    td(
+                      orderStatusLabel(o.status),
+                      _colStatus,
+                      maxLines: 1,
+                      softWrap: false,
+                    ),
+                    td(it?.productCode ?? '—', 84),
+                    tdExp(it?.productName ?? 'Nema učitanih stavki'),
+                    td(() {
+                      final u = (it?.unit ?? '').trim();
+                      return u.isEmpty ? '—' : u;
+                    }(), 44),
+                    td(nar, 72, right: true),
+                    td(isp, 72, right: true),
+                    td(ost, 64, right: true),
+                    td(stText, 72, right: true),
+                  ],
+                ),
               ),
-              td(it?.productCode ?? '—', 84),
-              tdExp(it?.productName ?? 'Nema učitanih stavki'),
-              td(() {
-                final u = (it?.unit ?? '').trim();
-                return u.isEmpty ? '—' : u;
-              }(), 44),
-              td(nar, 72, right: true),
-              td(isp, 72, right: true),
-              td(ost, 64, right: true),
-              td(stText, 72, right: true),
-            ],
-          ),
+            ),
+            rowMenu(),
+          ],
         ),
       ),
     );
@@ -1037,6 +1113,173 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
     );
   }
 
+  Widget _buildCompactOrderCards(List<OrderModel> list) {
+    final cs = Theme.of(context).colorScheme;
+    final sorted = List<OrderModel>.from(list)
+      ..sort(
+        (a, b) => _orderCompactSortKey(a).compareTo(_orderCompactSortKey(b)),
+      );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Kartični prikaz — sort po najranijem roku. '
+          'Zelena pozadina stavke: dovoljno zalihe za ostatak.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 10),
+        ...sorted.map(_compactOrderCard),
+      ],
+    );
+  }
+
+  Widget _compactOrderCard(OrderModel o) {
+    final cs = Theme.of(context).colorScheme;
+    final ref = _partnerRef(o);
+
+    Widget lineTile(OrderItemModel it) {
+      final ready = _rowReady(o, it);
+      final bg = ready
+          ? Color.alphaBlend(
+              const Color(0xFFC8E6C9).withValues(alpha: 0.75),
+              cs.surface,
+            )
+          : cs.surfaceContainerHighest.withValues(alpha: 0.35);
+
+      return Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${it.productCode} — ${it.productName}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Naručeno ${_formatQty(it.qty)} • ostalo ${_formatQty(_remainingQty(o, it))}',
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: () => _openOrder(o),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      o.orderNumber,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      o.partnerName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${_typeLabel(o.orderType)} • ${orderStatusLabel(o.status)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (ref != null && ref.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Ref: $ref',
+                        style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                      ),
+                    ],
+                    const SizedBox(height: 4),
+                    Text(
+                      'Rok: ${_formatDate(o.requestedDeliveryDate ?? o.confirmedDeliveryDate)}'
+                      ' • Nar.: ${_formatDate(o.orderDate ?? o.createdAt)}',
+                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                    ),
+                    if (o.items.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      const Divider(height: 1),
+                      const SizedBox(height: 10),
+                      ...o.items.take(5).map(lineTile),
+                      if (o.items.length > 5)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            '+ ${o.items.length - 5} stavki',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: cs.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                    ] else
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Text(
+                          'Nema stavki',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 4, right: 2),
+            child: PopupMenuButton<String>(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              onSelected: (v) {
+                if (v == 'det') _openOrder(o);
+                if (v == 'asm') _openOrderUnifiedAssessment(o);
+              },
+              itemBuilder: (ctx) => const [
+                PopupMenuItem(value: 'det', child: Text('Detalji narudžbe')),
+                PopupMenuItem(value: 'asm', child: Text('Procjena (šablon)')),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final list = _filteredOrders;
@@ -1098,16 +1341,25 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                   sliver: SliverToBoxAdapter(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (_stockLoading)
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 8),
-                            child: LinearProgressIndicator(minHeight: 3),
-                          ),
-                        _buildGroupedOrderTables(list),
-                      ],
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final compact =
+                            constraints.maxWidth < _compactListBreakpoint;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (_stockLoading)
+                              const Padding(
+                                padding: EdgeInsets.only(bottom: 8),
+                                child: LinearProgressIndicator(minHeight: 3),
+                              ),
+                            if (compact)
+                              _buildCompactOrderCards(list)
+                            else
+                              _buildGroupedOrderTables(list),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ),

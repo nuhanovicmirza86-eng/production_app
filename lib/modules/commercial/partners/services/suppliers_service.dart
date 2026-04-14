@@ -164,5 +164,32 @@ class SuppliersService {
       throw Exception('Ažuriranje dobavljača nije uspjelo.');
     }
   }
+
+  /// Poziva Cloud Function [refreshSupplierOperationalSignals] (narudžbe → auto-skor).
+  Future<void> refreshOperationalSignals({
+    required String companyId,
+    String? supplierId,
+    bool allSuppliers = false,
+    int limit = 25,
+  }) async {
+    final cid = companyId.trim();
+    if (cid.isEmpty) throw Exception('Missing companyId');
+    if ((supplierId == null || supplierId.trim().isEmpty) && !allSuppliers) {
+      throw Exception('supplierId ili allSuppliers je obavezno.');
+    }
+    final payload = <String, dynamic>{
+      'companyId': cid,
+      'limit': limit,
+      if (supplierId != null && supplierId.trim().isNotEmpty)
+        'supplierId': supplierId.trim(),
+      if (allSuppliers) 'allSuppliers': true,
+    };
+    final res = await _functions
+        .httpsCallable('refreshSupplierOperationalSignals')
+        .call<Map<String, dynamic>>(payload);
+    if (res.data['success'] != true) {
+      throw Exception('Osvježavanje operativnog skora dobavljača nije uspjelo.');
+    }
+  }
 }
 

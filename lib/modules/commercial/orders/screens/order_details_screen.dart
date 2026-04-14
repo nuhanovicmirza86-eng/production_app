@@ -8,6 +8,7 @@ import '../models/order_model.dart';
 import '../order_status_ui.dart';
 import '../services/order_status_engine.dart';
 import '../services/orders_service.dart';
+import '../../assessment/screens/unified_assessment_run_screen.dart';
 import 'order_edit_screen.dart';
 import 'order_line_production_create_screen.dart';
 
@@ -90,6 +91,26 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       ),
     );
     if (ok == true && mounted) await _load();
+  }
+
+  Future<void> _openOrderUnifiedAssessment() async {
+    final pkOrder = (_order.plantKey ?? '').toString().trim();
+    final pkCompany =
+        (widget.companyData['plantKey'] ?? '').toString().trim();
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UnifiedAssessmentRunScreen(
+          companyId: _companyId,
+          plantKey: pkOrder.isNotEmpty ? pkOrder : pkCompany,
+          entityType: 'production_order',
+          entityId: _order.id,
+          entityLabel:
+              '${_order.orderNumber} • ${_order.partnerName}'.trim(),
+          userRole: _role,
+        ),
+      ),
+    );
   }
 
   Future<void> _confirmClose() async {
@@ -624,6 +645,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               onPressed: _openEdit,
               icon: const Icon(Icons.edit_outlined),
             ),
+          IconButton(
+            tooltip: 'Procjena (šablon)',
+            onPressed: _openOrderUnifiedAssessment,
+            icon: const Icon(Icons.table_chart_outlined),
+          ),
           if (_canCloseOrder || _canCancelOrder)
             PopupMenuButton<String>(
               tooltip: 'Zatvori ili otkaži',

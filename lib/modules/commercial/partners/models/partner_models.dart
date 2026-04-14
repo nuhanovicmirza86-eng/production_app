@@ -65,6 +65,81 @@ class CustomerModel {
   }
 }
 
+/// Auto-skor iz narudžbi (Callable `refreshSupplierOperationalSignals`) + NC/claim na dobavljaču.
+///
+/// Verzija algoritma 2: dodatni signali iz zatvorenih stavki narudžbe i opcionalno
+/// `quality_nonconformities` (polja `supplierId` / `partnerId` / `sourceSupplierId`).
+class SupplierOperationalAuto {
+  final double score;
+  final double? deliveryScore;
+  final double? qtyScore;
+  final double qualityScore;
+  final double lateLineRate;
+  final int linesAnalyzed;
+  final int algorithmVersion;
+
+  /// Snimljeno pri računanju (dokument dobavljača).
+  final int nonconformanceCount;
+  final int claimCount;
+
+  /// Zatvorene linije gdje primljeno/ naručeno < 0.92 ili > 1.05.
+  final int qtyMismatchLines;
+
+  /// Linije sa statusom odbijeno / vraćeno (heuristika po nazivu statusa).
+  final int rejectedLines;
+
+  /// Broj zapisa u `quality_nonconformities` vezanih za ovog dobavljača.
+  final int linkedNonconformityCount;
+
+  final double? avgQtyFillRatio;
+
+  const SupplierOperationalAuto({
+    required this.score,
+    this.deliveryScore,
+    this.qtyScore,
+    required this.qualityScore,
+    required this.lateLineRate,
+    required this.linesAnalyzed,
+    required this.algorithmVersion,
+    this.nonconformanceCount = 0,
+    this.claimCount = 0,
+    this.qtyMismatchLines = 0,
+    this.rejectedLines = 0,
+    this.linkedNonconformityCount = 0,
+    this.avgQtyFillRatio,
+  });
+
+  static SupplierOperationalAuto? tryParse(dynamic raw) {
+    if (raw is! Map) return null;
+    final m = Map<String, dynamic>.from(raw);
+    if (!m.containsKey('score')) return null;
+    return SupplierOperationalAuto(
+      score: _double(m['score']),
+      deliveryScore: m['deliveryScore'] == null
+          ? null
+          : _double(m['deliveryScore']),
+      qtyScore: m['qtyScore'] == null ? null : _double(m['qtyScore']),
+      qualityScore: _double(m['qualityScore']),
+      lateLineRate: _double(m['lateLineRate']),
+      linesAnalyzed: _int(m['linesAnalyzed']),
+      algorithmVersion: _int(m['algorithmVersion']),
+      nonconformanceCount: m.containsKey('nonconformanceCount')
+          ? _int(m['nonconformanceCount'])
+          : 0,
+      claimCount: m.containsKey('claimCount') ? _int(m['claimCount']) : 0,
+      qtyMismatchLines:
+          m.containsKey('qtyMismatchLines') ? _int(m['qtyMismatchLines']) : 0,
+      rejectedLines: m.containsKey('rejectedLines') ? _int(m['rejectedLines']) : 0,
+      linkedNonconformityCount: m.containsKey('linkedNonconformityCount')
+          ? _int(m['linkedNonconformityCount'])
+          : 0,
+      avgQtyFillRatio: m['avgQtyFillRatio'] == null
+          ? null
+          : _double(m['avgQtyFillRatio']),
+    );
+  }
+}
+
 class SupplierModel {
   final String id;
   final String companyId;
@@ -103,6 +178,9 @@ class SupplierModel {
   final List<String> approvedProcesses;
   final List<String> certificates;
 
+  /// Agregat iz `order_items` (rokovi, količine) + NC/claim; ne mijenja IATF evaluaciju.
+  final SupplierOperationalAuto? operationalAuto;
+
   const SupplierModel({
     required this.id,
     required this.companyId,
@@ -133,6 +211,7 @@ class SupplierModel {
     this.approvedMaterialGroups = const [],
     this.approvedProcesses = const [],
     this.certificates = const [],
+    this.operationalAuto,
   });
 
   factory SupplierModel.fromMap(String id, Map<String, dynamic> map) {
@@ -172,6 +251,7 @@ class SupplierModel {
       approvedMaterialGroups: _stringList(map['approvedMaterialGroups']),
       approvedProcesses: _stringList(map['approvedProcesses']),
       certificates: _stringList(map['certificates']),
+      operationalAuto: SupplierOperationalAuto.tryParse(map['operationalAuto']),
     );
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:production_app/screens/about_screen.dart';
 
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/company_logo_resolver.dart';
@@ -260,6 +261,18 @@ class ProductionDashboardScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Proizvodnja'),
         actions: [
+          IconButton(
+            tooltip: 'O aplikaciji',
+            icon: const Icon(Icons.info_outline),
+            onPressed: () {
+              Navigator.push<void>(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => const AboutScreen(),
+                ),
+              );
+            },
+          ),
           IconButton(
             tooltip: 'Odjava',
             icon: const Icon(Icons.logout),
