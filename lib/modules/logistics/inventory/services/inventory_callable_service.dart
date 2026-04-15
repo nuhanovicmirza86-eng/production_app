@@ -3,8 +3,8 @@ import 'package:cloud_functions/cloud_functions.dart';
 /// Callable mutacije za `inventory_movements` / `inventory_balances` (Admin SDK).
 class InventoryCallableService {
   InventoryCallableService({FirebaseFunctions? functions})
-      : _functions =
-            functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
+    : _functions =
+          functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
 
   final FirebaseFunctions _functions;
 
@@ -22,10 +22,7 @@ class InventoryCallableService {
     }
     final res = await _functions
         .httpsCallable('confirmInventoryMovement')
-        .call<Map<String, dynamic>>({
-      'companyId': cid,
-      'movementId': mid,
-    });
+        .call<Map<String, dynamic>>({'companyId': cid, 'movementId': mid});
     final data = res.data;
     if (data['success'] != true) {
       throw Exception('Potvrda kretanja nije uspjela.');

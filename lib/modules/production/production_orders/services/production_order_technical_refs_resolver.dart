@@ -40,11 +40,7 @@ class ProductionOrderTechnicalRefsResolver {
 
     if (bomId.isEmpty || bomVersion.isEmpty) {
       Map<String, dynamic>? found;
-      for (final classification in [
-        'PRIMARY',
-        'SECONDARY',
-        'TRANSPORT',
-      ]) {
+      for (final classification in ['PRIMARY', 'SECONDARY', 'TRANSPORT']) {
         final bom = await _bom.getActiveBomForProductAndClassification(
           companyId: cid,
           productId: pid,

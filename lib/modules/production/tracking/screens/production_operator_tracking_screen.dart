@@ -8,7 +8,10 @@ import '../widgets/preparation_tracking_tab.dart';
 class ProductionOperatorTrackingScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
 
-  const ProductionOperatorTrackingScreen({super.key, required this.companyData});
+  const ProductionOperatorTrackingScreen({
+    super.key,
+    required this.companyData,
+  });
 
   @override
   State<ProductionOperatorTrackingScreen> createState() =>
@@ -57,17 +60,25 @@ class _ProductionOperatorTrackingScreenState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Material(
-            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.35,
+            ),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: Row(
                 children: [
-                  Icon(Icons.calendar_today_outlined, size: 20, color: theme.colorScheme.primary),
+                  Icon(
+                    Icons.calendar_today_outlined,
+                    size: 20,
+                    color: theme.colorScheme.primary,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       'Radni dan: ${_todayLine(context)}',
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],

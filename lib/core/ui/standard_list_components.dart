@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:production_app/core/theme/operonix_production_brand.dart';
 
 class KpiMetric {
   final String label;
@@ -18,6 +19,7 @@ class StandardScreenHeader extends StatelessWidget {
   final String title;
   final VoidCallback? onBack;
   final VoidCallback? onInfo;
+
   /// Ikone izvoza itd. — prikazuje se prije info dugmeta.
   final Widget? beforeInfoAction;
   final Widget? action;
@@ -151,6 +153,7 @@ class StandardSearchField extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
   final ValueChanged<String>? onChanged;
+
   /// Kompaktniji unos (npr. unutar sklopivog filter panela).
   final bool compact;
 
@@ -165,7 +168,7 @@ class StandardSearchField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final outline = cs.outlineVariant;
+    final outline = kOperonixProductionBrandGreen.withValues(alpha: 0.45);
     final pad = compact
         ? const EdgeInsets.symmetric(horizontal: 12, vertical: 10)
         : const EdgeInsets.symmetric(horizontal: 14, vertical: 14);
@@ -190,7 +193,10 @@ class StandardSearchField extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(compact ? 12 : 14),
-          borderSide: BorderSide(color: cs.primary, width: 1.5),
+          borderSide: const BorderSide(
+            color: kOperonixProductionBrandGreen,
+            width: 2,
+          ),
         ),
       ),
     );
@@ -246,7 +252,10 @@ class StandardFilterPanel extends StatelessWidget {
                   if (activeCount > 0)
                     Container(
                       margin: const EdgeInsets.only(right: 10),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: cs.primaryContainer,
                         borderRadius: BorderRadius.circular(999),
@@ -283,7 +292,9 @@ class StandardFilterPanel extends StatelessWidget {
                 ],
               ),
             ),
-            crossFadeState: expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            crossFadeState: expanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
             duration: const Duration(milliseconds: 180),
             sizeCurve: Curves.easeInOut,
             alignment: Alignment.topCenter,
@@ -293,4 +304,3 @@ class StandardFilterPanel extends StatelessWidget {
     );
   }
 }
-

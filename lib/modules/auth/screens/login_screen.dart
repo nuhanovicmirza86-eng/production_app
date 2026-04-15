@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../register/screens/register_screen.dart';
 import '../shared/services/auth_service.dart';
@@ -18,6 +19,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   static const _kRememberEmail = 'remember_email';
   static const _kSavedEmail = 'saved_email';
+  static const _privacyPolicyUrl =
+      'https://operonixindustrial.com/privacy-policy';
 
   final _authService = AuthService();
 
@@ -128,6 +131,18 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _openPrivacyPolicy() async {
+    final uri = Uri.parse(_privacyPolicyUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ne mogu otvoriti stranicu politike.')),
+      );
+    }
+  }
+
   Future<void> _openRegister() async {
     final res = await Navigator.push<bool>(
       context,
@@ -180,18 +195,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text(
                         'Operonix Production',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       TextField(
                         controller: _emailCtrl,
                         enabled: !_loading,
                         keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
-                          border: OutlineInputBorder(),
-                        ),
+                        decoration: const InputDecoration(labelText: 'Email'),
                       ),
                       const SizedBox(height: 12),
                       TextField(
@@ -200,7 +212,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         obscureText: _obscure,
                         decoration: InputDecoration(
                           labelText: 'Lozinka',
-                          border: const OutlineInputBorder(),
                           suffixIcon: IconButton(
                             onPressed: _loading
                                 ? null
@@ -257,6 +268,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: _loading ? null : _openRegister,
                         icon: const Icon(Icons.person_add_alt_1),
                         label: const Text('Nemaš račun? Registruj se'),
+                      ),
+                      TextButton(
+                        onPressed: _loading ? null : _openPrivacyPolicy,
+                        child: const Text('Politika privatnosti'),
                       ),
                     ],
                   ),

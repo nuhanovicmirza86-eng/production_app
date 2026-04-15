@@ -66,8 +66,7 @@ class CompanyLogoResolver {
     final u = _normalizeWebsiteUri(rawWebsite);
     if (u == null) return const [];
 
-    final origin =
-        '${u.scheme}://${u.host}${u.hasPort ? ':${u.port}' : ''}/';
+    final origin = '${u.scheme}://${u.host}${u.hasPort ? ':${u.port}' : ''}/';
     final encodedOrigin = Uri.encodeComponent(origin);
     final host = u.host;
     final base = '${u.scheme}://$host';

@@ -5,8 +5,8 @@ import 'package:cloud_functions/cloud_functions.dart';
 /// Isti backend kao `maintenance_app` (`upsertAssessmentTemplate`, `computeAssessment`).
 class AssessmentEngineService {
   AssessmentEngineService({FirebaseFunctions? functions})
-      : _functions =
-            functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
+    : _functions =
+          functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
 
   final FirebaseFunctions _functions;
 

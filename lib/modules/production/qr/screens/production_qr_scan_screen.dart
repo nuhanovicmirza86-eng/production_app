@@ -119,7 +119,6 @@ class _ProductionQrScanScreenState extends State<ProductionQrScanScreen> {
                   minLines: 2,
                   decoration: const InputDecoration(
                     labelText: 'Ručni unos (sadržaj QR)',
-                    border: OutlineInputBorder(),
                     alignLabelWithHint: true,
                   ),
                   onSubmitted: (_) => _onManualSubmit(),

@@ -55,8 +55,7 @@ class _OrderLineProductionCreateScreenState
           ? widget.item.qty.toInt().toString()
           : widget.item.qty.toString(),
     );
-    _scheduledEndAt =
-        widget.item.dueDate ?? widget.order.requestedDeliveryDate;
+    _scheduledEndAt = widget.item.dueDate ?? widget.order.requestedDeliveryDate;
     _loadProduct();
   }
 
@@ -131,9 +130,9 @@ class _OrderLineProductionCreateScreenState
 
     final p = _product;
     if (p == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Proizvod nije učitan')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Proizvod nije učitan')));
       return;
     }
 
@@ -177,9 +176,9 @@ class _OrderLineProductionCreateScreenState
         _qtyController.text.trim().replaceAll(',', '.'),
       );
     } catch (_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Neispravna količina')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Neispravna količina')));
       return;
     }
     if (plannedQty <= 0) {
@@ -224,9 +223,9 @@ class _OrderLineProductionCreateScreenState
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -315,7 +314,6 @@ class _OrderLineProductionCreateScreenState
                       controller: _qtyController,
                       decoration: const InputDecoration(
                         labelText: 'Planirana količina',
-                        border: OutlineInputBorder(),
                       ),
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
@@ -335,8 +333,8 @@ class _OrderLineProductionCreateScreenState
                         _scheduledEndAt == null
                             ? 'Nije odabrano'
                             : '${_scheduledEndAt!.day.toString().padLeft(2, '0')}.'
-                                '${_scheduledEndAt!.month.toString().padLeft(2, '0')}.'
-                                '${_scheduledEndAt!.year}',
+                                  '${_scheduledEndAt!.month.toString().padLeft(2, '0')}.'
+                                  '${_scheduledEndAt!.year}',
                       ),
                       trailing: const Icon(Icons.calendar_today),
                       onTap: _pickDate,

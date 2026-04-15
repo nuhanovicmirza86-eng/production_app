@@ -23,7 +23,8 @@ class ProductsListScreen extends StatefulWidget {
 
 class _ProductsListScreenState extends State<ProductsListScreen> {
   final ProductService _productService = ProductService();
-  final ProductWarehouseStockService _stockService = ProductWarehouseStockService();
+  final ProductWarehouseStockService _stockService =
+      ProductWarehouseStockService();
   final TextEditingController _searchController = TextEditingController();
 
   bool _isLoading = true;
@@ -38,15 +39,18 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
 
   /// null = svi
   String? _filterCustomerName;
+
   /// null = svi tipovi; vrijednosti: GK, PP, SK, MA, PM, __ostalo__
   String? _filterPieceTypeKey;
+
   /// null = sve ukupno (zbir po magacinima u kontekstu pogona)
   String? _filterWarehouseId;
 
   Timer? _searchDebounce;
 
   /// Keš linija zalihe po proizvodu (učitava se za trenutno filtriranu listu).
-  final Map<String, List<ProductWarehouseStockLine>> _stockLinesByProductId = {};
+  final Map<String, List<ProductWarehouseStockLine>> _stockLinesByProductId =
+      {};
   Map<String, double> _displayStockQty = <String, double>{};
   int _stockRequestId = 0;
 
@@ -82,8 +86,9 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
 
   String _s(dynamic value) => (value ?? '').toString().trim();
 
-  String get _companyPlantKey =>
-      _s(widget.companyData['plantKey']).isEmpty ? '' : _s(widget.companyData['plantKey']);
+  String get _companyPlantKey => _s(widget.companyData['plantKey']).isEmpty
+      ? ''
+      : _s(widget.companyData['plantKey']);
 
   static const Set<String> _piecePrefixes = {'GK', 'PP', 'SK', 'MA', 'PM'};
   static const List<String> _pieceTypeOrder = [
@@ -133,21 +138,21 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
       final status = _s(p['status']).toLowerCase();
       final ptKey = _pieceTypeKey(p);
       final ptTitle = _pieceTypeTitleFromKey(ptKey).toLowerCase();
-      final matchesSearch = q.isEmpty ||
+      final matchesSearch =
+          q.isEmpty ||
           code.contains(q) ||
           name.contains(q) ||
           cust.contains(q) ||
           ptKey.toLowerCase().contains(q) ||
           ptTitle.contains(q);
       final matchesStatus = _selectedStatus.matches(status);
-      final matchesCustomer = _filterCustomerName == null ||
+      final matchesCustomer =
+          _filterCustomerName == null ||
           _customerLabel(p) == _filterCustomerName;
-      final matchesPiece = _filterPieceTypeKey == null ||
+      final matchesPiece =
+          _filterPieceTypeKey == null ||
           _pieceTypeKey(p) == _filterPieceTypeKey;
-      return matchesSearch &&
-          matchesStatus &&
-          matchesCustomer &&
-          matchesPiece;
+      return matchesSearch && matchesStatus && matchesCustomer && matchesPiece;
     }).toList();
   }
 
@@ -314,10 +319,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
       final lines = _stockLinesByProductId[id];
       if (lines == null) continue;
       if (wid == null) {
-        next[id] = lines.fold<double>(
-          0,
-          (a, b) => a + b.quantityOnHand,
-        );
+        next[id] = lines.fold<double>(0, (a, b) => a + b.quantityOnHand);
       } else {
         next[id] = lines
             .where((l) => l.warehouseId == wid)
@@ -363,16 +365,18 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
           i,
           i + batchSize > idList.length ? idList.length : i + batchSize,
         );
-        await Future.wait(chunk.map((id) async {
-          if (_stockLinesByProductId.containsKey(id)) return;
-          final lines = await _stockService.loadStockLinesForProduct(
-            companyId: _companyId,
-            productId: id,
-            plantKey: plant,
-          );
-          if (req != _stockRequestId) return;
-          _stockLinesByProductId[id] = lines;
-        }));
+        await Future.wait(
+          chunk.map((id) async {
+            if (_stockLinesByProductId.containsKey(id)) return;
+            final lines = await _stockService.loadStockLinesForProduct(
+              companyId: _companyId,
+              productId: id,
+              plantKey: plant,
+            );
+            if (req != _stockRequestId) return;
+            _stockLinesByProductId[id] = lines;
+          }),
+        );
       }
       if (!mounted || req != _stockRequestId) return;
       _applyStockDisplay();
@@ -453,7 +457,9 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                     '• secondaryClassificationCode, secondaryClassificationDescription',
                   ),
                   Text('• secondaryClassification (jedna kolona → opis)'),
-                  Text('• standardUnitPrice (ili unitPrice, listPrice, jedinicnaCijena)'),
+                  Text(
+                    '• standardUnitPrice (ili unitPrice, listPrice, jedinicnaCijena)',
+                  ),
                   Text('• currency (ili valuta, npr. KM)'),
                   SizedBox(height: 12),
                   Text(
@@ -688,10 +694,10 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
             customerId: customerId.isEmpty ? null : customerId,
             customerName: customerName.isEmpty ? null : customerName,
             defaultPlantKey: defaultPlantKey.isEmpty ? null : defaultPlantKey,
-            secondaryClassificationCode:
-                outSecCode.isEmpty ? null : outSecCode,
-            secondaryClassificationDescription:
-                outSecDesc.isEmpty ? null : outSecDesc,
+            secondaryClassificationCode: outSecCode.isEmpty ? null : outSecCode,
+            secondaryClassificationDescription: outSecDesc.isEmpty
+                ? null
+                : outSecDesc,
             standardUnitPrice: standardUnitPrice,
             currency: currencyRaw.trim().isEmpty ? null : currencyRaw.trim(),
           );
@@ -797,8 +803,12 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   }
 
   Widget _buildKpis() {
-    final active = _products.where((e) => _s(e['status']).toLowerCase() == 'active').length;
-    final inactive = _products.where((e) => _s(e['status']).toLowerCase() == 'inactive').length;
+    final active = _products
+        .where((e) => _s(e['status']).toLowerCase() == 'active')
+        .length;
+    final inactive = _products
+        .where((e) => _s(e['status']).toLowerCase() == 'inactive')
+        .length;
     return StandardKpiGrid(
       metrics: [
         KpiMetric(
@@ -855,9 +865,6 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
         isExpanded: true,
         decoration: InputDecoration(
           labelText: label,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 10,
             vertical: 8,
@@ -870,49 +877,37 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
     }
 
     List<DropdownMenuItem<String?>> customerItems() => [
-          const DropdownMenuItem<String?>(
-            value: null,
-            child: Text('Svi'),
-          ),
-          ...customers.map(
-            (n) => DropdownMenuItem<String?>(
-              value: n,
-              child: Text(n, overflow: TextOverflow.ellipsis),
-            ),
-          ),
-        ];
+      const DropdownMenuItem<String?>(value: null, child: Text('Svi')),
+      ...customers.map(
+        (n) => DropdownMenuItem<String?>(
+          value: n,
+          child: Text(n, overflow: TextOverflow.ellipsis),
+        ),
+      ),
+    ];
 
     List<DropdownMenuItem<String?>> pieceItems() => [
-          const DropdownMenuItem<String?>(
-            value: null,
-            child: Text('Sve'),
+      const DropdownMenuItem<String?>(value: null, child: Text('Sve')),
+      ...pieceKeys.map(
+        (k) => DropdownMenuItem<String?>(
+          value: k,
+          child: Text(
+            _pieceTypeTitleFromKey(k),
+            overflow: TextOverflow.ellipsis,
           ),
-          ...pieceKeys.map(
-            (k) => DropdownMenuItem<String?>(
-              value: k,
-              child: Text(
-                _pieceTypeTitleFromKey(k),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ),
-        ];
+        ),
+      ),
+    ];
 
     List<DropdownMenuItem<String?>> warehouseItems() => [
-          const DropdownMenuItem<String?>(
-            value: null,
-            child: Text('Sve ukupno'),
-          ),
-          ..._warehouses.map(
-            (w) => DropdownMenuItem<String?>(
-              value: w.id,
-              child: Text(
-                '${w.code} – ${w.name}',
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ),
-        ];
+      const DropdownMenuItem<String?>(value: null, child: Text('Sve ukupno')),
+      ..._warehouses.map(
+        (w) => DropdownMenuItem<String?>(
+          value: w.id,
+          child: Text('${w.code} – ${w.name}', overflow: TextOverflow.ellipsis),
+        ),
+      ),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1038,7 +1033,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
     }
 
     final activeCount =
-        _axisFilterActiveCount + (_selectedStatus == ProductStatusFilter.all ? 0 : 1);
+        _axisFilterActiveCount +
+        (_selectedStatus == ProductStatusFilter.all ? 0 : 1);
 
     return StandardFilterPanel(
       expanded: _filtersExpanded,
@@ -1047,7 +1043,10 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Status', style: TextStyle(fontSize: 12, color: Colors.black54)),
+          const Text(
+            'Status',
+            style: TextStyle(fontSize: 12, color: Colors.black54),
+          ),
           const SizedBox(height: 8),
           Wrap(
             children: ProductStatusFilter.values.map((status) {
@@ -1071,8 +1070,13 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   Widget _reportHeaderRow() {
     final cs = Theme.of(context).colorScheme;
     final border = BorderSide(color: cs.outlineVariant, width: 1);
-    Widget cell(String t, double? w,
-        {bool exp = false, bool right = false, bool bold = true}) {
+    Widget cell(
+      String t,
+      double? w, {
+      bool exp = false,
+      bool right = false,
+      bool bold = true,
+    }) {
       final child = Text(
         t,
         textAlign: right ? TextAlign.right : TextAlign.left,
@@ -1097,10 +1101,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
           child: Container(
             decoration: BoxDecoration(
               color: cs.surfaceContainerHighest,
-              border: Border.all(
-                color: border.color,
-                width: border.width,
-              ),
+              border: Border.all(color: border.color, width: border.width),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 7),
             alignment: right ? Alignment.centerRight : Alignment.centerLeft,
@@ -1162,10 +1163,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
         return Expanded(
           child: Container(
             decoration: BoxDecoration(
-              border: Border.all(
-                color: border.color,
-                width: border.width,
-              ),
+              border: Border.all(color: border.color, width: border.width),
               color: cs.surface,
             ),
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
@@ -1276,8 +1274,9 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   Widget _buildGroupedProductReport(List<Map<String, dynamic>> list) {
     final sorted = List<Map<String, dynamic>>.from(list)
       ..sort((a, b) {
-        var c = _customerLabel(a).toLowerCase().compareTo(
-              _customerLabel(b).toLowerCase());
+        var c = _customerLabel(
+          a,
+        ).toLowerCase().compareTo(_customerLabel(b).toLowerCase());
         if (c != 0) return c;
         final ka = _pieceTypeKey(a);
         final kb = _pieceTypeKey(b);
@@ -1375,10 +1374,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                 width: _reportTableWidth,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _reportHeaderRow(),
-                    ...rows.map(_reportDataRow),
-                  ],
+                  children: [_reportHeaderRow(), ...rows.map(_reportDataRow)],
                 ),
               ),
             ),

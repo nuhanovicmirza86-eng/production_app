@@ -46,12 +46,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       (widget.companyData['role'] ?? '').toString().trim().toLowerCase();
 
   bool get _canCreatePnFromLine => ProductionAccessHelper.canManage(
-        role: _role,
-        card: ProductionDashboardCard.productionOrders,
-      );
+    role: _role,
+    card: ProductionDashboardCard.productionOrders,
+  );
 
-  String get _userId =>
-      (widget.companyData['userId'] ?? '').toString().trim();
+  String get _userId => (widget.companyData['userId'] ?? '').toString().trim();
 
   bool get _canManageOrder =>
       _role == 'admin' ||
@@ -84,10 +83,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     final ok = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => OrderEditScreen(
-          companyData: widget.companyData,
-          order: _order,
-        ),
+        builder: (_) =>
+            OrderEditScreen(companyData: widget.companyData, order: _order),
       ),
     );
     if (ok == true && mounted) await _load();
@@ -95,8 +92,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   Future<void> _openOrderUnifiedAssessment() async {
     final pkOrder = (_order.plantKey ?? '').toString().trim();
-    final pkCompany =
-        (widget.companyData['plantKey'] ?? '').toString().trim();
+    final pkCompany = (widget.companyData['plantKey'] ?? '').toString().trim();
     await Navigator.push<void>(
       context,
       MaterialPageRoute(
@@ -105,8 +101,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           plantKey: pkOrder.isNotEmpty ? pkOrder : pkCompany,
           entityType: 'production_order',
           entityId: _order.id,
-          entityLabel:
-              '${_order.orderNumber} • ${_order.partnerName}'.trim(),
+          entityLabel: '${_order.orderNumber} • ${_order.partnerName}'.trim(),
           userRole: _role,
         ),
       ),
@@ -152,14 +147,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       if (!mounted) return;
       await _load();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Narudžba je zatvorena.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Narudžba je zatvorena.')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     }
   }
 
@@ -179,10 +174,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: reasonController,
-              decoration: const InputDecoration(
-                labelText: 'Razlog',
-                border: OutlineInputBorder(),
-              ),
+              decoration: const InputDecoration(labelText: 'Razlog'),
               maxLines: 2,
             ),
           ],
@@ -231,14 +223,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       if (!mounted) return;
       await _load();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Narudžba je otkazana.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Narudžba je otkazana.')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     }
   }
 
@@ -492,8 +484,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           const Text('Datumi', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           _metaRow('Datum narudžbe', _formatDate(_order.orderDate)),
-          _metaRow('Tražena isporuka', _formatDate(_order.requestedDeliveryDate)),
-          _metaRow('Potvrđena isporuka', _formatDate(_order.confirmedDeliveryDate)),
+          _metaRow(
+            'Tražena isporuka',
+            _formatDate(_order.requestedDeliveryDate),
+          ),
+          _metaRow(
+            'Potvrđena isporuka',
+            _formatDate(_order.confirmedDeliveryDate),
+          ),
         ],
       ),
     );
@@ -515,7 +513,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           _metaRow('Ukupno naručeno', _formatQty(_order.totalQty)),
           if ((_order.notes ?? '').isNotEmpty) ...[
             const SizedBox(height: 10),
-            const Text('Napomena', style: TextStyle(fontWeight: FontWeight.w600)),
+            const Text(
+              'Napomena',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 4),
             Text(_order.notes!),
           ],
@@ -529,9 +530,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: _cardDecoration(),
-        child: const Text(
-          'Nema stavki u order_items (ili još nisu učitane).',
-        ),
+        child: const Text('Nema stavki u order_items (ili još nisu učitane).'),
       );
     }
 
@@ -571,14 +570,20 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   if (item.dueDate != null)
                     Text(
                       'Rok: ${_formatDate(item.dueDate)}',
-                      style: const TextStyle(fontSize: 13, color: Colors.black54),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.black54,
+                      ),
                     ),
                   if (lineLbl != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
                         'Status linije: $lineLbl',
-                        style: const TextStyle(fontSize: 12, color: Colors.black87),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.black87,
+                        ),
                       ),
                     ),
                   if (item.linkedProductionOrderCodes.isNotEmpty)
@@ -586,16 +591,23 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
                         'PN: ${item.linkedProductionOrderCodes.join(', ')}',
-                        style: const TextStyle(fontSize: 12, color: Colors.black87),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.black87,
+                        ),
                       ),
                     ),
-                  if (_order.orderType == OrderType.customer && _canCreatePnFromLine)
+                  if (_order.orderType == OrderType.customer &&
+                      _canCreatePnFromLine)
                     Padding(
                       padding: const EdgeInsets.only(top: 10),
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: OutlinedButton.icon(
-                          icon: const Icon(Icons.precision_manufacturing, size: 18),
+                          icon: const Icon(
+                            Icons.precision_manufacturing,
+                            size: 18,
+                          ),
                           label: const Text('Kreiraj PN iz stavke'),
                           onPressed: () async {
                             final ok = await Navigator.push<bool>(

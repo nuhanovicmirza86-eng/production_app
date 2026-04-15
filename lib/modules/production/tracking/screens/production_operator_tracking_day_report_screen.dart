@@ -34,11 +34,10 @@ class _ProductionOperatorTrackingDayReportScreenState
       (widget.companyData['plantKey'] ?? '').toString().trim();
 
   String get _companyDisplayName {
-    final n = (widget.companyData['name'] ??
-            widget.companyData['companyName'] ??
-            '')
-        .toString()
-        .trim();
+    final n =
+        (widget.companyData['name'] ?? widget.companyData['companyName'] ?? '')
+            .toString()
+            .trim();
     if (n.isNotEmpty) return n;
     return _companyId;
   }
@@ -67,7 +66,9 @@ class _ProductionOperatorTrackingDayReportScreenState
   Future<void> _printPdf() async {
     if (_companyId.isEmpty || _plantKey.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nedostaje companyId ili plantKey u sesiji.')),
+        const SnackBar(
+          content: Text('Nedostaje companyId ili plantKey u sesiji.'),
+        ),
       );
       return;
     }
@@ -82,9 +83,9 @@ class _ProductionOperatorTrackingDayReportScreenState
       );
       if (!mounted) return;
       if (entries.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Nema unosa za $workKey.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Nema unosa za $workKey.')));
         return;
       }
       await ProductionOperatorTrackingDayPdfExport.preview(
@@ -97,9 +98,7 @@ class _ProductionOperatorTrackingDayReportScreenState
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -141,10 +140,7 @@ class _ProductionOperatorTrackingDayReportScreenState
           DropdownButtonFormField<String>(
             key: ValueKey<String>(_phase),
             initialValue: _phase,
-            decoration: const InputDecoration(
-              labelText: 'Faza',
-              border: OutlineInputBorder(),
-            ),
+            decoration: const InputDecoration(labelText: 'Faza'),
             items: const [
               DropdownMenuItem(
                 value: ProductionOperatorTrackingEntry.phasePreparation,
@@ -175,7 +171,9 @@ class _ProductionOperatorTrackingDayReportScreenState
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.picture_as_pdf_outlined),
-            label: Text(_loading ? 'Učitavanje…' : 'Ispis PDF (dijalog ispisa)'),
+            label: Text(
+              _loading ? 'Učitavanje…' : 'Ispis PDF (dijalog ispisa)',
+            ),
           ),
         ],
       ),

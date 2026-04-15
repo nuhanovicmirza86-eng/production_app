@@ -37,12 +37,10 @@ class _CarbonFootprintScreenState extends State<CarbonFootprintScreen>
   String? _loadError;
   bool _accessDenied = false;
 
-  String get _cid =>
-      (widget.companyData['companyId'] ?? '').toString().trim();
+  String get _cid => (widget.companyData['companyId'] ?? '').toString().trim();
   String get _role =>
       (widget.companyData['role'] ?? '').toString().trim().toLowerCase();
-  String get _userId =>
-      (widget.companyData['userId'] ?? '').toString().trim();
+  String get _userId => (widget.companyData['userId'] ?? '').toString().trim();
 
   String get _fallbackName =>
       (widget.companyData['name'] ?? widget.companyData['companyName'] ?? '')
@@ -50,9 +48,9 @@ class _CarbonFootprintScreenState extends State<CarbonFootprintScreen>
           .trim();
 
   bool get _canEditInputs => ProductionAccessHelper.canManage(
-        role: _role,
-        card: ProductionDashboardCard.carbonFootprint,
-      );
+    role: _role,
+    card: ProductionDashboardCard.carbonFootprint,
+  );
 
   bool get _isAdmin => ProductionAccessHelper.isAdminRole(_role);
 
@@ -61,9 +59,9 @@ class _CarbonFootprintScreenState extends State<CarbonFootprintScreen>
     super.initState();
     _tabs = TabController(length: 7, vsync: this);
     if (!ProductionAccessHelper.canView(
-          role: _role,
-          card: ProductionDashboardCard.carbonFootprint,
-        )) {
+      role: _role,
+      card: ProductionDashboardCard.carbonFootprint,
+    )) {
       _accessDenied = true;
       _loading = false;
       return;
@@ -86,10 +84,11 @@ class _CarbonFootprintScreenState extends State<CarbonFootprintScreen>
         .where('reportingYear', isEqualTo: _year)
         .snapshots()
         .listen((snap) {
-          final list = snap.docs
-              .map((d) => CarbonActivityLine.fromDoc(d.id, d.data()))
-              .toList()
-            ..sort((a, b) => a.rowId.compareTo(b.rowId));
+          final list =
+              snap.docs
+                  .map((d) => CarbonActivityLine.fromDoc(d.id, d.data()))
+                  .toList()
+                ..sort((a, b) => a.rowId.compareTo(b.rowId));
           if (mounted) setState(() => _activities = list);
         });
   }
@@ -202,9 +201,7 @@ class _CarbonFootprintScreenState extends State<CarbonFootprintScreen>
               child: DropdownButton<int>(
                 value: _year,
                 items: years
-                    .map(
-                      (y) => DropdownMenuItem(value: y, child: Text('$y')),
-                    )
+                    .map((y) => DropdownMenuItem(value: y, child: Text('$y')))
                     .toList(),
                 onChanged: _onYearChanged,
               ),
@@ -252,7 +249,11 @@ class _CarbonFootprintScreenState extends State<CarbonFootprintScreen>
                   service: _svc,
                   onSaved: _loadStatic,
                 ),
-                _DashboardTab(setup: _setup!, summary: _summary, quotas: _quotas!),
+                _DashboardTab(
+                  setup: _setup!,
+                  summary: _summary,
+                  quotas: _quotas!,
+                ),
                 _ExportTab(
                   setup: _setup!,
                   activities: _activities,
@@ -284,9 +285,9 @@ class _CarbonFootprintScreenState extends State<CarbonFootprintScreen>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Greška: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Greška: $e')));
       }
     }
   }
@@ -295,16 +296,16 @@ class _CarbonFootprintScreenState extends State<CarbonFootprintScreen>
     try {
       await _svc.saveQuotas(quotas: q, userId: _userId);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Kvote su spremljene.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Kvote su spremljene.')));
         await _loadStatic();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Greška: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Greška: $e')));
       }
     }
   }
@@ -383,7 +384,10 @@ class _SetupTabState extends State<_SetupTab> {
         title: Text(title),
         content: SingleChildScrollView(child: Text(body)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
         ],
       ),
     );
@@ -527,10 +531,7 @@ class _SetupTabState extends State<_SetupTab> {
         const SizedBox(height: 16),
         Text(
           'Izračun (zaključano)',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: scheme.primary,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w600, color: scheme.primary),
         ),
         const SizedBox(height: 8),
         _lockedRow(
@@ -603,7 +604,6 @@ class _SetupTabState extends State<_SetupTab> {
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
-          border: const OutlineInputBorder(),
           suffixIcon: help != null ? _info(help) : trailing,
         ),
       ),
@@ -624,13 +624,14 @@ class _SetupTabState extends State<_SetupTab> {
           labelText: label,
           filled: true,
           fillColor: bg,
-          border: const OutlineInputBorder(),
           suffixIcon: _info(help),
         ),
         child: Text(
           value.isEmpty ? '—' : value,
           style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.9),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.9),
           ),
         ),
       ),
@@ -677,9 +678,7 @@ class _QuotasTabState extends State<_QuotasTab> {
     _intEmp = TextEditingController(
       text: q.intensityTargetPerEmployee.toString(),
     );
-    _intUnit = TextEditingController(
-      text: q.intensityTargetPerUnit.toString(),
-    );
+    _intUnit = TextEditingController(text: q.intensityTargetPerUnit.toString());
   }
 
   @override
@@ -721,7 +720,10 @@ class _QuotasTabState extends State<_QuotasTab> {
         title: Text(title),
         content: SingleChildScrollView(child: Text(body)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
         ],
       ),
     );
@@ -762,7 +764,6 @@ class _QuotasTabState extends State<_QuotasTab> {
           decoration: InputDecoration(
             labelText: 'Bazna godina',
             hintText: 'npr. 2022',
-            border: const OutlineInputBorder(),
             suffixIcon: _quotaInfo(
               'Što unijeti\n'
               'Godinu za koju imate pouzdan, dokumentiran ukupni iznos emisija cijele '
@@ -781,7 +782,6 @@ class _QuotasTabState extends State<_QuotasTab> {
           decoration: InputDecoration(
             labelText: 'Bazne emisije (tCO2e)',
             hintText: 'ukupno u baznoj godini',
-            border: const OutlineInputBorder(),
             suffixIcon: _quotaInfo(
               'Što unijeti\n'
               'Ukupne godišnje emisije u tonaama CO2e (CO₂-ekvivalent) za baznu godinu — '
@@ -799,7 +799,6 @@ class _QuotasTabState extends State<_QuotasTab> {
           decoration: InputDecoration(
             labelText: 'Cilj smanjenja (%) do tekuće godine',
             hintText: 'npr. 10',
-            border: const OutlineInputBorder(),
             suffixIcon: _quotaInfo(
               'Što znači\n'
               'Koliko želite smanjiti emisije u odnosu na baznu godinu, izraženo u postotku. '
@@ -818,7 +817,6 @@ class _QuotasTabState extends State<_QuotasTab> {
           decoration: InputDecoration(
             labelText: 'Apsolutna interna kvota (tCO2e), opcionalno',
             hintText: '0 = koristi % cilj',
-            border: const OutlineInputBorder(),
             suffixIcon: _quotaInfo(
               'Što unijeti\n'
               'Interni „ceiling” u tonaama CO2e za tekuću godinu. Ako je broj veći od 0, '
@@ -836,7 +834,6 @@ class _QuotasTabState extends State<_QuotasTab> {
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(
             labelText: 'Ciljni intenzitet tCO2e / zaposlenom',
-            border: const OutlineInputBorder(),
             suffixIcon: _quotaInfo(
               'Što unijeti\n'
               'Vaš ciljni prag: koliko tCO2e smije pasti na jednog zaposlenog (ili želite '
@@ -855,7 +852,6 @@ class _QuotasTabState extends State<_QuotasTab> {
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(
             labelText: 'Ciljni intenzitet kgCO2e / jedinici',
-            border: const OutlineInputBorder(),
             suffixIcon: _quotaInfo(
               'Što unijeti\n'
               'Ciljni prag kg CO2e po jedinici proizvoda (iz Postavki — „proizvedene jedinice”). '
@@ -924,12 +920,7 @@ class _QuotasTabState extends State<_QuotasTab> {
     );
   }
 
-  Widget _decorBox(
-    Color bg,
-    String label,
-    String value, {
-    String? help,
-  }) {
+  Widget _decorBox(Color bg, String label, String value, {String? help}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: InputDecorator(
@@ -937,7 +928,6 @@ class _QuotasTabState extends State<_QuotasTab> {
           labelText: label,
           filled: true,
           fillColor: bg,
-          border: const OutlineInputBorder(),
           suffixIcon: help != null ? _quotaInfo(help) : null,
         ),
         child: Text(value),
@@ -980,7 +970,10 @@ class _ActivitiesTab extends StatelessWidget {
     return 'A${(maxN + 1).toString().padLeft(3, '0')}';
   }
 
-  Future<void> _openEditor(BuildContext context, CarbonActivityLine? existing) async {
+  Future<void> _openEditor(
+    BuildContext context,
+    CarbonActivityLine? existing,
+  ) async {
     void sheetHelp(String title, String body) {
       showDialog<void>(
         context: context,
@@ -1049,7 +1042,9 @@ class _ActivitiesTab extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      existing == null ? 'Nova aktivnost' : 'Uredi ${existing.rowId}',
+                      existing == null
+                          ? 'Nova aktivnost'
+                          : 'Uredi ${existing.rowId}',
                       style: Theme.of(ctx).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 12),
@@ -1059,13 +1054,13 @@ class _ActivitiesTab extends StatelessWidget {
                         onPressed: () => sheetHelp(
                           'Uključi u zbroj',
                           'Ovaj prekidač mijenja samo aktivnost koju upravo uređujete '
-                          '(npr. red A001), ne cijelu listu odjednom.\n\n'
-                          'UKLJUČENO: emisije ovog reda ulaze u ukupni tCO2e na tabovima '
-                          'Pregled i Kvote te u CSV izvoz (uključeni redovi).\n\n'
-                          'ISKLJUČENO: red ostaje spremljen, ali se ne zbraja i ne izvozi '
-                          'u CSV — npr. skica, duplikat, ili podatak samo za arhivu.\n\n'
-                          'Primjer: imate privremeni red za test — isključite ga dok ne '
-                          'potvrdite brojke.',
+                              '(npr. red A001), ne cijelu listu odjednom.\n\n'
+                              'UKLJUČENO: emisije ovog reda ulaze u ukupni tCO2e na tabovima '
+                              'Pregled i Kvote te u CSV izvoz (uključeni redovi).\n\n'
+                              'ISKLJUČENO: red ostaje spremljen, ali se ne zbraja i ne izvozi '
+                              'u CSV — npr. skica, duplikat, ili podatak samo za arhivu.\n\n'
+                              'Primjer: imate privremeni red za test — isključite ga dok ne '
+                              'potvrdite brojke.',
                         ),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(
@@ -1085,7 +1080,6 @@ class _ActivitiesTab extends StatelessWidget {
                       decoration: InputDecoration(
                         labelText: 'Oznaka u izvozu (opcionalno)',
                         hintText: 'prazno = bez podjele po pogonu u CSV-u',
-                        border: const OutlineInputBorder(),
                         suffixIcon: infoIcon(
                           'Zašto polje postoji\n'
                           'Ukupni obračun u aplikaciji je na razini kompanije (sve aktivnosti '
@@ -1105,7 +1099,6 @@ class _ActivitiesTab extends StatelessWidget {
                       decoration: InputDecoration(
                         labelText: 'Datum (YYYY-MM-DD)',
                         hintText: '2026-03-15',
-                        border: const OutlineInputBorder(),
                         suffixIcon: infoIcon(
                           'Unesite datum u obliku GGGG-MM-DD (ISO).\n\n'
                           'Primjer: 2026-03-15 za ožujsku struju, ili zadnji dan godine ako '
@@ -1121,7 +1114,6 @@ class _ActivitiesTab extends StatelessWidget {
                       decoration: InputDecoration(
                         labelText: 'Tip aktivnosti',
                         hintText: 'Electricity / Fuel / Freight…',
-                        border: const OutlineInputBorder(),
                         suffixIcon: infoIcon(
                           'Kratka kategorija radi grupiranja u izvještajima.\n\n'
                           'Primjeri: Electricity, Natural gas, Diesel, Freight, Business travel.\n\n'
@@ -1136,7 +1128,6 @@ class _ActivitiesTab extends StatelessWidget {
                       decoration: InputDecoration(
                         labelText: 'Opis',
                         hintText: 'Kupljena struja — glavni pogon',
-                        border: const OutlineInputBorder(),
                         suffixIcon: infoIcon(
                           'Tekst koji čita čovjek: što je točno potrošeno ili prevezeno.\n\n'
                           'Primjer: „Kupljena struja — glavna hala, Elektroprivreda, račun 45/2026” '
@@ -1155,7 +1146,6 @@ class _ActivitiesTab extends StatelessWidget {
                       decoration: InputDecoration(
                         labelText: 'Količina',
                         hintText: 'npr. 125000',
-                        border: const OutlineInputBorder(),
                         suffixIcon: infoIcon(
                           'Brojčana potrošnja ili udaljenost u jedinicama koje odgovaraju faktoru.\n\n'
                           'Primjeri: 125000 kWh (struja), 2400 l (dizel), 8500 tkm (prijevoz).\n\n'
@@ -1171,7 +1161,6 @@ class _ActivitiesTab extends StatelessWidget {
                       decoration: InputDecoration(
                         labelText: 'Jedinica',
                         hintText: 'kWh, litres, km…',
-                        border: const OutlineInputBorder(),
                         suffixIcon: infoIcon(
                           'Jedinica mora biti ista kao u emisijskom faktoru (npr. kWh, l, tkm).\n\n'
                           'Primjer: ako je faktor „kg CO2e po kWh”, ovdje piše kWh — ne MWh '
@@ -1218,8 +1207,9 @@ class _ActivitiesTab extends StatelessWidget {
                       decoration: InputDecoration(
                         labelText: 'Faktor (kg CO2e / jed.) — zaključano',
                         filled: true,
-                        fillColor: Theme.of(ctx).colorScheme.surfaceContainerHighest,
-                        border: const OutlineInputBorder(),
+                        fillColor: Theme.of(
+                          ctx,
+                        ).colorScheme.surfaceContainerHighest,
                         suffixIcon: infoIcon(
                           'Očitano iz taba Faktori — ne mijenja se ovdje.\n\n'
                           'Primjer: 0,122260 znači da svaka jedinica količine (npr. 1 tkm) '
@@ -1227,15 +1217,18 @@ class _ActivitiesTab extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        f == null ? '—' : f.factorKgCo2ePerUnit.toStringAsFixed(6),
+                        f == null
+                            ? '—'
+                            : f.factorKgCo2ePerUnit.toStringAsFixed(6),
                       ),
                     ),
                     InputDecorator(
                       decoration: InputDecoration(
                         labelText: 'kg CO2e — zaključano',
                         filled: true,
-                        fillColor: Theme.of(ctx).colorScheme.surfaceContainerHighest,
-                        border: const OutlineInputBorder(),
+                        fillColor: Theme.of(
+                          ctx,
+                        ).colorScheme.surfaceContainerHighest,
                         suffixIcon: infoIcon(
                           'Izračun: količina (gore) × faktor (kg CO2e po jedinici).\n\n'
                           'Primjer: 1000 tkm × 0,122260 = 122,26 kg CO2e.\n\n'
@@ -1250,7 +1243,6 @@ class _ActivitiesTab extends StatelessWidget {
                       decoration: InputDecoration(
                         labelText: 'Referenca dokaza',
                         hintText: 'Račun br.…',
-                        border: const OutlineInputBorder(),
                         suffixIcon: infoIcon(
                           'Što zapisati\n'
                           'Nešto što će revizor ili kolega moći pronaći: broj računa, interni '
@@ -1264,7 +1256,6 @@ class _ActivitiesTab extends StatelessWidget {
                       controller: notesC,
                       decoration: InputDecoration(
                         labelText: 'Napomena',
-                        border: const OutlineInputBorder(),
                         suffixIcon: infoIcon(
                           'Opcionalno: pretpostavke, izuzeci, tko je unio podatak, zašto je '
                           'faktor odabran.\n\n'
@@ -1459,9 +1450,7 @@ class _FactorsTab extends StatelessWidget {
   }
 
   Future<void> _editFactor(BuildContext context, CarbonEmissionFactor f) async {
-    final valC = TextEditingController(
-      text: f.factorKgCo2ePerUnit.toString(),
-    );
+    final valC = TextEditingController(text: f.factorKgCo2ePerUnit.toString());
     final srcC = TextEditingController(text: f.sourceName);
 
     final ok = await showDialog<bool>(
@@ -1478,16 +1467,12 @@ class _FactorsTab extends StatelessWidget {
               ),
               decoration: const InputDecoration(
                 labelText: 'kg CO2e po jedinici',
-                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 10),
             TextField(
               controller: srcC,
-              decoration: const InputDecoration(
-                labelText: 'Izvor',
-                border: OutlineInputBorder(),
-              ),
+              decoration: const InputDecoration(labelText: 'Izvor'),
             ),
           ],
         ),
@@ -1582,9 +1567,7 @@ class _DashboardTab extends StatelessWidget {
         _tile(
           bg,
           'kgCO2e / jedinici',
-          setup.unitsProduced <= 0
-              ? '—'
-              : s.perUnitKgCo2e.toStringAsFixed(4),
+          setup.unitsProduced <= 0 ? '—' : s.perUnitKgCo2e.toStringAsFixed(4),
         ),
         if (setup.revenue > 0)
           _tile(
@@ -1612,7 +1595,6 @@ class _DashboardTab extends StatelessWidget {
           labelText: label,
           filled: true,
           fillColor: bg,
-          border: const OutlineInputBorder(),
         ),
         child: Text(value),
       ),
@@ -1661,13 +1643,9 @@ class _ExportTab extends StatelessWidget {
               activities: activities,
               factorsByKey: factors,
             );
-            final fn =
-                'karbon_${setup.companyId}_${setup.reportingYear}.csv';
+            final fn = 'karbon_${setup.companyId}_${setup.reportingYear}.csv';
             try {
-              await CarbonExportService.shareCsv(
-                fileName: fn,
-                csvContent: csv,
-              );
+              await CarbonExportService.shareCsv(fileName: fn, csvContent: csv);
               await auditService.logReportEvent(
                 companyId: setup.companyId,
                 reportingYear: setup.reportingYear,
@@ -1677,9 +1655,9 @@ class _ExportTab extends StatelessWidget {
               );
             } catch (e) {
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Izvoz: $e')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Izvoz: $e')));
               }
             }
           },
@@ -1706,9 +1684,9 @@ class _ExportTab extends StatelessWidget {
                     );
                   } catch (e) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('PDF: $e')),
-                      );
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text('PDF: $e')));
                     }
                   }
                 },
@@ -1776,7 +1754,8 @@ class _AuditLogTabState extends State<_AuditLogTab> {
     String settingsUpdatedBy,
     DateTime? quotasUpdatedAt,
     String quotasUpdatedBy,
-  })? _docHints;
+  })?
+  _docHints;
 
   bool _metaLoading = true;
   String? _metaError;
@@ -1892,12 +1871,7 @@ class _AuditLogTabState extends State<_AuditLogTab> {
     );
   }
 
-  Widget _metaRow(
-    ThemeData theme,
-    String title,
-    DateTime? at,
-    String by,
-  ) {
+  Widget _metaRow(ThemeData theme, String title, DateTime? at, String by) {
     final label = UserDisplayLabel.labelForStored(by);
     return Text(
       '$title\n'
@@ -1953,13 +1927,7 @@ class _AuditLogTabState extends State<_AuditLogTab> {
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
                 title: Text(title),
-                subtitle: Text(
-                  [
-                    when,
-                    who,
-                    ?detail,
-                  ].join(' • '),
-                ),
+                subtitle: Text([when, who, ?detail].join(' • ')),
                 isThreeLine: longDetail,
               ),
             );

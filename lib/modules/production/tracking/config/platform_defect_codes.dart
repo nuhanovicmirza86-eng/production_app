@@ -25,7 +25,9 @@ class PlatformDefectCodes {
 const String defectDisplayNamesKey = 'defectDisplayNames';
 
 /// Mapa kanonskog koda → prikazni naziv (iz `companies` / sesije).
-Map<String, String> parseDefectDisplayNamesMap(Map<String, dynamic> companyData) {
+Map<String, String> parseDefectDisplayNamesMap(
+  Map<String, dynamic> companyData,
+) {
   final raw = companyData[defectDisplayNamesKey];
   if (raw is! Map) return {};
   final out = <String, String>{};
@@ -45,7 +47,9 @@ String displayLabelForScrapCode(String code, Map<String, String> namesByCode) {
 }
 
 /// Pločice za unos škarta: fiksni [PlatformDefectCodes.allCodes], [ScrapTileDef.label] iz mape.
-List<ScrapTileDef> defectTilesForCompanySession(Map<String, dynamic> companyData) {
+List<ScrapTileDef> defectTilesForCompanySession(
+  Map<String, dynamic> companyData,
+) {
   return defectTilesFromDisplayMap(parseDefectDisplayNamesMap(companyData));
 }
 

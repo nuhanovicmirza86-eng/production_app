@@ -44,7 +44,8 @@ class _TrackingQuantitySheetBody extends StatefulWidget {
       _TrackingQuantitySheetBodyState();
 }
 
-class _TrackingQuantitySheetBodyState extends State<_TrackingQuantitySheetBody> {
+class _TrackingQuantitySheetBodyState
+    extends State<_TrackingQuantitySheetBody> {
   late final TextEditingController _ctrl;
 
   @override
@@ -77,9 +78,9 @@ class _TrackingQuantitySheetBodyState extends State<_TrackingQuantitySheetBody> 
         children: [
           Text(
             widget.title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           if (widget.hint != null && widget.hint!.isNotEmpty) ...[
             const SizedBox(height: 6),
@@ -93,10 +94,7 @@ class _TrackingQuantitySheetBodyState extends State<_TrackingQuantitySheetBody> 
               decimal: true,
               signed: false,
             ),
-            decoration: const InputDecoration(
-              labelText: 'Količina',
-              border: OutlineInputBorder(),
-            ),
+            decoration: const InputDecoration(labelText: 'Količina'),
           ),
           const SizedBox(height: 16),
           FilledButton(

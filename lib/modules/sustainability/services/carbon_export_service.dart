@@ -86,7 +86,9 @@ class CarbonExportService {
     final path = '${dir.path}/$fileName';
     final f = File(path);
     await f.writeAsString(csvContent, encoding: utf8);
-    await Share.shareXFiles([XFile(path)], text: 'Izvještaj karbonskog otiska (CSV)');
+    await Share.shareXFiles([
+      XFile(path),
+    ], text: 'Izvještaj karbonskog otiska (CSV)');
   }
 
   static Future<pw.Font> _loadFont(String asset) async {
@@ -110,11 +112,8 @@ class CarbonExportService {
     final fontBold = await _loadFont('assets/fonts/NotoSans-Bold.ttf');
     final generated = DateTime.now();
 
-    pw.TextStyle labelStyle() => pw.TextStyle(
-          font: fontBold,
-          fontSize: 9,
-          color: PdfColors.grey800,
-        );
+    pw.TextStyle labelStyle() =>
+        pw.TextStyle(font: fontBold, fontSize: 9, color: PdfColors.grey800);
 
     pw.TextStyle valueStyle() => pw.TextStyle(font: fontRegular, fontSize: 9);
 
@@ -125,10 +124,7 @@ class CarbonExportService {
         child: pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.SizedBox(
-              width: 150,
-              child: pw.Text(label, style: labelStyle()),
-            ),
+            pw.SizedBox(width: 150, child: pw.Text(label, style: labelStyle())),
             pw.Expanded(child: pw.Text(v, style: valueStyle())),
           ],
         ),
@@ -153,13 +149,21 @@ class CarbonExportService {
           padding: const pw.EdgeInsets.only(top: 12),
           child: pw.Text(
             'Generisano: ${_formatDateTime(generated)}',
-            style: pw.TextStyle(font: fontRegular, fontSize: 8, color: PdfColors.grey600),
+            style: pw.TextStyle(
+              font: fontRegular,
+              fontSize: 8,
+              color: PdfColors.grey600,
+            ),
           ),
         ),
         build: (ctx) => [
           pw.Text(
             'Izvještaj o karbonskom otisku',
-            style: pw.TextStyle(font: fontBold, fontSize: 18, color: PdfColors.teal900),
+            style: pw.TextStyle(
+              font: fontBold,
+              fontSize: 18,
+              color: PdfColors.teal900,
+            ),
           ),
           pw.SizedBox(height: 4),
           pw.Text(
@@ -205,7 +209,11 @@ class CarbonExportService {
                   _pdfCell('Vrijednost', fontBold, true),
                 ],
               ),
-              _pdfMetricRow(fontRegular, 'Ukupno', '${summary.totalTCO2e.toStringAsFixed(3)} tCO2e'),
+              _pdfMetricRow(
+                fontRegular,
+                'Ukupno',
+                '${summary.totalTCO2e.toStringAsFixed(3)} tCO2e',
+              ),
               _pdfMetricRow(
                 fontRegular,
                 'Scope 1',
@@ -250,11 +258,18 @@ class CarbonExportService {
           ),
           pw.SizedBox(height: 6),
           kv('Bazna godina', quotas.baselineYear.toString()),
-          kv('Bazne emisije (tCO2e)', quotas.baselineEmissionsTCO2e.toStringAsFixed(3)),
-          kv('Cilj smanjenja (%)', quotas.reductionTargetPercent.toStringAsFixed(2)),
+          kv(
+            'Bazne emisije (tCO2e)',
+            quotas.baselineEmissionsTCO2e.toStringAsFixed(3),
+          ),
+          kv(
+            'Cilj smanjenja (%)',
+            quotas.reductionTargetPercent.toStringAsFixed(2),
+          ),
           kv(
             'Cilj iz postotka (tCO2e)',
-            quotas.baselineEmissionsTCO2e <= 0 || quotas.reductionTargetPercent <= 0
+            quotas.baselineEmissionsTCO2e <= 0 ||
+                    quotas.reductionTargetPercent <= 0
                 ? '—'
                 : targetPct.toStringAsFixed(3),
           ),
@@ -326,11 +341,8 @@ class CarbonExportService {
     final safeName = _safeFileName(setup.companyName, setup.reportingYear);
     await Printing.layoutPdf(
       name: safeName,
-      onLayout: (_) => buildSummaryPdfBytes(
-        setup: setup,
-        summary: summary,
-        quotas: quotas,
-      ),
+      onLayout: (_) =>
+          buildSummaryPdfBytes(setup: setup, summary: summary, quotas: quotas),
     );
   }
 

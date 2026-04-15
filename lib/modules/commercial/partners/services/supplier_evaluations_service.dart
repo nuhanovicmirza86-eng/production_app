@@ -67,9 +67,9 @@ class SupplierEvaluationsService {
   SupplierEvaluationsService({
     FirebaseFirestore? firestore,
     FirebaseFunctions? functions,
-  })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _functions =
-            functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _functions =
+           functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
 
   final FirebaseFirestore _firestore;
   final FirebaseFunctions _functions;
@@ -85,7 +85,8 @@ class SupplierEvaluationsService {
     required double responseRating,
     required double complianceRating,
   }) {
-    final raw = (qualityRating * 0.40) +
+    final raw =
+        (qualityRating * 0.40) +
         (deliveryRating * 0.30) +
         (responseRating * 0.20) +
         (complianceRating * 0.10);
@@ -143,17 +144,17 @@ class SupplierEvaluationsService {
     final res = await _functions
         .httpsCallable('createSupplierEvaluation')
         .call<Map<String, dynamic>>({
-      'companyId': companyId,
-      'supplierId': supplierId.trim(),
-      'supplierCode': supplierCode.trim(),
-      'supplierName': supplierName.trim(),
-      'periodKey': periodKey.trim(),
-      'qualityRating': qualityRating,
-      'deliveryRating': deliveryRating,
-      'responseRating': responseRating,
-      'complianceRating': complianceRating,
-      if ((notes ?? '').trim().isNotEmpty) 'notes': notes!.trim(),
-    });
+          'companyId': companyId,
+          'supplierId': supplierId.trim(),
+          'supplierCode': supplierCode.trim(),
+          'supplierName': supplierName.trim(),
+          'periodKey': periodKey.trim(),
+          'qualityRating': qualityRating,
+          'deliveryRating': deliveryRating,
+          'responseRating': responseRating,
+          'complianceRating': complianceRating,
+          if ((notes ?? '').trim().isNotEmpty) 'notes': notes!.trim(),
+        });
     final data = res.data;
     if (data['success'] != true) {
       throw Exception('Evaluacija nije uspjela.');
@@ -185,4 +186,3 @@ DateTime? _evalToDate(dynamic v) {
   if (v is DateTime) return v;
   return DateTime.tryParse(_evalS(v));
 }
-

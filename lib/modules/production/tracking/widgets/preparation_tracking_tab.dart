@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
+import '../../../../core/theme/operonix_production_brand.dart';
 import '../../production_orders/printing/classification_label_print_qr.dart';
 import '../../products/services/product_lookup_service.dart';
 import '../../qr/production_qr_resolver.dart';
@@ -26,6 +27,7 @@ import 'tracking_quantity_editor_sheet.dart';
 /// kodovi se ne mijenjaju (vidi `QUALITY_ARCHITECTURE.md`).
 class PreparationTrackingTab extends StatefulWidget {
   final Map<String, dynamic> companyData;
+
   /// [ProductionOperatorTrackingEntry.phasePreparation] / `first_control` / `final_control`.
   final String phase;
 
@@ -285,14 +287,16 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
     final name = _nameCtrl.text.trim();
     if (code.isEmpty || name.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_labelPrintNeedCodeNameMessage())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_labelPrintNeedCodeNameMessage())));
       return;
     }
     final rawPn = _pnCtrl.text.trim();
     final pn = rawPn.isEmpty ? 'RUČNO-${_workDateKey(_workDay)}' : rawPn;
-    final op = _preparedBySnapshot().trim().isEmpty ? '—' : _preparedBySnapshot().trim();
+    final op = _preparedBySnapshot().trim().isEmpty
+        ? '—'
+        : _preparedBySnapshot().trim();
     final json = buildClassificationLabelPrintQrJson(
       productionOrderCode: pn,
       productCode: code,
@@ -310,9 +314,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ispis etikete: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Ispis etikete: $e')));
     }
   }
 
@@ -377,15 +381,18 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
   }
 
   /// R.br. 1 = najnoviji unos (isti redoslijed kao stream: `createdAt` desc).
-  Map<String, int> _sequenceByEntryId(List<ProductionOperatorTrackingEntry> rows) {
-    final sorted = [...rows]..sort((a, b) {
-      final ta = a.createdAt;
-      final tb = b.createdAt;
-      if (ta == null && tb == null) return 0;
-      if (ta == null) return 1;
-      if (tb == null) return -1;
-      return tb.compareTo(ta);
-    });
+  Map<String, int> _sequenceByEntryId(
+    List<ProductionOperatorTrackingEntry> rows,
+  ) {
+    final sorted = [...rows]
+      ..sort((a, b) {
+        final ta = a.createdAt;
+        final tb = b.createdAt;
+        if (ta == null && tb == null) return 0;
+        if (ta == null) return 1;
+        if (tb == null) return -1;
+        return tb.compareTo(ta);
+      });
     final map = <String, int>{};
     for (var i = 0; i < sorted.length; i++) {
       map[sorted[i].id] = i + 1;
@@ -432,7 +439,10 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
 
   void _scheduleCatalogSearch() {
     _catalogDebounce?.cancel();
-    _catalogDebounce = Timer(const Duration(milliseconds: 280), _runCatalogSearch);
+    _catalogDebounce = Timer(
+      const Duration(milliseconds: 280),
+      _runCatalogSearch,
+    );
   }
 
   Future<void> _runCatalogSearch() async {
@@ -571,7 +581,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
       if (!mounted) return;
       if (hit == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nema aktivnog proizvoda s tom šifrom.')),
+          const SnackBar(
+            content: Text('Nema aktivnog proizvoda s tom šifrom.'),
+          ),
         );
         return;
       }
@@ -643,12 +655,16 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
         if (pcode.isEmpty && piece.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Etiketa nema šifru ni naziv komada (pcode / piece).'),
+              content: Text(
+                'Etiketa nema šifru ni naziv komada (pcode / piece).',
+              ),
             ),
           );
           return;
         }
-        final cust = (m['customer'] ?? m['customerName'] ?? '').toString().trim();
+        final cust = (m['customer'] ?? m['customerName'] ?? '')
+            .toString()
+            .trim();
         _muteCatalogFieldListeners = true;
         try {
           setState(() {
@@ -667,16 +683,20 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
           await _fillFromCatalog();
         }
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_scanLabelLoadedSnack())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_scanLabelLoadedSnack())));
         break;
 
       case ProductionQrIntent.productionOrderReferenceV1:
         final id = resolution.productionOrderId?.trim();
         if (id == null || id.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('QR naloga nema ID — koristi etiketu sirovog komada (JSON).')),
+            const SnackBar(
+              content: Text(
+                'QR naloga nema ID — koristi etiketu sirovog komada (JSON).',
+              ),
+            ),
           );
           return;
         }
@@ -685,9 +705,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
           _sourceQrPayload = resolution.rawPayload;
         });
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_scanOrderQrSnack())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_scanOrderQrSnack())));
         break;
 
       case ProductionQrIntent.nepoznat:
@@ -767,7 +787,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
   Future<void> _submit(List<ScrapTileDef> scrapDefs) async {
     if (_companyId.isEmpty || _plantKey.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nedostaje companyId ili plantKey u sesiji.')),
+        const SnackBar(
+          content: Text('Nedostaje companyId ili plantKey u sesiji.'),
+        ),
       );
       return;
     }
@@ -783,9 +805,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
       return;
     }
     if (_goodQty + scrapSum <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_submitNeedPositiveQtyMessage())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_submitNeedPositiveQtyMessage())));
       return;
     }
 
@@ -804,12 +826,18 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
         productId: _linkedProductId,
         productionOrderId: rawPn.isEmpty ? null : rawPn,
         rawMaterialOrderCode: rawPn.isEmpty ? null : rawPn,
-        lineOrBatchRef: _batchCtrl.text.trim().isEmpty ? null : _batchCtrl.text.trim(),
-        customerName: _customerCtrl.text.trim().isEmpty ? null : _customerCtrl.text.trim(),
+        lineOrBatchRef: _batchCtrl.text.trim().isEmpty
+            ? null
+            : _batchCtrl.text.trim(),
+        customerName: _customerCtrl.text.trim().isEmpty
+            ? null
+            : _customerCtrl.text.trim(),
         rawWorkOperatorName: _rawOperatorCtrl.text.trim().isEmpty
             ? null
             : _rawOperatorCtrl.text.trim(),
-        preparedByDisplayName: _preparedBySnapshot().isEmpty ? null : _preparedBySnapshot(),
+        preparedByDisplayName: _preparedBySnapshot().isEmpty
+            ? null
+            : _preparedBySnapshot(),
         notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
         scrapBreakdown: scrapLines,
         sourceQrPayload: _sourceQrPayload,
@@ -834,9 +862,7 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -862,7 +888,10 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
       enabledBorder: none,
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide(color: cs.primary.withValues(alpha: 0.45), width: 1),
+        borderSide: BorderSide(
+          color: kOperonixProductionBrandGreen.withValues(alpha: 0.55),
+          width: 1,
+        ),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
     );
@@ -872,7 +901,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
     final cs = Theme.of(context).colorScheme;
     final soft = OutlineInputBorder(
       borderRadius: BorderRadius.circular(8),
-      borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.65)),
+      borderSide: BorderSide(
+        color: kOperonixProductionBrandGreen.withValues(alpha: 0.45),
+      ),
     );
     return InputDecoration(
       isDense: true,
@@ -881,7 +912,10 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
       border: soft,
       enabledBorder: soft,
       focusedBorder: soft.copyWith(
-        borderSide: BorderSide(color: cs.primary.withValues(alpha: 0.5), width: 1),
+        borderSide: const BorderSide(
+          color: kOperonixProductionBrandGreen,
+          width: 1.5,
+        ),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
     );
@@ -893,11 +927,15 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
     required Widget child,
     bool showRightDivider = true,
   }) {
-    final line = Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.55);
+    final line = Theme.of(
+      context,
+    ).colorScheme.outlineVariant.withValues(alpha: 0.55);
     return Container(
       width: width,
       decoration: BoxDecoration(
-        border: showRightDivider ? Border(right: BorderSide(color: line, width: 1)) : null,
+        border: showRightDivider
+            ? Border(right: BorderSide(color: line, width: 1))
+            : null,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       alignment: Alignment.centerLeft,
@@ -913,7 +951,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isLight = theme.brightness == Brightness.light;
-    final headerStrip = isLight ? const Color(0xFFE0E4E7) : cs.surfaceContainerHigh;
+    final headerStrip = isLight
+        ? const Color(0xFFE0E4E7)
+        : cs.surfaceContainerHigh;
     final frameLine = cs.outlineVariant.withValues(alpha: 0.72);
     final rowRule = cs.outlineVariant.withValues(alpha: 0.5);
     final scrapSum = _scrapSum();
@@ -925,7 +965,11 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
       fontWeight: FontWeight.w700,
       height: 1.15,
     );
-    final cellStyle = TextStyle(fontSize: 11, height: 1.25, color: cs.onSurface);
+    final cellStyle = TextStyle(
+      fontSize: 11,
+      height: 1.25,
+      color: cs.onSurface,
+    );
 
     final colW = <double>[
       _pwRb,
@@ -959,7 +1003,11 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
       );
     }
 
-    Widget oneLine(String text, {int maxLines = 2, TextAlign align = TextAlign.start}) {
+    Widget oneLine(
+      String text, {
+      int maxLines = 2,
+      TextAlign align = TextAlign.start,
+    }) {
       return Text(
         text,
         maxLines: maxLines,
@@ -987,9 +1035,21 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            hLabel('R.br.', tooltip: 'Redni broj unosa (1 = zadnji spremljen u danu)', w: _pwRb),
-            hLabel('Datum i vrijeme', tooltip: 'Automatski se postavlja pri spremanju', w: _pwDt),
-            hLabel('Palica / šarž / lin.', tooltip: 'Broj palice, šarže ili linije', w: _pwBl),
+            hLabel(
+              'R.br.',
+              tooltip: 'Redni broj unosa (1 = zadnji spremljen u danu)',
+              w: _pwRb,
+            ),
+            hLabel(
+              'Datum i vrijeme',
+              tooltip: 'Automatski se postavlja pri spremanju',
+              w: _pwDt,
+            ),
+            hLabel(
+              'Palica / šarž / lin.',
+              tooltip: 'Broj palice, šarže ili linije',
+              w: _pwBl,
+            ),
             hLabel('Šifra kom.', tooltip: 'Šifra komada', w: _pwCd),
             hLabel('Naziv kom.', tooltip: 'Naziv komada', w: _pwNm),
             hLabel('Kupac', tooltip: 'Kupac', w: _pwCu),
@@ -998,10 +1058,27 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
               tooltip: _tableGoodColumnTooltip(),
               w: _pwGd,
             ),
-            hLabel('Škart ($_unit)', tooltip: 'Ukupna količina škarta', w: _pwSc),
-            hLabel('Nalog sirov.', tooltip: 'Broj naloga izrade sirovih komada', w: _pwPo),
-            hLabel('Op. izrada', tooltip: 'Ime operatera na izradi sirovih komada', w: _pwRo),
-            hLabel('Pripremio', tooltip: 'Ime i prezime proizvodnog operatera koji je pripremio komade', w: _pwBy),
+            hLabel(
+              'Škart ($_unit)',
+              tooltip: 'Ukupna količina škarta',
+              w: _pwSc,
+            ),
+            hLabel(
+              'Nalog sirov.',
+              tooltip: 'Broj naloga izrade sirovih komada',
+              w: _pwPo,
+            ),
+            hLabel(
+              'Op. izrada',
+              tooltip: 'Ime operatera na izradi sirovih komada',
+              w: _pwRo,
+            ),
+            hLabel(
+              'Pripremio',
+              tooltip:
+                  'Ime i prezime proizvodnog operatera koji je pripremio komade',
+              w: _pwBy,
+            ),
           ],
         ),
       );
@@ -1102,10 +1179,7 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
       ),
     ];
 
-    final bodyChunks = <Widget>[
-      headerBand(),
-      dataBand(draftCells),
-    ];
+    final bodyChunks = <Widget>[headerBand(), dataBand(draftCells)];
 
     for (final e in savedRows) {
       final n = seq[e.id] ?? 0;
@@ -1114,13 +1188,23 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
         dataBand([
           oneLine('$n', maxLines: 1),
           oneLine(_formatPrepDateTime(e.createdAt), maxLines: 1),
-          oneLine((e.lineOrBatchRef ?? '').isEmpty ? '—' : e.lineOrBatchRef!, maxLines: 2),
+          oneLine(
+            (e.lineOrBatchRef ?? '').isEmpty ? '—' : e.lineOrBatchRef!,
+            maxLines: 2,
+          ),
           oneLine(e.itemCode, maxLines: 1),
           oneLine(e.itemName, maxLines: 2),
-          oneLine((e.customerName ?? '').isEmpty ? '—' : e.customerName!, maxLines: 2),
+          oneLine(
+            (e.customerName ?? '').isEmpty ? '—' : e.customerName!,
+            maxLines: 2,
+          ),
           Align(
             alignment: Alignment.centerRight,
-            child: oneLine(_fmtQty(e.effectiveGoodQty), maxLines: 1, align: TextAlign.right),
+            child: oneLine(
+              _fmtQty(e.effectiveGoodQty),
+              maxLines: 1,
+              align: TextAlign.right,
+            ),
           ),
           Tooltip(
             message: e.scrapBreakdownSummaryForDisplay(defectNames).isEmpty
@@ -1140,7 +1224,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
             maxLines: 2,
           ),
           oneLine(
-            (e.rawWorkOperatorName ?? '').isEmpty ? '—' : e.rawWorkOperatorName!,
+            (e.rawWorkOperatorName ?? '').isEmpty
+                ? '—'
+                : e.rawWorkOperatorName!,
             maxLines: 2,
           ),
           oneLine(e.displayPreparedBy, maxLines: 2),
@@ -1202,10 +1288,7 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
               width: _prepTableScrollWidth,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  ...bodyChunks,
-                  _buildCatalogMatchesStrip(theme, cs),
-                ],
+                children: [...bodyChunks, _buildCatalogMatchesStrip(theme, cs)],
               ),
             ),
           ),
@@ -1290,7 +1373,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
             children: [
               Row(
                 children: [
-                  Expanded(child: Text('Količine', style: theme.textTheme.titleMedium)),
+                  Expanded(
+                    child: Text('Količine', style: theme.textTheme.titleMedium),
+                  ),
                   if (_canEditCompanyDefectNames())
                     TextButton.icon(
                       onPressed: _openDefectLabelsEditor,
@@ -1365,7 +1450,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
                       ),
                     );
                   }
-                  final rows = snap.hasData ? snap.data! : const <ProductionOperatorTrackingEntry>[];
+                  final rows = snap.hasData
+                      ? snap.data!
+                      : const <ProductionOperatorTrackingEntry>[];
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -1408,9 +1495,8 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab> {
               TextField(
                 controller: _notesCtrl,
                 maxLines: 2,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'Napomena (opcionalno)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ],
@@ -1435,7 +1521,8 @@ class _DefectDisplayNamesEditorDialog extends StatefulWidget {
       _DefectDisplayNamesEditorDialogState();
 }
 
-class _DefectDisplayNamesEditorDialogState extends State<_DefectDisplayNamesEditorDialog> {
+class _DefectDisplayNamesEditorDialogState
+    extends State<_DefectDisplayNamesEditorDialog> {
   final _svc = CompanyDefectDisplayNamesService();
   late final Map<String, TextEditingController> _c = {
     for (final code in PlatformDefectCodes.allCodes)
@@ -1482,14 +1569,12 @@ class _DefectDisplayNamesEditorDialogState extends State<_DefectDisplayNamesEdit
       Navigator.of(context).pop(_effectiveFromControllers());
     } on FirebaseException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? e.code)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message ?? e.code)));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -1521,10 +1606,7 @@ class _DefectDisplayNamesEditorDialogState extends State<_DefectDisplayNamesEdit
                 TextField(
                   controller: _c[code],
                   enabled: !_busy,
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: const InputDecoration(isDense: true),
                 ),
                 const SizedBox(height: 8),
               ],
@@ -1600,7 +1682,8 @@ class _QuantityTile extends StatelessWidget {
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     height: 1.1,
-                    fontSize: (theme.textTheme.titleSmall?.fontSize ?? 14) * 0.92,
+                    fontSize:
+                        (theme.textTheme.titleSmall?.fontSize ?? 14) * 0.92,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -1608,7 +1691,8 @@ class _QuantityTile extends StatelessWidget {
                   subtitle,
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
-                    fontSize: (theme.textTheme.labelSmall?.fontSize ?? 11) * 0.95,
+                    fontSize:
+                        (theme.textTheme.labelSmall?.fontSize ?? 11) * 0.95,
                   ),
                 ),
                 const Spacer(),
@@ -1619,7 +1703,9 @@ class _QuantityTile extends StatelessWidget {
                         has ? _fmt(value) : 'Odaberi',
                         style: theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
-                          fontSize: (theme.textTheme.titleLarge?.fontSize ?? 22) * 0.88,
+                          fontSize:
+                              (theme.textTheme.titleLarge?.fontSize ?? 22) *
+                              0.88,
                           color: has ? accent : theme.hintColor,
                         ),
                       ),

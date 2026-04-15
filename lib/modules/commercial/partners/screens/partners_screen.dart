@@ -47,7 +47,9 @@ class _PartnersScreenState extends State<PartnersScreen>
       _role == 'admin' || _role == 'production_manager' || _role == 'sales';
 
   bool get _canManageSuppliers =>
-      _role == 'admin' || _role == 'production_manager' || _role == 'purchasing';
+      _role == 'admin' ||
+      _role == 'production_manager' ||
+      _role == 'purchasing';
 
   /// Usklađeno s `assertCallableActor` u `refreshSupplierOperationalSignals`.
   bool get _canRefreshSupplierOperational =>
@@ -130,7 +132,8 @@ class _PartnersScreenState extends State<PartnersScreen>
     final ok = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => PartnerCustomerEditScreen(companyData: widget.companyData),
+        builder: (_) =>
+            PartnerCustomerEditScreen(companyData: widget.companyData),
       ),
     );
     if (ok == true && mounted) await _load();
@@ -140,7 +143,8 @@ class _PartnersScreenState extends State<PartnersScreen>
     final ok = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => PartnerSupplierEditScreen(companyData: widget.companyData),
+        builder: (_) =>
+            PartnerSupplierEditScreen(companyData: widget.companyData),
       ),
     );
     if (ok == true && mounted) await _load();
@@ -176,8 +180,10 @@ class _PartnersScreenState extends State<PartnersScreen>
     final ok = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            SupplierEvaluationsScreen(companyData: widget.companyData, supplier: s),
+        builder: (_) => SupplierEvaluationsScreen(
+          companyData: widget.companyData,
+          supplier: s,
+        ),
       ),
     );
     if (ok == true && mounted) await _load();
@@ -362,8 +368,12 @@ class _PartnersScreenState extends State<PartnersScreen>
   }
 
   Widget _buildKpis() {
-    final customersActive = _customers.where((e) => e.status == 'active').length;
-    final suppliersActive = _suppliers.where((e) => e.status == 'active').length;
+    final customersActive = _customers
+        .where((e) => e.status == 'active')
+        .length;
+    final suppliersActive = _suppliers
+        .where((e) => e.status == 'active')
+        .length;
     final strategic = _suppliers.where((e) => e.isStrategic).length;
     return StandardKpiGrid(
       metrics: [
@@ -400,8 +410,12 @@ class _PartnersScreenState extends State<PartnersScreen>
     final canCreate = _tabController.index == 0
         ? _canManageCustomers
         : _canManageSuppliers;
-    final createLabel = _tabController.index == 0 ? 'Novi kupac' : 'Novi dobavljač';
-    final createAction = _tabController.index == 0 ? _openCreateCustomer : _openCreateSupplier;
+    final createLabel = _tabController.index == 0
+        ? 'Novi kupac'
+        : 'Novi dobavljač';
+    final createAction = _tabController.index == 0
+        ? _openCreateCustomer
+        : _openCreateSupplier;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
@@ -509,10 +523,7 @@ class _PartnersScreenState extends State<PartnersScreen>
                       final c = _customers[i];
                       return Card(
                         child: ListTile(
-                          title: Text(
-                            '${c.code} — ${c.name}',
-                            maxLines: 3,
-                          ),
+                          title: Text('${c.code} — ${c.name}', maxLines: 3),
                           subtitle: Text(
                             'Pravni naziv: ${c.legalName}\n'
                             'Status: ${c.status} • Tip: ${c.customerType}',
@@ -540,7 +551,9 @@ class _PartnersScreenState extends State<PartnersScreen>
                               ),
                             ],
                           ),
-                          onTap: _canManageCustomers ? () => _openEditCustomer(c) : null,
+                          onTap: _canManageCustomers
+                              ? () => _openEditCustomer(c)
+                              : null,
                         ),
                       );
                     },
@@ -557,13 +570,10 @@ class _PartnersScreenState extends State<PartnersScreen>
                       final autoLine = oa == null
                           ? 'Auto (narudžbe): —'
                           : 'Auto (narudžbe): ${oa.score.toStringAsFixed(0)} '
-                              '(${oa.linesAnalyzed} stavki, v${oa.algorithmVersion})';
+                                '(${oa.linesAnalyzed} stavki, v${oa.algorithmVersion})';
                       return Card(
                         child: ListTile(
-                          title: Text(
-                            '${s.code} — ${s.name}',
-                            maxLines: 3,
-                          ),
+                          title: Text('${s.code} — ${s.name}', maxLines: 3),
                           subtitle: Text(
                             'Pravni naziv: ${s.legalName}\n'
                             'Status: ${s.status} • Tip: ${s.supplierType}\n'
@@ -615,11 +625,15 @@ class _PartnersScreenState extends State<PartnersScreen>
                                 PopupMenuItem(
                                   value: 'operational',
                                   enabled: !_opRefreshing,
-                                  child: const Text('Osvježi auto-skor (narudžbe)'),
+                                  child: const Text(
+                                    'Osvježi auto-skor (narudžbe)',
+                                  ),
                                 ),
                             ],
                           ),
-                          onTap: _canManageSuppliers ? () => _openEditSupplier(s) : null,
+                          onTap: _canManageSuppliers
+                              ? () => _openEditSupplier(s)
+                              : null,
                         ),
                       );
                     },
@@ -632,4 +646,3 @@ class _PartnersScreenState extends State<PartnersScreen>
     );
   }
 }
-

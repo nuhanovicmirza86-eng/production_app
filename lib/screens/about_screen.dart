@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:production_app/core/theme/operonix_production_brand.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AboutScreen extends StatefulWidget {
@@ -16,56 +17,32 @@ class _AboutScreenState extends State<AboutScreen> {
   String _version = '';
   String _buildNumber = '';
 
-  /// Zeleni brend obrub (usklađeno s `ColorScheme` seed u aplikaciji).
-  static const Color _brandOutline = Color(0xFF164344);
-
   static const String _authorName = 'Mirza Nuhanović';
-  static const String _contactEmail = 'info@operonix.com';
+  static const String _contactEmail = 'info@operonixindustrial.com';
   static const String _companyName = 'Operonix Industrial';
   static const String _companyWeb = 'www.operonixindustrial.com';
+  static const String _privacyPolicyUrl =
+      'https://www.operonixindustrial.com/privacy-policy?lang=bs';
 
-  /// Detaljan opis isključivo za Production app (bez CMMS / održavanja).
   static const String _appDescriptionFull =
-      'Operonix Production je operativni sloj za proizvodnju i komerciju u '
-      'industrijskom okruženju: povezuje proizvodne naloge, master podatke o '
-      'proizvodima, komercijalne narudžbe i partnere, te digitalne tokove na '
-      'podu (QR, operaterske stanice, logističke prijeme). Aplikacija radi u '
-      'kontekstu kompanije i pogona (company / plant), uz prijavu korisnika i '
-      'ovlaštenja po ulozi. '
+      'Operonix Production digitalno spaja prodaju, nabavu i proizvodnu liniju u '
+      'jedan brz i fleksibilan tok, prilagođen stvarnim industrijskim uslovima. '
+      'Osnovni cilj je da informacija i odgovornost stignu do ljudi na liniji '
+      'bez čekanja, uz jasnu kontrolu kvaliteta i rokova — prednost u odnosu na '
+      'spore ERP petlje ili papirne evidencije.'
       '\n\n'
-      'Koje funkcije aplikacija podržava u praksi:\n'
-      '• Proizvodni nalozi — pregled liste, detalji naloga, statusi i radni '
-      'tok oko izvršavanja (ovisno o konfiguraciji i pravima).\n'
-      '• Proizvodi — evidencija proizvoda, strukture / BOM gdje su definisane, '
-      'te povezani tehnički i komercijalni podaci za rad u proizvodnji.\n'
-      '• QR skeniranje — brzo otvaranje naloga ili rukovanje naljepnicama s '
-      'proizvodnog poda preko kamere (gdje je uređaj podržan), uz jasno '
-      'raspoznavanje tipa QR koda.\n'
-      '• Operativno praćenje proizvodnje — tabbed pregled faza i posebni '
-      'punozaslonski režimi stanica (npr. priprema, kontrolne faze) namijenjeni '
-      'monitorima na liniji; dio ekrana je u proširenju prema punom unosu, ali '
-      'arhitektura već podržava odvojene operaterske tokove.\n'
-      '• Komercija — narudžbe (pregled i rad s narudžbama) te partneri '
-      '(kupci / dobavljači) kao podrška prodajno-nabavnom krugu uz proizvodnju.\n'
-      '• Logistika — prijem štampanih klasifikacijskih naljepnica / isprava '
-      'kroz namjenski tok vezan za QR.\n'
-      '• Izvještaji — hub profesionalnih izvještaja (npr. otpad, dnevna '
-      'proizvodnja, IATF / CAPA) za uloge kojima je pristup dodijeljen.\n'
-      '• Održivost — modul karbonskog otiska (postavke, aktivnosti, faktori, '
-      'pregled i izvoz) kada je omogućen za kompaniju.\n'
-      '• Administracija — odobravanje novih korisnika (pending registracije) '
-      'za administratore.\n'
-      '\n'
-      'Prikaz modula i kartica na početnom ekranu ovisi o listi omogućenih '
-      'modula i pravima pristupa (uloga). Neki moduli u razvoju (npr. radni '
-      'centri, smjene, zastoji) mogu biti vidljivi kao „uskoro” ovisno o '
-      'konfiguraciji. '
+      'Sljedivost od sirovine i ulazne robe do gotovog proizvoda i otpreme: '
+      'jedinstven trag podataka koji olakšava audit, reklamacije i interne '
+      'kontrole.'
       '\n\n'
-      'Platforme: web, mobilni uređaji i desktop (Windows), uz prilagođen '
-      'izgled za širinu web sučelja. Aplikacija nije CMMS: ne obavlja '
-      'evidenciju održavanja, mjerača ni servisnih radnih naloga u smislu '
-      'Operonix Maintenance modula — fokus je na proizvodnji, komerciji i '
-      'povezanim operativnim i izvještajnim tokovima.';
+      'Izvještaji i pregledi (otpad, dnevna proizvodnja, IATF / CAPA, KPI) te '
+      'akcioni planovi za sve neusklađenosti; uz to live praćenje proizvodnog '
+      'toka radi brzog odgovora na odstupanja i zastoje.'
+      '\n\n'
+      'Rješenje je građeno IATF 16949–friendly logikom: strukturirani rizici '
+      '(uklj. PFMEA), jasne uloge i mjerljivi KPI, kako bi kvalitet i proizvodnja '
+      'dijelili istu sliku stanja. Moduli se kombinuju prema potrebama; dostupno '
+      'je za Android, iOS i Web — za timove u pogonu i u uredu.';
 
   @override
   void initState() {
@@ -90,29 +67,37 @@ class _AboutScreenState extends State<AboutScreen> {
     }
   }
 
-  Future<void> _openMail(String email) async {
-    final uri = Uri(scheme: 'mailto', path: email);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ne mogu otvoriti email klijent.')),
-      );
+  Future<void> _openMail(String email, {String? subject}) async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: email,
+      queryParameters: subject == null || subject.isEmpty
+          ? null
+          : <String, String>{'subject': subject},
+    );
+
+    if (await launchUrl(uri)) {
+      return;
     }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Ne mogu otvoriti email klijent.')),
+    );
   }
 
   Future<void> _openWeb(String web) async {
     final url = web.startsWith('http') ? web : 'https://$web';
     final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ne mogu otvoriti web stranicu.')),
-      );
+
+    if (await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      return;
     }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Ne mogu otvoriti web stranicu.')),
+    );
   }
 
   Widget _brandCard({required Widget child}) {
@@ -121,7 +106,10 @@ class _AboutScreenState extends State<AboutScreen> {
       elevation: 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: _brandOutline, width: 2),
+        side: const BorderSide(
+          color: kOperonixProductionBrandGreen,
+          width: 1.5,
+        ),
       ),
       child: child,
     );
@@ -147,7 +135,7 @@ class _AboutScreenState extends State<AboutScreen> {
                         const Icon(
                           Icons.factory_outlined,
                           size: 44,
-                          color: _brandOutline,
+                          color: kOperonixProductionBrandGreen,
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -247,16 +235,42 @@ class _AboutScreenState extends State<AboutScreen> {
                 ),
                 const SizedBox(height: 12),
                 _brandCard(
+                  child: ListTile(
+                    leading: const Icon(Icons.privacy_tip_outlined),
+                    title: const Text('Politika privatnosti'),
+                    subtitle: const Text(
+                      'Tekst politike na operonixindustrial.com (Operonix Production).',
+                    ),
+                    trailing: const Icon(Icons.open_in_new),
+                    onTap: () => _openWeb(_privacyPolicyUrl),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _brandCard(
+                  child: ListTile(
+                    leading: const Icon(Icons.delete_outline),
+                    title: const Text('Brisanje računa'),
+                    subtitle: const Text(
+                      'Zahtjev za brisanje računa i povezanih podataka šalje se emailom.',
+                    ),
+                    trailing: const Icon(Icons.open_in_new),
+                    onTap: () => _openMail(
+                      _contactEmail,
+                      subject: 'Zahtjev za brisanje računa',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _brandCard(
                   child: Column(
                     children: const [
                       ListTile(
                         leading: Icon(Icons.shield_outlined),
                         title: Text('Kontrola i sljedivost'),
                         subtitle: Text(
-                          'U proizvodnji i komerciji naglasak je na jasnim ulogama, '
-                          'dozvoljenim akcijama i sljedivosti podataka i promjena '
-                          '(IATF 16949–friendly pristup u izvještajima i procesima '
-                          'gdje su ti moduli uključeni).',
+                          'IATF 16949–friendly: uloge, evidencija promjena, CAPA i '
+                          'akcioni planovi za neusklađenosti, KPI i podrška PFMEA '
+                          'tokovima — jedna slika za kvalitet i proizvodnju.',
                         ),
                       ),
                     ],

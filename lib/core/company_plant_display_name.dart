@@ -16,12 +16,12 @@ class CompanyPlantDisplayName {
     final baseName = displayName.isNotEmpty
         ? displayName
         : defaultName.isNotEmpty
-            ? defaultName
-            : primaryName.isNotEmpty
-                ? primaryName
-                : plantKey.isNotEmpty
-                    ? plantKey
-                    : fallbackKey;
+        ? defaultName
+        : primaryName.isNotEmpty
+        ? primaryName
+        : plantKey.isNotEmpty
+        ? plantKey
+        : fallbackKey;
 
     if (plantCode.isNotEmpty && baseName.isNotEmpty) {
       return '$baseName ($plantCode)';
@@ -41,8 +41,10 @@ class CompanyPlantDisplayName {
     if (pKey.isEmpty) return '-';
 
     try {
-      final byDocId =
-          await fs.collection('company_plants').doc('${cId}_$pKey').get();
+      final byDocId = await fs
+          .collection('company_plants')
+          .doc('${cId}_$pKey')
+          .get();
       if (byDocId.exists) {
         return _labelFromPlantDoc(byDocId.data() ?? {}, pKey);
       }

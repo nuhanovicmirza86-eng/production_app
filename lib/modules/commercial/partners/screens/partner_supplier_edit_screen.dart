@@ -161,8 +161,7 @@ class _PartnerSupplierEditScreenState extends State<PartnerSupplierEditScreen> {
     }
   }
 
-  InputDecoration _dec(String label) =>
-      InputDecoration(labelText: label, border: const OutlineInputBorder());
+  InputDecoration _dec(String label) => InputDecoration(labelText: label);
 
   int? _leadTimeDaysOrNull() {
     final t = _leadTimeDaysController.text.trim();
@@ -206,12 +205,18 @@ class _PartnerSupplierEditScreenState extends State<PartnerSupplierEditScreen> {
         country: _countryController.text.trim().isEmpty
             ? null
             : _countryController.text.trim(),
-        city: _cityController.text.trim().isEmpty ? null : _cityController.text.trim(),
+        city: _cityController.text.trim().isEmpty
+            ? null
+            : _cityController.text.trim(),
         address: _addressController.text.trim().isEmpty
             ? null
             : _addressController.text.trim(),
-        taxId: _taxIdController.text.trim().isEmpty ? null : _taxIdController.text.trim(),
-        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        taxId: _taxIdController.text.trim().isEmpty
+            ? null
+            : _taxIdController.text.trim(),
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
         leadTimeDays: lead,
         supplierCategory: _supplierCategory,
         isStrategic: _isStrategic,
@@ -233,7 +238,10 @@ class _PartnerSupplierEditScreenState extends State<PartnerSupplierEditScreen> {
               : _changeReasonController.text.trim(),
         );
       } else {
-        await _service.createSupplier(companyData: widget.companyData, draft: draft);
+        await _service.createSupplier(
+          companyData: widget.companyData,
+          draft: draft,
+        );
       }
 
       if (!mounted) return;
@@ -311,11 +319,21 @@ class _PartnerSupplierEditScreenState extends State<PartnerSupplierEditScreen> {
                         initialValue: _status,
                         decoration: _dec('Status'),
                         items: const [
-                          DropdownMenuItem(value: 'active', child: Text('active')),
-                          DropdownMenuItem(value: 'inactive', child: Text('inactive')),
-                          DropdownMenuItem(value: 'blocked', child: Text('blocked')),
+                          DropdownMenuItem(
+                            value: 'active',
+                            child: Text('active'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'inactive',
+                            child: Text('inactive'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'blocked',
+                            child: Text('blocked'),
+                          ),
                         ],
-                        onChanged: (v) => setState(() => _status = v ?? 'active'),
+                        onChanged: (v) =>
+                            setState(() => _status = v ?? 'active'),
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
@@ -323,13 +341,29 @@ class _PartnerSupplierEditScreenState extends State<PartnerSupplierEditScreen> {
                         initialValue: _supplierType,
                         decoration: _dec('Tip dobavljača'),
                         items: const [
-                          DropdownMenuItem(value: 'material', child: Text('material')),
-                          DropdownMenuItem(value: 'packaging', child: Text('packaging')),
-                          DropdownMenuItem(value: 'service', child: Text('service')),
-                          DropdownMenuItem(value: 'tooling', child: Text('tooling')),
-                          DropdownMenuItem(value: 'transport', child: Text('transport')),
+                          DropdownMenuItem(
+                            value: 'material',
+                            child: Text('material'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'packaging',
+                            child: Text('packaging'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'service',
+                            child: Text('service'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'tooling',
+                            child: Text('tooling'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'transport',
+                            child: Text('transport'),
+                          ),
                         ],
-                        onChanged: (v) => setState(() => _supplierType = v ?? 'material'),
+                        onChanged: (v) =>
+                            setState(() => _supplierType = v ?? 'material'),
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
@@ -337,10 +371,22 @@ class _PartnerSupplierEditScreenState extends State<PartnerSupplierEditScreen> {
                         initialValue: _supplierCategory,
                         decoration: _dec('Supplier category'),
                         items: const [
-                          DropdownMenuItem(value: 'strategic', child: Text('strategic')),
-                          DropdownMenuItem(value: 'approved', child: Text('approved')),
-                          DropdownMenuItem(value: 'conditional', child: Text('conditional')),
-                          DropdownMenuItem(value: 'blocked', child: Text('blocked')),
+                          DropdownMenuItem(
+                            value: 'strategic',
+                            child: Text('strategic'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'approved',
+                            child: Text('approved'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'conditional',
+                            child: Text('conditional'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'blocked',
+                            child: Text('blocked'),
+                          ),
                         ],
                         onChanged: (v) =>
                             setState(() => _supplierCategory = v ?? 'approved'),
@@ -351,10 +397,22 @@ class _PartnerSupplierEditScreenState extends State<PartnerSupplierEditScreen> {
                         initialValue: _approvalStatus,
                         decoration: _dec('Approval status'),
                         items: const [
-                          DropdownMenuItem(value: 'pending', child: Text('pending')),
-                          DropdownMenuItem(value: 'approved', child: Text('approved')),
-                          DropdownMenuItem(value: 'conditional', child: Text('conditional')),
-                          DropdownMenuItem(value: 'disqualified', child: Text('disqualified')),
+                          DropdownMenuItem(
+                            value: 'pending',
+                            child: Text('pending'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'approved',
+                            child: Text('approved'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'conditional',
+                            child: Text('conditional'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'disqualified',
+                            child: Text('disqualified'),
+                          ),
                         ],
                         onChanged: (v) =>
                             setState(() => _approvalStatus = v ?? 'pending'),
@@ -366,10 +424,14 @@ class _PartnerSupplierEditScreenState extends State<PartnerSupplierEditScreen> {
                         decoration: _dec('Risk level'),
                         items: const [
                           DropdownMenuItem(value: 'low', child: Text('low')),
-                          DropdownMenuItem(value: 'medium', child: Text('medium')),
+                          DropdownMenuItem(
+                            value: 'medium',
+                            child: Text('medium'),
+                          ),
                           DropdownMenuItem(value: 'high', child: Text('high')),
                         ],
-                        onChanged: (v) => setState(() => _riskLevel = v ?? 'medium'),
+                        onChanged: (v) =>
+                            setState(() => _riskLevel = v ?? 'medium'),
                       ),
                       const SizedBox(height: 8),
                       SwitchListTile(
@@ -440,7 +502,9 @@ class _PartnerSupplierEditScreenState extends State<PartnerSupplierEditScreen> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _changeReasonController,
-                        decoration: _dec('Razlog promjene (obavezno za risk/approval/strategic)'),
+                        decoration: _dec(
+                          'Razlog promjene (obavezno za risk/approval/strategic)',
+                        ),
                         maxLines: 2,
                       ),
                       const SizedBox(height: 16),
@@ -457,4 +521,3 @@ class _PartnerSupplierEditScreenState extends State<PartnerSupplierEditScreen> {
     );
   }
 }
-

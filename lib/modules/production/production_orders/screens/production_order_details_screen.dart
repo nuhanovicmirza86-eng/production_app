@@ -343,9 +343,9 @@ class _ProductionOrderDetailsScreenState
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     } finally {
       if (mounted) setState(() => _isLifecycleBusy = false);
     }
@@ -383,14 +383,14 @@ class _ProductionOrderDetailsScreenState
       if (!mounted) return;
       await _loadOrder();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nalog je zatvoren.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Nalog je zatvoren.')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     } finally {
       if (mounted) setState(() => _isLifecycleBusy = false);
     }
@@ -410,9 +410,7 @@ class _ProductionOrderDetailsScreenState
             child: const Text('Ne'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade700,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Otkaži nalog'),
           ),
@@ -431,14 +429,14 @@ class _ProductionOrderDetailsScreenState
       if (!mounted) return;
       await _loadOrder();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nalog je otkazan.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Nalog je otkazan.')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     } finally {
       if (mounted) setState(() => _isLifecycleBusy = false);
     }
@@ -493,9 +491,9 @@ class _ProductionOrderDetailsScreenState
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     }
   }
 
@@ -547,9 +545,9 @@ class _ProductionOrderDetailsScreenState
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     }
   }
 
@@ -800,15 +798,14 @@ class _ProductionOrderDetailsScreenState
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (_hasMyActiveExecutionForStep &&
-                        resumeId != null) ...[
+                    if (_hasMyActiveExecutionForStep && resumeId != null) ...[
                       ElevatedButton.icon(
                         onPressed: _isLoadingExecutions
                             ? null
                             : () => _openExecutionScreen(
-                                  order,
-                                  resumeExecutionId: resumeId,
-                                ),
+                                order,
+                                resumeExecutionId: resumeId,
+                              ),
                         icon: const Icon(Icons.play_circle_outline),
                         label: const Text('Nastavi rad'),
                       ),
@@ -888,8 +885,10 @@ class _ProductionOrderDetailsScreenState
                         children: [
                           Text(
                             order.productName,
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(
+                            style:
+                                Theme.of(
+                                  context,
+                                ).textTheme.titleLarge?.copyWith(
                                   fontWeight: FontWeight.w800,
                                   height: 1.2,
                                 ) ??
@@ -1132,15 +1131,20 @@ class _ProductionOrderDetailsScreenState
                       label: const Text('Zatvori nalog'),
                     ),
                   ],
-                  if (!['completed', 'closed', 'cancelled'].contains(
-                    order.status,
-                  )) ...[
+                  if (![
+                    'completed',
+                    'closed',
+                    'cancelled',
+                  ].contains(order.status)) ...[
                     const SizedBox(height: 8),
                     TextButton.icon(
                       onPressed: _isLifecycleBusy
                           ? null
                           : () => _confirmCancelOrder(order),
-                      icon: Icon(Icons.cancel_outlined, color: Colors.red.shade700),
+                      icon: Icon(
+                        Icons.cancel_outlined,
+                        color: Colors.red.shade700,
+                      ),
                       label: Text(
                         'Otkaži nalog',
                         style: TextStyle(color: Colors.red.shade700),
@@ -1274,8 +1278,7 @@ class _PackagingQtyForLabelDialogState
   @override
   Widget build(BuildContext context) {
     final hasSuggestion =
-        widget.suggestedFromProduct != null &&
-        widget.suggestedFromProduct! > 0;
+        widget.suggestedFromProduct != null && widget.suggestedFromProduct! > 0;
 
     return AlertDialog(
       title: const Text('Količina za etiketu'),
@@ -1287,9 +1290,9 @@ class _PackagingQtyForLabelDialogState
             Text(
               hasSuggestion
                   ? 'Proizvod ima definisanu količinu pakovanja. Potvrdite je ili '
-                      'izmijenite (npr. manje komada u ovom pakovanju).'
+                        'izmijenite (npr. manje komada u ovom pakovanju).'
                   : 'Količina pakovanja nije postavljena na proizvodu. Unesite '
-                      'količinu koja vrijedi za ovu etiketu.',
+                        'količinu koja vrijedi za ovu etiketu.',
               style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
             ),
             const SizedBox(height: 16),
@@ -1301,9 +1304,10 @@ class _PackagingQtyForLabelDialogState
               autofocus: !hasSuggestion,
               decoration: InputDecoration(
                 labelText: 'Količina u pakovanju',
-                suffixText: widget.order.unit.isEmpty ? null : widget.order.unit,
+                suffixText: widget.order.unit.isEmpty
+                    ? null
+                    : widget.order.unit,
                 errorText: _error,
-                border: const OutlineInputBorder(),
               ),
               onChanged: (_) => setState(() => _error = null),
               onSubmitted: (_) => _submit(),
@@ -1316,10 +1320,7 @@ class _PackagingQtyForLabelDialogState
           onPressed: () => Navigator.pop(context),
           child: const Text('Otkaži'),
         ),
-        FilledButton(
-          onPressed: _submit,
-          child: const Text('Potvrdi i ispiši'),
-        ),
+        FilledButton(onPressed: _submit, child: const Text('Potvrdi i ispiši')),
       ],
     );
   }

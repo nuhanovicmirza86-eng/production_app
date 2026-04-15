@@ -973,7 +973,12 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    td(o.orderNumber, _colOrderNumber, maxLines: 1, softWrap: false),
+                    td(
+                      o.orderNumber,
+                      _colOrderNumber,
+                      maxLines: 1,
+                      softWrap: false,
+                    ),
                     td(_formatDate(o.orderDate ?? o.createdAt), 82),
                     td(ref ?? '—', 84),
                     td(rok, 88),
@@ -1126,9 +1131,9 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
         Text(
           'Kartični prikaz — sort po najranijem roku. '
           'Zelena pozadina stavke: dovoljno zalihe za ostatak.',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: cs.onSurfaceVariant,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
         ),
         const SizedBox(height: 10),
         ...sorted.map(_compactOrderCard),
@@ -1218,14 +1223,20 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                       const SizedBox(height: 4),
                       Text(
                         'Ref: $ref',
-                        style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
                     ],
                     const SizedBox(height: 4),
                     Text(
                       'Rok: ${_formatDate(o.requestedDeliveryDate ?? o.confirmedDeliveryDate)}'
                       ' • Nar.: ${_formatDate(o.orderDate ?? o.createdAt)}',
-                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                     if (o.items.isNotEmpty) ...[
                       const SizedBox(height: 12),

@@ -15,6 +15,7 @@ import '../widgets/preparation_tracking_tab.dart';
 /// Otvara se s [MaterialPageRoute] i `fullscreenDialog: true` radi što većeg prostora u web/mobilnom okruženju.
 class ProductionOperatorTrackingStationScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
+
   /// [ProductionOperatorTrackingEntry.phasePreparation] / `first_control` / `final_control`.
   final String phase;
 
@@ -53,9 +54,10 @@ class _ProductionOperatorTrackingStationScreenState
           defaultTargetPlatform == TargetPlatform.macOS);
 
   String get _companyLine {
-    final n = (widget.companyData['name'] ?? widget.companyData['companyName'] ?? '')
-        .toString()
-        .trim();
+    final n =
+        (widget.companyData['name'] ?? widget.companyData['companyName'] ?? '')
+            .toString()
+            .trim();
     final cid = (widget.companyData['companyId'] ?? '').toString().trim();
     if (n.isNotEmpty) return n;
     return cid.isNotEmpty ? cid : '—';
@@ -63,11 +65,12 @@ class _ProductionOperatorTrackingStationScreenState
 
   String get _plantLine {
     final pk = (widget.companyData['plantKey'] ?? '').toString().trim();
-    final name = (widget.companyData['plantDisplayName'] ??
-            widget.companyData['plantName'] ??
-            '')
-        .toString()
-        .trim();
+    final name =
+        (widget.companyData['plantDisplayName'] ??
+                widget.companyData['plantName'] ??
+                '')
+            .toString()
+            .trim();
     if (pk.isEmpty && name.isEmpty) return 'Pogon: —';
     if (name.isNotEmpty) return 'Pogon: $name';
     return 'Pogon: $pk';
@@ -128,7 +131,9 @@ class _ProductionOperatorTrackingStationScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(ProductionOperatorTrackingStationScreen.phaseTitle(widget.phase)),
+        title: Text(
+          ProductionOperatorTrackingStationScreen.phaseTitle(widget.phase),
+        ),
         leading: IconButton(
           tooltip: 'Zatvori stanicu',
           icon: const Icon(Icons.close),
@@ -140,7 +145,9 @@ class _ProductionOperatorTrackingStationScreenState
               tooltip: _desktopOsFullscreen
                   ? 'Izađi iz OS punog zaslona (ostani u stanici)'
                   : 'OS puni zaslon',
-              icon: Icon(_desktopOsFullscreen ? Icons.fullscreen_exit : Icons.fullscreen),
+              icon: Icon(
+                _desktopOsFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+              ),
               onPressed: () async {
                 if (_desktopOsFullscreen) {
                   await _exitOsFullscreenIfNeeded();
@@ -170,13 +177,17 @@ class _ProductionOperatorTrackingStationScreenState
                       children: [
                         Text(
                           _companyLine,
-                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
                           _plantLine,
-                          style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -184,12 +195,18 @@ class _ProductionOperatorTrackingStationScreenState
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Icon(Icons.calendar_today_outlined, size: 18, color: cs.primary),
+                  Icon(
+                    Icons.calendar_today_outlined,
+                    size: 18,
+                    color: cs.primary,
+                  ),
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
                       _todayLine(context),
-                      style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                       maxLines: 2,
                       textAlign: TextAlign.end,
                     ),

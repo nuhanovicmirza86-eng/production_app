@@ -10,8 +10,16 @@ import '../models/production_order_model.dart';
 
 /// PDF izvoz usklađen s ekranom: grupe po kupcu, sort po planiranom roku, količine i zalihe.
 class ProductionOrdersListPdfExport {
-  static final PdfColor _readyRowFill = PdfColor(200 / 255, 230 / 255, 201 / 255);
-  static final PdfColor _groupHeaderFill = PdfColor(80 / 255, 80 / 255, 80 / 255);
+  static final PdfColor _readyRowFill = PdfColor(
+    200 / 255,
+    230 / 255,
+    201 / 255,
+  );
+  static final PdfColor _groupHeaderFill = PdfColor(
+    80 / 255,
+    80 / 255,
+    80 / 255,
+  );
 
   static Future<pw.Font> _font(String asset) async {
     final b = await rootBundle.load(asset);
@@ -67,10 +75,7 @@ class ProductionOrdersListPdfExport {
     return v > 0 ? v : 0;
   }
 
-  static bool _pnRowReady(
-    ProductionOrderModel o,
-    Map<String, double>? stock,
-  ) {
+  static bool _pnRowReady(ProductionOrderModel o, Map<String, double>? stock) {
     if (stock == null || stock.isEmpty) return false;
     if (o.status == 'cancelled') return false;
     final rem = _pnRemaining(o);
@@ -81,7 +86,9 @@ class ProductionOrdersListPdfExport {
     return s + 1e-9 >= rem;
   }
 
-  static List<ProductionOrderModel> _sortedOrders(List<ProductionOrderModel> orders) {
+  static List<ProductionOrderModel> _sortedOrders(
+    List<ProductionOrderModel> orders,
+  ) {
     final rows = List<ProductionOrderModel>.from(orders)
       ..sort((a, b) {
         final c = _pnDeadlineSort(a).compareTo(_pnDeadlineSort(b));
@@ -198,10 +205,7 @@ class ProductionOrdersListPdfExport {
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
     final blocks = <pw.Widget>[
-      pw.Text(
-        reportTitle,
-        style: pw.TextStyle(font: fontB, fontSize: 14),
-      ),
+      pw.Text(reportTitle, style: pw.TextStyle(font: fontB, fontSize: 14)),
       if (companyLine != null && companyLine.trim().isNotEmpty)
         pw.Padding(
           padding: const pw.EdgeInsets.only(top: 4, bottom: 2),
@@ -212,11 +216,7 @@ class ProductionOrdersListPdfExport {
         ),
       pw.Text(
         'Generisano: ${formatCalendarDay(now)} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
-        style: pw.TextStyle(
-          font: fontR,
-          fontSize: 8,
-          color: PdfColors.grey700,
-        ),
+        style: pw.TextStyle(font: fontR, fontSize: 8, color: PdfColors.grey700),
       ),
       if (filterDescription != null && filterDescription.trim().isNotEmpty)
         pw.Padding(
@@ -235,10 +235,14 @@ class ProductionOrdersListPdfExport {
         child: pw.Text(
           stockByProductId != null && stockByProductId.isNotEmpty
               ? 'Grupisano po kupcu; redovi sortirani po planiranom roku. '
-                  'Zelena pozadina: zaliha pokriva ostatak plana (plan − dobro).'
+                    'Zelena pozadina: zaliha pokriva ostatak plana (plan − dobro).'
               : 'Grupisano po kupcu; redovi sortirani po planiranom roku. '
-                  'Stanje: — ako zalihe nisu proslijeđene iz aplikacije.',
-          style: pw.TextStyle(font: fontR, fontSize: 7, color: PdfColors.grey800),
+                    'Stanje: — ako zalihe nisu proslijeđene iz aplikacije.',
+          style: pw.TextStyle(
+            font: fontR,
+            fontSize: 7,
+            color: PdfColors.grey800,
+          ),
         ),
       ),
     ];
@@ -279,10 +283,7 @@ class ProductionOrdersListPdfExport {
             11: const pw.FixedColumnWidth(40),
             12: const pw.FixedColumnWidth(38),
           },
-          children: [
-            headerRow(),
-            for (final o in list) dataRow(o),
-          ],
+          children: [headerRow(), for (final o in list) dataRow(o)],
         ),
       );
       blocks.add(pw.SizedBox(height: 14));

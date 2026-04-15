@@ -45,8 +45,7 @@ class _ProductionLabelReceiptScreenState
   String get _plantKey =>
       (widget.companyData['plantKey'] ?? '').toString().trim();
 
-  Map<String, dynamic> get _label =>
-      widget.resolution.labelFields ?? const {};
+  Map<String, dynamic> get _label => widget.resolution.labelFields ?? const {};
 
   @override
   void initState() {
@@ -165,9 +164,9 @@ class _ProductionLabelReceiptScreenState
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -250,15 +249,16 @@ class _ProductionLabelReceiptScreenState
                   maxLines: 2,
                   decoration: const InputDecoration(
                     labelText: 'Napomena (opciono)',
-                    border: OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 20),
                 FilledButton.icon(
                   onPressed:
-                      _submitting || _order == null || _selectedWarehouseId == null
-                          ? null
-                          : _submit,
+                      _submitting ||
+                          _order == null ||
+                          _selectedWarehouseId == null
+                      ? null
+                      : _submit,
                   icon: _submitting
                       ? const SizedBox(
                           width: 20,
@@ -266,7 +266,9 @@ class _ProductionLabelReceiptScreenState
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.inventory_2_outlined),
-                  label: Text(_submitting ? 'Snimam…' : 'Snimi i knjiži u magacin'),
+                  label: Text(
+                    _submitting ? 'Snimam…' : 'Snimi i knjiži u magacin',
+                  ),
                 ),
               ],
             ),
@@ -282,10 +284,7 @@ class _ProductionLabelReceiptScreenState
         children: [
           SizedBox(
             width: 120,
-            child: Text(
-              k,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
+            child: Text(k, style: const TextStyle(fontWeight: FontWeight.w600)),
           ),
           Expanded(child: Text(t.isEmpty ? '—' : t)),
         ],

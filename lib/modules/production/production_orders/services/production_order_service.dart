@@ -63,6 +63,7 @@ class ProductionOrderService {
   Future<String> createProductionOrder({
     required String companyId,
     required String plantKey,
+
     /// Šifra pogona za prefiks u `productionOrderCode` (npr. iz companyData). Ako je prazno, koristi se [plantKey].
     String? plantCode,
     required String productId,

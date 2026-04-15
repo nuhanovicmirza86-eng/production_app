@@ -126,8 +126,7 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
     }
   }
 
-  InputDecoration _dec(String label) =>
-      InputDecoration(labelText: label, border: const OutlineInputBorder());
+  InputDecoration _dec(String label) => InputDecoration(labelText: label);
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
@@ -148,18 +147,30 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
         country: _countryController.text.trim().isEmpty
             ? null
             : _countryController.text.trim(),
-        city: _cityController.text.trim().isEmpty ? null : _cityController.text.trim(),
+        city: _cityController.text.trim().isEmpty
+            ? null
+            : _cityController.text.trim(),
         address: _addressController.text.trim().isEmpty
             ? null
             : _addressController.text.trim(),
-        taxId: _taxIdController.text.trim().isEmpty ? null : _taxIdController.text.trim(),
-        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        taxId: _taxIdController.text.trim().isEmpty
+            ? null
+            : _taxIdController.text.trim(),
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
       );
 
       if (_isEdit) {
-        await _service.updateCustomer(companyData: widget.companyData, customer: draft);
+        await _service.updateCustomer(
+          companyData: widget.companyData,
+          customer: draft,
+        );
       } else {
-        await _service.createCustomer(companyData: widget.companyData, draft: draft);
+        await _service.createCustomer(
+          companyData: widget.companyData,
+          draft: draft,
+        );
       }
 
       if (!mounted) return;
@@ -237,11 +248,21 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
                         initialValue: _status,
                         decoration: _dec('Status'),
                         items: const [
-                          DropdownMenuItem(value: 'active', child: Text('active')),
-                          DropdownMenuItem(value: 'inactive', child: Text('inactive')),
-                          DropdownMenuItem(value: 'blocked', child: Text('blocked')),
+                          DropdownMenuItem(
+                            value: 'active',
+                            child: Text('active'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'inactive',
+                            child: Text('inactive'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'blocked',
+                            child: Text('blocked'),
+                          ),
                         ],
-                        onChanged: (v) => setState(() => _status = v ?? 'active'),
+                        onChanged: (v) =>
+                            setState(() => _status = v ?? 'active'),
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
@@ -249,12 +270,25 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
                         initialValue: _customerType,
                         decoration: _dec('Tip kupca'),
                         items: const [
-                          DropdownMenuItem(value: 'direct', child: Text('direct')),
-                          DropdownMenuItem(value: 'distributor', child: Text('distributor')),
-                          DropdownMenuItem(value: 'internal', child: Text('internal')),
-                          DropdownMenuItem(value: 'other', child: Text('other')),
+                          DropdownMenuItem(
+                            value: 'direct',
+                            child: Text('direct'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'distributor',
+                            child: Text('distributor'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'internal',
+                            child: Text('internal'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'other',
+                            child: Text('other'),
+                          ),
                         ],
-                        onChanged: (v) => setState(() => _customerType = v ?? 'direct'),
+                        onChanged: (v) =>
+                            setState(() => _customerType = v ?? 'direct'),
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -296,4 +330,3 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
     );
   }
 }
-

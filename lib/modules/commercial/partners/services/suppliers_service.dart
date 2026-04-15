@@ -4,12 +4,10 @@ import 'package:cloud_functions/cloud_functions.dart';
 import '../models/partner_models.dart';
 
 class SuppliersService {
-  SuppliersService({
-    FirebaseFirestore? firestore,
-    FirebaseFunctions? functions,
-  })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _functions =
-            functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
+  SuppliersService({FirebaseFirestore? firestore, FirebaseFunctions? functions})
+    : _firestore = firestore ?? FirebaseFirestore.instance,
+      _functions =
+          functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
 
   final FirebaseFirestore _firestore;
   final FirebaseFunctions _functions;
@@ -41,8 +39,10 @@ class SuppliersService {
     final cid = companyId.trim();
     if (cid.isEmpty) return const [];
 
-    final snap =
-        await _suppliers.where('companyId', isEqualTo: cid).limit(limit).get();
+    final snap = await _suppliers
+        .where('companyId', isEqualTo: cid)
+        .limit(limit)
+        .get();
 
     final q = query.trim().toLowerCase();
     final out = <SupplierModel>[];
@@ -53,7 +53,8 @@ class SuppliersService {
       if (m.companyId != cid) continue;
 
       if (q.isNotEmpty) {
-        final hay = '${m.code.toLowerCase()} ${m.name.toLowerCase()} '
+        final hay =
+            '${m.code.toLowerCase()} ${m.name.toLowerCase()} '
             '${m.legalName.toLowerCase()}';
         if (!hay.contains(q)) continue;
       }
@@ -131,9 +132,9 @@ class SuppliersService {
     final res = await _functions
         .httpsCallable('createCommercialSupplier')
         .call<Map<String, dynamic>>({
-      'companyId': companyId,
-      'supplier': _supplierPayloadForCallable(payload),
-    });
+          'companyId': companyId,
+          'supplier': _supplierPayloadForCallable(payload),
+        });
     final data = res.data;
     if (data['success'] != true) {
       throw Exception('Kreiranje dobavljača nije uspjelo.');
@@ -155,11 +156,11 @@ class SuppliersService {
     final res = await _functions
         .httpsCallable('updateCommercialSupplier')
         .call<Map<String, dynamic>>({
-      'companyId': companyId,
-      'supplierId': supplier.id.trim(),
-      'changeReason': changeReason,
-      'supplier': _supplierPayloadForCallable(supplier),
-    });
+          'companyId': companyId,
+          'supplierId': supplier.id.trim(),
+          'changeReason': changeReason,
+          'supplier': _supplierPayloadForCallable(supplier),
+        });
     if (res.data['success'] != true) {
       throw Exception('Ažuriranje dobavljača nije uspjelo.');
     }
@@ -188,8 +189,9 @@ class SuppliersService {
         .httpsCallable('refreshSupplierOperationalSignals')
         .call<Map<String, dynamic>>(payload);
     if (res.data['success'] != true) {
-      throw Exception('Osvježavanje operativnog skora dobavljača nije uspjelo.');
+      throw Exception(
+        'Osvježavanje operativnog skora dobavljača nije uspjelo.',
+      );
     }
   }
 }
-

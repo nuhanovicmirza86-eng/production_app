@@ -15,7 +15,9 @@ class CarbonFirestoreService {
   final FirebaseFirestore _db;
   final FirebaseFunctions _functions;
 
-  Future<Map<String, dynamic>> _carbonWrite(Map<String, dynamic> payload) async {
+  Future<Map<String, dynamic>> _carbonWrite(
+    Map<String, dynamic> payload,
+  ) async {
     final res = await _functions
         .httpsCallable('carbonFootprintWrite')
         .call<Map<String, dynamic>>(payload);
@@ -84,12 +86,14 @@ class CarbonFirestoreService {
 
   /// Zadnji `updatedAt` / `updatedBy` na glavnim dokumentima perioda (prije audit kolekcije).
   Future<
-      ({
-        DateTime? settingsUpdatedAt,
-        String settingsUpdatedBy,
-        DateTime? quotasUpdatedAt,
-        String quotasUpdatedBy,
-      })> loadPeriodDocumentUpdateHints({
+    ({
+      DateTime? settingsUpdatedAt,
+      String settingsUpdatedBy,
+      DateTime? quotasUpdatedAt,
+      String quotasUpdatedBy,
+    })
+  >
+  loadPeriodDocumentUpdateHints({
     required String companyId,
     required int reportingYear,
   }) async {
@@ -132,7 +136,8 @@ class CarbonFirestoreService {
     final m = Map<String, dynamic>.from(snap.data()!);
     m['companyId'] = companyId;
     m['reportingYear'] = reportingYear;
-    if (m['plantKey'] == null || (m['plantKey'] is String && (m['plantKey'] as String).trim().isEmpty)) {
+    if (m['plantKey'] == null ||
+        (m['plantKey'] is String && (m['plantKey'] as String).trim().isEmpty)) {
       m['plantKey'] = '';
     }
     return CarbonCompanySetup.fromMap(m);
@@ -192,10 +197,11 @@ class CarbonFirestoreService {
         .where('reportingYear', isEqualTo: reportingYear)
         .snapshots()
         .map(
-          (s) => s.docs
-              .map((d) => CarbonActivityLine.fromDoc(d.id, d.data()))
-              .toList()
-            ..sort((a, b) => a.rowId.compareTo(b.rowId)),
+          (s) =>
+              s.docs
+                  .map((d) => CarbonActivityLine.fromDoc(d.id, d.data()))
+                  .toList()
+                ..sort((a, b) => a.rowId.compareTo(b.rowId)),
         );
   }
 
@@ -203,10 +209,7 @@ class CarbonFirestoreService {
     required CarbonActivityLine line,
     required String userId,
   }) async {
-    final linePayload = <String, dynamic>{
-      ...line.toMap(),
-      'id': line.id,
-    };
+    final linePayload = <String, dynamic>{...line.toMap(), 'id': line.id};
     final data = await _carbonWrite({
       'op': 'upsertActivity',
       'companyId': line.companyId,
@@ -257,7 +260,9 @@ class CarbonFirestoreService {
         .collection('carbon_emission_factors')
         .where('companyId', isEqualTo: companyId)
         .get();
-    return snap.docs.map((d) => CarbonEmissionFactor.fromMap(d.data())).toList();
+    return snap.docs
+        .map((d) => CarbonEmissionFactor.fromMap(d.data()))
+        .toList();
   }
 
   Future<void> saveFactorOverride({

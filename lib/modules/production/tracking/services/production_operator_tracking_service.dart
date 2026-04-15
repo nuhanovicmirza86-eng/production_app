@@ -33,9 +33,8 @@ class ProductionOperatorTrackingService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map(
-          (snap) => snap.docs
-              .map(ProductionOperatorTrackingEntry.fromDoc)
-              .toList(),
+          (snap) =>
+              snap.docs.map(ProductionOperatorTrackingEntry.fromDoc).toList(),
         );
   }
 
@@ -68,6 +67,7 @@ class ProductionOperatorTrackingService {
     required String workDate,
     required String itemCode,
     required String itemName,
+
     /// Pripremljeno / dobro (bez škarta).
     required double goodQty,
     required String unit,
@@ -88,10 +88,7 @@ class ProductionOperatorTrackingService {
       throw StateError('Korisnik nije prijavljen.');
     }
     final email = user.email ?? '';
-    final scrapSum = scrapBreakdown.fold<double>(
-      0,
-      (a, b) => a + b.qty,
-    );
+    final scrapSum = scrapBreakdown.fold<double>(0, (a, b) => a + b.qty);
     final totalQty = goodQty + scrapSum;
     final payload = <String, dynamic>{
       'companyId': companyId.trim(),
@@ -115,7 +112,8 @@ class ProductionOperatorTrackingService {
     if (commercialOrderId != null && commercialOrderId.trim().isNotEmpty) {
       payload['commercialOrderId'] = commercialOrderId.trim();
     }
-    if (rawMaterialOrderCode != null && rawMaterialOrderCode.trim().isNotEmpty) {
+    if (rawMaterialOrderCode != null &&
+        rawMaterialOrderCode.trim().isNotEmpty) {
       payload['rawMaterialOrderCode'] = rawMaterialOrderCode.trim();
     }
     if (lineOrBatchRef != null && lineOrBatchRef.trim().isNotEmpty) {
@@ -127,7 +125,8 @@ class ProductionOperatorTrackingService {
     if (rawWorkOperatorName != null && rawWorkOperatorName.trim().isNotEmpty) {
       payload['rawWorkOperatorName'] = rawWorkOperatorName.trim();
     }
-    if (preparedByDisplayName != null && preparedByDisplayName.trim().isNotEmpty) {
+    if (preparedByDisplayName != null &&
+        preparedByDisplayName.trim().isNotEmpty) {
       payload['preparedByDisplayName'] = preparedByDisplayName.trim();
     }
     if (sourceQrPayload != null && sourceQrPayload.trim().isNotEmpty) {
@@ -137,8 +136,7 @@ class ProductionOperatorTrackingService {
       payload['notes'] = notes.trim();
     }
     if (scrapBreakdown.isNotEmpty) {
-      payload['scrapBreakdown'] =
-          scrapBreakdown.map((e) => e.toMap()).toList();
+      payload['scrapBreakdown'] = scrapBreakdown.map((e) => e.toMap()).toList();
     }
     await _col.add(payload);
   }

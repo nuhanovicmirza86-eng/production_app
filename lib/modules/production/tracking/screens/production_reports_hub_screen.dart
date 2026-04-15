@@ -10,7 +10,11 @@ class ProductionReportsHubScreen extends StatelessWidget {
 
   void _soon(BuildContext context, String title) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$title — izvještaj u pripremi (Firestore + agregacije).')),
+      SnackBar(
+        content: Text(
+          '$title — izvještaj u pripremi (Firestore + agregacije).',
+        ),
+      ),
     );
   }
 
@@ -18,9 +22,8 @@ class ProductionReportsHubScreen extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute<void>(
-        builder: (_) => ProductionOperatorTrackingDayReportScreen(
-          companyData: companyData,
-        ),
+        builder: (_) =>
+            ProductionOperatorTrackingDayReportScreen(companyData: companyData),
       ),
     );
   }
@@ -91,7 +94,9 @@ class ProductionReportsHubScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
               'Napomena: detaljne kalkulacije i izvoz (PDF/Excel) vezat će se na iste kolekcije kao operativni unos u tabovima praćenja.',
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         ],

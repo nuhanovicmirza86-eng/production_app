@@ -12,11 +12,7 @@ class TrackingScrapLine {
     required this.qty,
   });
 
-  Map<String, dynamic> toMap() => {
-    'code': code,
-    'label': label,
-    'qty': qty,
-  };
+  Map<String, dynamic> toMap() => {'code': code, 'label': label, 'qty': qty};
 
   static TrackingScrapLine? tryParse(Map<String, dynamic> m) {
     final code = (m['code'] ?? '').toString().trim();

@@ -6,11 +6,7 @@ import '../order_status_ui.dart';
 import '../services/orders_service.dart';
 
 class _LineEditors {
-  _LineEditors({
-    required this.item,
-    required this.qtyController,
-    this.dueDate,
-  });
+  _LineEditors({required this.item, required this.qtyController, this.dueDate});
 
   final OrderItemModel item;
   final TextEditingController qtyController;
@@ -52,8 +48,7 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
 
-  String get _userId =>
-      (widget.companyData['userId'] ?? '').toString().trim();
+  String get _userId => (widget.companyData['userId'] ?? '').toString().trim();
 
   bool _lineQtyEditable(OrderItemModel it) {
     if (it.linkedProductionOrderCodes.isNotEmpty) return false;
@@ -192,7 +187,8 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
         final newQty = double.parse(raw);
 
         final qtyChanged = (newQty - le.item.qty).abs() > 1e-9;
-        final dueChanged = (le.dueDate?.millisecondsSinceEpoch ?? -1) !=
+        final dueChanged =
+            (le.dueDate?.millisecondsSinceEpoch ?? -1) !=
             (le.item.dueDate?.millisecondsSinceEpoch ?? -1);
         if (!qtyChanged && !dueChanged) continue;
 
@@ -207,15 +203,15 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Narudžba je ažurirana.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Narudžba je ažurirana.')));
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -249,9 +245,9 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
           children: [
             Text(
               o.orderNumber,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
             Text(
@@ -282,8 +278,8 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
                 _requestedDeliveryDate == null
                     ? '—'
                     : '${_requestedDeliveryDate!.day.toString().padLeft(2, '0')}.'
-                        '${_requestedDeliveryDate!.month.toString().padLeft(2, '0')}.'
-                        '${_requestedDeliveryDate!.year}',
+                          '${_requestedDeliveryDate!.month.toString().padLeft(2, '0')}.'
+                          '${_requestedDeliveryDate!.year}',
               ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -308,8 +304,8 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
                 _confirmedDeliveryDate == null
                     ? '—'
                     : '${_confirmedDeliveryDate!.day.toString().padLeft(2, '0')}.'
-                        '${_confirmedDeliveryDate!.month.toString().padLeft(2, '0')}.'
-                        '${_confirmedDeliveryDate!.year}',
+                          '${_confirmedDeliveryDate!.month.toString().padLeft(2, '0')}.'
+                          '${_confirmedDeliveryDate!.year}',
               ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -330,17 +326,13 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
             if (o.orderType == OrderType.customer) ...[
               TextFormField(
                 controller: _customerRefController,
-                decoration: const InputDecoration(
-                  labelText: 'Referenca kupca',
-                  border: OutlineInputBorder(),
-                ),
+                decoration: const InputDecoration(labelText: 'Referenca kupca'),
               ),
             ] else ...[
               TextFormField(
                 controller: _supplierRefController,
                 decoration: const InputDecoration(
                   labelText: 'Referenca dobavljača',
-                  border: OutlineInputBorder(),
                 ),
               ),
             ],
@@ -349,24 +341,20 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
               controller: _currencyController,
               decoration: const InputDecoration(
                 labelText: 'Valuta (opcionalno)',
-                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _notesController,
-              decoration: const InputDecoration(
-                labelText: 'Napomena',
-                border: OutlineInputBorder(),
-              ),
+              decoration: const InputDecoration(labelText: 'Napomena'),
               maxLines: 4,
             ),
             const SizedBox(height: 24),
             Text(
               'Stavke',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
             ...List.generate(_lines.length, (i) {
@@ -400,7 +388,6 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
                           controller: le.qtyController,
                           decoration: InputDecoration(
                             labelText: 'Naručeno (${le.item.unit})',
-                            border: const OutlineInputBorder(),
                           ),
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
@@ -413,8 +400,8 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
                             le.dueDate == null
                                 ? '—'
                                 : '${le.dueDate!.day.toString().padLeft(2, '0')}.'
-                                    '${le.dueDate!.month.toString().padLeft(2, '0')}.'
-                                    '${le.dueDate!.year}',
+                                      '${le.dueDate!.month.toString().padLeft(2, '0')}.'
+                                      '${le.dueDate!.year}',
                           ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,

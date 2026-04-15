@@ -36,7 +36,8 @@ class _PfmeaRow {
   int d = 5;
 }
 
-class _UnifiedAssessmentRunScreenState extends State<UnifiedAssessmentRunScreen> {
+class _UnifiedAssessmentRunScreenState
+    extends State<UnifiedAssessmentRunScreen> {
   final AssessmentEngineService _engine = AssessmentEngineService();
   final Map<String, TextEditingController> _textCtrls = {};
   final Map<String, bool> _boolVals = {};
@@ -127,8 +128,9 @@ class _UnifiedAssessmentRunScreenState extends State<UnifiedAssessmentRunScreen>
         final code = (c['code'] ?? '').toString().trim();
         if (code.isEmpty) continue;
         final type = (c['type'] ?? 'scale').toString().toLowerCase();
-        final method =
-            (doc['calculationMethod'] ?? '').toString().toLowerCase();
+        final method = (doc['calculationMethod'] ?? '')
+            .toString()
+            .toLowerCase();
 
         if (method == 'threshold_bands' || type == 'kpi_threshold') {
           _textCtrls[code] = TextEditingController();
@@ -167,8 +169,7 @@ class _UnifiedAssessmentRunScreenState extends State<UnifiedAssessmentRunScreen>
       final code = (c['code'] ?? '').toString().trim();
       if (code.isEmpty) continue;
       final type = (c['type'] ?? 'scale').toString().toLowerCase();
-      final method =
-          (tpl['calculationMethod'] ?? '').toString().toLowerCase();
+      final method = (tpl['calculationMethod'] ?? '').toString().toLowerCase();
 
       if (method == 'threshold_bands' || type == 'kpi_threshold') {
         final t = _textCtrls[code];
@@ -290,7 +291,9 @@ class _UnifiedAssessmentRunScreenState extends State<UnifiedAssessmentRunScreen>
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.normal,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.72),
               ),
             ),
           ],
@@ -393,9 +396,7 @@ class _UnifiedAssessmentRunScreenState extends State<UnifiedAssessmentRunScreen>
                       DropdownButtonFormField<String>(
                         // ignore: deprecated_member_use
                         value: validId,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                        ),
+                        decoration: const InputDecoration(),
                         items: items,
                         onChanged: (v) {
                           if (v == null) return;
@@ -418,9 +419,7 @@ class _UnifiedAssessmentRunScreenState extends State<UnifiedAssessmentRunScreen>
             ],
             const SizedBox(height: 12),
             FilledButton.icon(
-              onPressed: (_computing || !_canCompute)
-                  ? null
-                  : _runCompute,
+              onPressed: (_computing || !_canCompute) ? null : _runCompute,
               icon: _computing
                   ? const SizedBox(
                       width: 18,
@@ -462,8 +461,7 @@ class _UnifiedAssessmentRunScreenState extends State<UnifiedAssessmentRunScreen>
       if (code.isEmpty) continue;
       final label = (c['label'] ?? code).toString();
       final type = (c['type'] ?? 'scale').toString().toLowerCase();
-      final method =
-          (tpl['calculationMethod'] ?? '').toString().toLowerCase();
+      final method = (tpl['calculationMethod'] ?? '').toString().toLowerCase();
       final weight = c['weight'];
 
       children.add(
@@ -492,10 +490,7 @@ class _UnifiedAssessmentRunScreenState extends State<UnifiedAssessmentRunScreen>
           TextField(
             controller: _textCtrls[code],
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              hintText: 'Broj (KPI / pragovi)',
-            ),
+            decoration: const InputDecoration(hintText: 'Broj (KPI / pragovi)'),
           ),
         );
       } else if (type == 'boolean') {
@@ -512,10 +507,7 @@ class _UnifiedAssessmentRunScreenState extends State<UnifiedAssessmentRunScreen>
           TextField(
             controller: _textCtrls[code],
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              hintText: 'Broj',
-            ),
+            decoration: const InputDecoration(hintText: 'Broj'),
           ),
         );
       } else {
@@ -536,7 +528,10 @@ class _UnifiedAssessmentRunScreenState extends State<UnifiedAssessmentRunScreen>
                       setState(() => _scaleVals[code] = v.round()),
                 ),
               ),
-              SizedBox(width: 36, child: Text('$cur', textAlign: TextAlign.end)),
+              SizedBox(
+                width: 36,
+                child: Text('$cur', textAlign: TextAlign.end),
+              ),
             ],
           ),
         );
@@ -579,13 +574,34 @@ class _UnifiedAssessmentRunScreenState extends State<UnifiedAssessmentRunScreen>
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Row(
                   children: [
-                    Text('#${i + 1}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    Text(
+                      '#${i + 1}',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
                     const SizedBox(width: 8),
-                    Expanded(child: _sodDropdown('S', row.s, (v) => setState(() => row.s = v))),
+                    Expanded(
+                      child: _sodDropdown(
+                        'S',
+                        row.s,
+                        (v) => setState(() => row.s = v),
+                      ),
+                    ),
                     const SizedBox(width: 6),
-                    Expanded(child: _sodDropdown('O', row.o, (v) => setState(() => row.o = v))),
+                    Expanded(
+                      child: _sodDropdown(
+                        'O',
+                        row.o,
+                        (v) => setState(() => row.o = v),
+                      ),
+                    ),
                     const SizedBox(width: 6),
-                    Expanded(child: _sodDropdown('D', row.d, (v) => setState(() => row.d = v))),
+                    Expanded(
+                      child: _sodDropdown(
+                        'D',
+                        row.d,
+                        (v) => setState(() => row.d = v),
+                      ),
+                    ),
                     IconButton(
                       tooltip: 'Ukloni red',
                       onPressed: _pfmeaRows.length <= 1
@@ -612,11 +628,7 @@ class _UnifiedAssessmentRunScreenState extends State<UnifiedAssessmentRunScreen>
     return DropdownButtonFormField<int>(
       // ignore: deprecated_member_use
       value: value,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-        isDense: true,
-      ),
+      decoration: InputDecoration(labelText: label, isDense: true),
       items: List.generate(
         10,
         (i) => DropdownMenuItem(value: i + 1, child: Text('${i + 1}')),
@@ -642,10 +654,12 @@ class _UnifiedAssessmentRunScreenState extends State<UnifiedAssessmentRunScreen>
           return Text('Historija: ${snap.error}');
         }
         if (!snap.hasData) {
-          return const Center(child: Padding(
-            padding: EdgeInsets.all(16),
-            child: CircularProgressIndicator(),
-          ));
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: CircularProgressIndicator(),
+            ),
+          );
         }
         final docs = snap.data!.docs;
         if (docs.isEmpty) {

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:production_app/core/theme/operonix_production_brand.dart';
 import 'package:production_app/screens/about_screen.dart';
 
 import '../../../../core/access/production_access_helper.dart';
@@ -21,10 +22,29 @@ import '../../tracking/screens/production_reports_hub_screen.dart';
 import '../../qr/production_qr_resolver.dart';
 import '../../qr/screens/production_qr_scan_screen.dart';
 
-class ProductionDashboardScreen extends StatelessWidget {
+class _ProdNavItem {
+  final WidgetBuilder builder;
+  final NavigationDestination destination;
+
+  const _ProdNavItem({required this.builder, required this.destination});
+}
+
+class ProductionDashboardScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
 
   const ProductionDashboardScreen({super.key, required this.companyData});
+
+  @override
+  State<ProductionDashboardScreen> createState() =>
+      _ProductionDashboardScreenState();
+}
+
+class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
+  int _index = 0;
+
+  final GlobalKey<ScaffoldState> _shellScaffoldKey = GlobalKey<ScaffoldState>();
+
+  Map<String, dynamic> get companyData => widget.companyData;
 
   String get _companyId => (companyData['companyId'] ?? '').toString().trim();
   String get _plantKey => (companyData['plantKey'] ?? '').toString().trim();
@@ -91,6 +111,8 @@ class ProductionDashboardScreen extends StatelessWidget {
   static const double _tileGap = 10;
 
   List<Widget> _buildProductionActions(BuildContext context) {
+    if (!_hasModule('production')) return [];
+
     void open(Widget screen) {
       Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
     }
@@ -154,9 +176,8 @@ class ProductionDashboardScreen extends StatelessWidget {
           icon: Icons.play_circle_outline,
           title: 'Praćenje proizvodnje (tabovi)',
           subtitle: 'Sve tri faze u jednom ekranu s tabovima.',
-          onTap: () => open(
-            ProductionOperatorTrackingScreen(companyData: companyData),
-          ),
+          onTap: () =>
+              open(ProductionOperatorTrackingScreen(companyData: companyData)),
         ),
         _DashboardActionTile(
           icon: Icons.fullscreen_outlined,
@@ -223,7 +244,8 @@ class ProductionDashboardScreen extends StatelessWidget {
           icon: Icons.assessment_outlined,
           title: 'Izvještaji',
           subtitle: 'Otpad, dnevna proizvodnja, IATF / CAPA.',
-          onTap: () => open(ProductionReportsHubScreen(companyData: companyData)),
+          onTap: () =>
+              open(ProductionReportsHubScreen(companyData: companyData)),
         ),
     ];
   }
@@ -238,6 +260,437 @@ class ProductionDashboardScreen extends StatelessWidget {
     return out;
   }
 
+  /// Ista logika širine kao maintenance `HomeScreen` (web / Windows / ≥900 px).
+  bool _isWideLayout(BuildContext context) {
+    final w = MediaQuery.sizeOf(context).width;
+    final isWin = !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+    return isWin || w >= 900;
+  }
+
+  List<Widget> _buildHomeQuickActions(BuildContext context) {
+    final tiles = <Widget>[];
+    if (_canViewCard(ProductionDashboardCard.registrations)) {
+      tiles.add(
+        _DashboardActionTile(
+          icon: Icons.person_add_alt_1,
+          title: 'Registracije',
+          subtitle: 'Odobri nove korisnike (pending).',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => const PendingUsersScreen(),
+              ),
+            );
+          },
+        ),
+      );
+    }
+    tiles.addAll(_buildProductionActions(context));
+    tiles.add(
+      _DashboardActionTile(
+        icon: Icons.article_outlined,
+        title: 'O aplikaciji',
+        subtitle: 'Verzija, autor, informacije.',
+        onTap: () {
+          Navigator.push<void>(
+            context,
+            MaterialPageRoute<void>(builder: (_) => const AboutScreen()),
+          );
+        },
+      ),
+    );
+    return tiles;
+  }
+
+  List<_ProdNavItem> _buildFullNav(BuildContext context) {
+    final cd = companyData;
+
+    final items = <_ProdNavItem>[
+      _ProdNavItem(
+        builder: (ctx) => _ProductionHomePage(
+          companyData: cd,
+          roleLabel: _prettyRoleLabel(_role),
+          companyId: _companyId,
+          plantKey: _plantKey,
+          companyLine: _companyDisplayName,
+          quickActionChildren: _withTileGaps(_buildHomeQuickActions(ctx)),
+        ),
+        destination: const NavigationDestination(
+          icon: Icon(Icons.home_outlined),
+          selectedIcon: Icon(Icons.home),
+          label: 'Početna',
+        ),
+      ),
+    ];
+
+    if (_hasModule('production') &&
+        _canViewCard(ProductionDashboardCard.products)) {
+      items.add(
+        _ProdNavItem(
+          builder: (_) => ProductsListScreen(companyData: cd),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.inventory_2_outlined),
+            selectedIcon: Icon(Icons.inventory_2),
+            label: 'Proizvodi',
+          ),
+        ),
+      );
+    }
+
+    if (_hasModule('production') &&
+        _canViewCard(ProductionDashboardCard.productionOrders)) {
+      items.add(
+        _ProdNavItem(
+          builder: (_) => ProductionOrdersListScreen(companyData: cd),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.assignment_outlined),
+            selectedIcon: Icon(Icons.assignment),
+            label: 'Nalozi',
+          ),
+        ),
+      );
+    }
+
+    if (_hasModule('production')) {
+      items.addAll([
+        _ProdNavItem(
+          builder: (_) => OrdersListScreen(companyData: cd),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.receipt_long_outlined),
+            selectedIcon: Icon(Icons.receipt_long),
+            label: 'Narudžbe',
+          ),
+        ),
+        _ProdNavItem(
+          builder: (_) => PartnersScreen(companyData: cd),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.groups_outlined),
+            selectedIcon: Icon(Icons.groups),
+            label: 'Partneri',
+          ),
+        ),
+      ]);
+    }
+
+    if (_hasModule('production') &&
+        _canViewCard(ProductionDashboardCard.carbonFootprint)) {
+      items.add(
+        _ProdNavItem(
+          builder: (_) => CarbonFootprintScreen(companyData: cd),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.eco_outlined),
+            selectedIcon: Icon(Icons.eco),
+            label: 'Karbon',
+          ),
+        ),
+      );
+    }
+
+    if (_hasModule('production') &&
+        _canViewCard(ProductionDashboardCard.productionTracking)) {
+      items.addAll([
+        _ProdNavItem(
+          builder: (_) => ProductionOperatorTrackingScreen(companyData: cd),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.play_circle_outline),
+            selectedIcon: Icon(Icons.play_circle),
+            label: 'Praćenje',
+          ),
+        ),
+        _ProdNavItem(
+          builder: (_) => ProductionOperatorTrackingStationScreen(
+            companyData: cd,
+            phase: ProductionOperatorTrackingEntry.phasePreparation,
+          ),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.fullscreen_outlined),
+            selectedIcon: Icon(Icons.fullscreen),
+            label: 'Stanica 1',
+          ),
+        ),
+        _ProdNavItem(
+          builder: (_) => ProductionOperatorTrackingStationScreen(
+            companyData: cd,
+            phase: ProductionOperatorTrackingEntry.phaseFirstControl,
+          ),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.fact_check_outlined),
+            selectedIcon: Icon(Icons.fact_check),
+            label: 'Stanica 2',
+          ),
+        ),
+        _ProdNavItem(
+          builder: (_) => ProductionOperatorTrackingStationScreen(
+            companyData: cd,
+            phase: ProductionOperatorTrackingEntry.phaseFinalControl,
+          ),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.verified_outlined),
+            selectedIcon: Icon(Icons.verified),
+            label: 'Stanica 3',
+          ),
+        ),
+      ]);
+    }
+
+    if (_hasModule('production') &&
+        _canViewCard(ProductionDashboardCard.workCenters)) {
+      items.add(
+        _ProdNavItem(
+          builder: (ctx) => _PlaceholderProductionTab(
+            title: 'Radni centri',
+            onNotImplemented: () => _notImplemented(ctx),
+          ),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.precision_manufacturing_outlined),
+            selectedIcon: Icon(Icons.precision_manufacturing),
+            label: 'Centri',
+          ),
+        ),
+      );
+    }
+
+    if (_hasModule('production') &&
+        _canViewCard(ProductionDashboardCard.shifts)) {
+      items.add(
+        _ProdNavItem(
+          builder: (ctx) => _PlaceholderProductionTab(
+            title: 'Smjene',
+            onNotImplemented: () => _notImplemented(ctx),
+          ),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.schedule_outlined),
+            selectedIcon: Icon(Icons.schedule),
+            label: 'Smjene',
+          ),
+        ),
+      );
+    }
+
+    if (_hasModule('production') &&
+        _canViewCard(ProductionDashboardCard.downtime)) {
+      items.add(
+        _ProdNavItem(
+          builder: (ctx) => _PlaceholderProductionTab(
+            title: 'Zastoji',
+            onNotImplemented: () => _notImplemented(ctx),
+          ),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.warning_amber_outlined),
+            selectedIcon: Icon(Icons.warning_amber),
+            label: 'Zastoji',
+          ),
+        ),
+      );
+    }
+
+    if (_hasModule('production') &&
+        _canViewCard(ProductionDashboardCard.problemReporting)) {
+      items.add(
+        _ProdNavItem(
+          builder: (ctx) => _PlaceholderProductionTab(
+            title: 'Prijava problema',
+            onNotImplemented: () => _notImplemented(ctx),
+          ),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.report_problem_outlined),
+            selectedIcon: Icon(Icons.report_problem),
+            label: 'Problemi',
+          ),
+        ),
+      );
+    }
+
+    if (_hasModule('production') &&
+        _canViewCard(ProductionDashboardCard.processExecution)) {
+      items.add(
+        _ProdNavItem(
+          builder: (ctx) => _PlaceholderProductionTab(
+            title: 'Evidencija procesa',
+            onNotImplemented: () => _notImplemented(ctx),
+          ),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.science_outlined),
+            selectedIcon: Icon(Icons.science),
+            label: 'Procesi',
+          ),
+        ),
+      );
+    }
+
+    if (_hasModule('production') && _canShowReportsCard()) {
+      items.add(
+        _ProdNavItem(
+          builder: (_) => ProductionReportsHubScreen(companyData: cd),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.assessment_outlined),
+            selectedIcon: Icon(Icons.assessment),
+            label: 'Izvještaji',
+          ),
+        ),
+      );
+    }
+
+    if (_canViewCard(ProductionDashboardCard.registrations)) {
+      items.add(
+        _ProdNavItem(
+          builder: (_) => const PendingUsersScreen(),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.person_add_alt_1_outlined),
+            selectedIcon: Icon(Icons.person_add_alt_1),
+            label: 'Registracije',
+          ),
+        ),
+      );
+    }
+
+    return items;
+  }
+
+  List<_ProdNavItem> _buildMobileNav(List<_ProdNavItem> full) {
+    if (full.length <= 5) return full;
+    const primaryCount = 4;
+    final primary = full.take(primaryCount).toList(growable: false);
+    final extras = full.skip(primaryCount).toList(growable: false);
+    return [
+      ...primary,
+      _ProdNavItem(
+        builder: (_) => _ProductionMoreMenuScreen(items: extras),
+        destination: const NavigationDestination(
+          icon: Icon(Icons.more_horiz),
+          selectedIcon: Icon(Icons.more_horiz),
+          label: 'Više',
+        ),
+      ),
+    ];
+  }
+
+  List<NavigationRailDestination> _toRailDestinations(List<_ProdNavItem> nav) {
+    return nav
+        .map(
+          (e) => NavigationRailDestination(
+            icon: e.destination.icon,
+            selectedIcon: e.destination.selectedIcon,
+            label: Text(e.destination.label),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  /// Web: hamburger otvara izbornik (kao maintenance) — brzi ulazi kad rail ima puno stavki.
+  Widget _webProductionDrawer(BuildContext context) {
+    final cd = companyData;
+    return Drawer(
+      child: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Text(
+                'Web meni',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Text(
+                'Brzi pristup iz bočnog izbornika. Glavna navigacija ostaje u lijevom railu.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _DashboardActionTile(
+                    icon: Icons.qr_code_scanner,
+                    title: 'Skeniraj QR',
+                    subtitle: 'Nalog ili naljepnica s poda',
+                    onTap: () {
+                      _shellScaffoldKey.currentState?.closeDrawer();
+                      _openProductionQrScan(context);
+                    },
+                  ),
+                  if (_hasModule('production')) ...[
+                    const SizedBox(height: 10),
+                    _DashboardActionTile(
+                      icon: Icons.receipt_long_outlined,
+                      title: 'Narudžbe',
+                      subtitle: 'Pregled i rad s narudžbama',
+                      onTap: () {
+                        _shellScaffoldKey.currentState?.closeDrawer();
+                        Navigator.push<void>(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => OrdersListScreen(companyData: cd),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    _DashboardActionTile(
+                      icon: Icons.groups_outlined,
+                      title: 'Kupci / dobavljači',
+                      subtitle: 'Partneri i poslovne veze',
+                      onTap: () {
+                        _shellScaffoldKey.currentState?.closeDrawer();
+                        Navigator.push<void>(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => PartnersScreen(companyData: cd),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  _DashboardActionTile(
+                    icon: Icons.article_outlined,
+                    title: 'O aplikaciji',
+                    subtitle: 'Verzija, autor, informacije',
+                    onTap: () {
+                      _shellScaffoldKey.currentState?.closeDrawer();
+                      Navigator.push<void>(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => const AboutScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: Icon(
+                Icons.logout,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              title: Text(
+                'Odjava',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onTap: () async {
+                _shellScaffoldKey.currentState?.closeDrawer();
+                await AuthService().signOut();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_companyId.isEmpty || _plantKey.isEmpty) {
@@ -247,88 +700,63 @@ class ProductionDashboardScreen extends StatelessWidget {
       );
     }
 
-    final showProductionModule = _hasModule('production');
-    final showAdminSection = _canViewCard(
-      ProductionDashboardCard.registrations,
-    );
+    final fullNav = _buildFullNav(context);
+    final isWide = _isWideLayout(context);
+    final nav = isWide ? fullNav : _buildMobileNav(fullNav);
+    final safeIndex = (_index >= 0 && _index < nav.length) ? _index : 0;
+    final current = nav[safeIndex].builder(context);
 
-    final productionTiles = _buildProductionActions(context);
-
-    final gap = kIsWeb ? 12.0 : 16.0;
-    final pad = kIsWeb ? 12.0 : 16.0;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Proizvodnja'),
-        actions: [
-          IconButton(
-            tooltip: 'O aplikaciji',
-            icon: const Icon(Icons.info_outline),
-            onPressed: () {
-              Navigator.push<void>(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => const AboutScreen(),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            tooltip: 'Odjava',
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await AuthService().signOut();
-            },
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: EdgeInsets.all(pad),
-        children: [
-          _SessionHeaderCard(
-            logoCandidates:
-                CompanyLogoResolver.resolveLogoImageCandidates(companyData),
-            roleLabel: _prettyRoleLabel(_role),
-            companyId: _companyId,
-            plantKey: _plantKey,
-            companyLine: _companyDisplayName,
-          ),
-          SizedBox(height: gap),
-          if (showAdminSection) ...[
-            const _SectionTitle(title: 'Administracija'),
-            SizedBox(height: gap * 0.75),
-            _DashboardActionTile(
-              icon: Icons.person_add_alt_1,
-              title: 'Registracije',
-              subtitle: 'Odobri nove korisnike (pending).',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const PendingUsersScreen(),
-                  ),
-                );
-              },
-            ),
-            SizedBox(height: gap * 1.5),
-          ],
-          if (showProductionModule && productionTiles.isNotEmpty) ...[
-            const _SectionTitle(title: 'Proizvodnja'),
-            SizedBox(height: gap * 0.75),
-            ..._withTileGaps(productionTiles),
-          ],
-          if (!showProductionModule || productionTiles.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 32),
-              child: Center(
-                child: Text(
-                  'Nema dostupnih modula za prikaz.',
-                  textAlign: TextAlign.center,
+    if (isWide) {
+      return Scaffold(
+        key: _shellScaffoldKey,
+        drawer: kIsWeb ? _webProductionDrawer(context) : null,
+        body: SafeArea(
+          child: Row(
+            children: [
+              NavigationRail(
+                leading: kIsWeb
+                    ? IconButton(
+                        tooltip: 'Web meni',
+                        icon: const Icon(Icons.menu),
+                        onPressed: () =>
+                            _shellScaffoldKey.currentState?.openDrawer(),
+                      )
+                    : null,
+                selectedIndex: safeIndex,
+                onDestinationSelected: (i) => setState(() => _index = i),
+                labelType: NavigationRailLabelType.all,
+                destinations: _toRailDestinations(nav),
+                scrollable: true,
+              ),
+              const VerticalDivider(width: 1, thickness: 1),
+              Expanded(
+                child: KeyedSubtree(
+                  key: ValueKey<String>('prod_rail_$safeIndex'),
+                  child: current,
                 ),
               ),
-            ),
-        ],
+            ],
+          ),
+        ),
+      );
+    }
+
+    final showBottomNav = nav.length >= 2;
+
+    return Scaffold(
+      body: SafeArea(
+        child: IndexedStack(
+          index: safeIndex,
+          children: nav.map((e) => e.builder(context)).toList(),
+        ),
       ),
+      bottomNavigationBar: showBottomNav
+          ? NavigationBar(
+              selectedIndex: safeIndex,
+              onDestinationSelected: (i) => setState(() => _index = i),
+              destinations: nav.map((e) => e.destination).toList(),
+            )
+          : null,
     );
   }
 
@@ -389,12 +817,194 @@ class ProductionDashboardScreen extends StatelessWidget {
         final raw = resolution.rawPayload;
         final preview = raw.length > 120 ? '${raw.substring(0, 120)}…' : raw;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Nepoznat QR. Sadržaj: $preview'),
-          ),
+          SnackBar(content: Text('Nepoznat QR. Sadržaj: $preview')),
         );
         break;
     }
+  }
+}
+
+/// Početna s karticom sesije i listom „Brze akcije“ (isti obrazac kao maintenance).
+class _ProductionHomePage extends StatelessWidget {
+  final Map<String, dynamic> companyData;
+  final String roleLabel;
+  final String companyId;
+  final String plantKey;
+  final String companyLine;
+  final List<Widget> quickActionChildren;
+
+  const _ProductionHomePage({
+    required this.companyData,
+    required this.roleLabel,
+    required this.companyId,
+    required this.plantKey,
+    required this.companyLine,
+    required this.quickActionChildren,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final gap = kIsWeb ? 12.0 : 16.0;
+    final pad = kIsWeb ? 12.0 : 16.0;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Početna'),
+        actions: [
+          IconButton(
+            tooltip: 'Odjava',
+            icon: const Icon(Icons.logout),
+            onPressed: () async => AuthService().signOut(),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: EdgeInsets.all(pad),
+        children: [
+          _SessionHeaderCard(
+            logoCandidates: CompanyLogoResolver.resolveLogoImageCandidates(
+              companyData,
+            ),
+            roleLabel: roleLabel,
+            companyId: companyId,
+            plantKey: plantKey,
+            companyLine: companyLine,
+          ),
+          SizedBox(height: gap),
+          const _SectionTitle(title: 'Brze akcije'),
+          SizedBox(height: gap * 0.75),
+          ...quickActionChildren,
+        ],
+      ),
+    );
+  }
+}
+
+/// Mobilni „Više“ meni kad je više od pet stavki u donjoj navigaciji.
+class _ProductionMoreMenuScreen extends StatefulWidget {
+  final List<_ProdNavItem> items;
+
+  const _ProductionMoreMenuScreen({required this.items});
+
+  @override
+  State<_ProductionMoreMenuScreen> createState() =>
+      _ProductionMoreMenuScreenState();
+}
+
+class _ProductionMoreMenuScreenState extends State<_ProductionMoreMenuScreen> {
+  String _q = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final q = _q.trim().toLowerCase();
+    final filtered = widget.items
+        .where((it) {
+          final label = it.destination.label.toLowerCase();
+          return q.isEmpty || label.contains(q);
+        })
+        .toList(growable: false);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Više'),
+        actions: [
+          IconButton(
+            tooltip: 'Odjava',
+            icon: const Icon(Icons.logout),
+            onPressed: () async => AuthService().signOut(),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+            child: TextField(
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
+                hintText: 'Pretraži meni…',
+              ),
+              onChanged: (v) => setState(() => _q = v),
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: filtered.isEmpty
+                ? const Center(child: Text('Nema rezultata.'))
+                : ListView.separated(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (context, i) {
+                      final it = filtered[i];
+                      return Card(
+                        child: ListTile(
+                          leading: it.destination.icon,
+                          title: Text(
+                            it.destination.label,
+                            style: const TextStyle(fontWeight: FontWeight.w900),
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute<void>(builder: it.builder),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlaceholderProductionTab extends StatelessWidget {
+  final String title;
+  final VoidCallback onNotImplemented;
+
+  const _PlaceholderProductionTab({
+    required this.title,
+    required this.onNotImplemented,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          IconButton(
+            tooltip: 'Odjava',
+            icon: const Icon(Icons.logout),
+            onPressed: () async => AuthService().signOut(),
+          ),
+        ],
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Uskoro u aplikaciji.',
+                style: Theme.of(context).textTheme.titleMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: onNotImplemented,
+                child: const Text('Obavijest'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -416,10 +1026,7 @@ class _SessionHeaderCard extends StatelessWidget {
 
   Widget _plantLine() {
     if (plantKey.trim().isEmpty) {
-      return const Text(
-        'Pogon: -',
-        style: TextStyle(color: Colors.black87),
-      );
+      return const Text('Pogon: -', style: TextStyle(color: Colors.black87));
     }
     if (companyId.trim().isEmpty) {
       return Text(
@@ -448,6 +1055,15 @@ class _SessionHeaderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      clipBehavior: Clip.antiAlias,
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(
+          color: kOperonixProductionBrandGreen,
+          width: 1.5,
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
@@ -515,7 +1131,8 @@ class _CompanyHeaderLogoState extends State<_CompanyHeaderLogo> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final border = Border.all(
-      color: scheme.outlineVariant.withValues(alpha: 0.6),
+      color: kOperonixProductionBrandGreen.withValues(alpha: 0.5),
+      width: 1.5,
     );
     final radius = BorderRadius.circular(12);
 
@@ -526,7 +1143,7 @@ class _CompanyHeaderLogoState extends State<_CompanyHeaderLogo> {
           child: Icon(
             Icons.apartment_outlined,
             size: 30,
-            color: scheme.onSurfaceVariant,
+            color: kOperonixProductionBrandGreen.withValues(alpha: 0.75),
           ),
         ),
       );
@@ -538,14 +1155,8 @@ class _CompanyHeaderLogoState extends State<_CompanyHeaderLogo> {
         width: _CompanyHeaderLogo.size,
         height: _CompanyHeaderLogo.size,
         child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: radius,
-            border: border,
-          ),
-          child: ClipRRect(
-            borderRadius: radius,
-            child: placeholder(),
-          ),
+          decoration: BoxDecoration(borderRadius: radius, border: border),
+          child: ClipRRect(borderRadius: radius, child: placeholder()),
         ),
       );
     }
@@ -557,10 +1168,7 @@ class _CompanyHeaderLogoState extends State<_CompanyHeaderLogo> {
       width: _CompanyHeaderLogo.size,
       height: _CompanyHeaderLogo.size,
       child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: radius,
-          border: border,
-        ),
+        decoration: BoxDecoration(borderRadius: radius, border: border),
         child: ClipRRect(
           borderRadius: radius,
           child: Image.network(
@@ -581,7 +1189,7 @@ class _CompanyHeaderLogoState extends State<_CompanyHeaderLogo> {
                     strokeWidth: 2,
                     value: loadingProgress.expectedTotalBytes != null
                         ? loadingProgress.cumulativeBytesLoaded /
-                            loadingProgress.expectedTotalBytes!
+                              loadingProgress.expectedTotalBytes!
                         : null,
                   ),
                 ),
@@ -632,8 +1240,16 @@ class _DashboardActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Card(
+      clipBehavior: Clip.antiAlias,
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(
+          color: kOperonixProductionBrandGreen,
+          width: 1.5,
+        ),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
@@ -646,13 +1262,15 @@ class _DashboardActionTile extends StatelessWidget {
                 height: 46,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: scheme.primary.withValues(alpha: 0.10),
+                  color: kOperonixProductionBrandGreen.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: scheme.primary.withValues(alpha: 0.25),
+                    color: kOperonixProductionBrandGreen.withValues(
+                      alpha: 0.45,
+                    ),
                   ),
                 ),
-                child: Icon(icon),
+                child: Icon(icon, color: kOperonixProductionBrandGreen),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -674,7 +1292,10 @@ class _DashboardActionTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right),
+              Icon(
+                Icons.chevron_right,
+                color: kOperonixProductionBrandGreen.withValues(alpha: 0.55),
+              ),
             ],
           ),
         ),

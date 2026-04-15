@@ -204,8 +204,7 @@ class _ProductWarehouseStockSectionState
                       break;
                     }
                   }
-                  final u =
-                      firstUnit ?? (widget.fallbackUnit ?? '').trim();
+                  final u = firstUnit ?? (widget.fallbackUnit ?? '').trim();
                   final unitSuffix = u.isEmpty ? '' : ' $u';
                   return Text(
                     'Ukupno: ${_formatQty(total)}$unitSuffix',

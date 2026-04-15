@@ -126,10 +126,7 @@ class ProductionOperatorTrackingDayPdfExport {
           cell(e.itemCode, maxLines: 2),
           cell(e.itemName, maxLines: 3),
           cell(_fmtQty(e.effectiveGoodQty), align: pw.TextAlign.right),
-          cell(
-            scrapTxt.isEmpty ? '—' : scrapTxt,
-            maxLines: 3,
-          ),
+          cell(scrapTxt.isEmpty ? '—' : scrapTxt, maxLines: 3),
           cell(_fmtQty(e.quantity), align: pw.TextAlign.right),
           cell(e.unit.isEmpty ? '—' : e.unit),
           cell(_dash(e.productionOrderId), maxLines: 2),
@@ -165,7 +162,11 @@ class ProductionOperatorTrackingDayPdfExport {
         pw.Text(
           'Generirano: ${now.day.toString().padLeft(2, '0')}.${now.month.toString().padLeft(2, '0')}.${now.year}. '
           '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
-          style: pw.TextStyle(font: fontR, fontSize: 7, color: PdfColors.grey700),
+          style: pw.TextStyle(
+            font: fontR,
+            fontSize: 7,
+            color: PdfColors.grey700,
+          ),
         ),
         pw.SizedBox(height: 10),
         pw.Text(
@@ -191,10 +192,7 @@ class ProductionOperatorTrackingDayPdfExport {
         9: const pw.FlexColumnWidth(0.9),
         10: const pw.FixedColumnWidth(68),
       },
-      children: [
-        headerRow(),
-        for (final e in rows) dataRow(e),
-      ],
+      children: [headerRow(), for (final e in rows) dataRow(e)],
     );
 
     final doc = pw.Document();

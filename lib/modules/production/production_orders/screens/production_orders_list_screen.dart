@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
+import '../../../../core/theme/operonix_production_brand.dart';
 import '../../../../core/date/date_range_utils.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/ui/date_range_filter_controls.dart';
@@ -47,11 +48,13 @@ class ProductionOrdersListScreen extends StatefulWidget {
 class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     with SingleTickerProviderStateMixin {
   final ProductionOrderService _service = ProductionOrderService();
-  final ProductWarehouseStockService _stockService = ProductWarehouseStockService();
+  final ProductWarehouseStockService _stockService =
+      ProductWarehouseStockService();
   final TextEditingController _searchController = TextEditingController();
 
   bool _isLoading = true;
   String? _error;
+
   /// Sklopivi blok: pretraga + kupac/proces + status/datum.
   bool _searchStripExpanded = false;
   ProductionOrderStatusFilter _selectedStatus = ProductionOrderStatusFilter.all;
@@ -70,7 +73,8 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
-  String get _plantKey => (widget.companyData['plantKey'] ?? '').toString().trim();
+  String get _plantKey =>
+      (widget.companyData['plantKey'] ?? '').toString().trim();
   String get _role =>
       (widget.companyData['role'] ?? '').toString().trim().toLowerCase();
 
@@ -127,18 +131,20 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     for (var i = 0; i < list.length; i += batch) {
       final end = i + batch > list.length ? list.length : i + batch;
       final chunk = list.sublist(i, end);
-      await Future.wait(chunk.map((pid) async {
-        try {
-          final lines = await _stockService.loadStockLinesForProduct(
-            companyId: _companyId,
-            productId: pid,
-            plantKey: _plantKey.isEmpty ? null : _plantKey,
-          );
-          next[pid] = lines.fold<double>(0, (a, b) => a + b.quantityOnHand);
-        } catch (_) {
-          next[pid] = 0;
-        }
-      }));
+      await Future.wait(
+        chunk.map((pid) async {
+          try {
+            final lines = await _stockService.loadStockLinesForProduct(
+              companyId: _companyId,
+              productId: pid,
+              plantKey: _plantKey.isEmpty ? null : _plantKey,
+            );
+            next[pid] = lines.fold<double>(0, (a, b) => a + b.quantityOnHand);
+          } catch (_) {
+            next[pid] = 0;
+          }
+        }),
+      );
     }
 
     if (!mounted) return;
@@ -167,7 +173,10 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     });
 
     try {
-      final orders = await _service.getOrders(companyId: _companyId, plantKey: _plantKey);
+      final orders = await _service.getOrders(
+        companyId: _companyId,
+        plantKey: _plantKey,
+      );
       if (!mounted) return;
       setState(() {
         _orders = orders;
@@ -196,7 +205,8 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     final created = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => ProductionOrderCreateScreen(companyData: widget.companyData),
+        builder: (_) =>
+            ProductionOrderCreateScreen(companyData: widget.companyData),
       ),
     );
     if (created == true && mounted) {
@@ -222,7 +232,8 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     return _orders.where((o) {
       final cust = _customerGroupKey(o);
       final op = (o.operationName ?? '').trim();
-      final matchesSearch = q.isEmpty ||
+      final matchesSearch =
+          q.isEmpty ||
           o.productionOrderCode.toLowerCase().contains(q) ||
           o.productCode.toLowerCase().contains(q) ||
           o.productName.toLowerCase().contains(q) ||
@@ -230,11 +241,11 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
           (o.sourceCustomerName ?? '').toLowerCase().contains(q) ||
           op.toLowerCase().contains(q);
       final matchesStatus = _selectedStatus.matches(o.status);
-      final matchesDate =
-          dateInInclusiveRange(o.createdAt, _dateFrom, _dateTo);
+      final matchesDate = dateInInclusiveRange(o.createdAt, _dateFrom, _dateTo);
       final matchesCustomer =
           _filterCustomerName == null || cust == _filterCustomerName;
-      final matchesOp = _filterOperationName == null ||
+      final matchesOp =
+          _filterOperationName == null ||
           (_filterOperationName == '__bez_procesa__' && op.isEmpty) ||
           op == _filterOperationName;
       return matchesSearch &&
@@ -376,18 +387,27 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
           fillColor: cs.surface,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: cs.outlineVariant),
+            borderSide: BorderSide(
+              color: kOperonixProductionBrandGreen.withValues(alpha: 0.45),
+            ),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: cs.outlineVariant),
+            borderSide: BorderSide(
+              color: kOperonixProductionBrandGreen.withValues(alpha: 0.45),
+            ),
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: cs.primary, width: 1.5),
+          focusedBorder: const OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+            borderSide: BorderSide(
+              color: kOperonixProductionBrandGreen,
+              width: 2,
+            ),
           ),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 10,
+          ),
         ),
         value: value,
         items: items,
@@ -399,7 +419,10 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
       builder: (context, c) {
         final narrow = c.maxWidth < 560;
         final customerItems = <DropdownMenuItem<String?>>[
-          const DropdownMenuItem<String?>(value: null, child: Text('Svi kupci')),
+          const DropdownMenuItem<String?>(
+            value: null,
+            child: Text('Svi kupci'),
+          ),
           ...customers.map(
             (n) => DropdownMenuItem<String?>(
               value: n,
@@ -408,7 +431,10 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
           ),
         ];
         final opItems = <DropdownMenuItem<String?>>[
-          const DropdownMenuItem<String?>(value: null, child: Text('Svi procesi')),
+          const DropdownMenuItem<String?>(
+            value: null,
+            child: Text('Svi procesi'),
+          ),
           const DropdownMenuItem<String?>(
             value: '__bez_procesa__',
             child: Text('(bez oznake procesa)'),
@@ -454,8 +480,8 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
               Text(
                 'Pogon: $plantLabel',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           );
@@ -499,8 +525,8 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
             Text(
               'Pogon: $plantLabel',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         );
@@ -509,11 +535,10 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
   }
 
   String _companyDisplayName() {
-    final n = (widget.companyData['companyName'] ??
-            widget.companyData['name'] ??
-            '')
-        .toString()
-        .trim();
+    final n =
+        (widget.companyData['companyName'] ?? widget.companyData['name'] ?? '')
+            .toString()
+            .trim();
     return n.isEmpty ? '—' : n;
   }
 
@@ -605,9 +630,9 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     }
   }
 
@@ -728,7 +753,9 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
         .where((o) => !['completed', 'closed', 'cancelled'].contains(o.status))
         .length;
     final inProgress = _orders.where((o) => o.status == 'in_progress').length;
-    final done = _orders.where((o) => o.status == 'completed' || o.status == 'closed').length;
+    final done = _orders
+        .where((o) => o.status == 'completed' || o.status == 'closed')
+        .length;
 
     return StandardKpiGrid(
       metrics: [
@@ -790,8 +817,8 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
         Text(
           'Status',
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 6),
         Wrap(
@@ -825,7 +852,8 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
       title: 'Pretraga i filteri',
       expanded: _searchStripExpanded,
       activeCount: _searchStripActiveCount,
-      onToggle: () => setState(() => _searchStripExpanded = !_searchStripExpanded),
+      onToggle: () =>
+          setState(() => _searchStripExpanded = !_searchStripExpanded),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -894,7 +922,10 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     TableCell h(String t, {TextAlign align = TextAlign.left}) {
       return TableCell(
         verticalAlignment: TableCellVerticalAlignment.middle,
-        child: ColoredBox(color: headerBg, child: hText(t, align: align)),
+        child: ColoredBox(
+          color: headerBg,
+          child: hText(t, align: align),
+        ),
       );
     }
 
@@ -913,7 +944,10 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
             onTap: () => _openDetailsScreen(o),
             hoverColor: cs.primary.withValues(alpha: 0.06),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: padH, vertical: padV),
+              padding: const EdgeInsets.symmetric(
+                horizontal: padH,
+                vertical: padV,
+              ),
               child: Align(
                 alignment: align,
                 child: DefaultTextStyle(style: cellStyle, child: child),
@@ -964,11 +998,19 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
       final rok = _formatDate(
         o.requestedDeliveryDate ?? o.scheduledEndAt ?? o.scheduledStartAt,
       );
-      final src =
-          (o.sourceOrderNumber ?? '').trim().isEmpty ? '—' : o.sourceOrderNumber!;
+      final src = (o.sourceOrderNumber ?? '').trim().isEmpty
+          ? '—'
+          : o.sourceOrderNumber!;
       return TableRow(
         children: [
-          d(o, Tooltip(message: o.productionOrderCode, child: oneLine(o.productionOrderCode)), rowBg: rowBg),
+          d(
+            o,
+            Tooltip(
+              message: o.productionOrderCode,
+              child: oneLine(o.productionOrderCode),
+            ),
+            rowBg: rowBg,
+          ),
           d(o, oneLine(_formatDate(o.createdAt)), rowBg: rowBg),
           d(o, oneLine(src), rowBg: rowBg),
           d(o, oneLine(rok), rowBg: rowBg),
@@ -1069,7 +1111,9 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     addIntr(); // Dana
     if (v.showRn) addIntr();
     addIntr(); // Šifra
-    m[i++] = const FlexColumnWidth(1); // Naziv — popunjava preostalu širinu ekrana
+    m[i++] = const FlexColumnWidth(
+      1,
+    ); // Naziv — popunjava preostalu širinu ekrana
     addIntr(); // Plan
     addIntr(); // Izrađeno
     addIntr(); // Ostalo
@@ -1097,7 +1141,10 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
 
     Widget hText(String t, {TextAlign align = TextAlign.left}) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: padH, vertical: padV + 2),
+        padding: const EdgeInsets.symmetric(
+          horizontal: padH,
+          vertical: padV + 2,
+        ),
         child: Align(
           alignment: align == TextAlign.right
               ? Alignment.centerRight
@@ -1117,7 +1164,10 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     TableCell h(String t, {TextAlign align = TextAlign.left}) {
       return TableCell(
         verticalAlignment: TableCellVerticalAlignment.middle,
-        child: ColoredBox(color: headerBg, child: hText(t, align: align)),
+        child: ColoredBox(
+          color: headerBg,
+          child: hText(t, align: align),
+        ),
       );
     }
 
@@ -1134,7 +1184,10 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
             onTap: () => _openDetailsScreen(o),
             hoverColor: cs.primary.withValues(alpha: 0.06),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: padH, vertical: padV),
+              padding: const EdgeInsets.symmetric(
+                horizontal: padH,
+                vertical: padV,
+              ),
               child: Align(
                 alignment: align,
                 child: DefaultTextStyle(style: cellStyle, child: child),
@@ -1175,8 +1228,9 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
       final rokOut =
           o.requestedDeliveryDate ?? o.scheduledEndAt ?? o.scheduledStartAt;
       final notes = o.notes?.trim();
-      final noteLine =
-          (notes == null || notes.isEmpty) ? '—' : notes.replaceAll('\n', ' ');
+      final noteLine = (notes == null || notes.isEmpty)
+          ? '—'
+          : notes.replaceAll('\n', ' ');
       return TableRow(
         children: [
           cell(o, oneLine(_formatDate(o.createdAt))),
@@ -1188,11 +1242,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
             ),
           ),
           cell(o, oneLine(_formatDate(rokOut))),
-          cell(
-            o,
-            oneLine(_leadDaysLabel(o)),
-            align: Alignment.centerRight,
-          ),
+          cell(o, oneLine(_leadDaysLabel(o)), align: Alignment.centerRight),
           if (v.showRn) cell(o, oneLine(_rnCellOneLine(o))),
           cell(o, _reportProductCodeCell(o)),
           cell(o, oneLine(o.productName)),
@@ -1225,7 +1275,10 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     );
   }
 
-  Widget _reportCustomerFooter(String customer, List<ProductionOrderModel> rows) {
+  Widget _reportCustomerFooter(
+    String customer,
+    List<ProductionOrderModel> rows,
+  ) {
     final cs = Theme.of(context).colorScheme;
     double sumPlan = 0;
     double sumGood = 0;
@@ -1269,9 +1322,9 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     final blocks = <Widget>[
       Text(
         'Dana: narudžba → rok isporuke. RN / palete / napomena samo ako postoje u grupi.',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: cs.onSurfaceVariant,
-            ),
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
       ),
       const SizedBox(height: 10),
     ];
@@ -1319,9 +1372,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
                 padding: const EdgeInsets.only(bottom: 2, right: 4),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minWidth: cons.maxWidth),
-                  child: IntrinsicWidth(
-                    child: _reportOrdersTable(rows, vis),
-                  ),
+                  child: IntrinsicWidth(child: _reportOrdersTable(rows, vis)),
                 ),
               );
             },
@@ -1355,9 +1406,9 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
           children: [
             Text(
               'Zeleno: zaliha pokriva ostatak plana.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 10),
             for (final customer in keys) ...[
@@ -1365,7 +1416,10 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
                 color: cs.primaryContainer,
                 borderRadius: BorderRadius.circular(12),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                   child: Text(
                     customer,
                     style: TextStyle(
@@ -1387,23 +1441,23 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
                 clipBehavior: Clip.antiAlias,
                 child: LayoutBuilder(
                   builder: (ctx, cons) {
-                    final sorted = List<ProductionOrderModel>.from(
-                      byCustomer[customer]!,
-                    )..sort((a, b) {
-                        final c =
-                            _pnDeadlineSort(a).compareTo(_pnDeadlineSort(b));
-                        if (c != 0) return c;
-                        return a.productionOrderCode
-                            .compareTo(b.productionOrderCode);
-                      });
+                    final sorted =
+                        List<ProductionOrderModel>.from(byCustomer[customer]!)
+                          ..sort((a, b) {
+                            final c = _pnDeadlineSort(
+                              a,
+                            ).compareTo(_pnDeadlineSort(b));
+                            if (c != 0) return c;
+                            return a.productionOrderCode.compareTo(
+                              b.productionOrderCode,
+                            );
+                          });
                     return SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.only(bottom: 2, right: 4),
                       child: ConstrainedBox(
                         constraints: BoxConstraints(minWidth: cons.maxWidth),
-                        child: IntrinsicWidth(
-                          child: _pnOrdersTable(sorted),
-                        ),
+                        child: IntrinsicWidth(child: _pnOrdersTable(sorted)),
                       ),
                     );
                   },
@@ -1422,8 +1476,8 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     final op = _filterOperationName == null
         ? ''
         : _filterOperationName == '__bez_procesa__'
-            ? ' · proces: (bez oznake)'
-            : ' · proces: $_filterOperationName';
+        ? ' · proces: (bez oznake)'
+        : ' · proces: $_filterOperationName';
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Text(
@@ -1439,23 +1493,23 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     final list = _filteredOrders;
 
     Widget loadingBody() => const Center(
-          child: Padding(
-            padding: EdgeInsets.all(32),
-            child: CircularProgressIndicator(),
-          ),
-        );
+      child: Padding(
+        padding: EdgeInsets.all(32),
+        child: CircularProgressIndicator(),
+      ),
+    );
 
     Widget errorBody() => Padding(
-          padding: const EdgeInsets.all(16),
-          child: Center(child: Text(_error!, textAlign: TextAlign.center)),
-        );
+      padding: const EdgeInsets.all(16),
+      child: Center(child: Text(_error!, textAlign: TextAlign.center)),
+    );
 
     Widget emptyBody() => const Center(
-          child: Padding(
-            padding: EdgeInsets.symmetric(vertical: 48),
-            child: Text('Nema proizvodnih naloga za trenutne filtere.'),
-          ),
-        );
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 48),
+        child: Text('Nema proizvodnih naloga za trenutne filtere.'),
+      ),
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
@@ -1463,85 +1517,82 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
         child: _isLoading
             ? loadingBody()
             : _error != null
-                ? errorBody()
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _buildHeader(),
-                            const SizedBox(height: 16),
-                            _buildKpis(),
-                            const SizedBox(height: 12),
-                            _buildSearchAndFiltersStrip(),
-                          ],
-                        ),
-                      ),
-                      if (list.isEmpty)
-                        Expanded(child: emptyBody())
-                      else ...[
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _buildReportMetaLine(),
-                              Material(
-                                color: Theme.of(context).colorScheme.surface,
-                                borderRadius: BorderRadius.circular(12),
-                                clipBehavior: Clip.antiAlias,
-                                child: TabBar(
-                                  controller: _tabController,
-                                  labelColor: Theme.of(context).colorScheme.primary,
-                                  unselectedLabelColor:
-                                      Theme.of(context).colorScheme.onSurfaceVariant,
-                                  tabs: const [
-                                    Tab(text: 'Zalihe i status'),
-                                    Tab(text: 'Izvještaj'),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: RefreshIndicator(
-                            onRefresh: _loadOrders,
-                            child: TabBarView(
+            ? errorBody()
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildHeader(),
+                        const SizedBox(height: 16),
+                        _buildKpis(),
+                        const SizedBox(height: 12),
+                        _buildSearchAndFiltersStrip(),
+                      ],
+                    ),
+                  ),
+                  if (list.isEmpty)
+                    Expanded(child: emptyBody())
+                  else ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildReportMetaLine(),
+                          Material(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            clipBehavior: Clip.antiAlias,
+                            child: TabBar(
                               controller: _tabController,
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              children: [
-                                ListView(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                                  children: [
-                                    if (_stockLoading)
-                                      const Padding(
-                                        padding: EdgeInsets.only(bottom: 8),
-                                        child: LinearProgressIndicator(
-                                          minHeight: 3,
-                                        ),
-                                      ),
-                                    _buildGroupedPnTables(list),
-                                  ],
-                                ),
-                                ListView(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                                  children: [
-                                    _buildReportGroupedTables(list),
-                                  ],
-                                ),
+                              labelColor: Theme.of(context).colorScheme.primary,
+                              unselectedLabelColor: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                              tabs: const [
+                                Tab(text: 'Zalihe i status'),
+                                Tab(text: 'Izvještaj'),
                               ],
                             ),
                           ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: _loadOrders,
+                        child: TabBarView(
+                          controller: _tabController,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            ListView(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                              children: [
+                                if (_stockLoading)
+                                  const Padding(
+                                    padding: EdgeInsets.only(bottom: 8),
+                                    child: LinearProgressIndicator(
+                                      minHeight: 3,
+                                    ),
+                                  ),
+                                _buildGroupedPnTables(list),
+                              ],
+                            ),
+                            ListView(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                              children: [_buildReportGroupedTables(list)],
+                            ),
+                          ],
                         ),
-                      ],
-                    ],
-                  ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
       ),
     );
   }

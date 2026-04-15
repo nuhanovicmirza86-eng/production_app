@@ -177,11 +177,12 @@ class ProductionOrderModel {
       sourceOrderNumber: map['sourceOrderNumber']?.toString(),
       sourceCustomerId: map['sourceCustomerId']?.toString(),
       sourceCustomerName: map['sourceCustomerName']?.toString(),
-      sourceOrderDate: (map['sourceOrderDate'] as Timestamp?)?.toDate() ??
+      sourceOrderDate:
+          (map['sourceOrderDate'] as Timestamp?)?.toDate() ??
           (map['orderDate'] as Timestamp?)?.toDate(),
       requestedDeliveryDate:
           (map['requestedDeliveryDate'] as Timestamp?)?.toDate() ??
-              (map['deliveryDeadline'] as Timestamp?)?.toDate(),
+          (map['deliveryDeadline'] as Timestamp?)?.toDate(),
       plannedQty: (map['plannedQty'] ?? 0).toDouble(),
       producedGoodQty: (map['producedGoodQty'] ?? 0).toDouble(),
       producedScrapQty: (map['producedScrapQty'] ?? 0).toDouble(),

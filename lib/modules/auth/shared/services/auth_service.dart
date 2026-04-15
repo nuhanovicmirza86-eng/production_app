@@ -5,8 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final FirebaseFunctions _functions =
-      FirebaseFunctions.instanceFor(region: 'europe-west1');
+  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
+    region: 'europe-west1',
+  );
 
   Future<User?> signIn(String email, String password) async {
     final cred = await _auth.signInWithEmailAndPassword(
@@ -62,7 +63,9 @@ class AuthService {
       case 'unauthenticated':
         return 'Nisi prijavljen. Pokušaj ponovo registraciju.';
       default:
-        return m.isNotEmpty ? m : 'Greška pri provjeri šifre firme (${e.code}).';
+        return m.isNotEmpty
+            ? m
+            : 'Greška pri provjeri šifre firme (${e.code}).';
     }
   }
 
@@ -75,9 +78,7 @@ class AuthService {
 
     try {
       final callable = _functions.httpsCallable('resolveCompanyByCode');
-      final res = await callable.call(<String, dynamic>{
-        'companyCode': code,
-      });
+      final res = await callable.call(<String, dynamic>{'companyCode': code});
       final raw = res.data;
       if (raw is! Map) {
         throw Exception('Nepotpuni odgovor servera.');

@@ -127,9 +127,12 @@ class SupplierOperationalAuto {
           ? _int(m['nonconformanceCount'])
           : 0,
       claimCount: m.containsKey('claimCount') ? _int(m['claimCount']) : 0,
-      qtyMismatchLines:
-          m.containsKey('qtyMismatchLines') ? _int(m['qtyMismatchLines']) : 0,
-      rejectedLines: m.containsKey('rejectedLines') ? _int(m['rejectedLines']) : 0,
+      qtyMismatchLines: m.containsKey('qtyMismatchLines')
+          ? _int(m['qtyMismatchLines'])
+          : 0,
+      rejectedLines: m.containsKey('rejectedLines')
+          ? _int(m['rejectedLines'])
+          : 0,
       linkedNonconformityCount: m.containsKey('linkedNonconformityCount')
           ? _int(m['linkedNonconformityCount'])
           : 0,
@@ -334,6 +337,8 @@ DateTime? _toDate(dynamic v) {
 
 List<String> _stringList(dynamic raw) {
   if (raw is! List) return const [];
-  return raw.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+  return raw
+      .map((e) => e.toString().trim())
+      .where((e) => e.isNotEmpty)
+      .toList();
 }
-

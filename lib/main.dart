@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'firebase_options.dart';
+import 'package:production_app/core/theme/operonix_production_brand.dart';
 import 'modules/auth/session/screens/auth_wrapper.dart';
 
 bool get _isDesktopNative =>
@@ -31,13 +32,58 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     const brand = Color(0xFF164344);
 
+    final baseTheme = ThemeData(
+      colorScheme: ColorScheme.fromSeed(seedColor: brand),
+      useMaterial3: true,
+      visualDensity: kIsWeb ? VisualDensity.compact : VisualDensity.standard,
+    );
+    final scheme = baseTheme.colorScheme;
+
     return MaterialApp(
       title: 'Operonix Production',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: brand),
-        useMaterial3: true,
-        visualDensity: kIsWeb ? VisualDensity.compact : VisualDensity.standard,
+      theme: baseTheme.copyWith(
+        cardTheme: const CardThemeData(
+          surfaceTintColor: Colors.transparent,
+          elevation: 1,
+          clipBehavior: Clip.antiAlias,
+          shape: kOperonixProductionCardShape,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          border: OutlineInputBorder(
+            borderRadius: const BorderRadius.all(Radius.circular(12)),
+            borderSide: BorderSide(
+              color: kOperonixProductionBrandGreen.withValues(alpha: 0.45),
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: const BorderRadius.all(Radius.circular(12)),
+            borderSide: BorderSide(
+              color: kOperonixProductionBrandGreen.withValues(alpha: 0.45),
+            ),
+          ),
+          focusedBorder: const OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+            borderSide: BorderSide(
+              color: kOperonixProductionBrandGreen,
+              width: 2,
+            ),
+          ),
+          disabledBorder: OutlineInputBorder(
+            borderRadius: const BorderRadius.all(Radius.circular(12)),
+            borderSide: BorderSide(
+              color: scheme.onSurface.withValues(alpha: 0.12),
+            ),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: const BorderRadius.all(Radius.circular(12)),
+            borderSide: BorderSide(color: scheme.error),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: const BorderRadius.all(Radius.circular(12)),
+            borderSide: BorderSide(color: scheme.error, width: 2),
+          ),
+        ),
       ),
       builder: (context, child) {
         if (child == null) return const SizedBox.shrink();

@@ -18,8 +18,9 @@ class EditUserDialog extends StatefulWidget {
 
 class _EditUserDialogState extends State<EditUserDialog> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final FirebaseFunctions _functions =
-      FirebaseFunctions.instanceFor(region: 'europe-west1');
+  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
+    region: 'europe-west1',
+  );
 
   static const List<String> _productionRoles = <String>[
     'production_operator',
@@ -283,7 +284,6 @@ class _EditUserDialogState extends State<EditUserDialog> {
                     DropdownButtonFormField<String>(
                       initialValue: _selectedRole,
                       decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
                         labelText: 'Production uloga',
                       ),
                       items: _productionRoles
@@ -308,10 +308,7 @@ class _EditUserDialogState extends State<EditUserDialog> {
                       initialValue: _selectedPlantKey.isEmpty
                           ? null
                           : _selectedPlantKey,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        labelText: 'Pogon',
-                      ),
+                      decoration: const InputDecoration(labelText: 'Pogon'),
                       items: _plants.map((p) {
                         final pd = p.data();
                         final pk = _s(pd['plantKey']).isNotEmpty
@@ -336,10 +333,7 @@ class _EditUserDialogState extends State<EditUserDialog> {
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: _selectedStatus,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        labelText: 'Status',
-                      ),
+                      decoration: const InputDecoration(labelText: 'Status'),
                       items: _allowedStatuses
                           .map(
                             (status) => DropdownMenuItem<String>(

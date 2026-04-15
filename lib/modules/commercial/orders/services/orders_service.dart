@@ -195,7 +195,10 @@ class OrdersService {
     final header = await getOrderById(companyId: companyId, orderId: orderId);
     if (header == null) return null;
 
-    final rawItems = await getOrderItems(companyId: companyId, orderId: orderId);
+    final rawItems = await getOrderItems(
+      companyId: companyId,
+      orderId: orderId,
+    );
     rawItems.sort((a, b) {
       final la = (a['lineId'] ?? '').toString();
       final lb = (b['lineId'] ?? '').toString();
@@ -387,10 +390,12 @@ class OrdersService {
       throw Exception('Nedostaje ID stavke narudžbe (order_items)');
     }
 
-    final sourceCustomerId =
-        orderType == OrderType.customer ? partnerId.trim() : null;
-    final sourceCustomerName =
-        orderType == OrderType.customer ? partnerName.trim() : null;
+    final sourceCustomerId = orderType == OrderType.customer
+        ? partnerId.trim()
+        : null;
+    final sourceCustomerName = orderType == OrderType.customer
+        ? partnerName.trim()
+        : null;
 
     final prodService = ProductionOrderService(firestore: _firestore);
     final plantCode = (companyData['plantCode'] ?? '').toString().trim();
@@ -411,14 +416,18 @@ class OrdersService {
       createdBy: userId,
       scheduledEndAt: scheduledEndAt,
       customerId: sourceCustomerId?.isEmpty ?? true ? null : sourceCustomerId,
-      customerName:
-          sourceCustomerName?.isEmpty ?? true ? null : sourceCustomerName,
+      customerName: sourceCustomerName?.isEmpty ?? true
+          ? null
+          : sourceCustomerName,
       sourceOrderId: orderId,
       sourceOrderItemId: orderItemDocId,
       sourceOrderNumber: orderNumber,
-      sourceCustomerId: sourceCustomerId?.isEmpty ?? true ? null : sourceCustomerId,
-      sourceCustomerName:
-          sourceCustomerName?.isEmpty ?? true ? null : sourceCustomerName,
+      sourceCustomerId: sourceCustomerId?.isEmpty ?? true
+          ? null
+          : sourceCustomerId,
+      sourceCustomerName: sourceCustomerName?.isEmpty ?? true
+          ? null
+          : sourceCustomerName,
       sourceOrderDate: sourceOrderDate,
       requestedDeliveryDate: requestedDeliveryDate,
     );
@@ -427,8 +436,9 @@ class OrdersService {
         .collection('production_orders')
         .doc(productionOrderId)
         .get();
-    final productionOrderCode =
-        (poSnap.data()?['productionOrderCode'] ?? '').toString().trim();
+    final productionOrderCode = (poSnap.data()?['productionOrderCode'] ?? '')
+        .toString()
+        .trim();
     if (productionOrderCode.isEmpty) {
       throw Exception('Proizvodni nalog nema orderCode nakon kreiranja');
     }

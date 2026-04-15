@@ -128,7 +128,9 @@ class _SupplierEvaluationsScreenState extends State<SupplierEvaluationsScreen> {
         deliveryRating: delivery,
         responseRating: response,
         complianceRating: compliance,
-        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
       );
 
       _notesController.clear();
@@ -211,7 +213,6 @@ class _SupplierEvaluationsScreenState extends State<SupplierEvaluationsScreen> {
                       controller: _periodController,
                       decoration: const InputDecoration(
                         labelText: 'Period (npr. 2026-Q2)',
-                        border: OutlineInputBorder(),
                       ),
                       validator: (v) =>
                           (v ?? '').trim().isEmpty ? 'Obavezno' : null,
@@ -219,23 +220,31 @@ class _SupplierEvaluationsScreenState extends State<SupplierEvaluationsScreen> {
                     const SizedBox(height: 10),
                     _ratingField(_qualityController, 'Quality rating (0-100)'),
                     const SizedBox(height: 10),
-                    _ratingField(_deliveryController, 'Delivery rating (0-100)'),
+                    _ratingField(
+                      _deliveryController,
+                      'Delivery rating (0-100)',
+                    ),
                     const SizedBox(height: 10),
-                    _ratingField(_responseController, 'Response rating (0-100)'),
+                    _ratingField(
+                      _responseController,
+                      'Response rating (0-100)',
+                    ),
                     const SizedBox(height: 10),
-                    _ratingField(_complianceController, 'Compliance rating (0-100)'),
+                    _ratingField(
+                      _complianceController,
+                      'Compliance rating (0-100)',
+                    ),
                     const SizedBox(height: 10),
                     TextFormField(
                       controller: _notesController,
                       maxLines: 2,
-                      decoration: const InputDecoration(
-                        labelText: 'Napomena',
-                        border: OutlineInputBorder(),
-                      ),
+                      decoration: const InputDecoration(labelText: 'Napomena'),
                     ),
                     const SizedBox(height: 12),
                     FilledButton.icon(
-                      onPressed: (!_canEvaluate || _saving) ? null : _createEvaluation,
+                      onPressed: (!_canEvaluate || _saving)
+                          ? null
+                          : _createEvaluation,
                       icon: const Icon(Icons.assessment_outlined),
                       label: const Text('Snimi evaluaciju'),
                     ),
@@ -246,26 +255,32 @@ class _SupplierEvaluationsScreenState extends State<SupplierEvaluationsScreen> {
           ),
           const SizedBox(height: 12),
           if (_loading)
-            const Center(child: Padding(
-              padding: EdgeInsets.all(24),
-              child: CircularProgressIndicator(),
-            ))
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(),
+              ),
+            )
           else if (_evaluations.isEmpty)
             const Text('Nema evaluacija za ovog dobavljača.')
           else
-            ..._evaluations.map((e) => Card(
-                  child: ListTile(
-                    title: Text('${e.periodKey} • ${e.overallScore.toStringAsFixed(1)}'),
-                    subtitle: Text(
-                      'Q:${e.qualityRating.toStringAsFixed(1)} '
-                      'D:${e.deliveryRating.toStringAsFixed(1)} '
-                      'R:${e.responseRating.toStringAsFixed(1)} '
-                      'C:${e.complianceRating.toStringAsFixed(1)}\n'
-                      'Risk: ${e.riskLevel} • Status: ${e.approvalStatus}',
-                    ),
-                    isThreeLine: true,
+            ..._evaluations.map(
+              (e) => Card(
+                child: ListTile(
+                  title: Text(
+                    '${e.periodKey} • ${e.overallScore.toStringAsFixed(1)}',
                   ),
-                )),
+                  subtitle: Text(
+                    'Q:${e.qualityRating.toStringAsFixed(1)} '
+                    'D:${e.deliveryRating.toStringAsFixed(1)} '
+                    'R:${e.responseRating.toStringAsFixed(1)} '
+                    'C:${e.complianceRating.toStringAsFixed(1)}\n'
+                    'Risk: ${e.riskLevel} • Status: ${e.approvalStatus}',
+                  ),
+                  isThreeLine: true,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -274,10 +289,7 @@ class _SupplierEvaluationsScreenState extends State<SupplierEvaluationsScreen> {
   Widget _ratingField(TextEditingController controller, String label) {
     return TextFormField(
       controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-      ),
+      decoration: InputDecoration(labelText: label),
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       validator: (v) {
         final n = double.tryParse((v ?? '').trim().replaceAll(',', '.'));
@@ -288,4 +300,3 @@ class _SupplierEvaluationsScreenState extends State<SupplierEvaluationsScreen> {
     );
   }
 }
-

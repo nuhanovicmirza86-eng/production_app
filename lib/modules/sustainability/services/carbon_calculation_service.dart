@@ -50,8 +50,7 @@ class CarbonCalculationService {
     final perUnitKg = units > 0 ? totalKg / units : 0.0;
 
     final rev = setup.revenue;
-    final per1000Rev =
-        rev > 0 ? (totalT / rev) * 1000.0 : 0.0;
+    final per1000Rev = rev > 0 ? (totalT / rev) * 1000.0 : 0.0;
 
     return CarbonDashboardSummary(
       totalKgCo2e: totalKg,

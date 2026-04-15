@@ -35,8 +35,7 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
       TextEditingController();
   final TextEditingController _secondaryClassDescController =
       TextEditingController();
-  final TextEditingController _packagingQtyController =
-      TextEditingController();
+  final TextEditingController _packagingQtyController = TextEditingController();
   final TextEditingController _standardUnitPriceController =
       TextEditingController();
   final TextEditingController _currencyController = TextEditingController(
@@ -57,11 +56,7 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
           .trim();
 
   InputDecoration _dec(String label, {String? hint}) {
-    return InputDecoration(
-      labelText: label,
-      hintText: hint,
-      border: const OutlineInputBorder(),
-    );
+    return InputDecoration(labelText: label, hintText: hint);
   }
 
   double? _optionalPositiveDouble(String text) {
@@ -138,14 +133,15 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
         packagingQty: _optionalPositiveDouble(_packagingQtyController.text),
         secondaryClassificationCode:
             _secondaryClassCodeController.text.trim().isEmpty
-                ? null
-                : _secondaryClassCodeController.text.trim(),
+            ? null
+            : _secondaryClassCodeController.text.trim(),
         secondaryClassificationDescription:
             _secondaryClassDescController.text.trim().isEmpty
-                ? null
-                : _secondaryClassDescController.text.trim(),
-        standardUnitPrice:
-            _optionalUnitPrice(_standardUnitPriceController.text),
+            ? null
+            : _secondaryClassDescController.text.trim(),
+        standardUnitPrice: _optionalUnitPrice(
+          _standardUnitPriceController.text,
+        ),
         currency: _currencyController.text.trim().isEmpty
             ? null
             : _currencyController.text.trim(),
@@ -306,8 +302,9 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _packagingQtyController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: _dec(
                     'Količina pakovanja',
                     hint: 'Za kolonu „Kol.“ na listi',
@@ -316,8 +313,9 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _standardUnitPriceController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: _dec(
                     'Jedinična cijena',
                     hint: 'Za listu / izvještaje',

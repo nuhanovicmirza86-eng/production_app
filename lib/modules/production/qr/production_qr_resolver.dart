@@ -30,7 +30,6 @@ enum ProductionQrIntent {
 
   /// Placeholder za buduće lot-based QR (zaliha, prenos).
   // inventoryLotV1,
-
   nepoznat,
 }
 
@@ -56,8 +55,7 @@ class ProductionQrScanResolution {
   /// Kad je [intent] [ProductionQrIntent.printedClassificationLabelV1].
   final Map<String, dynamic>? labelFields;
 
-  bool get isKnown =>
-      intent != ProductionQrIntent.nepoznat;
+  bool get isKnown => intent != ProductionQrIntent.nepoznat;
 }
 
 /// Jedna ulazna tačka za skener: prepoznaje sve registrirane formate.

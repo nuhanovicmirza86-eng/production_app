@@ -611,7 +611,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                             labelText: 'Pretraga komponente',
                             hintText: 'Unesi šifru ili naziv',
                             helperText: '🛈 Primjer: CEP, Etiketa, Ambalaža',
-                            border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.search),
                           ),
                           onChanged: searchProducts,
@@ -742,7 +741,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                           decoration: const InputDecoration(
                             labelText: 'Količina za 1 komad',
                             hintText: 'npr. 1 ili 0.05',
-                            border: OutlineInputBorder(),
                           ),
                           validator: (value) {
                             final qty = _d(value);
@@ -759,7 +757,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                           decoration: const InputDecoration(
                             labelText: 'Jedinica mjere',
                             hintText: 'npr. KOM',
-                            border: OutlineInputBorder(),
                           ),
                           validator: (value) {
                             if ((value ?? '').trim().isEmpty) {
@@ -774,7 +771,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                           decoration: const InputDecoration(
                             labelText: 'Napomena',
                             hintText: 'opcionalno',
-                            border: OutlineInputBorder(),
                           ),
                         ),
                       ],
@@ -918,7 +914,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                           decoration: const InputDecoration(
                             labelText: 'Količina za 1 komad',
                             hintText: 'npr. 1 ili 0.05',
-                            border: OutlineInputBorder(),
                           ),
                           validator: (value) {
                             final qty = _d(value);
@@ -935,7 +930,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                           decoration: const InputDecoration(
                             labelText: 'Jedinica mjere',
                             hintText: 'npr. KOM',
-                            border: OutlineInputBorder(),
                           ),
                           validator: (value) {
                             if ((value ?? '').trim().isEmpty) {
@@ -950,7 +944,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                           decoration: const InputDecoration(
                             labelText: 'Napomena',
                             hintText: 'opcionalno',
-                            border: OutlineInputBorder(),
                           ),
                         ),
                       ],
@@ -1193,14 +1186,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
               'Sek. klasifikacija (opis)',
               _s(product['secondaryClassificationDescription']),
             ),
-            _infoRow(
-              'Količina pakovanja',
-              _s(product['packagingQty']),
-            ),
-            _infoRow(
-              'Jedinična cijena',
-              _s(product['standardUnitPrice']),
-            ),
+            _infoRow('Količina pakovanja', _s(product['packagingQty'])),
+            _infoRow('Jedinična cijena', _s(product['standardUnitPrice'])),
             _infoRow('Valuta', _s(product['currency'])),
           ],
         ),
@@ -1421,7 +1408,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
               decoration: const InputDecoration(
                 labelText: 'Klasifikacija sastavnice',
                 helperText: '🛈 Svaka klasifikacija ima svoju sastavnicu.',
-                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 16),
@@ -1435,7 +1421,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                 hintText: 'npr. 12',
                 helperText:
                     '🛈 Broj komada u jednom pakovanju koji će se ispisivati na etiketi.',
-                border: OutlineInputBorder(),
               ),
               onChanged: (value) async {
                 final parsed = double.tryParse(value.replaceAll(',', '.'));

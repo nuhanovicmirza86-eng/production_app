@@ -127,11 +127,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
   }
 
   InputDecoration _dec(String label, {String? hint}) {
-    return InputDecoration(
-      labelText: label,
-      hintText: hint,
-      border: const OutlineInputBorder(),
-    );
+    return InputDecoration(labelText: label, hintText: hint);
   }
 
   Future<void> _save() async {
@@ -142,9 +138,9 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
       if (s.isEmpty) return 0.0;
       final v = double.tryParse(s);
       if (v == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Neispravan broj: $label')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Neispravan broj: $label')));
         return null;
       }
       return v;
@@ -192,8 +188,8 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
         routingVersion: _routingVersionController.text.trim(),
         packagingQty: packUp,
         secondaryClassificationCode: _secondaryClassCodeController.text.trim(),
-        secondaryClassificationDescription:
-            _secondaryClassDescController.text.trim(),
+        secondaryClassificationDescription: _secondaryClassDescController.text
+            .trim(),
         standardUnitPrice: priceUp,
         currency: _currencyController.text.trim(),
         isActive: _isActive,
@@ -339,8 +335,9 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _packagingQtyController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: _dec(
                     'Količina pakovanja',
                     hint: 'Prazno = ukloni',
@@ -349,12 +346,10 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _standardUnitPriceController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: _dec(
-                    'Jedinična cijena',
-                    hint: 'Prazno = ukloni',
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
                   ),
+                  decoration: _dec('Jedinična cijena', hint: 'Prazno = ukloni'),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(

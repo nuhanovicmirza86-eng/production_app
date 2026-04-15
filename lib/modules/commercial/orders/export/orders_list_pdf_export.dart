@@ -11,8 +11,16 @@ import '../order_status_ui.dart';
 
 /// PDF izvoz usklađen s ekranom: grupe po partneru, redovi po stavci, sort po roku isporuke.
 class OrdersListPdfExport {
-  static final PdfColor _readyRowFill = PdfColor(200 / 255, 230 / 255, 201 / 255);
-  static final PdfColor _groupHeaderFill = PdfColor(80 / 255, 80 / 255, 80 / 255);
+  static final PdfColor _readyRowFill = PdfColor(
+    200 / 255,
+    230 / 255,
+    201 / 255,
+  );
+  static final PdfColor _groupHeaderFill = PdfColor(
+    80 / 255,
+    80 / 255,
+    80 / 255,
+  );
 
   static Future<pw.Font> _font(String asset) async {
     final b = await rootBundle.load(asset);
@@ -93,8 +101,10 @@ class OrdersListPdfExport {
       }
     }
     lines.sort((a, b) {
-      final c =
-          _deadlineSortKey(a.o, a.it).compareTo(_deadlineSortKey(b.o, b.it));
+      final c = _deadlineSortKey(
+        a.o,
+        a.it,
+      ).compareTo(_deadlineSortKey(b.o, b.it));
       if (c != 0) return c;
       final n = a.o.orderNumber.compareTo(b.o.orderNumber);
       if (n != 0) return n;
@@ -103,7 +113,9 @@ class OrdersListPdfExport {
     return lines;
   }
 
-  static Map<String, List<OrderModel>> _groupByPartner(List<OrderModel> orders) {
+  static Map<String, List<OrderModel>> _groupByPartner(
+    List<OrderModel> orders,
+  ) {
     final m = <String, List<OrderModel>>{};
     for (final o in orders) {
       final k = o.partnerName.trim().isEmpty
@@ -169,10 +181,7 @@ class OrdersListPdfExport {
       );
     }
 
-    pw.TableRow dataRow(
-      OrderModel o,
-      OrderItemModel? it,
-    ) {
+    pw.TableRow dataRow(OrderModel o, OrderItemModel? it) {
       final ready = _rowReady(o, it, stockByProductId);
       final rowFill = ready ? _readyRowFill : null;
       final ref = _partnerRef(o);
@@ -216,10 +225,7 @@ class OrdersListPdfExport {
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
     final blocks = <pw.Widget>[
-      pw.Text(
-        reportTitle,
-        style: pw.TextStyle(font: fontB, fontSize: 14),
-      ),
+      pw.Text(reportTitle, style: pw.TextStyle(font: fontB, fontSize: 14)),
       if (companyLine != null && companyLine.trim().isNotEmpty)
         pw.Padding(
           padding: const pw.EdgeInsets.only(top: 4, bottom: 2),
@@ -230,11 +236,7 @@ class OrdersListPdfExport {
         ),
       pw.Text(
         'Generisano: ${formatCalendarDay(now)} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
-        style: pw.TextStyle(
-          font: fontR,
-          fontSize: 8,
-          color: PdfColors.grey700,
-        ),
+        style: pw.TextStyle(font: fontR, fontSize: 8, color: PdfColors.grey700),
       ),
       if (filterDescription != null && filterDescription.trim().isNotEmpty)
         pw.Padding(
@@ -253,10 +255,14 @@ class OrdersListPdfExport {
         child: pw.Text(
           stockByProductId != null && stockByProductId.isNotEmpty
               ? 'Grupisano po partneru; redovi sortirani po roku isporuke. '
-                  'Zelena pozadina: zaliha pokriva ostatak (ako su zalihe učitane u aplikaciji pri izvozu).'
+                    'Zelena pozadina: zaliha pokriva ostatak (ako su zalihe učitane u aplikaciji pri izvozu).'
               : 'Grupisano po partneru; redovi sortirani po roku isporuke. '
-                  'Kolona Stanje: — ako zalihe nisu proslijeđene iz aplikacije.',
-          style: pw.TextStyle(font: fontR, fontSize: 7, color: PdfColors.grey800),
+                    'Kolona Stanje: — ako zalihe nisu proslijeđene iz aplikacije.',
+          style: pw.TextStyle(
+            font: fontR,
+            fontSize: 7,
+            color: PdfColors.grey800,
+          ),
         ),
       ),
     ];

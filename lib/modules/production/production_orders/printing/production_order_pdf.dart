@@ -131,10 +131,9 @@ class ProductionOrderPdf {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(36),
         build: (ctx) {
-          final customer =
-              (order.customerName ?? '').trim().isEmpty
-                  ? '—'
-                  : order.customerName!.trim();
+          final customer = (order.customerName ?? '').trim().isEmpty
+              ? '—'
+              : order.customerName!.trim();
 
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -293,10 +292,7 @@ class ProductionOrderPdf {
                   kv('Kupac (narudžba)', order.sourceCustomerName!.trim()),
               ],
               if (order.hasCriticalChanges)
-                kv(
-                  'Napomena',
-                  'Nalog ima kritične izmjene nakon kreiranja.',
-                ),
+                kv('Napomena', 'Nalog ima kritične izmjene nakon kreiranja.'),
               pw.SizedBox(height: 14),
               pw.Text(
                 'Komentari',

@@ -149,7 +149,9 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
 
     if (_partner == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Odaberi partnera (kupca ili dobavljača).')),
+        const SnackBar(
+          content: Text('Odaberi partnera (kupca ili dobavljača).'),
+        ),
       );
       return;
     }
@@ -217,15 +219,15 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Narudžba je kreirana.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Narudžba je kreirana.')));
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     } finally {
       if (mounted) {
         setState(() => _submitting = false);
@@ -314,10 +316,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
             ),
             TextFormField(
               controller: _notesController,
-              decoration: const InputDecoration(
-                labelText: 'Napomena',
-                border: OutlineInputBorder(),
-              ),
+              decoration: const InputDecoration(labelText: 'Napomena'),
               maxLines: 3,
             ),
             const SizedBox(height: 20),
@@ -355,7 +354,6 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                               child: InputDecorator(
                                 decoration: const InputDecoration(
                                   labelText: 'Proizvod',
-                                  border: OutlineInputBorder(),
                                 ),
                                 child: Text(
                                   _lineLabel(line),
@@ -383,7 +381,6 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                         ),
                         decoration: const InputDecoration(
                           labelText: 'Količina',
-                          border: OutlineInputBorder(),
                         ),
                         validator: (v) {
                           final t = (v ?? '').trim();
@@ -555,10 +552,9 @@ class _PartnerPickerSheetState extends State<_PartnerPickerSheet> {
           const SizedBox(height: 12),
           TextField(
             controller: _q,
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               hintText: 'Pretraga po šifri ili nazivu',
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              prefixIcon: Icon(Icons.search),
             ),
           ),
           const SizedBox(height: 12),
@@ -707,10 +703,9 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
           TextField(
             controller: _q,
             autofocus: true,
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               hintText: 'Šifra ili naziv (typeahead)',
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              prefixIcon: Icon(Icons.search),
             ),
           ),
           const SizedBox(height: 12),

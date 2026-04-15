@@ -56,7 +56,8 @@ class _ProductionOrderCreateScreenState
 
   String get _companyId => (widget.companyData['companyId'] ?? '').toString();
   String get _plantKey => (widget.companyData['plantKey'] ?? '').toString();
-  String get _plantCode => (widget.companyData['plantCode'] ?? '').toString().trim();
+  String get _plantCode =>
+      (widget.companyData['plantCode'] ?? '').toString().trim();
   String get _userId => (widget.companyData['userId'] ?? 'system').toString();
 
   bool get _hasSelectedProduct => _productId != null && _productId!.isNotEmpty;
@@ -361,10 +362,7 @@ class _ProductionOrderCreateScreenState
   }
 
   InputDecoration _dec(String label) {
-    return InputDecoration(
-      labelText: label,
-      border: const OutlineInputBorder(),
-    );
+    return InputDecoration(labelText: label);
   }
 
   Widget _buildProductSuggestions() {
@@ -526,7 +524,10 @@ class _ProductionOrderCreateScreenState
                     const SizedBox(height: 6),
                     Text(
                       'Provjera aktivne sastavnice na proizvodu…',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade700,
+                      ),
                     ),
                   ],
                   if (!_technicalRefsLoading &&

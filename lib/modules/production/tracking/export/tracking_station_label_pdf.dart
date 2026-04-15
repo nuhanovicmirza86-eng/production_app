@@ -45,12 +45,20 @@ class TrackingStationLabelPdf {
               pw.SizedBox(height: 4),
               pw.Text(
                 logistics,
-                style: pw.TextStyle(font: fontB, fontSize: 8.5, color: PdfColors.grey800),
+                style: pw.TextStyle(
+                  font: fontB,
+                  fontSize: 8.5,
+                  color: PdfColors.grey800,
+                ),
               ),
               pw.SizedBox(height: 2),
               pw.Text(
                 'Klasifikacija: $clsTitle ($classification)',
-                style: pw.TextStyle(font: fontR, fontSize: 7.5, color: PdfColors.grey700),
+                style: pw.TextStyle(
+                  font: fontR,
+                  fontSize: 7.5,
+                  color: PdfColors.grey700,
+                ),
               ),
               pw.SizedBox(height: 10),
               pw.Row(
@@ -61,7 +69,10 @@ class TrackingStationLabelPdf {
                     height: 108,
                     padding: const pw.EdgeInsets.all(4),
                     decoration: pw.BoxDecoration(
-                      border: pw.Border.all(color: PdfColors.grey600, width: 0.9),
+                      border: pw.Border.all(
+                        color: PdfColors.grey600,
+                        width: 0.9,
+                      ),
                       borderRadius: pw.BorderRadius.circular(6),
                     ),
                     child: pw.BarcodeWidget(
@@ -74,7 +85,11 @@ class TrackingStationLabelPdf {
                   pw.Expanded(
                     child: pw.Text(
                       'Skeniraj istim QR čitačem kao za pripremnu etiketu (JSON na naljepnici).',
-                      style: pw.TextStyle(font: fontR, fontSize: 7.2, color: PdfColors.grey700),
+                      style: pw.TextStyle(
+                        font: fontR,
+                        fontSize: 7.2,
+                        color: PdfColors.grey700,
+                      ),
                     ),
                   ),
                 ],

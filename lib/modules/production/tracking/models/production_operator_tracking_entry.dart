@@ -19,13 +19,17 @@ class ProductionOperatorTrackingEntry {
   final String? productId;
   final String? productionOrderId;
   final String? commercialOrderId;
+
   /// Broj / oznaka naloga izrade sirovih komada (tekst s etikete ili ručni unos).
   final String? rawMaterialOrderCode;
+
   /// Palica, šarža, linija ili druga interna referenca.
   final String? lineOrBatchRef;
   final String? customerName;
+
   /// Operater koji radi izradu sirovog komada (evidencija).
   final String? rawWorkOperatorName;
+
   /// Ime i prezime (ili nadimak) operatera koji je pripremio — snapshot pri spremanju.
   final String? preparedByDisplayName;
   final String? sourceQrPayload;
@@ -146,11 +150,13 @@ class ProductionOperatorTrackingEntry {
   /// Sažetak škarta za prikaz / PDF: uvijek [namesByCode] (kompanijski naziv) kad postoji za [TrackingScrapLine.code].
   String scrapBreakdownSummaryForDisplay(Map<String, String> namesByCode) {
     if (scrapBreakdown.isEmpty) return '';
-    return scrapBreakdown.map((s) {
-      final dn = namesByCode[s.code]?.trim();
-      final lbl = (dn != null && dn.isNotEmpty) ? dn : s.label;
-      return '$lbl: ${_fmtQty(s.qty)}';
-    }).join(' · ');
+    return scrapBreakdown
+        .map((s) {
+          final dn = namesByCode[s.code]?.trim();
+          final lbl = (dn != null && dn.isNotEmpty) ? dn : s.label;
+          return '$lbl: ${_fmtQty(s.qty)}';
+        })
+        .join(' · ');
   }
 
   static String _fmtQty(double v) =>
@@ -159,12 +165,12 @@ class ProductionOperatorTrackingEntry {
   /// Prikaz kolone „nalog sirovih“: novo polje ili stari [productionOrderId].
   String get displayRawMaterialOrder =>
       (rawMaterialOrderCode ?? '').trim().isNotEmpty
-          ? rawMaterialOrderCode!.trim()
-          : (productionOrderId ?? '').trim();
+      ? rawMaterialOrderCode!.trim()
+      : (productionOrderId ?? '').trim();
 
   /// Tko je pripremio: snapshot ili e-mail.
   String get displayPreparedBy =>
       (preparedByDisplayName ?? '').trim().isNotEmpty
-          ? preparedByDisplayName!.trim()
-          : createdByEmail;
+      ? preparedByDisplayName!.trim()
+      : createdByEmail;
 }

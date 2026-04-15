@@ -270,9 +270,7 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
   @override
   Widget build(BuildContext context) {
     if (_initializingResume) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final started = _executionId != null;
@@ -292,7 +290,8 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
               (_order['productName'] ?? '').toString().trim().isEmpty
                   ? 'Proizvod'
                   : (_order['productName'] ?? '').toString(),
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              style:
+                  Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w800,
                     height: 1.2,
                   ) ??

@@ -4,12 +4,10 @@ import 'package:cloud_functions/cloud_functions.dart';
 import '../models/partner_models.dart';
 
 class CustomersService {
-  CustomersService({
-    FirebaseFirestore? firestore,
-    FirebaseFunctions? functions,
-  })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _functions =
-            functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
+  CustomersService({FirebaseFirestore? firestore, FirebaseFunctions? functions})
+    : _firestore = firestore ?? FirebaseFirestore.instance,
+      _functions =
+          functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
 
   final FirebaseFirestore _firestore;
   final FirebaseFunctions _functions;
@@ -33,8 +31,10 @@ class CustomersService {
     final cid = companyId.trim();
     if (cid.isEmpty) return const [];
 
-    final snap =
-        await _customers.where('companyId', isEqualTo: cid).limit(limit).get();
+    final snap = await _customers
+        .where('companyId', isEqualTo: cid)
+        .limit(limit)
+        .get();
 
     final q = query.trim().toLowerCase();
     final out = <CustomerModel>[];
@@ -45,7 +45,8 @@ class CustomersService {
       if (m.companyId != cid) continue;
 
       if (q.isNotEmpty) {
-        final hay = '${m.code.toLowerCase()} ${m.name.toLowerCase()} '
+        final hay =
+            '${m.code.toLowerCase()} ${m.name.toLowerCase()} '
             '${m.legalName.toLowerCase()}';
         if (!hay.contains(q)) continue;
       }
@@ -106,9 +107,9 @@ class CustomersService {
     final res = await _functions
         .httpsCallable('createCommercialCustomer')
         .call<Map<String, dynamic>>({
-      'companyId': companyId,
-      'customer': _customerPayloadForCallable(payload),
-    });
+          'companyId': companyId,
+          'customer': _customerPayloadForCallable(payload),
+        });
     final data = res.data;
     if (data['success'] != true) {
       throw Exception('Kreiranje kupca nije uspjelo.');
@@ -129,13 +130,12 @@ class CustomersService {
     final res = await _functions
         .httpsCallable('updateCommercialCustomer')
         .call<Map<String, dynamic>>({
-      'companyId': companyId,
-      'customerId': customer.id.trim(),
-      'customer': _customerPayloadForCallable(customer),
-    });
+          'companyId': companyId,
+          'customerId': customer.id.trim(),
+          'customer': _customerPayloadForCallable(customer),
+        });
     if (res.data['success'] != true) {
       throw Exception('Ažuriranje kupca nije uspjelo.');
     }
   }
 }
-

@@ -14,8 +14,9 @@ class PendingUsersScreen extends StatefulWidget {
 
 class _PendingUsersScreenState extends State<PendingUsersScreen> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final FirebaseFunctions _functions =
-      FirebaseFunctions.instanceFor(region: 'europe-west1');
+  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
+    region: 'europe-west1',
+  );
 
   bool _loadingMe = true;
   String? _error;
@@ -503,10 +504,7 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: selectedRole,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: 'Production uloga',
-              ),
+              decoration: const InputDecoration(labelText: 'Production uloga'),
               items: _productionRoles
                   .map(
                     (role) => DropdownMenuItem<String>(
@@ -528,7 +526,6 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
             DropdownButtonFormField<String>(
               initialValue: selectedPlantKey.isEmpty ? null : selectedPlantKey,
               decoration: InputDecoration(
-                border: const OutlineInputBorder(),
                 labelText: loadingPlants ? 'Učitavam pogone...' : 'Pogon',
               ),
               items: plants.map((p) {
@@ -753,7 +750,6 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
                     child: DropdownButtonFormField<String>(
                       initialValue: _usersStatusFilter,
                       decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
                         labelText: 'Filter statusa',
                         isDense: true,
                       ),

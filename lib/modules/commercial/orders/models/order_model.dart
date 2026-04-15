@@ -236,7 +236,9 @@ class OrderItemModel {
       dueDate: _toDate(map['dueDate']),
       lineId: _nullableString(map['lineId']),
       lineStatus: _nullableString(map['status']),
-      linkedProductionOrderCodes: _stringList(map['linkedProductionOrderCodes']),
+      linkedProductionOrderCodes: _stringList(
+        map['linkedProductionOrderCodes'],
+      ),
       deliveredQty: _d(map['deliveredQty']),
       receivedQty: _d(map['receivedQty']),
       openQty: _d(map['openQty']),
@@ -254,8 +256,9 @@ class OrderItemModel {
       dueDate: _toDate(map['dueDate']),
       lineId: _nullableString(map['lineId']),
       lineStatus: _nullableString(map['status']),
-      linkedProductionOrderCodes:
-          _stringList(map['linkedProductionOrderCodes']),
+      linkedProductionOrderCodes: _stringList(
+        map['linkedProductionOrderCodes'],
+      ),
       deliveredQty: _d(map['deliveredQty']),
       receivedQty: _d(map['receivedQty']),
       openQty: _d(map['openQty']),
@@ -279,7 +282,10 @@ class OrderItemModel {
 
   static List<String> _stringList(dynamic raw) {
     if (raw is! List) return const [];
-    return raw.map((e) => e.toString().trim()).where((s) => s.isNotEmpty).toList();
+    return raw
+        .map((e) => e.toString().trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
   }
 
   static String _s(dynamic v) => (v ?? '').toString().trim();

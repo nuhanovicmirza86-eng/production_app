@@ -5,11 +5,7 @@ class PartnerPick {
   final String code;
   final String name;
 
-  const PartnerPick({
-    required this.id,
-    required this.code,
-    required this.name,
-  });
+  const PartnerPick({required this.id, required this.code, required this.name});
 }
 
 /// Minimalni lookup za kupce/dobavljače prema arhitekturi (`customers`, `suppliers`).
