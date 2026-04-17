@@ -25,6 +25,8 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
   String _myRole = '';
   String _myCompanyId = '';
   String _usersStatusFilter = 'all';
+  /// 'all' ili kanonski kod uloge (npr. [admin], [production_operator]).
+  String _roleFilter = 'all';
 
   final Set<String> _busyIds = <String>{};
   final Set<String> _loadingPlantsFor = <String>{};
@@ -50,7 +52,21 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
     'inactive',
   ];
 
-  bool get _isAdmin => _myRole == 'admin';
+  /// Redoslijed grupiranja u listi; nepoznate uloge dolaze na kraju abecedno.
+  static const List<String> _rolesDisplayOrder = <String>[
+    ProductionAccessHelper.roleSuperAdmin,
+    ProductionAccessHelper.roleAdmin,
+    ProductionAccessHelper.roleProductionManager,
+    ProductionAccessHelper.roleSupervisor,
+    ProductionAccessHelper.roleLogisticsManager,
+    'shift_lead',
+    'quality_operator',
+    ProductionAccessHelper.roleProductionOperator,
+    'logistics_operator',
+    ProductionAccessHelper.roleMaintenanceManager,
+  ];
+
+  bool get _isAdmin => ProductionAccessHelper.isAdminRole(_myRole);
 
   String _s(dynamic v) => (v ?? '').toString().trim();
 
@@ -83,7 +99,7 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
       final meData = meSnap.data() ?? <String, dynamic>{};
 
       setState(() {
-        _myRole = _s(meData['role']).toLowerCase();
+        _myRole = ProductionAccessHelper.normalizeRole(meData['role']);
         _myCompanyId = _s(meData['companyId']);
         _loadingMe = false;
       });
@@ -105,6 +121,10 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
     switch (r) {
       case 'admin':
         return 'Admin';
+      case 'super_admin':
+        return 'Super admin';
+      case 'supervisor':
+        return 'Supervizor';
       case 'production_operator':
         return 'Operater proizvodnje';
       case 'quality_operator':
@@ -117,9 +137,27 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
         return 'Vođa smjene';
       case 'production_manager':
         return 'Menadžer proizvodnje';
+      case 'maintenance_manager':
+        return 'Menadžer održavanja';
       default:
-        return role;
+        return role.isEmpty ? '—' : role;
     }
+  }
+
+  String _roleFilterDropdownLabel(String value) {
+    if (value == 'all') return 'Sve uloge';
+    return _roleLabel(value);
+  }
+
+  List<String> _rolesForSections(Iterable<String> normalizedRoles) {
+    final present = normalizedRoles.toSet();
+    final out = <String>[];
+    for (final r in _rolesDisplayOrder) {
+      if (present.contains(r)) out.add(r);
+    }
+    final rest = present.difference(out.toSet()).toList()..sort();
+    out.addAll(rest);
+    return out;
   }
 
   String _statusFilterLabel(String status) {
@@ -647,16 +685,56 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
     final plantKey = _s(data['plantKey']);
     final status = _s(data['status']).toLowerCase();
     final approvedAt = _ts(data['approvedAt']);
+    final isActive = status == 'active';
+
+    final borderColor = isActive ? Colors.green.shade600 : Colors.black12;
+    final bgColor = isActive ? Colors.green.shade50 : null;
 
     return Card(
+      clipBehavior: Clip.antiAlias,
+      color: bgColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: borderColor, width: isActive ? 1.5 : 1),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              displayName,
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    displayName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                if (isActive)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green.shade700),
+                    ),
+                    child: Text(
+                      'Aktivan',
+                      style: TextStyle(
+                        color: Colors.green.shade900,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 6),
             Text(email.isEmpty ? '-' : email),
@@ -665,7 +743,9 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
               Text('Poslovni email: $workEmail'),
             ],
             const SizedBox(height: 4),
-            Text('Rola: ${_roleLabel(_s(data['role']).toLowerCase())}'),
+            Text(
+              'Rola: ${_roleLabel(ProductionAccessHelper.normalizeRole(data['role']))}',
+            ),
             const SizedBox(height: 4),
             Text('Pogon: ${plantKey.isEmpty ? '-' : plantKey}'),
             const SizedBox(height: 4),
@@ -701,79 +781,114 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
 
         final allDocs = snapshot.data!.docs;
 
-        final productionUsers = allDocs
-            .where((doc) {
-              final data = doc.data();
-              final status = _s(data['status']).toLowerCase();
-              final role = _s(data['role']).toLowerCase();
+        final companyUsers = allDocs.where((doc) {
+          final data = doc.data();
+          final status = _s(data['status']).toLowerCase();
 
-              final rawAppAccess = data['appAccess'];
-              final appAccess = rawAppAccess is Map<String, dynamic>
-                  ? rawAppAccess
-                  : <String, dynamic>{};
+          if (_usersStatusFilter == 'all') {
+            return true;
+          }
 
-              final hasProductionAccess = appAccess['production'] == true;
-              final isRoleAllowed = _productionRoles.contains(role);
+          return status == _usersStatusFilter;
+        }).toList();
 
-              if (!hasProductionAccess || !isRoleAllowed) {
-                return false;
-              }
+        final filtered = companyUsers.where((doc) {
+          if (_roleFilter == 'all') return true;
+          final data = doc.data();
+          final nr = ProductionAccessHelper.normalizeRole(data['role']);
+          return nr ==
+              ProductionAccessHelper.normalizeRole(_roleFilter);
+        });
 
-              if (_usersStatusFilter == 'all') {
-                return status == 'active' || status == 'inactive';
-              }
-
-              return status == _usersStatusFilter;
-            })
-            .map((doc) => doc.data())
+        final List<Map<String, dynamic>> productionUsers = filtered
+            .map(
+              (doc) => <String, dynamic>{
+                ...doc.data(),
+                'uid': doc.id,
+              },
+            )
             .toList();
 
-        final Map<String, List<Map<String, dynamic>>> grouped = {
-          for (final role in _productionRoles) role: <Map<String, dynamic>>[],
-        };
+        final Map<String, List<Map<String, dynamic>>> grouped =
+            <String, List<Map<String, dynamic>>>{};
 
         for (final user in productionUsers) {
-          final role = _s(user['role']).toLowerCase();
-          grouped.putIfAbsent(role, () => <Map<String, dynamic>>[]).add(user);
+          final normalizedRole = ProductionAccessHelper.normalizeRole(
+            user['role'],
+          );
+          grouped
+              .putIfAbsent(normalizedRole, () => <Map<String, dynamic>>[])
+              .add(user);
         }
+
+        final sectionRoles = _rolesForSections(grouped.keys);
 
         return Column(
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Expanded(
-                    child: Text(
-                      'Registrovani Production korisnici',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
+                  const Text(
+                    'Korisnici u kompaniji',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  SizedBox(
-                    width: 170,
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _usersStatusFilter,
-                      decoration: const InputDecoration(
-                        labelText: 'Filter statusa',
-                        isDense: true,
-                      ),
-                      items: _userStatusFilters
-                          .map(
-                            (status) => DropdownMenuItem<String>(
-                              value: status,
-                              child: Text(_statusFilterLabel(status)),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _usersStatusFilter = (value ?? 'all').trim();
-                        });
-                      },
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey<String>('status_$_usersStatusFilter'),
+                    initialValue: _usersStatusFilter,
+                    decoration: const InputDecoration(
+                      labelText: 'Status naloga',
+                      isDense: true,
                     ),
+                    items: _userStatusFilters
+                        .map(
+                          (status) => DropdownMenuItem<String>(
+                            value: status,
+                            child: Text(_statusFilterLabel(status)),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _usersStatusFilter = (value ?? 'all').trim();
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey<String>('role_$_roleFilter'),
+                    initialValue: _roleFilter,
+                    decoration: const InputDecoration(
+                      labelText: 'Uloga',
+                      isDense: true,
+                    ),
+                    items: <DropdownMenuItem<String>>[
+                      DropdownMenuItem<String>(
+                        value: 'all',
+                        child: Text(_roleFilterDropdownLabel('all')),
+                      ),
+                      for (final role in _rolesDisplayOrder)
+                        DropdownMenuItem<String>(
+                          value: role,
+                          child: Text(_roleLabel(role)),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _roleFilter = (value ?? 'all').trim();
+                        if (_roleFilter.isEmpty) _roleFilter = 'all';
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Aktivni korisnici imaju zelenu oznaku „Aktivan“ i zeleni okvir kartice.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                   ),
                 ],
               ),
@@ -782,14 +897,14 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
               child: productionUsers.isEmpty
                   ? const Center(
                       child: Text(
-                        'Nema korisnika za odabrani filter.',
+                        'Nema korisnika za odabrane filtere.',
                         textAlign: TextAlign.center,
                       ),
                     )
                   : ListView(
                       padding: const EdgeInsets.all(12),
                       children: [
-                        for (final role in _productionRoles)
+                        for (final role in sectionRoles)
                           if ((grouped[role] ?? const <Map<String, dynamic>>[])
                               .isNotEmpty)
                             Padding(
@@ -838,7 +953,7 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Novi zahtjevi'),
-              Tab(text: 'Korisnici po rolama'),
+              Tab(text: 'Korisnici kompanije'),
             ],
           ),
         ),
