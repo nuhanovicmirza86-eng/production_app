@@ -28,6 +28,9 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
   /// 'all' ili kanonski kod uloge (npr. [admin], [production_operator]).
   String _roleFilter = 'all';
 
+  /// Prošireni redovi u listi korisnika (ključ = uid ili email).
+  final Set<String> _expandedUserCardKeys = <String>{};
+
   final Set<String> _busyIds = <String>{};
   final Set<String> _loadingPlantsFor = <String>{};
 
@@ -672,13 +675,26 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
           '${_roleLabel(role)} (${users.length})',
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
         ),
-        const SizedBox(height: 10),
-        ...users.map(_registeredUserCard),
+        const SizedBox(height: 8),
+        for (final u in users) ...[
+          _registeredUserCard(u),
+          const SizedBox(height: 4),
+        ],
       ],
     );
   }
 
+  String _userCardKey(Map<String, dynamic> data) {
+    final u = _s(data['uid']);
+    if (u.isNotEmpty) return u;
+    final e = _s(data['email']);
+    if (e.isNotEmpty) return e;
+    return _userDisplayName(data);
+  }
+
   Widget _registeredUserCard(Map<String, dynamic> data) {
+    final cardKey = _userCardKey(data);
+    final expanded = _expandedUserCardKeys.contains(cardKey);
     final displayName = _userDisplayName(data);
     final email = _s(data['email']);
     final workEmail = _s(data['workEmail']);
@@ -686,82 +702,145 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
     final status = _s(data['status']).toLowerCase();
     final approvedAt = _ts(data['approvedAt']);
     final isActive = status == 'active';
+    final roleLabel = _roleLabel(
+      ProductionAccessHelper.normalizeRole(data['role']),
+    );
 
     final borderColor = isActive ? Colors.green.shade600 : Colors.black12;
     final bgColor = isActive ? Colors.green.shade50 : null;
 
     return Card(
       clipBehavior: Clip.antiAlias,
+      margin: EdgeInsets.zero,
       color: bgColor,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         side: BorderSide(color: borderColor, width: isActive ? 1.5 : 1),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            setState(() {
+              if (_expandedUserCardKeys.contains(cardKey)) {
+                _expandedUserCardKeys.remove(cardKey);
+              } else {
+                _expandedUserCardKeys.add(cardKey);
+              }
+            });
+          },
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: expanded ? 12 : 6,
+            ),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: Text(
-                    displayName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 15,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Icon(
+                      expanded ? Icons.expand_less : Icons.expand_more,
+                      size: 20,
+                      color: Colors.black45,
                     ),
-                  ),
-                ),
-                if (isActive)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.green.shade700),
-                    ),
-                    child: Text(
-                      'Aktivan',
-                      style: TextStyle(
-                        color: Colors.green.shade900,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
+                    const SizedBox(width: 2),
+                    Expanded(
+                      child: Text(
+                        displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
+                    if (isActive)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade100,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: Colors.green.shade700,
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Text(
+                            'Aktivan',
+                            style: TextStyle(
+                              color: Colors.green.shade900,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(width: 4),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 110),
+                      child: Text(
+                        roleLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (!expanded) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    email.isEmpty ? '—' : email,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade800,
+                    ),
                   ),
+                ],
+                if (expanded) ...[
+                  const SizedBox(height: 8),
+                  Text(email.isEmpty ? '-' : email),
+                  if (workEmail.isNotEmpty && workEmail != email) ...[
+                    const SizedBox(height: 4),
+                    Text('Poslovni email: $workEmail'),
+                  ],
+                  const SizedBox(height: 4),
+                  Text('Rola: $roleLabel'),
+                  const SizedBox(height: 4),
+                  Text('Pogon: ${plantKey.isEmpty ? '-' : plantKey}'),
+                  const SizedBox(height: 4),
+                  Text('Status: ${_statusLabel(status)}'),
+                  const SizedBox(height: 4),
+                  Text('Odobren: ${_formatDateTime(approvedAt)}'),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _openEditUserDialog(data),
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('Uredi'),
+                    ),
+                  ),
+                ],
               ],
             ),
-            const SizedBox(height: 6),
-            Text(email.isEmpty ? '-' : email),
-            if (workEmail.isNotEmpty && workEmail != email) ...[
-              const SizedBox(height: 4),
-              Text('Poslovni email: $workEmail'),
-            ],
-            const SizedBox(height: 4),
-            Text(
-              'Rola: ${_roleLabel(ProductionAccessHelper.normalizeRole(data['role']))}',
-            ),
-            const SizedBox(height: 4),
-            Text('Pogon: ${plantKey.isEmpty ? '-' : plantKey}'),
-            const SizedBox(height: 4),
-            Text('Status: ${_statusLabel(status)}'),
-            const SizedBox(height: 4),
-            Text('Odobren: ${_formatDateTime(approvedAt)}'),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: OutlinedButton.icon(
-                onPressed: () => _openEditUserDialog(data),
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('Uredi'),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -887,7 +966,7 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Aktivni korisnici imaju zelenu oznaku „Aktivan“ i zeleni okvir kartice.',
+                    'Klikni na red za detalje i „Uredi“. Aktivni: zeleno.',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                   ),
                 ],
@@ -902,13 +981,13 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
                       ),
                     )
                   : ListView(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
                       children: [
                         for (final role in sectionRoles)
                           if ((grouped[role] ?? const <Map<String, dynamic>>[])
                               .isNotEmpty)
                             Padding(
-                              padding: const EdgeInsets.only(bottom: 16),
+                              padding: const EdgeInsets.only(bottom: 12),
                               child: _roleSection(role, grouped[role]!),
                             ),
                       ],
