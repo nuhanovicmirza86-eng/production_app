@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../bom/services/bom_service.dart';
 import '../../products/services/product_lookup_service.dart';
 import '../services/production_order_service.dart';
 import '../services/production_order_technical_refs_resolver.dart';
@@ -25,6 +26,7 @@ class _ProductionOrderCreateScreenState
   final ProductLookupService _productLookupService = ProductLookupService();
   final ProductionOrderTechnicalRefsResolver _refsResolver =
       ProductionOrderTechnicalRefsResolver();
+  final BomService _bomService = BomService();
 
   final TextEditingController _productSearchController =
       TextEditingController();
@@ -35,6 +37,8 @@ class _ProductionOrderCreateScreenState
   final TextEditingController _unitController = TextEditingController(
     text: 'pcs',
   );
+  final TextEditingController _inputMaterialLotController =
+      TextEditingController();
 
   final FocusNode _productSearchFocusNode = FocusNode();
 
@@ -45,6 +49,8 @@ class _ProductionOrderCreateScreenState
   bool _showProductSuggestions = false;
   bool _technicalRefsLoading = false;
   String? _technicalRefsSummary;
+  /// `SECONDARY` = SK (poluproizvod) — prikaz polja za lot materijala.
+  String? _resolvedBomClassification;
 
   String? _productId;
   String? _customerId;
@@ -105,6 +111,8 @@ class _ProductionOrderCreateScreenState
     _productData = null;
     _technicalRefsLoading = false;
     _technicalRefsSummary = null;
+    _resolvedBomClassification = null;
+    _inputMaterialLotController.clear();
     _productCodeController.clear();
     _productNameController.clear();
     _customerNameController.clear();
@@ -231,14 +239,21 @@ class _ProductionOrderCreateScreenState
       if (r == null) {
         setState(() {
           _technicalRefsLoading = false;
+          _resolvedBomClassification = null;
           _technicalRefsSummary =
               'Nedostaju ID kompanije ili proizvoda za učitavanje tehničkih referenci.';
         });
         return;
       }
 
+      final bomId = r['bomId']?.toString() ?? '';
+      final cls = await _bomService.getClassificationForBomId(bomId);
+
+      if (!mounted) return;
+
       setState(() {
         _technicalRefsLoading = false;
+        _resolvedBomClassification = cls;
         _productData = <String, dynamic>{
           ...?_productData,
           'bomId': r['bomId'],
@@ -267,6 +282,7 @@ class _ProductionOrderCreateScreenState
       if (!mounted) return;
       setState(() {
         _technicalRefsLoading = false;
+        _resolvedBomClassification = null;
         _technicalRefsSummary = AppErrorMapper.toMessage(e);
       });
     }
@@ -341,6 +357,9 @@ class _ProductionOrderCreateScreenState
         customerName: _customerNameController.text.trim().isEmpty
             ? null
             : _customerNameController.text.trim(),
+        inputMaterialLot: _resolvedBomClassification == 'SECONDARY'
+            ? _inputMaterialLotController.text.trim()
+            : null,
       );
 
       if (!mounted) return;
@@ -451,6 +470,7 @@ class _ProductionOrderCreateScreenState
     _customerNameController.dispose();
     _qtyController.dispose();
     _unitController.dispose();
+    _inputMaterialLotController.dispose();
     _productSearchFocusNode.dispose();
     super.dispose();
   }
@@ -610,6 +630,30 @@ class _ProductionOrderCreateScreenState
                   controller: _unitController,
                   decoration: _dec('Jedinica'),
                 ),
+                if (_hasSelectedProduct &&
+                    !_technicalRefsLoading &&
+                    _resolvedBomClassification == 'SECONDARY') ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _inputMaterialLotController,
+                    decoration: _dec(
+                      'Lot materijala (šarža)',
+                    ).copyWith(
+                      helperText:
+                          'Unesi lot ili šaržu materijala iz prethodne izrade — za sljedljivost (SK).',
+                    ),
+                    textInputAction: TextInputAction.next,
+                    validator: (_) {
+                      if (_resolvedBomClassification != 'SECONDARY') {
+                        return null;
+                      }
+                      if (_inputMaterialLotController.text.trim().isEmpty) {
+                        return 'Obavezno za SK';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
                 const SizedBox(height: 12),
                 InkWell(
                   onTap: _pickDate,

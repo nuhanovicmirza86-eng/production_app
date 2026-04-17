@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../data/activity_sector_catalog.dart';
+import '../data/activity_sector_visibility.dart';
 import '../models/partner_models.dart';
 import '../services/customers_service.dart';
+import 'activity_sectors_catalog_screen.dart';
 
 class PartnerCustomerEditScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
@@ -36,9 +39,21 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
   late final TextEditingController _addressController;
   late final TextEditingController _taxIdController;
   late final TextEditingController _notesController;
+  late final TextEditingController _contractDeliveryController;
+  late final TextEditingController _contractPaymentController;
+  late final TextEditingController _contractCollectionController;
+  late final TextEditingController _contractGraceController;
 
   String _status = 'active';
   String _customerType = 'direct';
+  String _partnerRatingClass = 'unrated';
+  bool _isStrategic = false;
+
+  /// Šifra iz [activity_sector_catalog]; `null` = nije odabrano.
+  String? _activitySectorCode;
+
+  /// Stari slobodan unos u Firestoreu (nije u šifarniku).
+  String? _legacyActivitySector;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -56,6 +71,10 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
     _addressController = TextEditingController();
     _taxIdController = TextEditingController();
     _notesController = TextEditingController();
+    _contractDeliveryController = TextEditingController();
+    _contractPaymentController = TextEditingController();
+    _contractCollectionController = TextEditingController();
+    _contractGraceController = TextEditingController();
     _load();
   }
 
@@ -69,6 +88,10 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
     _addressController.dispose();
     _taxIdController.dispose();
     _notesController.dispose();
+    _contractDeliveryController.dispose();
+    _contractPaymentController.dispose();
+    _contractCollectionController.dispose();
+    _contractGraceController.dispose();
     super.dispose();
   }
 
@@ -115,6 +138,23 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
       _notesController.text = m.notes ?? '';
       _status = m.status;
       _customerType = m.customerType;
+      _contractDeliveryController.text = m.contractDeliveryDays?.toString() ?? '';
+      _contractPaymentController.text = m.contractPaymentDays?.toString() ?? '';
+      _contractCollectionController.text = m.contractCollectionDays?.toString() ?? '';
+      _contractGraceController.text = m.contractGraceDaysLate?.toString() ?? '';
+      final rawAct = (m.activitySector ?? '').trim();
+      if (rawAct.isEmpty) {
+        _activitySectorCode = null;
+        _legacyActivitySector = null;
+      } else if (activitySectorIsKnownCode(rawAct)) {
+        _activitySectorCode = rawAct;
+        _legacyActivitySector = null;
+      } else {
+        _activitySectorCode = null;
+        _legacyActivitySector = rawAct;
+      }
+      _partnerRatingClass = m.partnerRatingClass;
+      _isStrategic = m.isStrategic;
 
       setState(() => _loading = false);
     } catch (e) {
@@ -128,6 +168,16 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
 
   InputDecoration _dec(String label) => InputDecoration(labelText: label);
 
+  int? _optionalPositiveInt(TextEditingController c) {
+    final t = c.text.trim();
+    if (t.isEmpty) return null;
+    final n = int.tryParse(t);
+    if (n == null || n < 0) {
+      throw Exception('Broj dana mora biti nenegativan cijeli broj.');
+    }
+    return n;
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
@@ -136,6 +186,13 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
     });
 
     try {
+      if (_legacyActivitySector != null &&
+          _legacyActivitySector!.trim().isNotEmpty) {
+        throw Exception(
+          'Odaberi djelatnost iz šifarnika ili dodirni „Obriši djelatnost”.',
+        );
+      }
+
       final draft = CustomerModel(
         id: _isEdit ? widget.customerId!.trim() : '',
         companyId: _companyId,
@@ -159,6 +216,16 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
         notes: _notesController.text.trim().isEmpty
             ? null
             : _notesController.text.trim(),
+        contractDeliveryDays: _optionalPositiveInt(_contractDeliveryController),
+        contractPaymentDays: _optionalPositiveInt(_contractPaymentController),
+        contractCollectionDays: _optionalPositiveInt(_contractCollectionController),
+        contractGraceDaysLate: _optionalPositiveInt(_contractGraceController),
+        activitySector:
+            _activitySectorCode == null || _activitySectorCode!.trim().isEmpty
+                ? null
+                : _activitySectorCode!.trim(),
+        partnerRatingClass: _partnerRatingClass,
+        isStrategic: _isStrategic,
       );
 
       if (_isEdit) {
@@ -192,6 +259,20 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
       appBar: AppBar(
         title: Text(_isEdit ? 'Uredi kupca' : 'Novi kupac'),
         actions: [
+          IconButton(
+            tooltip: 'Šifarnik djelatnosti',
+            onPressed: _saving
+                ? null
+                : () {
+                    Navigator.push<void>(
+                      context,
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ActivitySectorsCatalogScreen(),
+                      ),
+                    );
+                  },
+            icon: const Icon(Icons.menu_book_outlined),
+          ),
           IconButton(
             onPressed: _saving ? null : _save,
             icon: const Icon(Icons.save),
@@ -309,6 +390,184 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
                       TextFormField(
                         controller: _taxIdController,
                         decoration: _dec('PIB / Tax ID'),
+                      ),
+                      const SizedBox(height: 20),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Ugovoreni normativi i procjena',
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _contractDeliveryController,
+                        decoration: _dec(
+                          'Rok isporuke od narudžbe (dana)',
+                        ).copyWith(
+                          helperText:
+                              'Ugovoreni kalendarski dani isporuke od datuma narudžbe.',
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _contractPaymentController,
+                        decoration: _dec('Rok plaćanja (dana)').copyWith(
+                          helperText: 'Npr. neto rok od fakture ili isporuke.',
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _contractCollectionController,
+                        decoration: _dec('Rok naplate (dana)').copyWith(
+                          helperText: 'Ako se razlikuje od roka plaćanja.',
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _contractGraceController,
+                        decoration: _dec(
+                          'Dozvoljeni prekoračeni rok (dana)',
+                        ).copyWith(
+                          helperText: 'Grace period prije eskalacije.',
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 12),
+                      Builder(
+                        builder: (context) {
+                          final visible = resolveVisibleActivitySectors(
+                            widget.companyData['enabledActivitySectorCodes'],
+                          );
+                          final picker = sectorsForPartnerPicker(
+                            visibleForCompany: visible,
+                            currentCode: _activitySectorCode,
+                          );
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              DropdownButtonFormField<String?>(
+                                key: ValueKey(
+                                  '${_activitySectorCode}_${_legacyActivitySector != null}',
+                                ),
+                                initialValue: _activitySectorCode,
+                                isExpanded: true,
+                                decoration: _dec('Djelatnost').copyWith(
+                                  helperText:
+                                      'Šifarnik — aktivne stavke određuje logistika (Kupci i dobavljači → ikonica klizača).',
+                                ),
+                                items: [
+                                  const DropdownMenuItem<String?>(
+                                    value: null,
+                                    child: Text('— Nije odabrano —'),
+                                  ),
+                                  ...picker.map(
+                                    (e) => DropdownMenuItem<String?>(
+                                      value: e.code,
+                                      child: Text(
+                                        e.label,
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (v) => setState(() {
+                                  _activitySectorCode = v;
+                                  _legacyActivitySector = null;
+                                }),
+                              ),
+                              if (visible.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    'Nema aktivnih djelatnosti za ovu tvrtku. '
+                                    'Otvori Kupci i dobavljači → postavke djelatnosti (ikona klizača).',
+                                    style: TextStyle(
+                                      color: Colors.orange.shade900,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                      if (_legacyActivitySector != null &&
+                          _legacyActivitySector!.trim().isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Material(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: Text(
+                              'Stari slobodan unos u bazi: “$_legacyActivitySector”. '
+                              'Odaberi stavku iz liste iznad i sačuvaj.',
+                              style: TextStyle(
+                                color: Colors.orange.shade900,
+                                fontSize: 13,
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton(
+                            onPressed: () => setState(() {
+                              _legacyActivitySector = null;
+                              _activitySectorCode = null;
+                            }),
+                            child: const Text(
+                              'Obriši djelatnost (ukloni iz partnera)',
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        key: ValueKey('abc_$_partnerRatingClass'),
+                        initialValue: _partnerRatingClass,
+                        decoration: _dec('Kategorija (ABC)').copyWith(
+                          helperText:
+                              'A dobar • B upozorenje • C nepouzdan (strategija ispod).',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'unrated',
+                            child: Text('Nije procijenjeno'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'A',
+                            child: Text('A — dobar'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'B',
+                            child: Text('B — upozorenje'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'C',
+                            child: Text('C — nepouzdan'),
+                          ),
+                        ],
+                        onChanged: (v) => setState(
+                          () => _partnerRatingClass = v ?? 'unrated',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Strateški partner'),
+                        subtitle: const Text(
+                          'Za C-kategoriju: nema alternative — posebno označavanje u listi.',
+                        ),
+                        value: _isStrategic,
+                        onChanged: (v) => setState(() => _isStrategic = v),
                       ),
                       const SizedBox(height: 12),
                       TextFormField(

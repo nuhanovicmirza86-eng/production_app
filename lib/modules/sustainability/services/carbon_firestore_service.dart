@@ -265,21 +265,26 @@ class CarbonFirestoreService {
         .toList();
   }
 
-  Future<void> saveFactorOverride({
+  /// Mrežni dohvat (DEFRA XLSX + OWID CSV) i upis u Firestore; vraća broj zapisa i eventualna upozorenja.
+  Future<({int upserted, List<String> warnings})> syncReferenceEmissionFactors({
     required String companyId,
-    required CarbonEmissionFactor factor,
-    required String userId,
     required int reportingYear,
   }) async {
     final data = await _carbonWrite({
-      'op': 'saveEmissionFactorOverride',
+      'op': 'syncReferenceEmissionFactors',
       'companyId': companyId,
       'reportingYear': reportingYear,
-      'factor': factor.toMap(),
     });
     if (data['success'] != true) {
-      throw Exception('Spremanje faktora nije uspjelo.');
+      throw Exception('Sinkronizacija faktora nije uspjela.');
     }
+    final raw = data['upserted'] ?? data['added'];
+    final n = raw is int ? raw : (raw is num ? raw.toInt() : 0);
+    final w = data['warnings'];
+    final warnings = w is List
+        ? w.map((e) => e.toString()).toList()
+        : <String>[];
+    return (upserted: n, warnings: warnings);
   }
 
   Future<void> deleteFactorOverride(String companyId, String factorKey) async {

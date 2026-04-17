@@ -627,6 +627,8 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
         stockByProductId: _stockByProductId.isEmpty
             ? null
             : Map<String, double>.from(_stockByProductId),
+        companyId: _companyId,
+        companyData: widget.companyData,
       );
     } catch (e) {
       if (!mounted) return;

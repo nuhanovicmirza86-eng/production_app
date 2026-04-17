@@ -2,7 +2,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/station_launch_config.dart';
+import '../../../../core/station_launch_preference.dart';
 import '../../../production/dashboard/screens/production_dashboard_screen.dart';
+import '../../../production/station_pages/widgets/station_page_active_gate.dart';
+import '../../../production/tracking/models/production_operator_tracking_entry.dart';
+import '../../../production/tracking/screens/production_operator_tracking_station_screen.dart';
+import '../../../production/station/screens/station_tracking_setup_screen.dart';
+import '../../../production/tracking/config/station_tracking_setup_store.dart';
+import '../../../production/tracking/screens/production_preparation_station_screen.dart';
 import '../../screens/login_screen.dart';
 import '../../shared/services/auth_service.dart';
 
@@ -22,6 +30,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   Map<String, dynamic>? _companyData;
 
+  /// Nakon ulaska na stanicu: korisnik zatvori stanicu → cijela aplikacija (do sljedećeg cold starta).
+  bool _showFullAppAfterDedicated = false;
+
+  /// Efektivna faza stanice: [StationLaunchConfig] (build) ili [StationLaunchPreference] (uređaj).
+  String? _effLaunchPhase;
+
   @override
   void initState() {
     super.initState();
@@ -29,6 +43,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   String _s(dynamic v) => (v ?? '').toString().trim();
+
+  /// Kanonski tenant id — `companyId` u users često je string, ponekad DocumentReference.
+  String _companyIdFromUserField(dynamic raw) {
+    if (raw is DocumentReference) return raw.id.trim();
+    return _s(raw);
+  }
 
   Future<void> _handleAuth(User? user) async {
     if (!mounted) return;
@@ -39,6 +59,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
         _loading = false;
         _error = null;
         _companyData = null;
+        _effLaunchPhase = null;
+        _showFullAppAfterDedicated = false;
       });
       return;
     }
@@ -48,6 +70,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       _user = user;
       _error = null;
       _companyData = null;
+      _effLaunchPhase = null;
     });
 
     try {
@@ -59,7 +82,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       if (!userDoc.exists) {
         _error =
             'Tvoj korisnički profil ne postoji u sistemu.\n'
-            'Administrator mora prvo odobriti korisnika.';
+            'Admin mora prvo odobriti korisnika.';
         if (!mounted) return;
         setState(() => _loading = false);
         return;
@@ -69,7 +92,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
       final status = _s(data['status']).toLowerCase();
       final role = _s(data['role']).toLowerCase();
-      final companyId = _s(data['companyId']);
+      final companyId = _companyIdFromUserField(data['companyId']);
       final plantKey = _s(data['plantKey']);
 
       final rawAppAccess = data['appAccess'];
@@ -81,7 +104,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
       if (status == 'pending') {
         _error =
-            'Vaš zahtjev za registraciju je zaprimljen i čeka odobrenje Administratora.';
+            'Vaš zahtjev za registraciju je zaprimljen i čeka odobrenje Admina.';
         if (!mounted) return;
         setState(() => _loading = false);
         return;
@@ -90,7 +113,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       if (status != 'active') {
         _error =
             'Tvoj račun nije aktivan (status: "$status").\n'
-            'Pristup je zaključan dok Administrator ne odobri nalog.';
+            'Pristup je zaključan dok Admin ne odobri nalog.';
         if (!mounted) return;
         setState(() => _loading = false);
         return;
@@ -99,7 +122,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       if (!canUseProduction) {
         _error =
             'Nemaš odobren pristup za Operonix Production aplikaciju.\n'
-            'Administrator mora odobriti Production pristup.';
+            'Admin mora odobriti Production pristup.';
         if (!mounted) return;
         setState(() => _loading = false);
         return;
@@ -162,16 +185,73 @@ class _AuthWrapperState extends State<AuthWrapper> {
         'userId': user.uid,
         'role': role,
         'plantKey': plantKey,
+        // Maintenance-style plant resolution (report_fault / assets plantKey).
+        'userHomePlantKey': _s(data['homePlantKey']),
+        'userHomePlantId': _s(data['homePlantId']),
+        'userLegacyPlantId': _s(data['plantId']),
+        'userAppAccess': appAccess,
         'userDisplayName': _s(data['displayName']),
         'nickname': _s(data['nickname']),
         'userEmail': _s(data['email'] ?? user.email ?? ''),
       };
+
+      try {
+        _effLaunchPhase =
+            StationLaunchConfig.phaseOrNull ??
+            await StationLaunchPreference.getPhaseOptional();
+      } catch (_) {
+        _effLaunchPhase = StationLaunchConfig.phaseOrNull;
+      }
+
+      if (_companyData != null) {
+        if (_effLaunchPhase != null) {
+          final cid = _s(_companyData!['companyId']);
+          final setup = await StationTrackingSetupStore.load(cid);
+          final stationBound = setup?.plantKey.trim() ?? '';
+          _companyData!['stationBoundPlantKey'] = stationBound;
+          _companyData!['stationTrackingClassification'] =
+              setup?.classification ?? '';
+          _companyData!['stationLabelPrintingEnabled'] =
+              setup?.labelPrintingEnabled ?? true;
+          _companyData!['stationLabelLayout'] =
+              setup?.labelLayoutKey ?? kStationLabelLayoutStandard;
+          final userPk = _s(_companyData!['plantKey']);
+          if (stationBound.isNotEmpty &&
+              userPk.isNotEmpty &&
+              stationBound != userPk) {
+            _error =
+                'Ova stanica je na ovom računalu vezana za jedan pogon, a tvoj korisnik '
+                'pripada drugom pogonu.\n\n'
+                'Odjavi se i prijavi računom korisnika tog pogona, ili zamoli Admina '
+                'da na ovom računalu promijeni pogon stanice.';
+            if (!mounted) return;
+            setState(() => _loading = false);
+            return;
+          }
+        } else {
+          _companyData!['stationBoundPlantKey'] = '';
+          final cid = _s(_companyData!['companyId']);
+          final localSetup = await StationTrackingSetupStore.load(cid);
+          if (localSetup != null) {
+            _companyData!['stationTrackingClassification'] =
+                localSetup.classification;
+            _companyData!['stationLabelPrintingEnabled'] =
+                localSetup.labelPrintingEnabled;
+            _companyData!['stationLabelLayout'] = localSetup.labelLayoutKey;
+          } else {
+            _companyData!['stationTrackingClassification'] = '';
+            _companyData!['stationLabelPrintingEnabled'] = true;
+            _companyData!['stationLabelLayout'] = kStationLabelLayoutStandard;
+          }
+        }
+      }
 
       _error = null;
     } catch (e) {
       _error =
           'Greška pri učitavanju korisničkog konteksta.\n'
           'Detalj: $e';
+      _effLaunchPhase = null;
     }
 
     if (!mounted) return;
@@ -227,6 +307,51 @@ class _AuthWrapperState extends State<AuthWrapper> {
               ),
             ],
           ),
+        ),
+      );
+    }
+
+    if (!_showFullAppAfterDedicated &&
+        _effLaunchPhase != null &&
+        _companyData != null) {
+      final sb = _s(_companyData!['stationBoundPlantKey']);
+      if (sb.isEmpty) {
+        return StationTrackingSetupScreen(
+          companyData: _companyData!,
+          onSaved: _refreshSession,
+        );
+      }
+    }
+
+    if (!_showFullAppAfterDedicated && _effLaunchPhase != null) {
+      final phase = _effLaunchPhase!;
+
+      void goFullApp() {
+        setState(() => _showFullAppAfterDedicated = true);
+      }
+
+      if (phase == ProductionOperatorTrackingEntry.phasePreparation) {
+        return StationPageActiveGate(
+          companyData: _companyData!,
+          phase: phase,
+          onCloseStation: goFullApp,
+          stationBuilder: (_) => ProductionPreparationStationScreen(
+            companyData: _companyData!,
+            onCloseStation: goFullApp,
+            onStationTrackingSetupSaved: _refreshSession,
+          ),
+        );
+      }
+      return StationPageActiveGate(
+        companyData: _companyData!,
+        phase: phase,
+        onCloseStation: goFullApp,
+        stationBuilder: (_) => ProductionOperatorTrackingStationScreen(
+          companyData: _companyData!,
+          phase: phase,
+          showOperativeSessionStrip: false,
+          onCloseStation: goFullApp,
+          onStationTrackingSetupSaved: _refreshSession,
         ),
       );
     }

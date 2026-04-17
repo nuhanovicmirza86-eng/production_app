@@ -102,6 +102,13 @@ class CustomersService {
       address: draft.address,
       taxId: draft.taxId,
       notes: draft.notes,
+      contractDeliveryDays: draft.contractDeliveryDays,
+      contractPaymentDays: draft.contractPaymentDays,
+      contractCollectionDays: draft.contractCollectionDays,
+      contractGraceDaysLate: draft.contractGraceDaysLate,
+      activitySector: draft.activitySector,
+      partnerRatingClass: draft.partnerRatingClass,
+      isStrategic: draft.isStrategic,
     );
 
     final res = await _functions

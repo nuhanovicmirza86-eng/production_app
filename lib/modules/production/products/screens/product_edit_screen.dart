@@ -1,7 +1,9 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
 import '../services/product_service.dart';
+import '../services/product_tracking_label_service.dart';
 
 class ProductEditScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
@@ -41,6 +43,11 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
   bool _isLoading = false;
   late bool _isActive;
   late String _status;
+
+  /// Prilagođena etiketa za ispis na stanici (upload u Storage).
+  bool _hasCustomTrackingLabel = false;
+  String _customLabelFileName = '';
+  bool _labelBusy = false;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -124,6 +131,10 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
         : _s(widget.productData['status']).toLowerCase();
     _isActive =
         (widget.productData['isActive'] as bool?) ?? (_status == 'active');
+
+    _hasCustomTrackingLabel =
+        _s(widget.productData['customTrackingLabelStoragePath']).isNotEmpty;
+    _customLabelFileName = _s(widget.productData['customTrackingLabelFileName']);
   }
 
   InputDecoration _dec(String label, {String? hint}) {
@@ -203,10 +214,79 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadTrackingLabel() async {
+    final r = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg'],
+      withData: true,
+    );
+    if (r == null || r.files.isEmpty) return;
+    final f = r.files.first;
+    final bytes = f.bytes;
+    if (bytes == null || bytes.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nije moguće učitati datoteku.')),
+      );
+      return;
+    }
+    setState(() => _labelBusy = true);
+    try {
+      await ProductTrackingLabelService().upload(
+        companyId: _companyId,
+        productId: _productId,
+        bytes: bytes,
+        fileName: f.name,
+        updatedBy: _userId,
+      );
       if (!mounted) return;
       setState(() {
-        _isLoading = false;
+        _hasCustomTrackingLabel = true;
+        _customLabelFileName = f.name;
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Prilagođena etiketa je spremljena.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _labelBusy = false);
+    }
+  }
+
+  Future<void> _removeTrackingLabel() async {
+    setState(() => _labelBusy = true);
+    try {
+      await ProductTrackingLabelService().remove(
+        productId: _productId,
+        updatedBy: _userId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _hasCustomTrackingLabel = false;
+        _customLabelFileName = '';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Prilagođena etiketa je uklonjena.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _labelBusy = false);
     }
   }
 
@@ -243,7 +323,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Uredi proizvod')),
       body: AbsorbPointer(
-        absorbing: _isLoading,
+        absorbing: _isLoading || _labelBusy,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Form(
@@ -385,6 +465,52 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                 TextFormField(
                   controller: _routingVersionController,
                   decoration: _dec('Aktivna Routing verzija'),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Etiketa za praćenje (stanica)',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Ako kupac traži svoj dizajn etikete (svoje kodove i oznake), učitaj PDF ili sliku. '
+                  'Pri ispisu na stanici koristi se ta datoteka umjesto sustavske etikete s QR-om, '
+                  'ako je šifra u unosu povezana s ovim proizvodom.',
+                  style: TextStyle(color: Colors.black54),
+                ),
+                const SizedBox(height: 12),
+                if (_hasCustomTrackingLabel) ...[
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      _customLabelFileName.isEmpty
+                          ? 'Postavljena je prilagođena etiketa'
+                          : 'Postavljeno: $_customLabelFileName',
+                    ),
+                    subtitle: const Text(
+                      'Maks. 10 MB · PDF, PNG ili JPG',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    trailing: TextButton(
+                      onPressed: _labelBusy ? null : _removeTrackingLabel,
+                      child: const Text('Ukloni'),
+                    ),
+                  ),
+                ],
+                OutlinedButton.icon(
+                  onPressed: _labelBusy ? null : _pickAndUploadTrackingLabel,
+                  icon: _labelBusy
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.upload_file_outlined),
+                  label: Text(
+                    _hasCustomTrackingLabel
+                        ? 'Zamijeni prilagođenu etiketu'
+                        : 'Učitaj prilagođenu etiketu',
+                  ),
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(

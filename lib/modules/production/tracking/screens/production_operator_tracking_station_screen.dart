@@ -4,8 +4,18 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../../../core/access/production_access_helper.dart'
+    show ProductionAccessHelper, ProductionDashboardCard;
+import '../../station/screens/station_tracking_setup_screen.dart';
+import '../../station_pages/models/production_station_page.dart';
+import '../../station_pages/screens/production_station_pages_admin_screen.dart';
+import '../../station_pages/services/production_station_page_service.dart';
+import '../config/station_screen_theme.dart';
+import '../config/station_screen_theme_store.dart';
 import '../models/production_operator_tracking_entry.dart';
 import '../widgets/preparation_tracking_tab.dart';
+import '../widgets/station_appearance_editor_dialog.dart';
+import '../widgets/station_session_strip.dart';
 
 /// Jedna operativna faza na cijelom zaslonu (npr. jedan monitor = jedna stanica).
 ///
@@ -19,10 +29,22 @@ class ProductionOperatorTrackingStationScreen extends StatefulWidget {
   /// [ProductionOperatorTrackingEntry.phasePreparation] / `first_control` / `final_control`.
   final String phase;
 
+  /// Traka „tko je prijavljen“ + placeholder QR — za operativne stanice na podu (npr. pripremna).
+  final bool showOperativeSessionStrip;
+
+  /// Kad je stanicu otvorio [AuthWrapper] u dedicated modu, zatvaranje ne radi `pop` nego ovaj callback.
+  final VoidCallback? onCloseStation;
+
+  /// Nakon što admin promijeni postavke stanice (pogon, klasifikacija, etiketa).
+  final VoidCallback? onStationTrackingSetupSaved;
+
   const ProductionOperatorTrackingStationScreen({
     super.key,
     required this.companyData,
     required this.phase,
+    this.showOperativeSessionStrip = false,
+    this.onCloseStation,
+    this.onStationTrackingSetupSaved,
   });
 
   static String phaseTitle(String phase) {
@@ -46,6 +68,8 @@ class ProductionOperatorTrackingStationScreen extends StatefulWidget {
 class _ProductionOperatorTrackingStationScreenState
     extends State<ProductionOperatorTrackingStationScreen> {
   bool _desktopOsFullscreen = false;
+  StationScreenAppearance _appearance = const StationScreenAppearance();
+  ProductionStationPage? _stationPageMeta;
 
   bool get _supportsOsWindowChrome =>
       !kIsWeb &&
@@ -61,6 +85,22 @@ class _ProductionOperatorTrackingStationScreenState
     final cid = (widget.companyData['companyId'] ?? '').toString().trim();
     if (n.isNotEmpty) return n;
     return cid.isNotEmpty ? cid : '—';
+  }
+
+  /// Postavke uređaja (pogon, ispis etikete) — samo [ProductionAccessHelper.roleAdmin].
+  bool get _showStationSetupAction {
+    final bound =
+        (widget.companyData['stationBoundPlantKey'] ?? '').toString().trim();
+    if (bound.isEmpty) return false;
+    return ProductionAccessHelper.isAdminRole(widget.companyData['role']);
+  }
+
+  /// Isti pristup kao pločica „Stranice stanica“ na dashboardu.
+  bool get _showStationPagesAdminAction {
+    return ProductionAccessHelper.canManage(
+      role: (widget.companyData['role'] ?? '').toString(),
+      card: ProductionDashboardCard.stationPages,
+    );
   }
 
   String get _plantLine {
@@ -81,9 +121,40 @@ class _ProductionOperatorTrackingStationScreenState
     return MaterialLocalizations.of(context).formatFullDate(d);
   }
 
+  Future<void> _loadStationTheme() async {
+    final a = await StationScreenThemeStore.load();
+    if (mounted) setState(() => _appearance = a);
+  }
+
+  Future<void> _loadStationPageMeta() async {
+    final cid = (widget.companyData['companyId'] ?? '').toString().trim();
+    final bound =
+        (widget.companyData['stationBoundPlantKey'] ?? '').toString().trim();
+    final pk = (widget.companyData['plantKey'] ?? '').toString().trim();
+    final plantKey = bound.isNotEmpty ? bound : pk;
+    if (cid.isEmpty || plantKey.isEmpty) return;
+    final slot = ProductionStationPage.stationSlotForPhase(widget.phase);
+    try {
+      final page = await ProductionStationPageService().getPage(
+        companyId: cid,
+        plantKey: plantKey,
+        stationSlot: slot,
+      );
+      if (mounted) setState(() => _stationPageMeta = page);
+    } catch (_) {}
+  }
+
+  String get _appBarTitleLine {
+    final d = _stationPageMeta?.displayName?.trim();
+    if (d != null && d.isNotEmpty) return d;
+    return ProductionOperatorTrackingStationScreen.phaseTitle(widget.phase);
+  }
+
   @override
   void initState() {
     super.initState();
+    unawaited(_loadStationTheme());
+    unawaited(_loadStationPageMeta());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _enterOsFullscreenIfDesktop();
     });
@@ -107,7 +178,12 @@ class _ProductionOperatorTrackingStationScreenState
 
   Future<void> _closeStation() async {
     await _exitOsFullscreenIfNeeded();
-    if (mounted) Navigator.of(context).maybePop();
+    if (!mounted) return;
+    if (widget.onCloseStation != null) {
+      widget.onCloseStation!();
+      return;
+    }
+    Navigator.of(context).maybePop();
   }
 
   @override
@@ -126,13 +202,42 @@ class _ProductionOperatorTrackingStationScreenState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final parentTheme = Theme.of(context);
+    final stationTheme = buildStationScreenTheme(parentTheme, _appearance);
 
-    return Scaffold(
+    return AnimatedTheme(
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+      data: stationTheme,
+      child: Builder(
+        builder: (context) {
+          final theme = Theme.of(context);
+          final cs = theme.colorScheme;
+
+          return Scaffold(
       appBar: AppBar(
-        title: Text(
-          ProductionOperatorTrackingStationScreen.phaseTitle(widget.phase),
+        toolbarHeight: 72,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _appBarTitleLine,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              _plantLine,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ),
         leading: IconButton(
           tooltip: 'Zatvori stanicu',
@@ -140,6 +245,55 @@ class _ProductionOperatorTrackingStationScreenState
           onPressed: _closeStation,
         ),
         actions: [
+          if (_showStationPagesAdminAction)
+            IconButton(
+              tooltip: 'Ekrani stanica za ovaj pogon',
+              icon: const Icon(Icons.settings_applications_outlined),
+              onPressed: () {
+                Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ProductionStationPagesAdminScreen(
+                      companyData: widget.companyData,
+                    ),
+                  ),
+                );
+              },
+            ),
+          IconButton(
+            tooltip: 'Izgled stanice (boje i predlošci)',
+            icon: const Icon(Icons.palette_outlined),
+            onPressed: () async {
+              final next = await showStationAppearanceEditorDialog(
+                context: context,
+                current: _appearance,
+                allowCustomColors:
+                    ProductionAccessHelper.canEditStationScreenCustomColors(
+                  (widget.companyData['role'] ?? '').toString(),
+                ),
+              );
+              if (next == null || !mounted) return;
+              setState(() => _appearance = next);
+              await StationScreenThemeStore.save(next);
+            },
+          ),
+          if (_showStationSetupAction)
+            IconButton(
+              tooltip: 'Postavke stanice (pogon, klasifikacija, etiketa)',
+              icon: const Icon(Icons.tune),
+              onPressed: () async {
+                await Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (ctx) => StationTrackingSetupScreen(
+                      companyData: widget.companyData,
+                      onSaved: () {
+                        Navigator.of(ctx).pop();
+                        widget.onStationTrackingSetupSaved?.call();
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
           if (_supportsOsWindowChrome)
             IconButton(
               tooltip: _desktopOsFullscreen
@@ -183,14 +337,6 @@ class _ProductionOperatorTrackingStationScreenState
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        Text(
-                          _plantLine,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
                       ],
                     ),
                   ),
@@ -215,8 +361,13 @@ class _ProductionOperatorTrackingStationScreenState
               ),
             ),
           ),
+          if (widget.showOperativeSessionStrip)
+            StationSessionStrip(companyData: widget.companyData),
           Expanded(child: _phaseBody()),
         ],
+      ),
+    );
+        },
       ),
     );
   }

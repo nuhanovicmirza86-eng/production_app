@@ -236,6 +236,15 @@ class CarbonActivityLine {
   final String rowId;
   final bool include;
   final String plantKey;
+  /// Firestore ID proizvoda (šifrarnik) — za zbrojeve; u UI-u se prikazuje šifra.
+  final String productId;
+  /// Šifra proizvoda iz šifrarnika (za prikaz/CSV); može biti prazna kod starijih zapisa.
+  final String productCode;
+  /// Opcionalno: ljudski čitljiv naziv proizvoda (prikaz u izvještajima).
+  final String productLabel;
+  /// Opcionalno: koliko ste proizveli uz ovaj red (jedinice proizvoda); ne utječe na
+  /// `unitsProduced` u postavkama kompanije niti na izračun kg CO2e (emisija = quantity × faktor).
+  final double productOutputQty;
   final String activityDate;
   final String activityType;
   final String description;
@@ -254,6 +263,10 @@ class CarbonActivityLine {
     required this.rowId,
     this.include = true,
     required this.plantKey,
+    this.productId = '',
+    this.productCode = '',
+    this.productLabel = '',
+    this.productOutputQty = 0,
     this.activityDate = '',
     required this.activityType,
     required this.description,
@@ -273,6 +286,10 @@ class CarbonActivityLine {
       'rowId': rowId,
       'include': include,
       'plantKey': plantKey,
+      'productId': productId,
+      'productCode': productCode,
+      'productLabel': productLabel,
+      'productOutputQty': productOutputQty,
       'activityDate': activityDate,
       'activityType': activityType,
       'description': description,
@@ -294,6 +311,10 @@ class CarbonActivityLine {
       rowId: _s(m['rowId']),
       include: m['include'] == true,
       plantKey: _s(m['plantKey']),
+      productId: _s(m['productId']),
+      productCode: _s(m['productCode']),
+      productLabel: _s(m['productLabel']),
+      productOutputQty: _d(m['productOutputQty']),
       activityDate: _s(m['activityDate']),
       activityType: _s(m['activityType']),
       description: _s(m['description']),
@@ -368,6 +389,124 @@ class CarbonDashboardSummary {
     required this.includedActivityCount,
     required this.rowsWithQuantity,
   });
+}
+
+/// Zbroj emisija po `plantKey` (prazan ključ = „bez oznake pogona”).
+class CarbonPlantRollup {
+  final String plantKey;
+  final double totalKgCo2e;
+  final double totalTCO2e;
+  final int lineCount;
+
+  const CarbonPlantRollup({
+    required this.plantKey,
+    required this.totalKgCo2e,
+    required this.totalTCO2e,
+    required this.lineCount,
+  });
+
+  String get displayPlant =>
+      plantKey.trim().isEmpty ? '(bez oznake pogona)' : plantKey.trim();
+}
+
+/// Razrada emisija po pogonu s podjelom na scope 1 / 2 / 3 (kg CO2e).
+class CarbonPlantDetailedRollup {
+  final String plantKey;
+  final double scope1Kg;
+  final double scope2Kg;
+  final double scope3Kg;
+  final int lineCount;
+
+  const CarbonPlantDetailedRollup({
+    required this.plantKey,
+    required this.scope1Kg,
+    required this.scope2Kg,
+    required this.scope3Kg,
+    required this.lineCount,
+  });
+
+  double get totalKgCo2e => scope1Kg + scope2Kg + scope3Kg;
+
+  double get totalTCO2e => totalKgCo2e / 1000;
+
+  String get displayPlant =>
+      plantKey.trim().isEmpty ? '(bez oznake pogona)' : plantKey.trim();
+}
+
+/// Jedna kombinacija pogon + proizvod (samo redovi s productId), s scope zbrojevima.
+class CarbonProductPlantRollup {
+  final String plantKey;
+  final String productId;
+  final String productCode;
+  final String productLabel;
+  final double scope1Kg;
+  final double scope2Kg;
+  final double scope3Kg;
+  final int lineCount;
+  final double totalProductOutputQty;
+
+  const CarbonProductPlantRollup({
+    required this.plantKey,
+    required this.productId,
+    this.productCode = '',
+    this.productLabel = '',
+    required this.scope1Kg,
+    required this.scope2Kg,
+    required this.scope3Kg,
+    required this.lineCount,
+    this.totalProductOutputQty = 0,
+  });
+
+  double get totalKgCo2e => scope1Kg + scope2Kg + scope3Kg;
+
+  double get totalTCO2e => totalKgCo2e / 1000;
+
+  String get displayPlant =>
+      plantKey.trim().isEmpty ? '(bez oznake pogona)' : plantKey.trim();
+
+  /// Za PDF: naziv + šifra, bez tehničkog ID-a.
+  String get displayProductTitle {
+    final code = productCode.trim();
+    final lb = productLabel.trim();
+    if (lb.isNotEmpty && code.isNotEmpty) return '$lb · $code';
+    if (lb.isNotEmpty) return lb;
+    if (code.isNotEmpty) return code;
+    return 'Proizvod';
+  }
+}
+
+/// Zbroj emisija po proizvodu (`productId` + prikazni `productLabel`).
+class CarbonProductRollup {
+  final String productId;
+  final String productCode;
+  final String productLabel;
+  final double totalKgCo2e;
+  final double totalTCO2e;
+  final int lineCount;
+  /// Zbroj opcionalnog polja „proizvedena količina” po redovima (ne utječe na emisiju).
+  final double totalProductOutputQty;
+
+  const CarbonProductRollup({
+    required this.productId,
+    this.productCode = '',
+    required this.productLabel,
+    required this.totalKgCo2e,
+    required this.totalTCO2e,
+    required this.lineCount,
+    this.totalProductOutputQty = 0,
+  });
+
+  String get displayTitle {
+    final code = productCode.trim();
+    final lb = productLabel.trim();
+    if (code.isNotEmpty && lb.isNotEmpty) {
+      return '$lb · šifra $code';
+    }
+    if (lb.isNotEmpty) return lb;
+    if (code.isNotEmpty) return 'šifra $code';
+    final id = productId.trim();
+    return id;
+  }
 }
 
 String _s(dynamic v) => (v ?? '').toString().trim();

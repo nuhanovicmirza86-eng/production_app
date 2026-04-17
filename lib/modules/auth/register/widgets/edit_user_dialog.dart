@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/access/production_access_helper.dart';
+
 class EditUserDialog extends StatefulWidget {
   final Map<String, dynamic> userData;
   final String companyId;
@@ -26,6 +28,7 @@ class _EditUserDialogState extends State<EditUserDialog> {
     'production_operator',
     'quality_operator',
     'logistics_operator',
+    'logistics_manager',
     'shift_lead',
     'production_manager',
   ];
@@ -58,17 +61,22 @@ class _EditUserDialogState extends State<EditUserDialog> {
   }
 
   String _roleLabel(String role) {
-    switch (role) {
+    final r = ProductionAccessHelper.normalizeRole(role);
+    switch (r) {
+      case 'admin':
+        return 'Admin';
       case 'production_operator':
-        return 'Production Operator';
+        return 'Operater proizvodnje';
       case 'quality_operator':
-        return 'Quality Operator';
+        return 'Operater kvaliteta';
       case 'logistics_operator':
-        return 'Logistics Operator';
+        return 'Operater logistike';
+      case 'logistics_manager':
+        return 'Menadžer logistike';
       case 'shift_lead':
-        return 'Shift Lead';
+        return 'Vođa smjene';
       case 'production_manager':
-        return 'Production Manager';
+        return 'Menadžer proizvodnje';
       default:
         return role;
     }

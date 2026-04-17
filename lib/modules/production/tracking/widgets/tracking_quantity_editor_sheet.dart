@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:production_app/core/ui/station_input.dart';
+
 String _initialQuantityText(double? v) {
   if (v == null || v <= 0) return '';
   if (v == v.roundToDouble()) return v.toInt().toString();
@@ -87,14 +89,23 @@ class _TrackingQuantitySheetBodyState
             Text(widget.hint!, style: Theme.of(context).textTheme.bodySmall),
           ],
           const SizedBox(height: 16),
-          TextField(
+          StationTextField(
             controller: _ctrl,
             autofocus: true,
             keyboardType: const TextInputType.numberWithOptions(
               decimal: true,
               signed: false,
             ),
-            decoration: const InputDecoration(labelText: 'Količina'),
+            decoration: StationInputDecoration.formField(
+              context,
+              labelText: 'Količina',
+            ),
+            onSubmitted: (_) {
+              final raw = _ctrl.text.trim().replaceAll(',', '.');
+              final v = double.tryParse(raw);
+              if (v == null || v < 0) return;
+              Navigator.pop(context, v);
+            },
           ),
           const SizedBox(height: 16),
           FilledButton(

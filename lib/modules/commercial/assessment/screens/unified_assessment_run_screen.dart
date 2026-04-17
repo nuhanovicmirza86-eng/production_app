@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:production_app/core/access/production_access_helper.dart';
 import 'package:production_app/core/errors/app_error_mapper.dart';
 import 'package:production_app/modules/commercial/assessment/services/assessment_engine_service.dart';
 
@@ -48,15 +49,16 @@ class _UnifiedAssessmentRunScreenState
   /// Grubo usklađeno s backend `canComputeAssessment` (samo UX; Callable i dalje validira).
   bool get _canCompute {
     final r = _role;
-    if (r == 'super_admin') return true;
-    if (r == 'admin' || r == 'company_admin' || r == 'administrator') {
+    if (ProductionAccessHelper.isSuperAdminRole(r)) return true;
+    if (ProductionAccessHelper.isAdminRole(r)) {
       return true;
     }
     final et = _et;
     if (et == 'supplier' || et == 'customer') {
       return r == 'purchasing' ||
           r == 'production_manager' ||
-          r == 'supervisor';
+          r == 'supervisor' ||
+          r == 'logistics_manager';
     }
     if (et == 'production_order') {
       return r == 'production_manager' || r == 'supervisor';
@@ -78,6 +80,7 @@ class _UnifiedAssessmentRunScreenState
   final List<_PfmeaRow> _pfmeaRows = [_PfmeaRow()];
 
   bool _computing = false;
+  bool _creatingTemplate = false;
   String? _error;
   AssessmentComputeResult? _lastResult;
 
@@ -89,7 +92,7 @@ class _UnifiedAssessmentRunScreenState
   @override
   void initState() {
     super.initState();
-    _role = widget.userRole.trim().toLowerCase();
+    _role = ProductionAccessHelper.normalizeRole(widget.userRole);
   }
 
   @override
@@ -156,6 +159,93 @@ class _UnifiedAssessmentRunScreenState
     final at = (d['assessmentType'] ?? '').toString().toUpperCase();
     final cm = (d['calculationMethod'] ?? '').toString().toLowerCase();
     return at == 'PFMEA' || cm == 'fmea_rpn';
+  }
+
+  bool get _canManageTemplates {
+    final r = _role;
+    return ProductionAccessHelper.isSuperAdminRole(r) ||
+        ProductionAccessHelper.isAdminRole(r) ||
+        r == 'production_manager' ||
+        r == 'supervisor' ||
+        r == 'purchasing' ||
+        r == 'logistics_manager';
+  }
+
+  Map<String, dynamic> _starterTemplatePayload() {
+    final et = _et;
+    final nameSuffix = switch (et) {
+      'customer' => 'Customer',
+      'supplier' => 'Supplier',
+      'production_order' => 'Production Order',
+      'asset' => 'Asset',
+      'process_step' => 'Process Step',
+      'quality_event' => 'Quality Event',
+      _ => et.toUpperCase(),
+    };
+    // Mora odgovarati backend `upperEnum` u upsertAssessmentTemplate:
+    // assessmentType ∈ {RISK, KPI, PFMEA}, calculationMethod ∈ {WEIGHTED_SUM, THRESHOLD_BANDS, FMEA_RPN}.
+    return <String, dynamic>{
+      'name': 'Starter $nameSuffix',
+      'entityType': et,
+      'assessmentType': 'KPI',
+      'calculationMethod': 'WEIGHTED_SUM',
+      'active': true,
+      'criteria': <Map<String, dynamic>>[
+        <String, dynamic>{
+          'code': 'quality',
+          'label': 'Kvalitet',
+          'type': 'scale',
+          'scaleMin': 1,
+          'scaleMax': 5,
+          'weight': 0.40,
+        },
+        <String, dynamic>{
+          'code': 'delivery',
+          'label': 'Isporuka / rok',
+          'type': 'scale',
+          'scaleMin': 1,
+          'scaleMax': 5,
+          'weight': 0.35,
+        },
+        <String, dynamic>{
+          'code': 'responsiveness',
+          'label': 'Responsivnost',
+          'type': 'scale',
+          'scaleMin': 1,
+          'scaleMax': 5,
+          'weight': 0.25,
+        },
+      ],
+    };
+  }
+
+  Future<void> _createStarterTemplate() async {
+    if (_cid.isEmpty || _et.isEmpty) return;
+    setState(() {
+      _creatingTemplate = true;
+      _error = null;
+    });
+    try {
+      await _engine.upsertAssessmentTemplate(
+        companyId: _cid,
+        payload: _starterTemplatePayload(),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Početni šablon je kreiran. Sada ga možeš odabrati i pokrenuti procjenu.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = _mapComputeError(e));
+    } finally {
+      if (mounted) {
+        setState(() => _creatingTemplate = false);
+      }
+    }
   }
 
   Map<String, dynamic> _buildInputs(Map<String, dynamic> tpl) {
@@ -309,7 +399,7 @@ class _UnifiedAssessmentRunScreenState
                 padding: EdgeInsets.all(12),
                 child: Text(
                   'Vaša uloga možda nema pravo na izračun za ovaj tip entiteta. '
-                  'Ako je potrebno, obratite se administratoru.',
+                  'Ako je potrebno, obratite se Adminu.',
                 ),
               ),
             ),
@@ -353,12 +443,48 @@ class _UnifiedAssessmentRunScreenState
               }
               final docs = snap.data!.docs;
               if (docs.isEmpty) {
-                return const Card(
+                return Card(
                   child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'Nema aktivnih šablona za ovaj tip entiteta. '
-                      'Kreiraj šablon Callable-om upsertAssessmentTemplate ili admin alatom.',
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Nema aktivnih šablona za ovaj tip entiteta.',
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Možeš kreirati starter šablon direktno iz ovog ekrana.',
+                        ),
+                        if (_canManageTemplates) ...[
+                          const SizedBox(height: 12),
+                          FilledButton.icon(
+                            onPressed: _creatingTemplate
+                                ? null
+                                : _createStarterTemplate,
+                            icon: _creatingTemplate
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.add_task_outlined),
+                            label: const Text('Kreiraj starter šablon'),
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'Za kreiranje šablona potreban je manager/admin pristup '
+                            '(production_manager, logistics_manager, supervisor, '
+                            'purchasing, admin).',
+                            style: TextStyle(
+                              color: Colors.black.withValues(alpha: 0.65),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 );

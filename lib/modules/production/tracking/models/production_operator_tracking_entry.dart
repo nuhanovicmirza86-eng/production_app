@@ -25,6 +25,9 @@ class ProductionOperatorTrackingEntry {
 
   /// Palica, šarža, linija ili druga interna referenca.
   final String? lineOrBatchRef;
+
+  /// Broj alata ili palice na koju je pripremljen proizvod za puštanje u proizvodnju (pripremna faza).
+  final String? releaseToolOrRodRef;
   final String? customerName;
 
   /// Operater koji radi izradu sirovog komada (evidencija).
@@ -32,6 +35,9 @@ class ProductionOperatorTrackingEntry {
 
   /// Ime i prezime (ili nadimak) operatera koji je pripremio — snapshot pri spremanju.
   final String? preparedByDisplayName;
+
+  /// ID kutije u [packing_boxes] ako je stavka uključena u zatvorenu kutiju (Stanica 1).
+  final String? packedBoxId;
   final String? sourceQrPayload;
   final String? notes;
 
@@ -41,6 +47,11 @@ class ProductionOperatorTrackingEntry {
   final DateTime? createdAt;
   final String createdByUid;
   final String createdByEmail;
+
+  /// Jedna ispravka po zapisu; nakon toga više izmjena nije dozvoljeno (Callable).
+  final bool correctionApplied;
+  final DateTime? correctedAt;
+  final String? correctionReason;
 
   const ProductionOperatorTrackingEntry({
     required this.id,
@@ -57,15 +68,20 @@ class ProductionOperatorTrackingEntry {
     this.commercialOrderId,
     this.rawMaterialOrderCode,
     this.lineOrBatchRef,
+    this.releaseToolOrRodRef,
     this.customerName,
     this.rawWorkOperatorName,
     this.preparedByDisplayName,
+    this.packedBoxId,
     this.sourceQrPayload,
     this.notes,
     this.scrapBreakdown = const [],
     this.createdAt,
     required this.createdByUid,
     required this.createdByEmail,
+    this.correctionApplied = false,
+    this.correctedAt,
+    this.correctionReason,
   });
 
   static const String phasePreparation = 'preparation';
@@ -80,6 +96,11 @@ class ProductionOperatorTrackingEntry {
     final ca = d['createdAt'];
     if (ca is Timestamp) {
       created = ca.toDate();
+    }
+    DateTime? corrAt;
+    final cx = d['correctedAt'];
+    if (cx is Timestamp) {
+      corrAt = cx.toDate();
     }
     final qty = d['quantity'];
     double q = 0;
@@ -114,15 +135,20 @@ class ProductionOperatorTrackingEntry {
       commercialOrderId: _s(d['commercialOrderId']),
       rawMaterialOrderCode: _s(d['rawMaterialOrderCode']),
       lineOrBatchRef: _s(d['lineOrBatchRef']),
+      releaseToolOrRodRef: _s(d['releaseToolOrRodRef']),
       customerName: _s(d['customerName']),
       rawWorkOperatorName: _s(d['rawWorkOperatorName']),
       preparedByDisplayName: _s(d['preparedByDisplayName']),
+      packedBoxId: _s(d['packedBoxId']),
       sourceQrPayload: _s(d['sourceQrPayload']),
       notes: _s(d['notes']),
       scrapBreakdown: scrap,
       createdAt: created,
       createdByUid: (d['createdByUid'] ?? '').toString(),
       createdByEmail: (d['createdByEmail'] ?? '').toString(),
+      correctionApplied: d['correctionApplied'] == true,
+      correctedAt: corrAt,
+      correctionReason: _s(d['correctionReason']),
     );
   }
 

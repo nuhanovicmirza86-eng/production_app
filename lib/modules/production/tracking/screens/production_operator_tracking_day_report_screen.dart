@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../config/operator_tracking_column_labels.dart';
 import '../config/platform_defect_codes.dart';
 import '../export/production_operator_tracking_day_pdf_export.dart';
 import '../models/production_operator_tracking_entry.dart';
@@ -88,6 +89,11 @@ class _ProductionOperatorTrackingDayReportScreenState
         ).showSnackBar(SnackBar(content: Text('Nema unosa za $workKey.')));
         return;
       }
+      final u = entries.isEmpty
+          ? 'kom'
+          : entries.first.unit.trim().isEmpty
+          ? 'kom'
+          : entries.first.unit.trim();
       await ProductionOperatorTrackingDayPdfExport.preview(
         entries: entries,
         workDate: workKey,
@@ -95,6 +101,10 @@ class _ProductionOperatorTrackingDayReportScreenState
         companyLine: _companyDisplayName,
         plantLine: 'Pogon: $_plantKey',
         defectDisplayNames: parseDefectDisplayNamesMap(widget.companyData),
+        columnLabels: parseOperatorTrackingColumnLabels(widget.companyData),
+        unitForHeaders: u,
+        companyId: _companyId,
+        companyData: widget.companyData,
       );
     } catch (e) {
       if (!mounted) return;

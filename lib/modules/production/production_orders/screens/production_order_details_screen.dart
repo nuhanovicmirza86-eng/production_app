@@ -10,6 +10,7 @@ import '../../execution/services/production_execution_service.dart';
 import '../../products/services/product_service.dart';
 import '../models/production_order_model.dart';
 import '../printing/bom_classification_catalog.dart';
+import '../../../commercial/orders/services/company_print_identity_service.dart';
 import '../printing/production_order_pdf.dart';
 import '../printing/production_order_qr_payload.dart';
 import '../services/production_order_service.dart';
@@ -485,9 +486,22 @@ class _ProductionOrderDetailsScreenState
 
   Future<void> _printWorkOrder(ProductionOrderModel order) async {
     try {
+      CompanyPrintIdentity? printIdentity;
+      final cid = _companyId.trim();
+      if (cid.isNotEmpty) {
+        printIdentity = await CompanyPrintIdentityService().load(
+          companyId: cid,
+          companyData: widget.companyData,
+        );
+      }
       await Printing.layoutPdf(
         name: order.productionOrderCode,
-        onLayout: (_) => ProductionOrderPdf.buildWorkOrderPdf(order: order),
+        onLayout: (_) => ProductionOrderPdf.buildWorkOrderPdf(
+          order: order,
+          printedAt: DateTime.now(),
+          printIdentity: printIdentity,
+          companyData: widget.companyData,
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -996,6 +1010,12 @@ class _ProductionOrderDetailsScreenState
                       : order.customerName!.trim(),
                 ),
                 _buildInfoRow('Šifra proizvoda', order.productCode),
+                _buildInfoRow(
+                  'Lot materijala (šarža)',
+                  (order.inputMaterialLot ?? '').trim().isEmpty
+                      ? '—'
+                      : order.inputMaterialLot!.trim(),
+                ),
                 _buildInfoRow(
                   'Planirana količina',
                   '${_formatQty(order.plannedQty)} ${order.unit}',

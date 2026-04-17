@@ -4,21 +4,30 @@ import 'package:production_app/core/theme/operonix_production_brand.dart';
 import 'package:production_app/screens/about_screen.dart';
 
 import '../../../../core/access/production_access_helper.dart';
+import '../../../auth/screens/station_device_mode_screen.dart';
+import '../../../../core/access/production_maintenance_bridge.dart';
 import '../../../../core/company_logo_resolver.dart';
 import '../../../../core/company_plant_display_name.dart';
 import '../../../auth/shared/services/auth_service.dart';
 import '../../../auth/register/screens/pending_users_screen.dart';
 import '../../../commercial/partners/screens/partners_screen.dart';
+import '../../../commercial/orders/screens/document_pdf_settings_screen.dart';
 import '../../../commercial/orders/screens/orders_list_screen.dart';
 import '../../products/screens/products_list_screen.dart';
+import '../../../logistics/receipt/screens/packing_box_receipt_screen.dart';
 import '../../../logistics/receipt/screens/production_label_receipt_screen.dart';
+import '../../../logistics/receipt/screens/station1_packed_boxes_logistics_screen.dart';
 import '../../../sustainability/screens/carbon_footprint_screen.dart';
 import '../../production_orders/screens/production_order_details_screen.dart';
 import '../../production_orders/screens/production_orders_list_screen.dart';
 import '../../tracking/models/production_operator_tracking_entry.dart';
 import '../../tracking/screens/production_operator_tracking_screen.dart';
 import '../../tracking/screens/production_operator_tracking_station_screen.dart';
+import '../../station_pages/screens/production_station_pages_admin_screen.dart';
+import '../../station_pages/widgets/station_page_active_gate.dart';
+import '../../tracking/screens/production_preparation_station_screen.dart';
 import '../../tracking/screens/production_reports_hub_screen.dart';
+import '../../issues/screens/production_problem_reporting_screen.dart';
 import '../../qr/production_qr_resolver.dart';
 import '../../qr/screens/production_qr_scan_screen.dart';
 
@@ -57,26 +66,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     return _companyId;
   }
 
-  String get _role =>
-      (companyData['role'] ?? '').toString().trim().toLowerCase();
-
-  static String _prettyRoleLabel(String role) {
-    final r = role.trim().toLowerCase();
-    switch (r) {
-      case ProductionAccessHelper.roleAdmin:
-        return 'Administrator';
-      case ProductionAccessHelper.roleProductionManager:
-        return 'Menadžer proizvodnje';
-      case ProductionAccessHelper.roleSupervisor:
-        return 'Supervizor';
-      case ProductionAccessHelper.roleProductionOperator:
-        return 'Operater proizvodnje';
-      case ProductionAccessHelper.roleMaintenanceManager:
-        return 'Menadžer održavanja';
-      default:
-        return r.isEmpty ? '-' : role;
-    }
-  }
+  String get _role => ProductionAccessHelper.normalizeRole(companyData['role']);
 
   List<String> get _enabledModules {
     final raw = companyData['enabledModules'];
@@ -98,6 +88,10 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     return _enabledModules.contains(normalized);
   }
 
+  bool _canAccessMaintenanceFaultBridge() {
+    return maintenanceFaultBridgeEnabled(companyData);
+  }
+
   bool _canViewCard(ProductionDashboardCard card) {
     return ProductionAccessHelper.canView(role: _role, card: card);
   }
@@ -106,6 +100,36 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
   /// (ne ovisi o SaaS listi enabledReports — hub sadrži profesionalne kategorije).
   bool _canShowReportsCard() {
     return _canViewCard(ProductionDashboardCard.reports);
+  }
+
+  bool _canAccessOrders() {
+    return _role == 'admin' ||
+        _role == 'production_manager' ||
+        _role == 'sales' ||
+        _role == 'purchasing' ||
+        _role == 'logistics_manager';
+  }
+
+  bool _canAccessPartners() {
+    return _role == 'admin' ||
+        _role == 'production_manager' ||
+        _role == 'sales' ||
+        _role == 'purchasing' ||
+        _role == 'logistics_manager';
+  }
+
+  bool _canAccessCentralWarehouse() {
+    return _role == 'admin' ||
+        _role == 'production_manager' ||
+        _role == 'purchasing' ||
+        _role == 'logistics_operator' ||
+        _role == 'logistics_manager';
+  }
+
+  /// Postavka lokalnog uređaja (stanica nakon prijave) — samo uloga Admin (tenant),
+  /// ne Super admin niti druge uloge.
+  bool _canConfigureStationDevice() {
+    return ProductionAccessHelper.isAdminRole(_role);
   }
 
   static const double _tileGap = 10;
@@ -122,21 +146,38 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         context,
         MaterialPageRoute<void>(
           fullscreenDialog: true,
-          builder: (_) => ProductionOperatorTrackingStationScreen(
+          builder: (_) => StationPageActiveGate(
             companyData: companyData,
             phase: phase,
+            stationBuilder: (_) =>
+                phase == ProductionOperatorTrackingEntry.phasePreparation
+                ? ProductionPreparationStationScreen(companyData: companyData)
+                : ProductionOperatorTrackingStationScreen(
+                    companyData: companyData,
+                    phase: phase,
+                  ),
           ),
         ),
       );
     }
 
     return [
-      _DashboardActionTile(
-        icon: Icons.qr_code_scanner,
-        title: 'Skeniraj QR',
-        subtitle: 'Nalog ili naljepnica s proizvodnog poda.',
-        onTap: () => _openProductionQrScan(context),
-      ),
+      if (_hasModule('production') && _canConfigureStationDevice())
+        _DashboardActionTile(
+          icon: Icons.display_settings_outlined,
+          title: 'Način rada na ovom uređaju',
+          subtitle:
+              'Cijela aplikacija ili jedna stanica nakon prijave (samo uloga Admin).',
+          onTap: () => open(const StationDeviceModeScreen()),
+        ),
+      if (_canViewCard(ProductionDashboardCard.productionOrders) ||
+          _canAccessCentralWarehouse())
+        _DashboardActionTile(
+          icon: Icons.qr_code_scanner,
+          title: 'Skeniraj QR',
+          subtitle: 'Nalog ili naljepnica s proizvodnog poda.',
+          onTap: () => _openProductionQrScan(context),
+        ),
       if (_canViewCard(ProductionDashboardCard.products))
         _DashboardActionTile(
           icon: Icons.inventory_2_outlined,
@@ -152,18 +193,45 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           onTap: () =>
               open(ProductionOrdersListScreen(companyData: companyData)),
         ),
-      _DashboardActionTile(
-        icon: Icons.receipt_long_outlined,
-        title: 'Narudžbe',
-        subtitle: 'Pregled i rad s narudžbama.',
-        onTap: () => open(OrdersListScreen(companyData: companyData)),
-      ),
-      _DashboardActionTile(
-        icon: Icons.groups_outlined,
-        title: 'Kupci / dobavljači',
-        subtitle: 'Partneri i poslovne veze.',
-        onTap: () => open(PartnersScreen(companyData: companyData)),
-      ),
+      if (_canAccessOrders())
+        _DashboardActionTile(
+          icon: Icons.receipt_long_outlined,
+          title: 'Narudžbe',
+          subtitle: 'Pregled i rad s narudžbama.',
+          onTap: () => open(OrdersListScreen(companyData: companyData)),
+        ),
+      if (_canAccessOrders())
+        _DashboardActionTile(
+          icon: Icons.picture_as_pdf_outlined,
+          title: 'Podaci za ispis PDF',
+          subtitle: 'Zaglavlje, logo i podaci kompanije na dokumentima.',
+          onTap: () =>
+              open(DocumentPdfSettingsScreen(companyData: companyData)),
+        ),
+      if (_canAccessPartners())
+        _DashboardActionTile(
+          icon: Icons.groups_outlined,
+          title: 'Kupci / dobavljači',
+          subtitle: 'Partneri i poslovne veze.',
+          onTap: () => open(PartnersScreen(companyData: companyData)),
+        ),
+      if (_canAccessCentralWarehouse()) ...[
+        _DashboardActionTile(
+          icon: Icons.warehouse_outlined,
+          title: 'Centralni magacin',
+          subtitle: 'Prijem i knjiženje preko QR etiketa.',
+          onTap: () => _openProductionQrScan(context),
+        ),
+        _DashboardActionTile(
+          icon: Icons.move_to_inbox_outlined,
+          title: 'Upakovane kutije Stanica 1',
+          subtitle:
+              'Lista zatvorenih kutija i prijem u magacin skeniranjem QR-a.',
+          onTap: () => open(
+            Station1PackedBoxesLogisticsScreen(companyData: companyData),
+          ),
+        ),
+      ],
       if (_canViewCard(ProductionDashboardCard.carbonFootprint))
         _DashboardActionTile(
           icon: Icons.eco_outlined,
@@ -182,7 +250,8 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         _DashboardActionTile(
           icon: Icons.fullscreen_outlined,
           title: 'Stanica: pripremna',
-          subtitle: 'Puni zaslon — samo unos pripreme (jedan monitor).',
+          subtitle:
+              'Puni zaslon — pripremna + traka prijave (QR uskoro). Jedan monitor.',
           onTap: () => openTrackingStation(
             ProductionOperatorTrackingEntry.phasePreparation,
           ),
@@ -204,6 +273,14 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           ),
         ),
       ],
+      if (_canViewCard(ProductionDashboardCard.stationPages))
+        _DashboardActionTile(
+          icon: Icons.touch_app_outlined,
+          title: 'Stranice stanica',
+          subtitle: 'Definicija stanica 1–3 za terminal (tenant + pogon).',
+          onTap: () =>
+              open(ProductionStationPagesAdminScreen(companyData: companyData)),
+        ),
       if (_canViewCard(ProductionDashboardCard.workCenters))
         _DashboardActionTile(
           icon: Icons.precision_manufacturing_outlined,
@@ -225,12 +302,14 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           subtitle: 'Uskoro u aplikaciji.',
           onTap: () => _notImplemented(context),
         ),
-      if (_canViewCard(ProductionDashboardCard.problemReporting))
+      if (_canAccessMaintenanceFaultBridge() &&
+          _canViewCard(ProductionDashboardCard.problemReporting))
         _DashboardActionTile(
           icon: Icons.report_problem_outlined,
           title: 'Prijava problema',
-          subtitle: 'Uskoro u aplikaciji.',
-          onTap: () => _notImplemented(context),
+          subtitle: 'Prijava kvara + pregled mojih prijava.',
+          onTap: () =>
+              open(ProductionProblemReportingScreen(companyData: companyData)),
         ),
       if (_canViewCard(ProductionDashboardCard.processExecution))
         _DashboardActionTile(
@@ -310,7 +389,8 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       _ProdNavItem(
         builder: (ctx) => _ProductionHomePage(
           companyData: cd,
-          roleLabel: _prettyRoleLabel(_role),
+          roleLabel:
+              ProductionAccessHelper.displayRoleLabel(companyData['role']),
           companyId: _companyId,
           plantKey: _plantKey,
           companyLine: _companyDisplayName,
@@ -352,8 +432,8 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       );
     }
 
-    if (_hasModule('production')) {
-      items.addAll([
+    if (_hasModule('production') && _canAccessOrders()) {
+      items.add(
         _ProdNavItem(
           builder: (_) => OrdersListScreen(companyData: cd),
           destination: const NavigationDestination(
@@ -362,6 +442,11 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             label: 'Narudžbe',
           ),
         ),
+      );
+    }
+
+    if (_hasModule('production') && _canAccessPartners()) {
+      items.add(
         _ProdNavItem(
           builder: (_) => PartnersScreen(companyData: cd),
           destination: const NavigationDestination(
@@ -370,7 +455,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             label: 'Partneri',
           ),
         ),
-      ]);
+      );
     }
 
     if (_hasModule('production') &&
@@ -399,9 +484,11 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           ),
         ),
         _ProdNavItem(
-          builder: (_) => ProductionOperatorTrackingStationScreen(
+          builder: (_) => StationPageActiveGate(
             companyData: cd,
             phase: ProductionOperatorTrackingEntry.phasePreparation,
+            stationBuilder: (_) =>
+                ProductionPreparationStationScreen(companyData: cd),
           ),
           destination: const NavigationDestination(
             icon: Icon(Icons.fullscreen_outlined),
@@ -410,9 +497,13 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           ),
         ),
         _ProdNavItem(
-          builder: (_) => ProductionOperatorTrackingStationScreen(
+          builder: (_) => StationPageActiveGate(
             companyData: cd,
             phase: ProductionOperatorTrackingEntry.phaseFirstControl,
+            stationBuilder: (_) => ProductionOperatorTrackingStationScreen(
+              companyData: cd,
+              phase: ProductionOperatorTrackingEntry.phaseFirstControl,
+            ),
           ),
           destination: const NavigationDestination(
             icon: Icon(Icons.fact_check_outlined),
@@ -421,9 +512,13 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           ),
         ),
         _ProdNavItem(
-          builder: (_) => ProductionOperatorTrackingStationScreen(
+          builder: (_) => StationPageActiveGate(
             companyData: cd,
             phase: ProductionOperatorTrackingEntry.phaseFinalControl,
+            stationBuilder: (_) => ProductionOperatorTrackingStationScreen(
+              companyData: cd,
+              phase: ProductionOperatorTrackingEntry.phaseFinalControl,
+            ),
           ),
           destination: const NavigationDestination(
             icon: Icon(Icons.verified_outlined),
@@ -486,13 +581,11 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     }
 
     if (_hasModule('production') &&
+        _canAccessMaintenanceFaultBridge() &&
         _canViewCard(ProductionDashboardCard.problemReporting)) {
       items.add(
         _ProdNavItem(
-          builder: (ctx) => _PlaceholderProductionTab(
-            title: 'Prijava problema',
-            onNotImplemented: () => _notImplemented(ctx),
-          ),
+          builder: (_) => ProductionProblemReportingScreen(companyData: cd),
           destination: const NavigationDestination(
             icon: Icon(Icons.report_problem_outlined),
             selectedIcon: Icon(Icons.report_problem),
@@ -608,46 +701,81 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _DashboardActionTile(
-                    icon: Icons.qr_code_scanner,
-                    title: 'Skeniraj QR',
-                    subtitle: 'Nalog ili naljepnica s poda',
-                    onTap: () {
-                      _shellScaffoldKey.currentState?.closeDrawer();
-                      _openProductionQrScan(context);
-                    },
-                  ),
+                  if (_canViewCard(ProductionDashboardCard.productionOrders) ||
+                      _canAccessCentralWarehouse())
+                    _DashboardActionTile(
+                      icon: Icons.qr_code_scanner,
+                      title: 'Skeniraj QR',
+                      subtitle: 'Nalog ili naljepnica sa linije',
+                      onTap: () {
+                        _shellScaffoldKey.currentState?.closeDrawer();
+                        _openProductionQrScan(context);
+                      },
+                    ),
                   if (_hasModule('production')) ...[
-                    const SizedBox(height: 10),
-                    _DashboardActionTile(
-                      icon: Icons.receipt_long_outlined,
-                      title: 'Narudžbe',
-                      subtitle: 'Pregled i rad s narudžbama',
-                      onTap: () {
-                        _shellScaffoldKey.currentState?.closeDrawer();
-                        Navigator.push<void>(
-                          context,
-                          MaterialPageRoute<void>(
-                            builder: (_) => OrdersListScreen(companyData: cd),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    _DashboardActionTile(
-                      icon: Icons.groups_outlined,
-                      title: 'Kupci / dobavljači',
-                      subtitle: 'Partneri i poslovne veze',
-                      onTap: () {
-                        _shellScaffoldKey.currentState?.closeDrawer();
-                        Navigator.push<void>(
-                          context,
-                          MaterialPageRoute<void>(
-                            builder: (_) => PartnersScreen(companyData: cd),
-                          ),
-                        );
-                      },
-                    ),
+                    if (_canAccessOrders()) ...[
+                      const SizedBox(height: 10),
+                      _DashboardActionTile(
+                        icon: Icons.receipt_long_outlined,
+                        title: 'Narudžbe',
+                        subtitle: 'Pregled i rad s narudžbama',
+                        onTap: () {
+                          _shellScaffoldKey.currentState?.closeDrawer();
+                          Navigator.push<void>(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (_) => OrdersListScreen(companyData: cd),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      _DashboardActionTile(
+                        icon: Icons.picture_as_pdf_outlined,
+                        title: 'Podaci za ispis PDF',
+                        subtitle:
+                            'Zaglavlje, logo i podaci kompanije na dokumentima',
+                        onTap: () {
+                          _shellScaffoldKey.currentState?.closeDrawer();
+                          Navigator.push<void>(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  DocumentPdfSettingsScreen(companyData: cd),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                    if (_canAccessPartners()) ...[
+                      const SizedBox(height: 10),
+                      _DashboardActionTile(
+                        icon: Icons.groups_outlined,
+                        title: 'Kupci / dobavljači',
+                        subtitle: 'Partneri i poslovne veze',
+                        onTap: () {
+                          _shellScaffoldKey.currentState?.closeDrawer();
+                          Navigator.push<void>(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (_) => PartnersScreen(companyData: cd),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                    if (_canAccessCentralWarehouse()) ...[
+                      const SizedBox(height: 10),
+                      _DashboardActionTile(
+                        icon: Icons.warehouse_outlined,
+                        title: 'Centralni magacin',
+                        subtitle: 'Prijem i knjiženje preko QR etiketa',
+                        onTap: () {
+                          _shellScaffoldKey.currentState?.closeDrawer();
+                          _openProductionQrScan(context);
+                        },
+                      ),
+                    ],
                   ],
                   const SizedBox(height: 10),
                   _DashboardActionTile(
@@ -809,6 +937,23 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
               companyData: companyData,
               resolution: resolution,
             ),
+          ),
+        );
+        break;
+
+      case ProductionQrIntent.packedStation1BoxV1:
+        final boxId = resolution.packingBoxId?.trim();
+        if (boxId == null || boxId.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('QR kutije nije valjan.')),
+          );
+          return;
+        }
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                PackingBoxReceiptScreen(companyData: companyData, boxId: boxId),
           ),
         );
         break;

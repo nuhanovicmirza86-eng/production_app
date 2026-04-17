@@ -35,6 +35,16 @@ class BomService {
 
   // ================= BOM HEADER =================
 
+  /// Klasifikacija sastavnice (`PRIMARY` / `SECONDARY` / `TRANSPORT`) s dokumenta `boms/{bomId}`.
+  Future<String?> getClassificationForBomId(String bomId) async {
+    final id = _s(bomId);
+    if (id.isEmpty || id == 'unspecified') return null;
+    final doc = await _boms.doc(id).get();
+    if (!doc.exists) return null;
+    final c = _s(doc.data()?['classification']);
+    return c.isEmpty ? null : c;
+  }
+
   Future<Map<String, dynamic>?> getActiveBomForProductAndClassification({
     required String companyId,
     required String productId,

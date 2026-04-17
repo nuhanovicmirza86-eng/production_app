@@ -1,3 +1,4 @@
+import '../packing/packing_box_qr.dart';
 import '../production_orders/printing/classification_label_print_qr.dart';
 import '../production_orders/printing/production_order_qr_payload.dart';
 
@@ -28,6 +29,9 @@ enum ProductionQrIntent {
   /// Otisnuta etiketa klasifikacije (`type`: production_classification_label).
   printedClassificationLabelV1,
 
+  /// Zatvorena kutija Stanica 1 (`type`: packing_box_station1).
+  packedStation1BoxV1,
+
   /// Placeholder za buduće lot-based QR (zaliha, prenos).
   // inventoryLotV1,
   nepoznat,
@@ -41,6 +45,7 @@ class ProductionQrScanResolution {
     this.productionOrderId,
     this.productionOrderCode,
     this.labelFields,
+    this.packingBoxId,
   });
 
   final ProductionQrIntent intent;
@@ -54,6 +59,9 @@ class ProductionQrScanResolution {
 
   /// Kad je [intent] [ProductionQrIntent.printedClassificationLabelV1].
   final Map<String, dynamic>? labelFields;
+
+  /// Kad je [intent] [ProductionQrIntent.packedStation1BoxV1] — `packing_boxes` id.
+  final String? packingBoxId;
 
   bool get isKnown => intent != ProductionQrIntent.nepoznat;
 }
@@ -74,6 +82,16 @@ ProductionQrScanResolution resolveProductionQrScan(String raw) {
       rawPayload: trimmed,
       productionOrderId: tryParseProductionOrderIdFromQr(trimmed),
       productionOrderCode: tryParseProductionOrderCodeFromQr(trimmed),
+    );
+  }
+
+  final boxMap = tryParsePackingBoxQr(trimmed);
+  if (boxMap != null && isPackingBoxStation1Map(boxMap)) {
+    final bid = (boxMap['boxId'] ?? '').toString().trim();
+    return ProductionQrScanResolution(
+      intent: ProductionQrIntent.packedStation1BoxV1,
+      rawPayload: trimmed,
+      packingBoxId: bid.isEmpty ? null : bid,
     );
   }
 

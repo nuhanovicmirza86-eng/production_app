@@ -127,6 +127,12 @@ class SuppliersService {
       approvedMaterialGroups: draft.approvedMaterialGroups,
       approvedProcesses: draft.approvedProcesses,
       certificates: draft.certificates,
+      contractDeliveryDays: draft.contractDeliveryDays,
+      contractPaymentDays: draft.contractPaymentDays,
+      contractCollectionDays: draft.contractCollectionDays,
+      contractGraceDaysLate: draft.contractGraceDaysLate,
+      activitySector: draft.activitySector,
+      partnerRatingClass: draft.partnerRatingClass,
     );
 
     final res = await _functions

@@ -1,8 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 
 class AppErrorMapper {
   static String toMessage(Object error) {
+    if (error is FirebaseFunctionsException) {
+      return _firebaseFunctionsMessage(error);
+    }
+
     if (error is FirebaseException) {
       switch (error.code) {
         case 'permission-denied':
@@ -67,6 +72,51 @@ class AppErrorMapper {
     return 'Došlo je do greške. Pokušajte ponovo.';
   }
 
+  /// Callable (Cloud Functions) — nije Firestore `permission-denied` s klijenta.
+  /// Poruka s poslužitelja (HttpsError) obično je već na bosanskom.
+  static String _firebaseFunctionsMessage(FirebaseFunctionsException e) {
+    final m = (e.message ?? '').trim();
+    switch (e.code) {
+      case 'permission-denied':
+        if (m.isNotEmpty) {
+          return kDebugMode ? '$m\n\n(kod: ${e.code})' : m;
+        }
+        return 'Nemaš dozvolu za ovu radnju (provjera na serveru). '
+            'Provjeri ulogu, da li korisnik pripada istoj firmi i da li je nalog aktivan.';
+      case 'unauthenticated':
+        return m.isNotEmpty
+            ? m
+            : 'Morate biti prijavljeni da biste nastavili.';
+      case 'invalid-argument':
+        return m.isNotEmpty
+            ? m
+            : 'Uneseni podaci nisu ispravni.';
+      case 'not-found':
+        return m.isNotEmpty ? m : 'Traženi podatak nije pronađen.';
+      case 'failed-precondition':
+        return m.isNotEmpty
+            ? m
+            : 'Operacija nije dozvoljena u trenutnom stanju podataka.';
+      case 'internal':
+        return m.isNotEmpty
+            ? m
+            : 'Greška na serveru. Pokušajte ponovo kasnije.';
+      case 'unavailable':
+        return 'Servis trenutno nije dostupan. Pokušajte ponovo.';
+      case 'deadline-exceeded':
+        return 'Zahtjev je istekao. Pokušajte ponovo.';
+      case 'resource-exhausted':
+        return m.isNotEmpty
+            ? m
+            : 'Kvota ili limit servisa je prekoračen. Pokušajte kasnije.';
+      default:
+        if (m.isNotEmpty) {
+          return kDebugMode ? '$m\n\n(kod: ${e.code})' : m;
+        }
+        return 'Greška na serveru (${e.code}). Pokušajte ponovo.';
+    }
+  }
+
   /// Jasno razlikuje Firestore security rules od ostalih uzroka.
   static String _permissionDeniedMessage(FirebaseException error) {
     const base =
@@ -89,7 +139,7 @@ class AppErrorMapper {
     if (m.contains('index') || m.contains('indexes')) {
       final base =
           'Baza traži sastavljeni indeks za ovaj prikaz (ili se indeks još gradi 1–5 min). '
-          'Administrator: iz maintenance_app repozitorija pokreni '
+          'Admin: iz maintenance_app repozitorija pokreni '
           '`firebase deploy --only firestore:indexes`, ili u Firebase konzoli '
           'otvori Firestore → Indexes i koristi link „create composite index” '
           'iz poruke greške u pregledniku (Network / Console).';

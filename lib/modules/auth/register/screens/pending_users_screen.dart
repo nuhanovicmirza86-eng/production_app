@@ -3,6 +3,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/access/production_access_helper.dart';
 import '../widgets/edit_user_dialog.dart';
 
 class PendingUsersScreen extends StatefulWidget {
@@ -38,6 +39,7 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
     'production_operator',
     'quality_operator',
     'logistics_operator',
+    'logistics_manager',
     'shift_lead',
     'production_manager',
   ];
@@ -99,17 +101,22 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
   }
 
   String _roleLabel(String role) {
-    switch (role) {
+    final r = ProductionAccessHelper.normalizeRole(role);
+    switch (r) {
+      case 'admin':
+        return 'Admin';
       case 'production_operator':
-        return 'Production Operator';
+        return 'Operater proizvodnje';
       case 'quality_operator':
-        return 'Quality Operator';
+        return 'Operater kvaliteta';
       case 'logistics_operator':
-        return 'Logistics Operator';
+        return 'Operater logistike';
+      case 'logistics_manager':
+        return 'Menadžer logistike';
       case 'shift_lead':
-        return 'Shift Lead';
+        return 'Vođa smjene';
       case 'production_manager':
-        return 'Production Manager';
+        return 'Menadžer proizvodnje';
       default:
         return role;
     }

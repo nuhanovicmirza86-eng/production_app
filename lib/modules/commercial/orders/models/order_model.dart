@@ -39,6 +39,15 @@ class OrderModel {
   final String? customerReference;
   final String? supplierReference;
 
+  /// Adresa isporuke / prijema (tekstualno, za PDF).
+  final String? deliveryAddress;
+
+  /// Način dostave / Incoterms (npr. DHL Economy).
+  final String? shippingTerms;
+
+  /// Pogon prijema (interno).
+  final String? receiptPlantKey;
+
   const OrderModel({
     required this.id,
     required this.companyId,
@@ -63,6 +72,9 @@ class OrderModel {
     this.plantKey,
     this.customerReference,
     this.supplierReference,
+    this.deliveryAddress,
+    this.shippingTerms,
+    this.receiptPlantKey,
   });
 
   OrderModel copyWith({
@@ -79,6 +91,9 @@ class OrderModel {
     DateTime? updatedAt,
     String? customerReference,
     String? supplierReference,
+    String? deliveryAddress,
+    String? shippingTerms,
+    String? receiptPlantKey,
   }) {
     return OrderModel(
       id: id,
@@ -106,6 +121,9 @@ class OrderModel {
       plantKey: plantKey ?? this.plantKey,
       customerReference: customerReference ?? this.customerReference,
       supplierReference: supplierReference ?? this.supplierReference,
+      deliveryAddress: deliveryAddress ?? this.deliveryAddress,
+      shippingTerms: shippingTerms ?? this.shippingTerms,
+      receiptPlantKey: receiptPlantKey ?? this.receiptPlantKey,
     );
   }
 
@@ -146,6 +164,9 @@ class OrderModel {
       plantKey: _nullableString(map['plantKey']),
       customerReference: _nullableString(map['customerReference']),
       supplierReference: _nullableString(map['supplierReference']),
+      deliveryAddress: _nullableString(map['deliveryAddress']),
+      shippingTerms: _nullableString(map['shippingTerms']),
+      receiptPlantKey: _nullableString(map['receiptPlantKey']),
     );
   }
 
@@ -209,6 +230,15 @@ class OrderItemModel {
   final double receivedQty;
   final double openQty;
 
+  /// Jedinična cijena (Firestore: `unitPrice`).
+  final double unitPrice;
+
+  /// Rabat u postotku (opcionalno u bazi).
+  final double discountPercent;
+
+  /// PDV u postotku po liniji; `null` = koristi podrazumijevani iz postavki dokumenta.
+  final double? vatPercent;
+
   const OrderItemModel({
     this.orderItemDocId,
     required this.productId,
@@ -223,6 +253,9 @@ class OrderItemModel {
     this.deliveredQty = 0,
     this.receivedQty = 0,
     this.openQty = 0,
+    this.unitPrice = 0,
+    this.discountPercent = 0,
+    this.vatPercent,
   });
 
   factory OrderItemModel.fromMap(Map<String, dynamic> map) {
@@ -242,6 +275,9 @@ class OrderItemModel {
       deliveredQty: _d(map['deliveredQty']),
       receivedQty: _d(map['receivedQty']),
       openQty: _d(map['openQty']),
+      unitPrice: _d(map['unitPrice']),
+      discountPercent: _d(map['discountPercent'] ?? map['rebatePercent']),
+      vatPercent: map['vatPercent'] != null ? _d(map['vatPercent']) : null,
     );
   }
 
@@ -262,6 +298,9 @@ class OrderItemModel {
       deliveredQty: _d(map['deliveredQty']),
       receivedQty: _d(map['receivedQty']),
       openQty: _d(map['openQty']),
+      unitPrice: _d(map['unitPrice']),
+      discountPercent: _d(map['discountPercent'] ?? map['rebatePercent']),
+      vatPercent: map['vatPercent'] != null ? _d(map['vatPercent']) : null,
     );
   }
 

@@ -88,6 +88,7 @@ class ProductionOrderService {
     String? sourceCustomerName,
     DateTime? sourceOrderDate,
     DateTime? requestedDeliveryDate,
+    String? inputMaterialLot,
   }) async {
     final docRef = _orders.doc();
     final now = DateTime.now();
@@ -148,6 +149,7 @@ class ProductionOrderService {
       piecesPerPallet: null,
       notes: null,
       operationName: null,
+      inputMaterialLot: _trimOrNull(inputMaterialLot),
     );
 
     await docRef.set(order.toMap());

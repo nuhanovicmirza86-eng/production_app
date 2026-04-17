@@ -5,9 +5,14 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import '../../../../core/pdf/operonix_pdf_footer.dart';
+import '../../../commercial/orders/export/pdf_company_header.dart';
+import '../../../commercial/orders/services/company_print_identity_service.dart';
+import '../config/operator_tracking_column_labels.dart';
 import '../models/production_operator_tracking_entry.dart';
 
 typedef DefectDisplayNames = Map<String, String>;
+typedef OperatorTrackingColumnLabels = Map<String, String>;
 
 /// PDF dnevnog lista unosa iz praćenja (pripremna / kontrole).
 class ProductionOperatorTrackingDayPdfExport {
@@ -66,12 +71,23 @@ class ProductionOperatorTrackingDayPdfExport {
     String? companyLine,
     String? plantLine,
     DefectDisplayNames defectDisplayNames = const {},
+    OperatorTrackingColumnLabels columnLabels = const {},
+    String unitForHeaders = 'kom',
+    CompanyPrintIdentity? printIdentity,
+    Map<String, dynamic>? companyData,
   }) async {
     final fontR = await _font('assets/fonts/NotoSans-Regular.ttf');
     final fontB = await _font('assets/fonts/NotoSans-Bold.ttf');
     final now = DateTime.now();
     final phaseHuman = _phaseTitle(phase);
     final rows = _chronological(entries);
+
+    String col(String key) => resolvedOperatorTrackingColumnTitle(
+      key,
+      companyLabels: columnLabels,
+      phase: phase,
+      unit: unitForHeaders,
+    );
 
     pw.Widget cell(
       String t, {
@@ -101,17 +117,28 @@ class ProductionOperatorTrackingDayPdfExport {
       return pw.TableRow(
         decoration: const pw.BoxDecoration(color: PdfColors.grey300),
         children: [
-          cell('Vrijeme', header: true),
-          cell('Šifra', header: true),
-          cell('Naziv', header: true),
-          cell('Dobro', header: true, align: pw.TextAlign.right),
-          cell('Škart', header: true),
-          cell('Ukup.', header: true, align: pw.TextAlign.right),
-          cell('MJ', header: true),
-          cell('PN', header: true),
-          cell('Nar.', header: true),
-          cell('Napomena', header: true),
-          cell('Operater', header: true),
+          cell(col(OperatorTrackingColumnKeys.prepDateTime), header: true),
+          cell(col(OperatorTrackingColumnKeys.itemCode), header: true),
+          cell(col(OperatorTrackingColumnKeys.itemName), header: true),
+          cell(
+            col(OperatorTrackingColumnKeys.goodQty),
+            header: true,
+            align: pw.TextAlign.right,
+          ),
+          cell(col(OperatorTrackingColumnKeys.scrapTotal), header: true),
+          cell(
+            col(OperatorTrackingColumnKeys.quantityTotal),
+            header: true,
+            align: pw.TextAlign.right,
+          ),
+          cell(col(OperatorTrackingColumnKeys.unit), header: true),
+          cell(col(OperatorTrackingColumnKeys.productionOrderNumber), header: true),
+          cell(
+            col(OperatorTrackingColumnKeys.commercialOrderNumber),
+            header: true,
+          ),
+          cell(col(OperatorTrackingColumnKeys.notes), header: true),
+          cell(col(OperatorTrackingColumnKeys.operatorEmail), header: true),
         ],
       );
     }
@@ -195,12 +222,29 @@ class ProductionOperatorTrackingDayPdfExport {
       children: [headerRow(), for (final e in rows) dataRow(e)],
     );
 
+    final pageBody = <pw.Widget>[
+      if (printIdentity != null && companyData != null)
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(bottom: 10),
+          child: PdfCompanyHeader.buildLetterhead(
+            fontR: fontR,
+            fontB: fontB,
+            data: printIdentity.toLetterheadData(companyData),
+            logoBytes: printIdentity.logoBytes,
+            maxLogoHeight: 40,
+          ),
+        ),
+      headerBlock,
+      table,
+    ];
+
     final doc = pw.Document();
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4.landscape,
         margin: const pw.EdgeInsets.all(24),
-        build: (context) => [headerBlock, table],
+        footer: (ctx) => OperonixPdfFooter.multiPageFooter(ctx, fontR),
+        build: (context) => pageBody,
       ),
     );
     return doc.save();
@@ -213,7 +257,15 @@ class ProductionOperatorTrackingDayPdfExport {
     String? companyLine,
     String? plantLine,
     DefectDisplayNames defectDisplayNames = const {},
+    OperatorTrackingColumnLabels columnLabels = const {},
+    String unitForHeaders = 'kom',
+    required String companyId,
+    required Map<String, dynamic> companyData,
   }) async {
+    final identity = await CompanyPrintIdentityService().load(
+      companyId: companyId,
+      companyData: companyData,
+    );
     await Printing.layoutPdf(
       name: 'pracenje_proizvodnje_dnevni_list',
       onLayout: (_) => buildPdf(
@@ -223,6 +275,10 @@ class ProductionOperatorTrackingDayPdfExport {
         companyLine: companyLine,
         plantLine: plantLine,
         defectDisplayNames: defectDisplayNames,
+        columnLabels: columnLabels,
+        unitForHeaders: unitForHeaders,
+        printIdentity: identity,
+        companyData: companyData,
       ),
     );
   }

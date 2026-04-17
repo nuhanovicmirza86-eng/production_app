@@ -83,6 +83,9 @@ class ProductionOrderModel {
   /// Segment procesa (npr. GALVANIZACIJA) — za filter u pregledu.
   final String? operationName;
 
+  /// Lot / šarža ulaznog materijala (za SK — sekundarna klasifikacija), iz izrade „iznad“ u lancu — sljedljivost.
+  final String? inputMaterialLot;
+
   ProductionOrderModel({
     required this.id,
     required this.companyId,
@@ -133,6 +136,7 @@ class ProductionOrderModel {
     this.piecesPerPallet,
     this.notes,
     this.operationName,
+    this.inputMaterialLot,
   });
 
   static int? _readInt(dynamic v) {
@@ -224,6 +228,7 @@ class ProductionOrderModel {
       operationName: _nullableTrimString(
         map['operationName'] ?? map['processName'] ?? map['routingSegment'],
       ),
+      inputMaterialLot: _nullableTrimString(map['inputMaterialLot']),
     );
   }
 
@@ -288,6 +293,8 @@ class ProductionOrderModel {
       if (notes != null && notes!.trim().isNotEmpty) 'notes': notes,
       if (operationName != null && operationName!.trim().isNotEmpty)
         'operationName': operationName,
+      if (inputMaterialLot != null && inputMaterialLot!.trim().isNotEmpty)
+        'inputMaterialLot': inputMaterialLot!.trim(),
     };
   }
 }

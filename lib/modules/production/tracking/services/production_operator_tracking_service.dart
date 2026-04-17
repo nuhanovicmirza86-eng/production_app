@@ -1,14 +1,24 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../packing/services/packing_box_callable_service.dart';
 import '../models/production_operator_tracking_entry.dart';
 import '../models/tracking_scrap_line.dart';
+import 'production_operator_tracking_callable_service.dart';
 
 class ProductionOperatorTrackingService {
-  ProductionOperatorTrackingService({FirebaseFirestore? firestore})
-    : _db = firestore ?? FirebaseFirestore.instance;
+  ProductionOperatorTrackingService({
+    FirebaseFirestore? firestore,
+    PackingBoxCallableService? packingCallable,
+    ProductionOperatorTrackingCallableService? trackingCallable,
+  })  : _db = firestore ?? FirebaseFirestore.instance,
+        _packingCallable = packingCallable ?? PackingBoxCallableService(),
+        _trackingCallable =
+            trackingCallable ?? ProductionOperatorTrackingCallableService();
 
   final FirebaseFirestore _db;
+  final PackingBoxCallableService _packingCallable;
+  final ProductionOperatorTrackingCallableService _trackingCallable;
 
   CollectionReference<Map<String, dynamic>> get _col =>
       _db.collection('production_operator_tracking');
@@ -60,6 +70,7 @@ class ProductionOperatorTrackingService {
     return snap.docs.map(ProductionOperatorTrackingEntry.fromDoc).toList();
   }
 
+  /// Snimanje unosa — Callable `createProductionOperatorTrackingEntry` (createdAt samo na serveru).
   Future<void> createEntry({
     required String companyId,
     required String plantKey,
@@ -76,6 +87,7 @@ class ProductionOperatorTrackingService {
     String? commercialOrderId,
     String? rawMaterialOrderCode,
     String? lineOrBatchRef,
+    String? releaseToolOrRodRef,
     String? customerName,
     String? rawWorkOperatorName,
     String? preparedByDisplayName,
@@ -87,57 +99,136 @@ class ProductionOperatorTrackingService {
     if (user == null) {
       throw StateError('Korisnik nije prijavljen.');
     }
-    final email = user.email ?? '';
-    final scrapSum = scrapBreakdown.fold<double>(0, (a, b) => a + b.qty);
-    final totalQty = goodQty + scrapSum;
-    final payload = <String, dynamic>{
-      'companyId': companyId.trim(),
-      'plantKey': plantKey.trim(),
-      'phase': phase,
-      'workDate': workDate.trim(),
-      'itemCode': itemCode.trim(),
-      'itemName': itemName.trim(),
-      'quantity': totalQty,
-      'unit': unit.trim().isEmpty ? 'kom' : unit.trim(),
-      'createdAt': FieldValue.serverTimestamp(),
-      'createdByUid': user.uid,
-      'createdByEmail': email,
-    };
-    if (productId != null && productId.trim().isNotEmpty) {
-      payload['productId'] = productId.trim();
+    await _trackingCallable.createProductionOperatorTrackingEntry(
+      companyId: companyId,
+      plantKey: plantKey,
+      phase: phase,
+      workDate: workDate,
+      itemCode: itemCode,
+      itemName: itemName,
+      goodQty: goodQty,
+      unit: unit,
+      productId: productId,
+      productionOrderId: productionOrderId,
+      commercialOrderId: commercialOrderId,
+      rawMaterialOrderCode: rawMaterialOrderCode,
+      lineOrBatchRef: lineOrBatchRef,
+      releaseToolOrRodRef: releaseToolOrRodRef,
+      customerName: customerName,
+      rawWorkOperatorName: rawWorkOperatorName,
+      preparedByDisplayName: preparedByDisplayName,
+      sourceQrPayload: sourceQrPayload,
+      notes: notes,
+      scrapBreakdown: scrapBreakdown,
+    );
+  }
+
+  /// Jedna ispravka vlastitog zapisa (audit u `production_operator_tracking_audit`).
+  Future<void> correctEntry({
+    required String companyId,
+    required ProductionOperatorTrackingEntry entry,
+    required String itemCode,
+    required String itemName,
+    required double goodQty,
+    required String unit,
+    String? productId,
+    String? productionOrderId,
+    String? commercialOrderId,
+    String? rawMaterialOrderCode,
+    String? lineOrBatchRef,
+    String? releaseToolOrRodRef,
+    String? customerName,
+    String? rawWorkOperatorName,
+    String? preparedByDisplayName,
+    String? sourceQrPayload,
+    String? notes,
+    List<TrackingScrapLine> scrapBreakdown = const [],
+    String? reason,
+  }) async {
+    await _trackingCallable.correctProductionOperatorTrackingEntry(
+      companyId: companyId,
+      entryId: entry.id,
+      itemCode: itemCode,
+      itemName: itemName,
+      goodQty: goodQty,
+      unit: unit,
+      productId: productId,
+      productionOrderId: productionOrderId,
+      commercialOrderId: commercialOrderId,
+      rawMaterialOrderCode: rawMaterialOrderCode,
+      lineOrBatchRef: lineOrBatchRef,
+      releaseToolOrRodRef: releaseToolOrRodRef,
+      customerName: customerName,
+      rawWorkOperatorName: rawWorkOperatorName,
+      preparedByDisplayName: preparedByDisplayName,
+      sourceQrPayload: sourceQrPayload,
+      notes: notes,
+      scrapBreakdown: scrapBreakdown,
+      reason: reason,
+    );
+  }
+
+  /// Ponovno slanje unosa iz lokalnog reda ([OfflineTrackingQueue]).
+  Future<void> createEntryFromQueuePayload(Map<String, dynamic> q) async {
+    final scrap = <TrackingScrapLine>[];
+    final raw = q['scrapBreakdown'];
+    if (raw is List) {
+      for (final e in raw) {
+        if (e is Map) {
+          final m = Map<String, dynamic>.from(e);
+          final s = TrackingScrapLine.tryParse(m);
+          if (s != null) scrap.add(s);
+        }
+      }
     }
-    if (productionOrderId != null && productionOrderId.trim().isNotEmpty) {
-      payload['productionOrderId'] = productionOrderId.trim();
-    }
-    if (commercialOrderId != null && commercialOrderId.trim().isNotEmpty) {
-      payload['commercialOrderId'] = commercialOrderId.trim();
-    }
-    if (rawMaterialOrderCode != null &&
-        rawMaterialOrderCode.trim().isNotEmpty) {
-      payload['rawMaterialOrderCode'] = rawMaterialOrderCode.trim();
-    }
-    if (lineOrBatchRef != null && lineOrBatchRef.trim().isNotEmpty) {
-      payload['lineOrBatchRef'] = lineOrBatchRef.trim();
-    }
-    if (customerName != null && customerName.trim().isNotEmpty) {
-      payload['customerName'] = customerName.trim();
-    }
-    if (rawWorkOperatorName != null && rawWorkOperatorName.trim().isNotEmpty) {
-      payload['rawWorkOperatorName'] = rawWorkOperatorName.trim();
-    }
-    if (preparedByDisplayName != null &&
-        preparedByDisplayName.trim().isNotEmpty) {
-      payload['preparedByDisplayName'] = preparedByDisplayName.trim();
-    }
-    if (sourceQrPayload != null && sourceQrPayload.trim().isNotEmpty) {
-      payload['sourceQrPayload'] = sourceQrPayload.trim();
-    }
-    if (notes != null && notes.trim().isNotEmpty) {
-      payload['notes'] = notes.trim();
-    }
-    if (scrapBreakdown.isNotEmpty) {
-      payload['scrapBreakdown'] = scrapBreakdown.map((e) => e.toMap()).toList();
-    }
-    await _col.add(payload);
+    final g = q['goodQty'];
+    final goodQty = g is num ? g.toDouble() : double.tryParse('$g') ?? 0.0;
+
+    await createEntry(
+      companyId: (q['companyId'] ?? '').toString(),
+      plantKey: (q['plantKey'] ?? '').toString(),
+      phase: (q['phase'] ?? '').toString(),
+      workDate: (q['workDate'] ?? '').toString(),
+      itemCode: (q['itemCode'] ?? '').toString(),
+      itemName: (q['itemName'] ?? '').toString(),
+      goodQty: goodQty,
+      unit: (q['unit'] ?? 'kom').toString(),
+      productId: _optStr(q['productId']),
+      productionOrderId: _optStr(q['productionOrderId']),
+      commercialOrderId: _optStr(q['commercialOrderId']),
+      rawMaterialOrderCode: _optStr(q['rawMaterialOrderCode']),
+      lineOrBatchRef: _optStr(q['lineOrBatchRef']),
+      releaseToolOrRodRef: _optStr(q['releaseToolOrRodRef']),
+      customerName: _optStr(q['customerName']),
+      rawWorkOperatorName: _optStr(q['rawWorkOperatorName']),
+      preparedByDisplayName: _optStr(q['preparedByDisplayName']),
+      sourceQrPayload: _optStr(q['sourceQrPayload']),
+      notes: _optStr(q['notes']),
+      scrapBreakdown: scrap,
+    );
+  }
+
+  static String? _optStr(dynamic v) {
+    final s = (v ?? '').toString().trim();
+    return s.isEmpty ? null : s;
+  }
+
+  /// Nakon ispisa etikete kutije — povezuje tracking unose s [packing_boxes] dokumentom (Callable).
+  Future<void> setPackedBoxIdForEntries({
+    required String companyId,
+    required String plantKey,
+    required List<String> entryIds,
+    required String packedBoxId,
+  }) async {
+    final pid = packedBoxId.trim();
+    if (pid.isEmpty) return;
+    final ids = entryIds.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    if (ids.isEmpty) return;
+    await _packingCallable.setTrackingPackedBoxIds(
+      companyId: companyId,
+      plantKey: plantKey,
+      entryIds: ids,
+      packedBoxId: pid,
+    );
   }
 }

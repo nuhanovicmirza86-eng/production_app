@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/access/production_access_helper.dart';
 import '../../../core/user_display_label.dart';
@@ -9,6 +10,7 @@ import '../models/carbon_models.dart';
 import '../services/carbon_calculation_service.dart';
 import '../services/carbon_export_service.dart';
 import '../services/carbon_firestore_service.dart';
+import 'carbon_activity_line_editor_sheet.dart';
 
 /// Redoslijed tabova = redoslijed unosa: postavke → kvote → aktivnosti → faktori → pregled → izvoz.
 class CarbonFootprintScreen extends StatefulWidget {
@@ -57,7 +59,7 @@ class _CarbonFootprintScreenState extends State<CarbonFootprintScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 7, vsync: this);
+    _tabs = TabController(length: 8, vsync: this);
     if (!ProductionAccessHelper.canView(
       role: _role,
       card: ProductionDashboardCard.carbonFootprint,
@@ -166,7 +168,7 @@ class _CarbonFootprintScreenState extends State<CarbonFootprintScreen>
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
-              'Nemate pristup ovom modulu. Potrebna je uloga administrator, '
+              'Nemate pristup ovom modulu. Potrebna je uloga Admin, '
               'menadžer proizvodnje ili menadžer održavanja.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyLarge,
@@ -192,6 +194,7 @@ class _CarbonFootprintScreenState extends State<CarbonFootprintScreen>
             Tab(text: '5. Pregled'),
             Tab(text: '6. Izvoz'),
             Tab(text: '7. Audit'),
+            Tab(text: '8. Regulativa'),
           ],
         ),
         actions: [
@@ -245,7 +248,6 @@ class _CarbonFootprintScreenState extends State<CarbonFootprintScreen>
                   reportingYear: _year,
                   factors: _factors,
                   isAdmin: _isAdmin,
-                  userId: _userId.isEmpty ? 'system' : _userId,
                   service: _svc,
                   onSaved: _loadStatic,
                 ),
@@ -253,6 +255,8 @@ class _CarbonFootprintScreenState extends State<CarbonFootprintScreen>
                   setup: _setup!,
                   summary: _summary,
                   quotas: _quotas!,
+                  activities: _activities,
+                  factors: _factors,
                 ),
                 _ExportTab(
                   setup: _setup!,
@@ -269,6 +273,7 @@ class _CarbonFootprintScreenState extends State<CarbonFootprintScreen>
                   reportingYear: _year,
                   service: _svc,
                 ),
+                const _RegulatoryTab(),
               ],
             ),
     );
@@ -573,7 +578,7 @@ class _SetupTabState extends State<_SetupTab> {
           const Padding(
             padding: EdgeInsets.only(top: 16),
             child: Text(
-              'Samo pregled: unos imaju administrator, menadžer proizvodnje i '
+              'Samo pregled: unos imaju Admin, menadžer proizvodnje i '
               'menadžer održavanja.',
               style: TextStyle(fontStyle: FontStyle.italic),
             ),
@@ -974,350 +979,20 @@ class _ActivitiesTab extends StatelessWidget {
     BuildContext context,
     CarbonActivityLine? existing,
   ) async {
-    void sheetHelp(String title, String body) {
-      showDialog<void>(
-        context: context,
-        builder: (dctx) => AlertDialog(
-          title: Text(title),
-          content: SingleChildScrollView(child: Text(body)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dctx),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    Widget infoIcon(String body) {
-      return IconButton(
-        icon: const Icon(Icons.info_outline, size: 20),
-        onPressed: () => sheetHelp('Pojašnjenje', body),
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-      );
-    }
-
-    final rowId = existing?.rowId ?? _nextRowId();
-    final include = existing?.include ?? true;
-    final plantC = TextEditingController(text: existing?.plantKey ?? '');
-    final dateC = TextEditingController(text: existing?.activityDate ?? '');
-    final typeC = TextEditingController(text: existing?.activityType ?? '');
-    final descC = TextEditingController(text: existing?.description ?? '');
-    final qtyC = TextEditingController(
-      text: existing == null ? '' : existing.quantity.toString(),
-    );
-    final unitC = TextEditingController(text: existing?.unit ?? '');
-    final keys = factors.keys.toList()..sort();
-    var factorKey = existing?.factorKey ?? '';
-    if (factorKey.isEmpty && keys.isNotEmpty) factorKey = keys.first;
-    if (keys.isNotEmpty && !keys.contains(factorKey)) factorKey = keys.first;
-    final evC = TextEditingController(text: existing?.evidenceRef ?? '');
-    final notesC = TextEditingController(text: existing?.notes ?? '');
-
-    final includeHolder = <bool>[include];
-
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 16,
-            bottom: MediaQuery.viewInsetsOf(ctx).bottom + 16,
-          ),
-          child: StatefulBuilder(
-            builder: (ctx2, setSt) {
-              final f = factors[factorKey];
-              final kg = existing == null && qtyC.text.isEmpty
-                  ? 0.0
-                  : (double.tryParse(qtyC.text.replaceAll(',', '.')) ?? 0) *
-                        (f?.factorKgCo2ePerUnit ?? 0);
-
-              return SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      existing == null
-                          ? 'Nova aktivnost'
-                          : 'Uredi ${existing.rowId}',
-                      style: Theme.of(ctx).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 12),
-                    SwitchListTile(
-                      secondary: IconButton(
-                        icon: const Icon(Icons.info_outline, size: 22),
-                        onPressed: () => sheetHelp(
-                          'Uključi u zbroj',
-                          'Ovaj prekidač mijenja samo aktivnost koju upravo uređujete '
-                              '(npr. red A001), ne cijelu listu odjednom.\n\n'
-                              'UKLJUČENO: emisije ovog reda ulaze u ukupni tCO2e na tabovima '
-                              'Pregled i Kvote te u CSV izvoz (uključeni redovi).\n\n'
-                              'ISKLJUČENO: red ostaje spremljen, ali se ne zbraja i ne izvozi '
-                              'u CSV — npr. skica, duplikat, ili podatak samo za arhivu.\n\n'
-                              'Primjer: imate privremeni red za test — isključite ga dok ne '
-                              'potvrdite brojke.',
-                        ),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 40,
-                          minHeight: 40,
-                        ),
-                      ),
-                      title: const Text('Uključi u zbroj'),
-                      subtitle: const Text(
-                        'Vrijedi samo za ovaj red. Isključeno = nema u zbroju niti u CSV izvozu.',
-                      ),
-                      value: includeHolder[0],
-                      onChanged: (v) => setSt(() => includeHolder[0] = v),
-                    ),
-                    TextField(
-                      controller: plantC,
-                      decoration: InputDecoration(
-                        labelText: 'Oznaka u izvozu (opcionalno)',
-                        hintText: 'prazno = bez podjele po pogonu u CSV-u',
-                        suffixIcon: infoIcon(
-                          'Zašto polje postoji\n'
-                          'Ukupni obračun u aplikaciji je na razini kompanije (sve aktivnosti '
-                          'za godinu zajedno). Ovo polje NE određuje zaseban zbroj po pogonu '
-                          'u pregledu — služi samo kao oznaka u CSV datoteci ako želite '
-                          'kasnije u Excelu filtrirati ili pivotirati po lokaciji.\n\n'
-                          'Primjer: dva pogona — jedan red označite SARAJEVO, drugi MOSTAR; '
-                          'u izvozu će stupac plantKey imati te tekstove.\n\n'
-                          'Ako vam ne treba podjela, ostavite prazno. Nije isto što je '
-                          'bilo staro zaključano polje iz profila korisnika.',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: dateC,
-                      decoration: InputDecoration(
-                        labelText: 'Datum (YYYY-MM-DD)',
-                        hintText: '2026-03-15',
-                        suffixIcon: infoIcon(
-                          'Unesite datum u obliku GGGG-MM-DD (ISO).\n\n'
-                          'Primjer: 2026-03-15 za ožujsku struju, ili zadnji dan godine ako '
-                          'unosiš godišnji zbroj.\n\n'
-                          'Bitno: godina mora odgovarati izvještajnoj godini u traci (inače '
-                          'red može biti zbunjujuć u pregledu).',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: typeC,
-                      decoration: InputDecoration(
-                        labelText: 'Tip aktivnosti',
-                        hintText: 'Electricity / Fuel / Freight…',
-                        suffixIcon: infoIcon(
-                          'Kratka kategorija radi grupiranja u izvještajima.\n\n'
-                          'Primjeri: Electricity, Natural gas, Diesel, Freight, Business travel.\n\n'
-                          'Može odgovarati nazivu u faktoru, ali ne mora — opis može biti '
-                          'detaljniji u polju „Opis”.',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: descC,
-                      decoration: InputDecoration(
-                        labelText: 'Opis',
-                        hintText: 'Kupljena struja — glavni pogon',
-                        suffixIcon: infoIcon(
-                          'Tekst koji čita čovjek: što je točno potrošeno ili prevezeno.\n\n'
-                          'Primjer: „Kupljena struja — glavna hala, Elektroprivreda, račun 45/2026” '
-                          'ili „Dostava sirovine kamionom Sarajevo–Mostar”.\n\n'
-                          'Pomaže pri reviziji uz polje Referenca dokaza.',
-                        ),
-                      ),
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: qtyC,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Količina',
-                        hintText: 'npr. 125000',
-                        suffixIcon: infoIcon(
-                          'Brojčana potrošnja ili udaljenost u jedinicama koje odgovaraju faktoru.\n\n'
-                          'Primjeri: 125000 kWh (struja), 2400 l (dizel), 8500 tkm (prijevoz).\n\n'
-                          'kg CO2e = količina × faktor (vidi zaključano polje ispod). '
-                          'Ako je količina 0, red ne doprinosi emisijama čak i ako je uključen.',
-                        ),
-                      ),
-                      onChanged: (_) => setSt(() {}),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: unitC,
-                      decoration: InputDecoration(
-                        labelText: 'Jedinica',
-                        hintText: 'kWh, litres, km…',
-                        suffixIcon: infoIcon(
-                          'Jedinica mora biti ista kao u emisijskom faktoru (npr. kWh, l, tkm).\n\n'
-                          'Primjer: ako je faktor „kg CO2e po kWh”, ovdje piše kWh — ne MWh '
-                          '(osim ako faktor eksplicitno koristi MWh).\n\n'
-                          'Kriva jedinica = krivi izračun emisija.',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (keys.isEmpty)
-                      const Text('Nema faktora — učitajte modul ponovo.')
-                    else
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: DropdownMenu<String>(
-                              key: ValueKey(factorKey),
-                              initialSelection: factorKey,
-                              label: const Text('Factor Key'),
-                              expandedInsets: EdgeInsets.zero,
-                              dropdownMenuEntries: [
-                                for (final k in keys)
-                                  DropdownMenuEntry<String>(value: k, label: k),
-                              ],
-                              onSelected: (v) {
-                                if (v != null) setSt(() => factorKey = v);
-                              },
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.only(left: 4, top: 8),
-                            child: infoIcon(
-                              'Svaki ključ veže red na tablicu faktora (scope 1/2/3, izvor, jedinica).\n\n'
-                              'Primjer: BA_2025_ELEC_GRID_kWh znači „mrežna struja, kg CO2e po kWh”.\n\n'
-                              'Ako niste sigurni, pitajte osobu koja je unijela faktore ili '
-                              'koristite ključ koji odgovara vašem računu (isti izvor i godina).',
-                            ),
-                          ),
-                        ],
-                      ),
-                    const SizedBox(height: 12),
-                    InputDecorator(
-                      decoration: InputDecoration(
-                        labelText: 'Faktor (kg CO2e / jed.) — zaključano',
-                        filled: true,
-                        fillColor: Theme.of(
-                          ctx,
-                        ).colorScheme.surfaceContainerHighest,
-                        suffixIcon: infoIcon(
-                          'Očitano iz taba Faktori — ne mijenja se ovdje.\n\n'
-                          'Primjer: 0,122260 znači da svaka jedinica količine (npr. 1 tkm) '
-                          'množi ovaj broj da dobije kg CO2e.',
-                        ),
-                      ),
-                      child: Text(
-                        f == null
-                            ? '—'
-                            : f.factorKgCo2ePerUnit.toStringAsFixed(6),
-                      ),
-                    ),
-                    InputDecorator(
-                      decoration: InputDecoration(
-                        labelText: 'kg CO2e — zaključano',
-                        filled: true,
-                        fillColor: Theme.of(
-                          ctx,
-                        ).colorScheme.surfaceContainerHighest,
-                        suffixIcon: infoIcon(
-                          'Izračun: količina (gore) × faktor (kg CO2e po jedinici).\n\n'
-                          'Primjer: 1000 tkm × 0,122260 = 122,26 kg CO2e.\n\n'
-                          'Tone (tCO2e) vide se u tabu Pregled i u CSV stupcu co2eT.',
-                        ),
-                      ),
-                      child: Text(kg.toStringAsFixed(3)),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: evC,
-                      decoration: InputDecoration(
-                        labelText: 'Referenca dokaza',
-                        hintText: 'Račun br.…',
-                        suffixIcon: infoIcon(
-                          'Što zapisati\n'
-                          'Nešto što će revizor ili kolega moći pronaći: broj računa, interni '
-                          'dokument, link na SharePoint/DMS, ime datoteke.\n\n'
-                          'Primjer: „INV-2026-0144” ili „Struja 03-2026 PDF u mapi Energetika”.',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: notesC,
-                      decoration: InputDecoration(
-                        labelText: 'Napomena',
-                        suffixIcon: infoIcon(
-                          'Opcionalno: pretpostavke, izuzeci, tko je unio podatak, zašto je '
-                          'faktor odabran.\n\n'
-                          'Primjer: „Procjena dok nije stigao konačni račun” ili '
-                          '„Uključeno 50% rada iz najma”.\n\n'
-                          'Ne utječe na izračun — samo dokumentacija.',
-                        ),
-                      ),
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 16),
-                    FilledButton(
-                      onPressed: () async {
-                        final line = CarbonActivityLine(
-                          id: existing?.id ?? '',
-                          companyId: companyId,
-                          reportingYear: reportingYear,
-                          rowId: rowId,
-                          include: includeHolder[0],
-                          plantKey: plantC.text.trim(),
-                          activityDate: dateC.text.trim(),
-                          activityType: typeC.text.trim(),
-                          description: descC.text.trim(),
-                          quantity:
-                              double.tryParse(
-                                qtyC.text.trim().replaceAll(',', '.'),
-                              ) ??
-                              0,
-                          unit: unitC.text.trim(),
-                          factorKey: factorKey,
-                          evidenceRef: evC.text.trim(),
-                          notes: notesC.text.trim(),
-                        );
-                        await service.upsertActivity(
-                          line: line,
-                          userId: userId,
-                        );
-                        if (ctx.mounted) Navigator.pop(ctx);
-                      },
-                      child: const Text('Spremi'),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        );
-      },
+      builder: (ctx) => CarbonActivityLineEditorSheet(
+        hostContext: context,
+        companyId: companyId,
+        reportingYear: reportingYear,
+        userId: userId,
+        service: service,
+        factors: factors,
+        existing: existing,
+        nextRowId: _nextRowId,
+      ),
     );
-
-    // Ne dispose-ati odmah: zatvoreni sheet još uklanja dependente s kontrolera
-    // (InputDecorator/TextField) pa assert '_dependents.isEmpty' puca. Čekaj sljedeći frame.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      plantC.dispose();
-      dateC.dispose();
-      typeC.dispose();
-      descC.dispose();
-      qtyC.dispose();
-      unitC.dispose();
-      evC.dispose();
-      notesC.dispose();
-    });
   }
 
   @override
@@ -1326,12 +1001,42 @@ class _ActivitiesTab extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Text(
-            'Svaki red je jedna stavka (npr. struja, gorivo, prijevoz). Prekidač „Uključi u zbroj” '
-            'odnosi se samo na red koji uređujete. Ikone (i) uz polja sadrže primjere i '
-            'pojašnjenja.',
-            style: Theme.of(context).textTheme.bodyMedium,
+          padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Lista aktivnosti',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Kako rade aktivnosti',
+                icon: const Icon(Icons.info_outline),
+                onPressed: () {
+                  showDialog<void>(
+                    context: context,
+                    builder: (dctx) => AlertDialog(
+                      title: const Text('Aktivnosti'),
+                      content: SingleChildScrollView(
+                        child: Text(
+                          'Svaki red je jedna stavka (npr. struja, gorivo, prijevoz). Prekidač '
+                          '„Uključi u zbroj” odnosi se samo na red koji uređujete. Ikone (i) uz '
+                          'polja sadrže primjere i pojašnjenja.',
+                          style: Theme.of(dctx).textTheme.bodyMedium,
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dctx),
+                          child: const Text('Zatvori'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
         ),
         if (canEdit)
@@ -1358,13 +1063,35 @@ class _ActivitiesTab extends StatelessWidget {
                   itemBuilder: (ctx, i) {
                     final a = activities[i];
                     final kg = CarbonCalculationService.lineKgCo2e(a, factors);
+                    final pk = a.plantKey.trim();
+                    final prod = a.productId.trim();
+                    final pcode = a.productCode.trim();
+                    final plab = a.productLabel.trim();
+                    String productLine() {
+                      if (prod.isEmpty && pcode.isEmpty && plab.isEmpty) {
+                        return '';
+                      }
+                      if (pcode.isNotEmpty && plab.isNotEmpty) {
+                        return 'Proizvod: $plab · šifra $pcode';
+                      }
+                      if (plab.isNotEmpty) return 'Proizvod: $plab';
+                      if (pcode.isNotEmpty) return 'Proizvod: šifra $pcode';
+                      return 'Proizvod: (povezano — otvorite uređivanje za prikaz iz kataloga)';
+                    }
+
+                    final subParts = <String>[
+                      '${a.quantity} ${a.unit} • ${a.factorKey}',
+                      if (pk.isNotEmpty) 'Pogon: $pk',
+                      if (prod.isNotEmpty || pcode.isNotEmpty || plab.isNotEmpty)
+                        productLine(),
+                      if (a.productOutputQty > 0)
+                        'Proizvedeno (uz red): ${a.productOutputQty}',
+                      '→ ${kg.toStringAsFixed(1)} kg CO2e',
+                    ];
                     return Card(
                       child: ListTile(
                         title: Text('${a.rowId} • ${a.description}'),
-                        subtitle: Text(
-                          '${a.quantity} ${a.unit} • ${a.factorKey}\n'
-                          '→ ${kg.toStringAsFixed(1)} kg CO2e',
-                        ),
+                        subtitle: Text(subParts.join('\n')),
                         isThreeLine: true,
                         trailing: canEdit
                             ? IconButton(
@@ -1389,7 +1116,6 @@ class _FactorsTab extends StatelessWidget {
   final int reportingYear;
   final Map<String, CarbonEmissionFactor> factors;
   final bool isAdmin;
-  final String userId;
   final CarbonFirestoreService service;
   final Future<void> Function() onSaved;
 
@@ -1398,48 +1124,162 @@ class _FactorsTab extends StatelessWidget {
     required this.reportingYear,
     required this.factors,
     required this.isAdmin,
-    required this.userId,
     required this.service,
     required this.onSaved,
   });
+
+  Future<void> _syncReferenceFactors(BuildContext context) async {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20),
+              Expanded(child: Text('Preuzimanje s mreže (DEFRA, OWID)…')),
+            ],
+          ),
+        ),
+      ),
+    );
+    try {
+      final res = await service.syncReferenceEmissionFactors(
+        companyId: companyId,
+        reportingYear: reportingYear,
+      );
+      await onSaved();
+      if (!context.mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      final extra = res.warnings.isEmpty
+          ? ''
+          : ' ${res.warnings.join(' ')}';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            res.upserted == 0
+                ? 'Nema zapisa za upis.'
+                : 'Sinkronizirano faktora: ${res.upserted}.$extra',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$e')),
+        );
+      }
+    }
+  }
+
+  String _statusLabel(String status) {
+    final s = status.trim().toLowerCase();
+    if (s == 'reference') return 'Referentno';
+    if (s == 'imported') return 'Uvezeno';
+    if (s == 'override') return 'Kompanija';
+    if (s == 'proxy') return 'Zadano (proxy)';
+    if (s.isEmpty || s == 'default') return 'Zadano';
+    return status;
+  }
 
   @override
   Widget build(BuildContext context) {
     final entries = factors.values.toList()
       ..sort((a, b) => a.factorKey.compareTo(b.factorKey));
+    final scheme = Theme.of(context).colorScheme;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text(
-            isAdmin
-                ? 'Faktori utječu na sve formule. Samo administrator može mijenjati vrijednosti.'
-                : 'Faktori su zaključani. Kontaktirajte administratora za izmjene.',
-            style: Theme.of(context).textTheme.bodyMedium,
+          padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Katalog faktora',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ),
+              IconButton(
+                tooltip: 'O referentnim faktorima i izvorima',
+                icon: const Icon(Icons.info_outline),
+                onPressed: () {
+                  showDialog<void>(
+                    context: context,
+                    builder: (dctx) => AlertDialog(
+                      title: const Text('Referentni faktori'),
+                      content: SingleChildScrollView(
+                        child: Text(
+                          'Faktori se temelje na međunarodno referentnim vrijednostima. '
+                          'Izmjena faktora u aplikaciji nije dozvoljena.\n\n'
+                          'Izvori u katalogu:\n'
+                          '• Our World in Data / Ember — intenzitet električne energije za BiH (mrežni CSV)\n'
+                          '• UK Government / DEFRA — GHG Conversion Factors 2025 flat XLSX '
+                          '(gorivo, transport, voda, let)\n'
+                          '• Otpad (tonne) — iste UK vrijednosti kao u ugrađenom katalogu '
+                          'do potpunog mapiranja DEFRA redova',
+                          style: Theme.of(dctx).textTheme.bodyMedium?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dctx),
+                          child: const Text('Zatvori'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
         ),
+        if (isAdmin)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: FilledButton.icon(
+              onPressed: () => _syncReferenceFactors(context),
+              icon: const Icon(Icons.cloud_download_outlined),
+              label: const Text('Import novih faktora'),
+            ),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Text(
+              'Import referentnih faktora može pokrenuti samo Admin.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
         Expanded(
           child: ListView.builder(
             itemCount: entries.length,
             itemBuilder: (ctx, i) {
               final f = entries[i];
+              final src = f.sourceName.trim();
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 child: ListTile(
                   title: Text(f.factorKey),
                   subtitle: Text(
                     '${f.scope} • ${f.activity} • ${f.unit}\n'
-                    'kg CO2e / j.: ${f.factorKgCo2ePerUnit.toStringAsFixed(5)}',
+                    'kg CO2e / j.: ${f.factorKgCo2ePerUnit.toStringAsFixed(5)}'
+                    '${src.isEmpty ? '' : '\nIzvor: $src'}',
                   ),
                   isThreeLine: true,
-                  trailing: isAdmin
-                      ? IconButton(
-                          icon: const Icon(Icons.edit),
-                          onPressed: () => _editFactor(context, f),
-                        )
-                      : const Icon(Icons.lock_outline),
+                  trailing: Chip(
+                    visualDensity: VisualDensity.compact,
+                    label: Text(
+                      _statusLabel(f.factorStatus),
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                  ),
                 ),
               );
             },
@@ -1448,75 +1288,6 @@ class _FactorsTab extends StatelessWidget {
       ],
     );
   }
-
-  Future<void> _editFactor(BuildContext context, CarbonEmissionFactor f) async {
-    final valC = TextEditingController(text: f.factorKgCo2ePerUnit.toString());
-    final srcC = TextEditingController(text: f.sourceName);
-
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Faktor ${f.factorKey}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: valC,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: const InputDecoration(
-                labelText: 'kg CO2e po jedinici',
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: srcC,
-              decoration: const InputDecoration(labelText: 'Izvor'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Odustani'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Spremi'),
-          ),
-        ],
-      ),
-    );
-
-    if (ok == true && context.mounted) {
-      final v = double.tryParse(valC.text.replaceAll(',', '.'));
-      if (v == null) return;
-      final next = CarbonEmissionFactor(
-        factorKey: f.factorKey,
-        scope: f.scope,
-        category: f.category,
-        activity: f.activity,
-        unit: f.unit,
-        factorKgCo2ePerUnit: v,
-        sourceName: srcC.text.trim(),
-        sourceUrl: f.sourceUrl,
-        factorStatus: 'override',
-      );
-      await service.saveFactorOverride(
-        companyId: companyId,
-        factor: next,
-        userId: userId,
-        reportingYear: reportingYear,
-      );
-      await onSaved();
-      valC.dispose();
-      srcC.dispose();
-    } else {
-      valC.dispose();
-      srcC.dispose();
-    }
-  }
 }
 
 // --- Tab 5 ---
@@ -1524,11 +1295,15 @@ class _DashboardTab extends StatelessWidget {
   final CarbonCompanySetup setup;
   final CarbonDashboardSummary? summary;
   final CarbonQuotaSettings quotas;
+  final List<CarbonActivityLine> activities;
+  final Map<String, CarbonEmissionFactor> factors;
 
   const _DashboardTab({
     required this.setup,
     required this.summary,
     required this.quotas,
+    required this.activities,
+    required this.factors,
   });
 
   @override
@@ -1540,12 +1315,28 @@ class _DashboardTab extends StatelessWidget {
       return const Center(child: Text('Nema podataka za pregled.'));
     }
 
+    final byPlant = CarbonCalculationService.rollupsByPlant(
+      activities: activities,
+      factorsByKey: factors,
+    );
+    final byProduct = CarbonCalculationService.rollupsByProduct(
+      activities: activities,
+      factorsByKey: factors,
+    );
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         Text(
           'Pregled za ${setup.companyName} • ${setup.reportingYear}',
           style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Kompanijski ukupni tCO2e uključuje sve uključene aktivnosti za godinu. '
+          'Ispod su razrade po pogonu (plantKey na aktivnosti) i po proizvodu ako ste '
+          'unijeli ID proizvoda na redovima.',
+          style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 16),
         _tile(bg, 'Ukupno', '${s.totalTCO2e.toStringAsFixed(3)} tCO2e'),
@@ -1583,6 +1374,96 @@ class _DashboardTab extends StatelessWidget {
               ? '—'
               : '${CarbonCalculationService.effectiveQuotaTCO2e(quotas).toStringAsFixed(3)} t',
         ),
+        const Divider(height: 32),
+        Text(
+          'Razrada po pogonima',
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 8),
+        if (byPlant.isEmpty)
+          Text(
+            'Nema aktivnosti s izračunatim emisijama za ovu godinu.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          )
+        else
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              headingRowColor: WidgetStatePropertyAll(
+                Theme.of(context).colorScheme.surfaceContainerHigh,
+              ),
+              columns: const [
+                DataColumn(label: Text('Pogon')),
+                DataColumn(label: Text('tCO2e'), numeric: true),
+                DataColumn(label: Text('Redova'), numeric: true),
+              ],
+              rows: [
+                for (final p in byPlant)
+                  DataRow(
+                    cells: [
+                      DataCell(Text(p.displayPlant)),
+                      DataCell(Text(p.totalTCO2e.toStringAsFixed(3))),
+                      DataCell(Text('${p.lineCount}')),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        const SizedBox(height: 24),
+        Text(
+          'Razrada po proizvodu',
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Samo redovi s odabranim proizvodom iz šifrarnika ulaze ovdje. Ostale emisije '
+          'ostaju u kompanijskom ukupnom zbroju. Opcionalno „proizvedeno uz red” ne dira '
+          'polje „Proizvedene jedinice” u Postavkama.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 8),
+        if (byProduct.isEmpty)
+          Text(
+            'Još nema dodijele proizvodu. U tabu Aktivnosti odaberite proizvod (šifra/naziv) '
+            'na redovima koje želite pripisati proizvodu.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          )
+        else
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              headingRowColor: WidgetStatePropertyAll(
+                Theme.of(context).colorScheme.surfaceContainerHigh,
+              ),
+              columns: const [
+                DataColumn(label: Text('Proizvod')),
+                DataColumn(label: Text('Σ proizv. kol.'), numeric: true),
+                DataColumn(label: Text('tCO2e'), numeric: true),
+                DataColumn(label: Text('Redova'), numeric: true),
+              ],
+              rows: [
+                for (final p in byProduct)
+                  DataRow(
+                    cells: [
+                      DataCell(Text(p.displayTitle)),
+                      DataCell(
+                        Text(
+                          p.totalProductOutputQty > 0
+                              ? p.totalProductOutputQty.toStringAsFixed(2)
+                              : '—',
+                        ),
+                      ),
+                      DataCell(Text(p.totalTCO2e.toStringAsFixed(3))),
+                      DataCell(Text('${p.lineCount}')),
+                    ],
+                  ),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -1624,6 +1505,11 @@ class _ExportTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final plantRoll = CarbonCalculationService.rollupsByPlant(
+      activities: activities,
+      factorsByKey: factors,
+    );
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -1632,7 +1518,15 @@ class _ExportTab extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         const Text(
-          'PDF: prvo se otvara pregled (štampa / dijeljenje / spremanje) — ne šalje se odmah.',
+          'PDF sažetak i zbirni PDF-ovi (po pogonu / po proizvodu): prvo se otvara pregled '
+          '(štampa / dijeljenje / spremanje) — ništa se ne šalje odmah iz aplikacije.',
+          style: TextStyle(fontSize: 13, color: Colors.black54),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Zbirni PDF po pogonu: tablica GHG scope 1/2/3 za svaki pogon. Po proizvodu: isti '
+          'oblik kao ukupno za kompaniju, zatim tablice po pogonu (proizvod, šifra, scopeovi). '
+          '„Podijeli CSV” i dalje šalje flat CSV za Excel.',
           style: TextStyle(fontSize: 13, color: Colors.black54),
         ),
         const SizedBox(height: 20),
@@ -1674,13 +1568,17 @@ class _ExportTab extends StatelessWidget {
                       setup: setup,
                       summary: summary!,
                       quotas: quotas,
+                      plantRollups:
+                          plantRoll.isEmpty ? null : plantRoll,
                     );
                     await auditService.logReportEvent(
                       companyId: setup.companyId,
                       reportingYear: setup.reportingYear,
                       userId: userId,
                       action: 'export_pdf_preview',
-                      detail: 'Sažetak PDF',
+                      detail: plantRoll.isEmpty
+                          ? 'Sažetak PDF'
+                          : 'Sažetak PDF + pogoni',
                     );
                   } catch (e) {
                     if (context.mounted) {
@@ -1691,9 +1589,241 @@ class _ExportTab extends StatelessWidget {
                   }
                 },
           icon: const Icon(Icons.picture_as_pdf),
-          label: const Text('PDF pregled (sažetak)'),
+          label: Text(
+            plantRoll.isEmpty
+                ? 'PDF pregled (sažetak)'
+                : 'PDF pregled (sažetak + pogoni)',
+          ),
+        ),
+        const SizedBox(height: 12),
+        FilledButton.tonalIcon(
+          onPressed: () async {
+            final base =
+                'karbon_po_pogonu_${setup.companyId}_${setup.reportingYear}';
+            try {
+              await CarbonExportService.previewPlantRollupPdf(
+                setup: setup,
+                activities: activities,
+                factorsByKey: factors,
+              );
+              await auditService.logReportEvent(
+                companyId: setup.companyId,
+                reportingYear: setup.reportingYear,
+                userId: userId,
+                action: 'export_csv_plant_preview',
+                detail: '$base.pdf',
+              );
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Izvoz: $e')));
+              }
+            }
+          },
+          icon: const Icon(Icons.factory_outlined),
+          label: const Text('PDF zbroj po pogonu (pregled)'),
+        ),
+        const SizedBox(height: 8),
+        FilledButton.tonalIcon(
+          onPressed: () async {
+            final base =
+                'karbon_po_proizvodu_${setup.companyId}_${setup.reportingYear}';
+            try {
+              await CarbonExportService.previewProductRollupByPlantPdf(
+                setup: setup,
+                activities: activities,
+                factorsByKey: factors,
+              );
+              await auditService.logReportEvent(
+                companyId: setup.companyId,
+                reportingYear: setup.reportingYear,
+                userId: userId,
+                action: 'export_csv_product_preview',
+                detail: '$base.pdf',
+              );
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Izvoz: $e')));
+              }
+            }
+          },
+          icon: const Icon(Icons.inventory_2_outlined),
+          label: const Text('PDF zbroj po proizvodu (pregled)'),
         ),
       ],
+    );
+  }
+}
+
+/// Sažetak aktuelne EU regulative relevantne za izvještavanje o emisijama (informativno).
+class _RegulatoryTab extends StatelessWidget {
+  const _RegulatoryTab();
+
+  Future<void> _open(BuildContext context, String url) async {
+    final u = Uri.parse(url);
+    try {
+      var ok = await launchUrl(u, mode: LaunchMode.externalApplication);
+      if (!ok) {
+        ok = await launchUrl(u, mode: LaunchMode.inAppWebView);
+      }
+      if (!ok && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nije moguće otvoriti link na ovom uređaju.')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Greška pri otvaranju linka: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(
+          'Regulativa (EU) — informativni pregled',
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Ovo nije pravni savjet. Za obaveze vaše organizacije koristite interni pravni '
+          'tim ili savjetnika; ovdje su sažeti naslovi korisni uz modul karbonskog otiska.',
+          style: theme.textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 20),
+        _regCard(
+          context,
+          title: 'CSRD — Direktiva o izvještavanju o održivosti',
+          body:
+              'Direktiva (EU) 2022/2464 (izmijenjena Direktiva o računovodstvenim iskazima) '
+              'uvodi detaljnije nefinansijsko izvještavanje za velike i srednje kapitalne '
+              'društva u EU-u, uključujući klimu i druge ESG teme. Primjena ovisi o veličini '
+              'i statusu entiteta (procjena „velike” / „srednje” prema kriterijima EU-a).',
+          url:
+              'https://eur-lex.europa.eu/legal-content/HR/TXT/?uri=CELEX:32022L2464',
+          linkLabel: 'EUR-Lex (HR): 2022/2464',
+        ),
+        const SizedBox(height: 12),
+        _regCard(
+          context,
+          title: 'ESRS — Europski standardi izvještavanja o održivosti',
+          body:
+              'Delegated akti Komisije (npr. 2023/2772) donose ESRS standarde koje treba '
+              'koristiti uz CSRD. Oni preciziraju metrike i strukturu (uključivo emisije GHG '
+              'po scope-ovima gdje je primjenjivo).',
+          url:
+              'https://eur-lex.europa.eu/legal-content/HR/TXT/?uri=CELEX:32023R2772',
+          linkLabel: 'EUR-Lex: delegirani akt ESRS',
+        ),
+        const SizedBox(height: 12),
+        _regCard(
+          context,
+          title: 'EU ETS — Tržište ugljika za instalacije',
+          body:
+              'Direktiva 2003/87/EZ (s izmjenama) uspostavlja sistem trgovanja emisijama za '
+              'energetiku, industriju i zrakoplovstvo (EU ETS). Ako ste operator instalacije '
+              'pod obuhvatom, obratite se obvezama dozvola za emisije — odvojeno od ovog '
+              'internog modula karbonskog otiska.',
+          url:
+              'https://climate.ec.europa.eu/eu-action/eu-emissions-trading-system-eu-ets_hr',
+          linkLabel: 'European Commission: EU ETS',
+          bodyInInfoDialog: true,
+        ),
+        const SizedBox(height: 12),
+        _regCard(
+          context,
+          title: 'CBAM — mehanizam prilagodbe na granici',
+          body:
+              'Uredba (EU) 2023/956 uvodi postepeno izvještavanje i naknadu za uvoz određenih '
+              'proizvoda s intenzitetom ugljika (čelik, željezo, cement, gnojivo, aluminij, '
+              'električna energija…). Ako uvožete u EU, provjerite obuhvat i obveze izvještaja.',
+          url:
+              'https://taxation-customs.ec.europa.eu/carbon-border-adjustment-mechanism_hr',
+          linkLabel: 'European Commission: CBAM',
+        ),
+        const SizedBox(height: 12),
+        _regCard(
+          context,
+          title: 'Fit for 55',
+          body:
+              'Paket politika EU-a za smanjenje neto emisija najmanje 55% do 2030. u odnosu na '
+              '1990. godinu. Povezuje ETS, energetsku učinkovitost, promet i druge sektore.',
+          url: 'https://commission.europa.eu/strategy-and-policy/priorities-2019-2024/european-green-deal/delivering-european-green-deal/fit-55_hr',
+          linkLabel: 'European Commission: Fit for 55',
+        ),
+      ],
+    );
+  }
+
+  Widget _regCard(
+    BuildContext context, {
+    required String title,
+    required String body,
+    required String url,
+    required String linkLabel,
+    bool bodyInInfoDialog = false,
+  }) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
+                if (bodyInInfoDialog)
+                  IconButton(
+                    tooltip: 'Detalji',
+                    icon: const Icon(Icons.info_outline),
+                    onPressed: () {
+                      showDialog<void>(
+                        context: context,
+                        builder: (dctx) => AlertDialog(
+                          title: Text(title),
+                          content: SingleChildScrollView(child: Text(body)),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dctx),
+                              child: const Text('Zatvori'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
+            if (!bodyInInfoDialog) ...[
+              const SizedBox(height: 8),
+              Text(body, style: Theme.of(context).textTheme.bodyMedium),
+            ],
+            const SizedBox(height: 10),
+            TextButton.icon(
+              onPressed: () => _open(context, url),
+              icon: const Icon(Icons.open_in_new, size: 18),
+              label: Text(linkLabel),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1710,8 +1840,20 @@ String _carbonAuditActionLabelHr(String action) {
       return 'Ažurirana stavka aktivnosti';
     case 'factor_override_saved':
       return 'Izmijenjen faktor emisije';
+    case 'factors_csv_imported':
+      return 'Uvoz faktora iz CSV';
+    case 'reference_factors_synced':
+      return 'Import referentnih faktora';
     case 'export_csv_shared':
       return 'Podijeljen CSV izvještaj';
+    case 'export_csv_plant_shared':
+      return 'Podijeljen CSV zbroj po pogonu';
+    case 'export_csv_plant_preview':
+      return 'Pregled PDF-a (zbroj po pogonu, tablice scope)';
+    case 'export_csv_product_shared':
+      return 'Podijeljen CSV zbroj po proizvodu';
+    case 'export_csv_product_preview':
+      return 'Pregled PDF-a (zbroj po proizvodu, tablice po pogonu)';
     case 'export_pdf_preview':
       return 'Pregled PDF (sažetak)';
     default:

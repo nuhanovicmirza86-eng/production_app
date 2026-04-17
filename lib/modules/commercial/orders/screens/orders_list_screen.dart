@@ -59,7 +59,8 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
       _role == 'admin' ||
       _role == 'production_manager' ||
       _role == 'sales' ||
-      _role == 'purchasing';
+      _role == 'purchasing' ||
+      _role == 'logistics_manager';
 
   @override
   void initState() {
@@ -370,6 +371,8 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
         stockByProductId: _stockByProductId.isEmpty
             ? null
             : Map<String, double>.from(_stockByProductId),
+        companyId: _companyId,
+        companyData: widget.companyData,
       );
     } catch (e) {
       if (!mounted) return;

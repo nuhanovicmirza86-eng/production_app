@@ -11,6 +11,13 @@ import '../services/partners_lookup_service.dart';
 class _DraftLine {
   ProductLookupItem? product;
   final TextEditingController qtyController = TextEditingController(text: '1');
+  final TextEditingController unitPriceController = TextEditingController(
+    text: '0',
+  );
+  final TextEditingController discountController = TextEditingController(
+    text: '0',
+  );
+  final TextEditingController vatController = TextEditingController();
   DateTime? dueDate;
 }
 
@@ -50,6 +57,9 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
     _notesController.dispose();
     for (final line in _lines) {
       line.qtyController.dispose();
+      line.unitPriceController.dispose();
+      line.discountController.dispose();
+      line.vatController.dispose();
     }
     super.dispose();
   }
@@ -134,6 +144,9 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
     if (_lines.length <= 1) return;
     setState(() {
       _lines[index].qtyController.dispose();
+      _lines[index].unitPriceController.dispose();
+      _lines[index].discountController.dispose();
+      _lines[index].vatController.dispose();
       _lines.removeAt(index);
     });
   }
@@ -174,6 +187,39 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
         );
         return;
       }
+
+      final up = double.tryParse(
+        line.unitPriceController.text.trim().replaceAll(',', '.'),
+      );
+      if (up == null || up < 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Stavka ${i + 1}: neispravna jedinična cijena.')),
+        );
+        return;
+      }
+      final disc = double.tryParse(
+        line.discountController.text.trim().replaceAll(',', '.'),
+      );
+      if (disc == null || disc < 0 || disc > 100) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Stavka ${i + 1}: rabat mora biti 0–100 %.'),
+          ),
+        );
+        return;
+      }
+      final vatRaw = line.vatController.text.trim().replaceAll(',', '.');
+      if (vatRaw.isNotEmpty) {
+        final vat = double.tryParse(vatRaw);
+        if (vat == null || vat < 0 || vat > 100) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Stavka ${i + 1}: PDV % mora biti 0–100 ili prazno.'),
+            ),
+          );
+          return;
+        }
+      }
     }
 
     setState(() => _submitting = true);
@@ -190,7 +236,15 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
         final lineId =
             'L${DateTime.now().microsecondsSinceEpoch}_${i}_${items.length}';
 
-        items.add({
+        final up = double.parse(
+          line.unitPriceController.text.trim().replaceAll(',', '.'),
+        );
+        final disc = double.parse(
+          line.discountController.text.trim().replaceAll(',', '.'),
+        );
+        final vatRaw = line.vatController.text.trim().replaceAll(',', '.');
+
+        final row = <String, dynamic>{
           'lineId': lineId,
           'itemType': 'product',
           'productId': p.productId,
@@ -198,9 +252,14 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
           'name': p.productName,
           'orderedQty': qty,
           'unit': (p.unit ?? '').trim().isEmpty ? 'kom' : p.unit!.trim(),
-          'unitPrice': 0.0,
+          'unitPrice': up,
+          'discountPercent': disc,
           'dueDate': line.dueDate,
-        });
+        };
+        if (vatRaw.isNotEmpty) {
+          row['vatPercent'] = double.parse(vatRaw);
+        }
+        items.add(row);
       }
 
       await _ordersService.createOrder(
@@ -391,6 +450,36 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                           }
                           return null;
                         },
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: line.unitPriceController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Jedinična cijena',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: line.discountController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Rabat %',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: line.vatController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'PDV % (opcionalno, prazno = iz postavki)',
+                        ),
                       ),
                       const SizedBox(height: 8),
                       ListTile(

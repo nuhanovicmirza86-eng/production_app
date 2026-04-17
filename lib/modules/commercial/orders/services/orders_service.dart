@@ -283,19 +283,32 @@ class OrdersService {
     required String updatedBy,
     required double orderedQty,
     DateTime? dueDate,
+    double? unitPrice,
+    double? discountPercent,
+    double? vatPercent,
+    bool clearVatPercent = false,
   }) async {
     if (orderedQty <= 0) {
       throw Exception('Naručena količina mora biti veća od 0');
     }
 
-    final data = await _callUpdateCommercialOrder({
+    final payload = <String, dynamic>{
       'companyId': companyId,
       'op': 'item_ordered',
       'orderId': orderId,
       'orderItemId': orderItemId,
       'orderedQty': orderedQty,
       'dueDate': dueDate?.toIso8601String(),
-    });
+    };
+    if (unitPrice != null) payload['unitPrice'] = unitPrice;
+    if (discountPercent != null) payload['discountPercent'] = discountPercent;
+    if (clearVatPercent) {
+      payload['vatPercent'] = null;
+    } else if (vatPercent != null) {
+      payload['vatPercent'] = vatPercent;
+    }
+
+    final data = await _callUpdateCommercialOrder(payload);
     if (data['success'] != true) {
       throw Exception('Ažuriranje stavke nije uspjelo.');
     }
@@ -382,6 +395,7 @@ class OrdersService {
     required String routingVersion,
     DateTime? sourceOrderDate,
     DateTime? requestedDeliveryDate,
+    String? inputMaterialLot,
   }) async {
     final companyId = _requireCompanyId(companyData);
     final userId = _requireUserId(companyData);
@@ -430,6 +444,7 @@ class OrdersService {
           : sourceCustomerName,
       sourceOrderDate: sourceOrderDate,
       requestedDeliveryDate: requestedDeliveryDate,
+      inputMaterialLot: inputMaterialLot,
     );
 
     final poSnap = await _firestore

@@ -2,6 +2,7 @@ enum ProductionDashboardCard {
   products,
   productionOrders,
   productionTracking,
+  stationPages,
   workCenters,
   shifts,
   downtime,
@@ -20,11 +21,60 @@ class ProductionAccessHelper {
   static const String roleProductionOperator = 'production_operator';
   static const String roleSupervisor = 'supervisor';
   static const String roleProductionManager = 'production_manager';
+  static const String roleLogisticsManager = 'logistics_manager';
   static const String roleMaintenanceManager = 'maintenance_manager';
   static const String roleAdmin = 'admin';
 
+  /// Vlasnik projekta (SaaS) — izvan scopea pojedine kompanije u smislu `admin`.
+  static const String roleSuperAdmin = 'super_admin';
+
+  /// Kanonski kod uloge; legacy aliasi se mapiraju na jednu ulogu (npr. `administrator` → [roleAdmin]).
   static String normalizeRole(dynamic role) {
-    return (role ?? '').toString().trim().toLowerCase();
+    var r = (role ?? '').toString().trim().toLowerCase();
+    if (r == 'manager') {
+      r = roleMaintenanceManager;
+    }
+    if (r == 'administrator' ||
+        r == 'company_admin' ||
+        r == 'company-admin') {
+      r = roleAdmin;
+    }
+    return r;
+  }
+
+  /// Tekst za prikaz u UI (npr. „Uloga: …”). Za tenant admin uvijek tačno **„Admin”**
+  /// (nikad „Administrator” ili sirovi kod iz baze).
+  static String displayRoleLabel(dynamic role) {
+    final s = (role ?? '').toString().trim().toLowerCase();
+    if (s == 'admin' ||
+        s == 'administrator' ||
+        s == 'company_admin' ||
+        s == 'company-admin') {
+      return 'Admin';
+    }
+    if (isAdminRole(s)) {
+      return 'Admin';
+    }
+    final r = normalizeRole(role);
+    if (r == roleAdmin) {
+      return 'Admin';
+    }
+    switch (r) {
+      case roleSuperAdmin:
+        return 'Super admin';
+      case roleProductionManager:
+        return 'Menadžer proizvodnje';
+      case roleLogisticsManager:
+        return 'Menadžer logistike';
+      case roleSupervisor:
+        return 'Supervizor';
+      case roleProductionOperator:
+        return 'Operater proizvodnje';
+      case roleMaintenanceManager:
+        return 'Menadžer održavanja';
+      default:
+        return r.isEmpty ? '-' : r;
+    }
   }
 
   static ProductionAccessLevel getAccess({
@@ -84,12 +134,16 @@ class ProductionAccessHelper {
       ProductionDashboardCard.products: ProductionAccessLevel.view,
       ProductionDashboardCard.productionOrders: ProductionAccessLevel.view,
       ProductionDashboardCard.productionTracking: ProductionAccessLevel.manage,
+      ProductionDashboardCard.stationPages: ProductionAccessLevel.hidden,
       ProductionDashboardCard.workCenters: ProductionAccessLevel.hidden,
       ProductionDashboardCard.shifts: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.downtime: ProductionAccessLevel.manage,
+      /// MVP: zasebni dashboard ekran za zastoje još nije isporučen — operater koristi praćenje / nalog.
+      ProductionDashboardCard.downtime: ProductionAccessLevel.hidden,
       ProductionDashboardCard.problemReporting: ProductionAccessLevel.manage,
-      ProductionDashboardCard.processExecution: ProductionAccessLevel.manage,
-      ProductionDashboardCard.reports: ProductionAccessLevel.view,
+      /// MVP: „Evidencija procesa“ kao zaseban tab još nije isporučen — operater koristi detalj naloga → execution.
+      ProductionDashboardCard.processExecution: ProductionAccessLevel.hidden,
+      /// Operater na podu: praćenje i nalozi; analitički hub (Izvještaji) ostaje menadžeru / supervizoru.
+      ProductionDashboardCard.reports: ProductionAccessLevel.hidden,
       ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
     },
@@ -97,6 +151,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.products: ProductionAccessLevel.view,
       ProductionDashboardCard.productionOrders: ProductionAccessLevel.manage,
       ProductionDashboardCard.productionTracking: ProductionAccessLevel.manage,
+      ProductionDashboardCard.stationPages: ProductionAccessLevel.hidden,
       ProductionDashboardCard.workCenters: ProductionAccessLevel.view,
       ProductionDashboardCard.shifts: ProductionAccessLevel.manage,
       ProductionDashboardCard.downtime: ProductionAccessLevel.manage,
@@ -110,6 +165,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.products: ProductionAccessLevel.manage,
       ProductionDashboardCard.productionOrders: ProductionAccessLevel.manage,
       ProductionDashboardCard.productionTracking: ProductionAccessLevel.manage,
+      ProductionDashboardCard.stationPages: ProductionAccessLevel.manage,
       ProductionDashboardCard.workCenters: ProductionAccessLevel.manage,
       ProductionDashboardCard.shifts: ProductionAccessLevel.manage,
       ProductionDashboardCard.downtime: ProductionAccessLevel.manage,
@@ -119,10 +175,39 @@ class ProductionAccessHelper {
       ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.manage,
     },
+    roleLogisticsManager: {
+      ProductionDashboardCard.products: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionOrders: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionTracking: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.stationPages: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.workCenters: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.shifts: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.downtime: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.problemReporting: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.processExecution: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.reports: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
+    },
     roleAdmin: {
       ProductionDashboardCard.products: ProductionAccessLevel.manage,
       ProductionDashboardCard.productionOrders: ProductionAccessLevel.manage,
       ProductionDashboardCard.productionTracking: ProductionAccessLevel.manage,
+      ProductionDashboardCard.stationPages: ProductionAccessLevel.manage,
+      ProductionDashboardCard.workCenters: ProductionAccessLevel.manage,
+      ProductionDashboardCard.shifts: ProductionAccessLevel.manage,
+      ProductionDashboardCard.downtime: ProductionAccessLevel.manage,
+      ProductionDashboardCard.problemReporting: ProductionAccessLevel.manage,
+      ProductionDashboardCard.processExecution: ProductionAccessLevel.manage,
+      ProductionDashboardCard.reports: ProductionAccessLevel.manage,
+      ProductionDashboardCard.registrations: ProductionAccessLevel.manage,
+      ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.manage,
+    },
+    roleSuperAdmin: {
+      ProductionDashboardCard.products: ProductionAccessLevel.manage,
+      ProductionDashboardCard.productionOrders: ProductionAccessLevel.manage,
+      ProductionDashboardCard.productionTracking: ProductionAccessLevel.manage,
+      ProductionDashboardCard.stationPages: ProductionAccessLevel.manage,
       ProductionDashboardCard.workCenters: ProductionAccessLevel.manage,
       ProductionDashboardCard.shifts: ProductionAccessLevel.manage,
       ProductionDashboardCard.downtime: ProductionAccessLevel.manage,
@@ -136,6 +221,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.products: ProductionAccessLevel.hidden,
       ProductionDashboardCard.productionOrders: ProductionAccessLevel.hidden,
       ProductionDashboardCard.productionTracking: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.stationPages: ProductionAccessLevel.hidden,
       ProductionDashboardCard.workCenters: ProductionAccessLevel.hidden,
       ProductionDashboardCard.shifts: ProductionAccessLevel.hidden,
       ProductionDashboardCard.downtime: ProductionAccessLevel.hidden,
@@ -151,7 +237,17 @@ class ProductionAccessHelper {
     return normalizeRole(role) == roleAdmin;
   }
 
+  static bool isSuperAdminRole(String role) {
+    return normalizeRole(role) == roleSuperAdmin;
+  }
+
   static bool isMaintenanceManagerRole(String role) {
     return normalizeRole(role) == roleMaintenanceManager;
+  }
+
+  /// Ručne boje ekrana stanica (praćenje) — samo [roleAdmin] ili [roleSuperAdmin].
+  static bool canEditStationScreenCustomColors(String role) {
+    final r = normalizeRole(role);
+    return r == roleAdmin || r == roleSuperAdmin;
   }
 }

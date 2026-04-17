@@ -1,13 +1,21 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/user_display_label.dart';
+import '../../partners/services/suppliers_service.dart';
+import '../export/supplier_order_pdf_export.dart';
 import '../models/order_model.dart';
 import '../order_status_ui.dart';
+import '../services/document_pdf_settings_service.dart';
 import '../services/order_status_engine.dart';
 import '../services/orders_service.dart';
+import 'document_pdf_settings_screen.dart';
 import '../../assessment/screens/unified_assessment_run_screen.dart';
 import 'order_edit_screen.dart';
 import 'order_line_production_create_screen.dart';
@@ -28,6 +36,9 @@ class OrderDetailsScreen extends StatefulWidget {
 
 class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   final OrdersService _ordersService = OrdersService();
+  final DocumentPdfSettingsService _pdfSettingsService =
+      DocumentPdfSettingsService();
+  final SuppliersService _suppliersService = SuppliersService();
   static const OrderStatusEngine _statusTransitions = OrderStatusEngine();
 
   late OrderModel _order;
@@ -56,7 +67,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       _role == 'admin' ||
       _role == 'production_manager' ||
       _role == 'sales' ||
-      _role == 'purchasing';
+      _role == 'purchasing' ||
+      _role == 'logistics_manager';
 
   bool get _canEditOrder =>
       _canManageOrder &&
@@ -282,6 +294,91 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     });
   }
 
+  Future<void> _openDocumentPdfSettings() async {
+    final ok = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            DocumentPdfSettingsScreen(companyData: widget.companyData),
+      ),
+    );
+    if (ok == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Postavke dokumenta su ažurirane.')),
+      );
+    }
+  }
+
+  Future<void> _previewSupplierOrderPdf() async {
+    if (_order.orderType != OrderType.supplier) return;
+    if (_companyId.isEmpty) return;
+    try {
+      final settings = await _pdfSettingsService.load(_companyId);
+      final logoBytes = await SupplierOrderPdfExport.loadLogoBytes(
+        companyId: _companyId,
+        settings: settings,
+        companyData: widget.companyData,
+      );
+      final supplier = await _suppliersService.getById(
+        companyId: _companyId,
+        supplierId: _order.partnerId,
+      );
+      await SupplierOrderPdfExport.preview(
+        order: _order,
+        settings: settings,
+        companyData: widget.companyData,
+        supplier: supplier,
+        logoBytes: logoBytes,
+        responsiblePersonLabel: _actorCreatedLabel,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
+    }
+  }
+
+  Future<void> _shareSupplierOrderPdf() async {
+    if (_order.orderType != OrderType.supplier) return;
+    if (_companyId.isEmpty) return;
+    try {
+      final settings = await _pdfSettingsService.load(_companyId);
+      final logoBytes = await SupplierOrderPdfExport.loadLogoBytes(
+        companyId: _companyId,
+        settings: settings,
+        companyData: widget.companyData,
+      );
+      final supplier = await _suppliersService.getById(
+        companyId: _companyId,
+        supplierId: _order.partnerId,
+      );
+      final bytes = await SupplierOrderPdfExport.buildPdfBytes(
+        order: _order,
+        settings: settings,
+        companyData: widget.companyData,
+        supplier: supplier,
+        logoBytes: logoBytes,
+        responsiblePersonLabel: _actorCreatedLabel,
+      );
+      final dir = await getTemporaryDirectory();
+      final safe = _order.orderNumber.replaceAll(RegExp(r'[^\w\-]+'), '_');
+      final path = '${dir.path}/narudzba_$safe.pdf';
+      final f = File(path);
+      await f.writeAsBytes(bytes, flush: true);
+      if (!mounted) return;
+      await Share.shareXFiles(
+        [XFile(path)],
+        text: 'Narudžba ${_order.orderNumber}',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
+    }
+  }
+
   Future<void> _load() async {
     if (_companyId.isEmpty) {
       setState(() {
@@ -492,6 +589,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             'Potvrđena isporuka',
             _formatDate(_order.confirmedDeliveryDate),
           ),
+          if ((_order.deliveryAddress ?? '').trim().isNotEmpty)
+            _metaRow('Adresa isporuke', _order.deliveryAddress!.trim()),
+          if ((_order.shippingTerms ?? '').trim().isNotEmpty)
+            _metaRow('Dostava / uvjeti', _order.shippingTerms!.trim()),
         ],
       ),
     );
@@ -567,6 +668,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     'Količina: ${_formatQty(item.qty)} ${item.unit}',
                     style: const TextStyle(fontSize: 13),
                   ),
+                  if (_order.orderType == OrderType.supplier)
+                    Text(
+                      'Cijena: ${item.unitPrice.toStringAsFixed(2)} '
+                      '${(_order.currency ?? '').trim().isNotEmpty ? _order.currency! : 'EUR'}',
+                      style: const TextStyle(fontSize: 13),
+                    ),
                   if (item.dueDate != null)
                     Text(
                       'Rok: ${_formatDate(item.dueDate)}',
@@ -651,6 +758,34 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       appBar: AppBar(
         title: const Text('Detalji narudžbe'),
         actions: [
+          if (_order.orderType == OrderType.supplier)
+            PopupMenuButton<String>(
+              tooltip: 'PDF narudžbe',
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              onSelected: (v) {
+                if (v == 'print') {
+                  _previewSupplierOrderPdf();
+                } else if (v == 'share') {
+                  _shareSupplierOrderPdf();
+                } else if (v == 'settings') {
+                  _openDocumentPdfSettings();
+                }
+              },
+              itemBuilder: (ctx) => const [
+                PopupMenuItem(
+                  value: 'print',
+                  child: Text('Pregled i štampa PDF…'),
+                ),
+                PopupMenuItem(
+                  value: 'share',
+                  child: Text('Dijeli PDF…'),
+                ),
+                PopupMenuItem(
+                  value: 'settings',
+                  child: Text('Postavke PDF dokumenta…'),
+                ),
+              ],
+            ),
           if (_canEditOrder)
             IconButton(
               tooltip: 'Uredi narudžbu',

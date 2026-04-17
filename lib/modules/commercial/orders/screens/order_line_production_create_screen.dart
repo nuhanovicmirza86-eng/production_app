@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../logistics/inventory/widgets/product_warehouse_stock_section.dart';
+import '../../../production/bom/services/bom_service.dart';
 import '../../../production/products/services/product_lookup_service.dart';
 import '../../../production/production_orders/services/production_order_technical_refs_resolver.dart';
 import '../models/order_model.dart';
@@ -31,14 +32,19 @@ class _OrderLineProductionCreateScreenState
   final _ordersService = OrdersService();
   final _productLookup = ProductLookupService();
   final _refsResolver = ProductionOrderTechnicalRefsResolver();
+  final _bomService = BomService();
 
   late final TextEditingController _qtyController;
+  final TextEditingController _inputMaterialLotController =
+      TextEditingController();
   DateTime? _scheduledEndAt;
 
   bool _loadingProduct = true;
   bool _submitting = false;
   String? _loadError;
   ProductLookupItem? _product;
+  String? _resolvedBomClassification;
+  bool _loadingBomClassification = false;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -84,12 +90,50 @@ class _OrderLineProductionCreateScreenState
               'Proizvod nije pronađen ili nije aktivan. Provjeri productId na stavci.';
         }
       });
+      if (p != null) {
+        await _resolveBomClassification();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loadingProduct = false;
         _loadError = AppErrorMapper.toMessage(e);
       });
+    }
+  }
+
+  Future<void> _resolveBomClassification() async {
+    final p = _product;
+    if (p == null) return;
+    setState(() {
+      _loadingBomClassification = true;
+      _resolvedBomClassification = null;
+    });
+    try {
+      final refs = await _refsResolver.resolve(
+        companyId: _companyId,
+        productId: p.productId,
+        productBomId: p.bomId,
+        productBomVersion: p.bomVersion,
+        productRoutingId: p.routingId,
+        productRoutingVersion: p.routingVersion,
+      );
+      if (!mounted) return;
+      if (refs == null) {
+        setState(() => _loadingBomClassification = false);
+        return;
+      }
+      final cls = await _bomService.getClassificationForBomId(
+        refs['bomId']?.toString() ?? '',
+      );
+      if (!mounted) return;
+      setState(() {
+        _loadingBomClassification = false;
+        _resolvedBomClassification = cls;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingBomClassification = false);
     }
   }
 
@@ -188,6 +232,18 @@ class _OrderLineProductionCreateScreenState
       return;
     }
 
+    if (_resolvedBomClassification == 'SECONDARY' &&
+        _inputMaterialLotController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Za SK (sekundarna sastavnica) unesi lot materijala ili šaržu.',
+          ),
+        ),
+      );
+      return;
+    }
+
     setState(() => _submitting = true);
     try {
       final unit = (p.unit ?? '').trim().isNotEmpty
@@ -218,6 +274,9 @@ class _OrderLineProductionCreateScreenState
         sourceOrderDate: widget.order.orderDate ?? widget.order.createdAt,
         requestedDeliveryDate:
             widget.order.requestedDeliveryDate ?? widget.item.dueDate,
+        inputMaterialLot: _resolvedBomClassification == 'SECONDARY'
+            ? _inputMaterialLotController.text.trim()
+            : null,
       );
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -234,6 +293,7 @@ class _OrderLineProductionCreateScreenState
   @override
   void dispose() {
     _qtyController.dispose();
+    _inputMaterialLotController.dispose();
     super.dispose();
   }
 
@@ -339,6 +399,23 @@ class _OrderLineProductionCreateScreenState
                       trailing: const Icon(Icons.calendar_today),
                       onTap: _pickDate,
                     ),
+                    if (_loadingBomClassification) ...[
+                      const SizedBox(height: 8),
+                      const LinearProgressIndicator(minHeight: 2),
+                    ],
+                    if (!_loadingBomClassification &&
+                        _resolvedBomClassification == 'SECONDARY') ...[
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _inputMaterialLotController,
+                        decoration: const InputDecoration(
+                          labelText: 'Lot materijala (šarža)',
+                          helperText:
+                              'Lot ili šarža materijala iz prethodne izrade (SK).',
+                        ),
+                        textInputAction: TextInputAction.done,
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Text(
                       'Pogon (za PN): $_plantKeyForProduction',

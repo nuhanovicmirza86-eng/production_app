@@ -6,7 +6,10 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import '../../../../core/date/date_range_utils.dart' show formatCalendarDay;
+import '../../../../core/pdf/operonix_pdf_footer.dart';
 import '../models/order_model.dart';
+import '../services/company_print_identity_service.dart';
+import 'pdf_company_header.dart';
 import '../order_status_ui.dart';
 
 /// PDF izvoz usklađen s ekranom: grupe po partneru, redovi po stavci, sort po roku isporuke.
@@ -132,6 +135,8 @@ class OrdersListPdfExport {
     String? companyLine,
     String? filterDescription,
     Map<String, double>? stockByProductId,
+    CompanyPrintIdentity? printIdentity,
+    Map<String, dynamic>? companyData,
   }) async {
     final fontR = await _font('assets/fonts/NotoSans-Regular.ttf');
     final fontB = await _font('assets/fonts/NotoSans-Bold.ttf');
@@ -225,15 +230,26 @@ class OrdersListPdfExport {
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
     final blocks = <pw.Widget>[
-      pw.Text(reportTitle, style: pw.TextStyle(font: fontB, fontSize: 14)),
-      if (companyLine != null && companyLine.trim().isNotEmpty)
+      if (printIdentity != null && companyData != null)
         pw.Padding(
-          padding: const pw.EdgeInsets.only(top: 4, bottom: 2),
+          padding: const pw.EdgeInsets.only(bottom: 10),
+          child: PdfCompanyHeader.buildLetterhead(
+            fontR: fontR,
+            fontB: fontB,
+            data: printIdentity.toLetterheadData(companyData),
+            logoBytes: printIdentity.logoBytes,
+            maxLogoHeight: 40,
+          ),
+        )
+      else if (companyLine != null && companyLine.trim().isNotEmpty)
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(bottom: 8),
           child: pw.Text(
             companyLine.trim(),
             style: pw.TextStyle(font: fontR, fontSize: 9),
           ),
         ),
+      pw.Text(reportTitle, style: pw.TextStyle(font: fontB, fontSize: 14)),
       pw.Text(
         'Generisano: ${formatCalendarDay(now)} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
         style: pw.TextStyle(font: fontR, fontSize: 8, color: PdfColors.grey700),
@@ -318,6 +334,7 @@ class OrdersListPdfExport {
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4.landscape,
         margin: const pw.EdgeInsets.all(24),
+        footer: (ctx) => OperonixPdfFooter.multiPageFooter(ctx, fontR),
         build: (context) => blocks,
       ),
     );
@@ -330,7 +347,13 @@ class OrdersListPdfExport {
     String? companyLine,
     String? filterDescription,
     Map<String, double>? stockByProductId,
+    required String companyId,
+    required Map<String, dynamic> companyData,
   }) async {
+    final identity = await CompanyPrintIdentityService().load(
+      companyId: companyId,
+      companyData: companyData,
+    );
     await Printing.layoutPdf(
       name: 'narudzbe_pregled_detaljno',
       onLayout: (_) => buildPdf(
@@ -339,6 +362,8 @@ class OrdersListPdfExport {
         companyLine: companyLine,
         filterDescription: filterDescription,
         stockByProductId: stockByProductId,
+        printIdentity: identity,
+        companyData: companyData,
       ),
     );
   }

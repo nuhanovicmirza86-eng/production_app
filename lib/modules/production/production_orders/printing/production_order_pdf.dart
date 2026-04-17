@@ -4,6 +4,9 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../../../../core/pdf/operonix_pdf_footer.dart';
+import '../../../commercial/orders/export/pdf_company_header.dart';
+import '../../../commercial/orders/services/company_print_identity_service.dart';
 import '../models/production_order_model.dart';
 import 'bom_classification_catalog.dart';
 import 'classification_label_print_qr.dart';
@@ -77,6 +80,8 @@ class ProductionOrderPdf {
   static Future<Uint8List> buildWorkOrderPdf({
     required ProductionOrderModel order,
     DateTime? printedAt,
+    CompanyPrintIdentity? printIdentity,
+    Map<String, dynamic>? companyData,
   }) async {
     final fontRegular = await _loadFont('assets/fonts/NotoSans-Regular.ttf');
     final fontBold = await _loadFont('assets/fonts/NotoSans-Bold.ttf');
@@ -138,6 +143,16 @@ class ProductionOrderPdf {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
+              if (printIdentity != null && companyData != null) ...[
+                PdfCompanyHeader.buildLetterhead(
+                  fontR: fontRegular,
+                  fontB: fontBold,
+                  data: printIdentity.toLetterheadData(companyData),
+                  logoBytes: printIdentity.logoBytes,
+                  maxLogoHeight: 52,
+                ),
+                pw.SizedBox(height: 14),
+              ],
               pw.Row(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
@@ -331,6 +346,7 @@ class ProductionOrderPdf {
                   color: PdfColors.grey600,
                 ),
               ),
+              OperonixPdfFooter.inline(fontRegular),
             ],
           );
         },

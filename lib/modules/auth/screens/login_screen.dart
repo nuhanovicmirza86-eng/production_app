@@ -1,9 +1,12 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/access/production_access_helper.dart';
+import '../../../../core/station_launch_preference.dart';
 import '../register/screens/register_screen.dart';
 import '../shared/services/auth_service.dart';
 
@@ -107,6 +110,29 @@ class _LoginScreenState extends State<LoginScreen> {
       await _authService.signIn(email, password);
       await _persistRememberState();
 
+      if (!mounted) return;
+
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        try {
+          final snap = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .get();
+          if (!mounted) return;
+          final role = snap.data()?['role'];
+          if (ProductionAccessHelper.isAdminRole(
+            ProductionAccessHelper.normalizeRole(role),
+          )) {
+            await _promptAdminStationMode(context);
+          }
+        } catch (_) {
+          // Ako profil ne može pročitati, nastavi bez postavke uređaja.
+        }
+      }
+
+      if (!mounted) return;
+
       if (widget.onLoginSuccess != null) {
         await widget.onLoginSuccess!();
       }
@@ -153,7 +179,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Vaš zahtjev za registraciju je zaprimljen i čeka odobrenje Administratora.',
+            'Vaš zahtjev za registraciju je zaprimljen i čeka odobrenje Admina.',
           ),
         ),
       );
@@ -281,6 +307,135 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  /// Samo uloga Admin — pitanje na samom ekranu prijave prije ulaska u aplikaciju.
+  Future<void> _promptAdminStationMode(BuildContext context) async {
+    final first = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ovaj uređaj'),
+        content: const Text(
+          'Želite li postaviti ovaj računar tako da se nakon svake prijave otvara '
+          'stanica (pripremna, prva ili završna kontrola) umjesto cijelog izbornika?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Ne, cijela aplikacija'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Da, kao stanicu'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (first != true) {
+      await StationLaunchPreference.setMode(StationLaunchPreference.modeFull);
+      return;
+    }
+
+    final initial = await _defaultStationPickerValue();
+    if (!mounted) return;
+    if (!context.mounted) return;
+
+    final picked = await showDialog<String?>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _StationPickDialog(initialMode: initial),
+    );
+    if (!mounted) return;
+    if (picked == null || picked.isEmpty) {
+      await StationLaunchPreference.setMode(StationLaunchPreference.modeFull);
+      return;
+    }
+    await StationLaunchPreference.setMode(picked);
+  }
+
+  Future<String> _defaultStationPickerValue() async {
+    final r = await StationLaunchPreference.getModeRaw();
+    switch (r) {
+      case StationLaunchPreference.modePreparation:
+      case StationLaunchPreference.modeFirstControl:
+      case StationLaunchPreference.modeFinalControl:
+        return r;
+      default:
+        return StationLaunchPreference.modePreparation;
+    }
+  }
+}
+
+class _StationPickDialog extends StatefulWidget {
+  final String initialMode;
+
+  const _StationPickDialog({required this.initialMode});
+
+  @override
+  State<_StationPickDialog> createState() => _StationPickDialogState();
+}
+
+class _StationPickDialogState extends State<_StationPickDialog> {
+  late String _mode = widget.initialMode;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Koja stanica?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Koju stanicu ovaj računar otvara nakon prijave?',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 12),
+          InputDecorator(
+            decoration: const InputDecoration(
+              labelText: 'Stanicu',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                isExpanded: true,
+                value: _mode,
+                items: const [
+                  DropdownMenuItem(
+                    value: StationLaunchPreference.modePreparation,
+                    child: Text('Stanica 1 — pripremna'),
+                  ),
+                  DropdownMenuItem(
+                    value: StationLaunchPreference.modeFirstControl,
+                    child: Text('Stanica 2 — prva kontrola'),
+                  ),
+                  DropdownMenuItem(
+                    value: StationLaunchPreference.modeFinalControl,
+                    child: Text('Stanica 3 — završna kontrola'),
+                  ),
+                ],
+                onChanged: (v) {
+                  if (v != null) setState(() => _mode = v);
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, null),
+          child: const Text('Odustani'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _mode),
+          child: const Text('Potvrdi'),
+        ),
+      ],
     );
   }
 }

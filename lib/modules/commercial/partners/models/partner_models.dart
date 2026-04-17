@@ -13,6 +13,27 @@ class CustomerModel {
   final String? taxId;
   final String? notes;
 
+  /// Ugovoreni rok isporuke od datuma narudžbe (kalendarski dani).
+  final int? contractDeliveryDays;
+
+  /// Ugovoreni rok plaćanja (npr. neto dani).
+  final int? contractPaymentDays;
+
+  /// Rok naplate / fakturisanja (dani), ako se razlikuje od plaćanja.
+  final int? contractCollectionDays;
+
+  /// Dozvoljeni prekoračeni rok (grace, dani).
+  final int? contractGraceDaysLate;
+
+  /// Sektor djelatnosti (NACE ili slobodan opis) — filter u listama.
+  final String? activitySector;
+
+  /// Operativna kategorija: A (dobar), B (upozorenje), C (nepouzdan), unrated.
+  final String partnerRatingClass;
+
+  /// Ako je C, ali nema alternative — označiti kao strateški (posebna logika u UI).
+  final bool isStrategic;
+
   const CustomerModel({
     required this.id,
     required this.companyId,
@@ -26,6 +47,13 @@ class CustomerModel {
     this.address,
     this.taxId,
     this.notes,
+    this.contractDeliveryDays,
+    this.contractPaymentDays,
+    this.contractCollectionDays,
+    this.contractGraceDaysLate,
+    this.activitySector,
+    this.partnerRatingClass = 'unrated',
+    this.isStrategic = false,
   });
 
   factory CustomerModel.fromMap(String id, Map<String, dynamic> map) {
@@ -44,6 +72,13 @@ class CustomerModel {
       address: _nullable(map['address']),
       taxId: _nullable(map['taxId']),
       notes: _nullable(map['notes']),
+      contractDeliveryDays: _intOrNull(map['contractDeliveryDays']),
+      contractPaymentDays: _intOrNull(map['contractPaymentDays']),
+      contractCollectionDays: _intOrNull(map['contractCollectionDays']),
+      contractGraceDaysLate: _intOrNull(map['contractGraceDaysLate']),
+      activitySector: _nullable(map['activitySector']),
+      partnerRatingClass: _partnerRatingClassFrom(map['partnerRatingClass']),
+      isStrategic: _bool(map['isStrategic']),
     );
   }
 
@@ -61,6 +96,17 @@ class CustomerModel {
       if ((address ?? '').trim().isNotEmpty) 'address': address,
       if ((taxId ?? '').trim().isNotEmpty) 'taxId': taxId,
       if ((notes ?? '').trim().isNotEmpty) 'notes': notes,
+      if (contractDeliveryDays != null)
+        'contractDeliveryDays': contractDeliveryDays,
+      if (contractPaymentDays != null)
+        'contractPaymentDays': contractPaymentDays,
+      if (contractCollectionDays != null)
+        'contractCollectionDays': contractCollectionDays,
+      if (contractGraceDaysLate != null)
+        'contractGraceDaysLate': contractGraceDaysLate,
+      'activitySector': (activitySector ?? '').trim(),
+      'partnerRatingClass': partnerRatingClass,
+      'isStrategic': isStrategic,
     };
   }
 }
@@ -158,6 +204,24 @@ class SupplierModel {
   final String? taxId;
   final String? notes;
 
+  /// Ugovoreni rok isporuke od datuma narudžbe (kalendarski dani).
+  final int? contractDeliveryDays;
+
+  /// Ugovoreni rok plaćanja (neto dani).
+  final int? contractPaymentDays;
+
+  /// Rok naplate / fakturisanja (dani).
+  final int? contractCollectionDays;
+
+  /// Dozvoljeni prekoračeni rok (grace, dani).
+  final int? contractGraceDaysLate;
+
+  /// Sektor djelatnosti (NACE ili opis).
+  final String? activitySector;
+
+  /// A / B / C / unrated — operativna procjena partnera.
+  final String partnerRatingClass;
+
   final int? leadTimeDays;
 
   // IATF supplier governance fields
@@ -197,6 +261,12 @@ class SupplierModel {
     this.address,
     this.taxId,
     this.notes,
+    this.contractDeliveryDays,
+    this.contractPaymentDays,
+    this.contractCollectionDays,
+    this.contractGraceDaysLate,
+    this.activitySector,
+    this.partnerRatingClass = 'unrated',
     this.leadTimeDays,
     this.supplierCategory = 'approved',
     this.isStrategic = false,
@@ -233,6 +303,12 @@ class SupplierModel {
       address: _nullable(map['address']),
       taxId: _nullable(map['taxId']),
       notes: _nullable(map['notes']),
+      contractDeliveryDays: _intOrNull(map['contractDeliveryDays']),
+      contractPaymentDays: _intOrNull(map['contractPaymentDays']),
+      contractCollectionDays: _intOrNull(map['contractCollectionDays']),
+      contractGraceDaysLate: _intOrNull(map['contractGraceDaysLate']),
+      activitySector: _nullable(map['activitySector']),
+      partnerRatingClass: _partnerRatingClassFrom(map['partnerRatingClass']),
       leadTimeDays: _intOrNull(map['leadTimeDays']),
       supplierCategory: _s(map['supplierCategory']).isEmpty
           ? 'approved'
@@ -272,6 +348,16 @@ class SupplierModel {
       if ((address ?? '').trim().isNotEmpty) 'address': address,
       if ((taxId ?? '').trim().isNotEmpty) 'taxId': taxId,
       if ((notes ?? '').trim().isNotEmpty) 'notes': notes,
+      if (contractDeliveryDays != null)
+        'contractDeliveryDays': contractDeliveryDays,
+      if (contractPaymentDays != null)
+        'contractPaymentDays': contractPaymentDays,
+      if (contractCollectionDays != null)
+        'contractCollectionDays': contractCollectionDays,
+      if (contractGraceDaysLate != null)
+        'contractGraceDaysLate': contractGraceDaysLate,
+      'activitySector': (activitySector ?? '').trim(),
+      'partnerRatingClass': partnerRatingClass,
       if (leadTimeDays != null) 'leadTimeDays': leadTimeDays,
       'supplierCategory': supplierCategory,
       'isStrategic': isStrategic,
@@ -294,6 +380,24 @@ class SupplierModel {
 }
 
 String _s(dynamic v) => (v ?? '').toString().trim();
+
+/// Kanonske vrijednosti: A, B, C, unrated (kompatibilno s backendom).
+String _partnerRatingClassFrom(dynamic v) {
+  final t = _s(v).toLowerCase();
+  switch (t) {
+    case 'a':
+      return 'A';
+    case 'b':
+      return 'B';
+    case 'c':
+      return 'C';
+    case 'unrated':
+    case '':
+      return 'unrated';
+    default:
+      return 'unrated';
+  }
+}
 
 String? _nullable(dynamic v) {
   final t = _s(v);

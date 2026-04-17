@@ -118,7 +118,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           title: const Text('Zahtjev uspješno poslan'),
           content: const Text(
             'Vaš zahtjev za pristup sistemu je uspješno kreiran.\n\n'
-            'Administrator vaše firme treba da ga odobri prije nego što možete koristiti aplikaciju.\n\n'
+            'Admin vaše firme treba da ga odobri prije nego što možete koristiti aplikaciju.\n\n'
             'Bićete obaviješteni nakon odobrenja.',
           ),
           actions: [
@@ -184,7 +184,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Šifra firme / Company Code',
                   helperText:
-                      'Unesi šifru firme koju si dobio od administratora.',
+                      'Unesi šifru firme koju si dobio od Admina.',
                 ),
               ),
               const SizedBox(height: 16),

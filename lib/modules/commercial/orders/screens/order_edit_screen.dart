@@ -6,10 +6,20 @@ import '../order_status_ui.dart';
 import '../services/orders_service.dart';
 
 class _LineEditors {
-  _LineEditors({required this.item, required this.qtyController, this.dueDate});
+  _LineEditors({
+    required this.item,
+    required this.qtyController,
+    required this.unitPriceController,
+    required this.discountController,
+    required this.vatController,
+    this.dueDate,
+  });
 
   final OrderItemModel item;
   final TextEditingController qtyController;
+  final TextEditingController unitPriceController;
+  final TextEditingController discountController;
+  final TextEditingController vatController;
   DateTime? dueDate;
 }
 
@@ -68,6 +78,9 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
     _requestedDeliveryDate = o.requestedDeliveryDate;
     _confirmedDeliveryDate = o.confirmedDeliveryDate;
 
+    String fmtDec(double v) =>
+        v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2);
+
     _lines = o.items.map((it) {
       final q = it.qty == it.qty.roundToDouble()
           ? it.qty.toInt().toString()
@@ -75,6 +88,11 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
       return _LineEditors(
         item: it,
         qtyController: TextEditingController(text: q),
+        unitPriceController: TextEditingController(text: fmtDec(it.unitPrice)),
+        discountController: TextEditingController(text: fmtDec(it.discountPercent)),
+        vatController: TextEditingController(
+          text: it.vatPercent != null ? fmtDec(it.vatPercent!) : '',
+        ),
         dueDate: it.dueDate,
       );
     }).toList();
@@ -88,6 +106,9 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
     _currencyController.dispose();
     for (final l in _lines) {
       l.qtyController.dispose();
+      l.unitPriceController.dispose();
+      l.discountController.dispose();
+      l.vatController.dispose();
     }
     super.dispose();
   }
@@ -190,7 +211,41 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
         final dueChanged =
             (le.dueDate?.millisecondsSinceEpoch ?? -1) !=
             (le.item.dueDate?.millisecondsSinceEpoch ?? -1);
-        if (!qtyChanged && !dueChanged) continue;
+
+        final priceRaw =
+            le.unitPriceController.text.trim().replaceAll(',', '.');
+        final newPrice = double.tryParse(priceRaw) ?? le.item.unitPrice;
+        final discRaw =
+            le.discountController.text.trim().replaceAll(',', '.');
+        final newDisc = double.tryParse(discRaw) ?? le.item.discountPercent;
+        final vatRaw = le.vatController.text.trim().replaceAll(',', '.');
+        final newVat = vatRaw.isEmpty ? null : double.tryParse(vatRaw);
+        if (vatRaw.isNotEmpty && newVat == null) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Stavka ${le.item.productCode}: neispravan PDV %.',
+              ),
+            ),
+          );
+          return;
+        }
+
+        final priceChanged = (newPrice - le.item.unitPrice).abs() > 1e-9;
+        final discChanged = (newDisc - le.item.discountPercent).abs() > 1e-9;
+        final vatChanged = vatRaw.isEmpty
+            ? (le.item.vatPercent != null)
+            : (le.item.vatPercent == null ||
+                  (newVat! - le.item.vatPercent!).abs() > 1e-9);
+
+        if (!qtyChanged &&
+            !dueChanged &&
+            !priceChanged &&
+            !discChanged &&
+            !vatChanged) {
+          continue;
+        }
 
         await _ordersService.updateOrderItemOrderedAndDue(
           companyId: _companyId,
@@ -199,6 +254,11 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
           updatedBy: _userId,
           orderedQty: newQty,
           dueDate: le.dueDate,
+          unitPrice: priceChanged ? newPrice : null,
+          discountPercent: discChanged ? newDisc : null,
+          vatPercent: vatChanged ? (vatRaw.isEmpty ? null : newVat) : null,
+          clearVatPercent:
+              vatChanged && vatRaw.isEmpty && le.item.vatPercent != null,
         );
       }
 
@@ -388,6 +448,36 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
                           controller: le.qtyController,
                           decoration: InputDecoration(
                             labelText: 'Naručeno (${le.item.unit})',
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: le.unitPriceController,
+                          decoration: const InputDecoration(
+                            labelText: 'Jedinična cijena',
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: le.discountController,
+                          decoration: const InputDecoration(
+                            labelText: 'Rabat %',
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: le.vatController,
+                          decoration: const InputDecoration(
+                            labelText: 'PDV % (prazno = podrazumijevani iz postavki)',
                           ),
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,

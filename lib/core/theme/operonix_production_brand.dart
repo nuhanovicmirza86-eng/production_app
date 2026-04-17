@@ -3,6 +3,12 @@ import 'package:flutter/material.dart';
 /// Svjetlija zelena za obrube kartica i polja (usklađeno s Početnom / „O aplikaciji“).
 const Color kOperonixProductionBrandGreen = Color(0xFF3DCF8C);
 
+// Usklađeno s dokumentacijom brenda i SCADA „Operonix grafit“ (maintenance SCADA zid).
+/// Tamno industrijsko plavo (wordmark / pozadina loga).
+const Color kOperonixBrandNavy = Color(0xFF0B1F3A);
+/// Akcent kao na SCADA zidu (Operonix grafit).
+const Color kOperonixScadaAccentBlue = Color(0xFF58A6FF);
+
 /// Obrub kartica — `RoundedRectangleBorder` + `side` 1.5 (isti obrazac kao maintenance narandžasta).
 const ShapeBorder kOperonixProductionCardShape = RoundedRectangleBorder(
   borderRadius: BorderRadius.all(Radius.circular(12)),

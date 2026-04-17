@@ -1,7 +1,8 @@
 import '../models/carbon_models.dart';
 
-/// Početni faktori (proxy; administrator ih može prepisati u Firestore).
-/// Izvori: UNFCCC grid BA + UK GHG Conversion Factors 2025 (kao u Excel predlošku).
+/// Ugrađeni faktori (proxy) dok kompanija nema zapis u Firestore.
+/// Referentni skup za sinkronizaciju održava se i na serveru (`carbon_reference_catalog.js`).
+/// Izvori: UNFCCC grid BA + UK GHG Conversion Factors 2025.
 class CarbonDefaults {
   CarbonDefaults._();
 
