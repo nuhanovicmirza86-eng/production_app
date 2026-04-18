@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:production_app/core/branding/operonix_ai_branding.dart';
 import 'package:production_app/core/theme/operonix_production_brand.dart';
 import 'package:production_app/screens/about_screen.dart';
 
 import '../../../../core/access/production_access_helper.dart';
+import '../../../../core/saas/production_module_keys.dart';
 import '../../../auth/screens/station_device_mode_screen.dart';
 import '../../../../core/access/production_maintenance_bridge.dart';
 import '../../../../core/company_logo_resolver.dart';
@@ -26,6 +28,7 @@ import '../../tracking/screens/production_operator_tracking_station_screen.dart'
 import '../../station_pages/screens/production_station_pages_admin_screen.dart';
 import '../../station_pages/widgets/station_page_active_gate.dart';
 import '../../tracking/screens/production_preparation_station_screen.dart';
+import '../../ai/screens/production_ai_hub_screen.dart';
 import '../../tracking/screens/production_reports_hub_screen.dart';
 import '../../issues/screens/production_problem_reporting_screen.dart';
 import '../../qr/production_qr_resolver.dart';
@@ -88,6 +91,10 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     return _enabledModules.contains(normalized);
   }
 
+  bool _hasAiProductionAiHubAccess() {
+    return ProductionModuleKeys.hasAnyProductionAiHubAccess(companyData);
+  }
+
   bool _canAccessMaintenanceFaultBridge() {
     return maintenanceFaultBridgeEnabled(companyData);
   }
@@ -134,6 +141,13 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
 
   static const double _tileGap = 10;
 
+  String _logisticsSectionSubtitle() {
+    if (_hasModule('logistics')) {
+      return 'Pretplata uključuje modul „logistics“. Kartice: skladište, prijem kutija (ovisno o ulozi).';
+    }
+    return 'Skladište i prijemi na liniji; puni modul logistike traži pretplatu „logistics“ (ovisno o ulozi).';
+  }
+
   List<Widget> _buildProductionActions(BuildContext context) {
     if (!_hasModule('production')) return [];
 
@@ -161,8 +175,8 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       );
     }
 
-    return [
-      if (_hasModule('production') && _canConfigureStationDevice())
+    final productionTiles = <Widget>[
+      if (_canConfigureStationDevice())
         _DashboardActionTile(
           icon: Icons.display_settings_outlined,
           title: 'Način rada na ovom uređaju',
@@ -193,57 +207,12 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           onTap: () =>
               open(ProductionOrdersListScreen(companyData: companyData)),
         ),
-      if (_canAccessOrders())
-        _DashboardActionTile(
-          icon: Icons.receipt_long_outlined,
-          title: 'Narudžbe',
-          subtitle: 'Pregled i rad s narudžbama.',
-          onTap: () => open(OrdersListScreen(companyData: companyData)),
-        ),
-      if (_canAccessOrders())
-        _DashboardActionTile(
-          icon: Icons.picture_as_pdf_outlined,
-          title: 'Podaci za ispis PDF',
-          subtitle: 'Zaglavlje, logo i podaci kompanije na dokumentima.',
-          onTap: () =>
-              open(DocumentPdfSettingsScreen(companyData: companyData)),
-        ),
-      if (_canAccessPartners())
-        _DashboardActionTile(
-          icon: Icons.groups_outlined,
-          title: 'Kupci / dobavljači',
-          subtitle: 'Partneri i poslovne veze.',
-          onTap: () => open(PartnersScreen(companyData: companyData)),
-        ),
-      if (_canAccessCentralWarehouse()) ...[
-        _DashboardActionTile(
-          icon: Icons.warehouse_outlined,
-          title: 'Centralni magacin',
-          subtitle: 'Prijem i knjiženje preko QR etiketa.',
-          onTap: () => _openProductionQrScan(context),
-        ),
-        _DashboardActionTile(
-          icon: Icons.move_to_inbox_outlined,
-          title: 'Upakovane kutije Stanica 1',
-          subtitle:
-              'Lista zatvorenih kutija i prijem u magacin skeniranjem QR-a.',
-          onTap: () => open(
-            Station1PackedBoxesLogisticsScreen(companyData: companyData),
-          ),
-        ),
-      ],
-      if (_canViewCard(ProductionDashboardCard.carbonFootprint))
-        _DashboardActionTile(
-          icon: Icons.eco_outlined,
-          title: 'Karbonski otisak',
-          subtitle: 'Praćenje i evidencija utjecaja.',
-          onTap: () => open(CarbonFootprintScreen(companyData: companyData)),
-        ),
       if (_canViewCard(ProductionDashboardCard.productionTracking)) ...[
         _DashboardActionTile(
           icon: Icons.play_circle_outline,
           title: 'Praćenje proizvodnje (tabovi)',
-          subtitle: 'Sve tri faze u jednom ekranu s tabovima.',
+          subtitle:
+              'Pregled KPI i trendova, zatim tri faze unosa u jednom ekranu.',
           onTap: () =>
               open(ProductionOperatorTrackingScreen(companyData: companyData)),
         ),
@@ -327,6 +296,129 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
               open(ProductionReportsHubScreen(companyData: companyData)),
         ),
     ];
+
+    final commercialTiles = <Widget>[
+      if (_canAccessOrders())
+        _DashboardActionTile(
+          icon: Icons.receipt_long_outlined,
+          title: 'Narudžbe',
+          subtitle: 'Pregled i rad s narudžbama.',
+          onTap: () => open(OrdersListScreen(companyData: companyData)),
+        ),
+      if (_canAccessOrders())
+        _DashboardActionTile(
+          icon: Icons.picture_as_pdf_outlined,
+          title: 'Podaci za ispis PDF',
+          subtitle: 'Zaglavlje, logo i podaci kompanije na dokumentima.',
+          onTap: () =>
+              open(DocumentPdfSettingsScreen(companyData: companyData)),
+        ),
+      if (_canAccessPartners())
+        _DashboardActionTile(
+          icon: Icons.groups_outlined,
+          title: 'Kupci / dobavljači',
+          subtitle: 'Partneri i poslovne veze.',
+          onTap: () => open(PartnersScreen(companyData: companyData)),
+        ),
+    ];
+
+    final logisticsTiles = <Widget>[
+      if (_canAccessCentralWarehouse()) ...[
+        _DashboardActionTile(
+          icon: Icons.warehouse_outlined,
+          title: 'Centralni magacin',
+          subtitle: 'Prijem i knjiženje preko QR etiketa.',
+          onTap: () => _openProductionQrScan(context),
+        ),
+        _DashboardActionTile(
+          icon: Icons.move_to_inbox_outlined,
+          title: 'Upakovane kutije Stanica 1',
+          subtitle:
+              'Lista zatvorenih kutija i prijem u magacin skeniranjem QR-a.',
+          onTap: () => open(
+            Station1PackedBoxesLogisticsScreen(companyData: companyData),
+          ),
+        ),
+      ],
+    ];
+
+    final sustainabilityTiles = <Widget>[
+      if (_canViewCard(ProductionDashboardCard.carbonFootprint))
+        _DashboardActionTile(
+          icon: Icons.eco_outlined,
+          title: 'Karbonski otisak',
+          subtitle: 'Praćenje i evidencija utjecaja.',
+          onTap: () => open(CarbonFootprintScreen(companyData: companyData)),
+        ),
+    ];
+
+    final aiTiles = <Widget>[
+      if (_hasAiProductionAiHubAccess() &&
+          _canViewCard(ProductionDashboardCard.aiAssistant))
+        _DashboardActionTile(
+          icon: Icons.smart_toy_outlined,
+          title: kOperonixAiAssistantTitle,
+          subtitle: 'Chat, analitika i izvještaji (SaaS AI paketi).',
+          onTap: () => open(ProductionAiHubScreen(companyData: companyData)),
+        ),
+    ];
+
+    const sectionGap = 18.0;
+    const afterHeader = 8.0;
+
+    final out = <Widget>[];
+
+    void addModuleSection({
+      required String title,
+      required String subtitle,
+      required IconData icon,
+      required List<Widget> tiles,
+    }) {
+      if (tiles.isEmpty) return;
+      if (out.isNotEmpty) out.add(const SizedBox(height: sectionGap));
+      out.add(
+        _ModuleGroupHeader(title: title, subtitle: subtitle, icon: icon),
+      );
+      out.add(const SizedBox(height: afterHeader));
+      out.addAll(_withTileGaps(tiles));
+    }
+
+    addModuleSection(
+      title: 'Proizvodnja',
+      subtitle:
+          'SaaS modul „production“: proizvodi, proizvodni nalozi, praćenje, stanice, izvještaji.',
+      icon: Icons.precision_manufacturing_outlined,
+      tiles: productionTiles,
+    );
+    addModuleSection(
+      title: 'Komercijalno',
+      subtitle:
+          'Narudžbe i partneri u ovoj aplikaciji — dio iste „production“ pretplate (nije zaseban modul).',
+      icon: Icons.storefront_outlined,
+      tiles: commercialTiles,
+    );
+    addModuleSection(
+      title: 'Logistika i magacin',
+      subtitle: _logisticsSectionSubtitle(),
+      icon: Icons.local_shipping_outlined,
+      tiles: logisticsTiles,
+    );
+    addModuleSection(
+      title: 'Održivost',
+      subtitle:
+          'Karbonski otisak uz proizvodnju (isti tenant; ovisi o uključenim izvještajima).',
+      icon: Icons.eco_outlined,
+      tiles: sustainabilityTiles,
+    );
+    addModuleSection(
+      title: kOperonixAiShortLabel,
+      subtitle:
+          'Dodatni SaaS paketi (npr. ai_assistant_production, ai_reports) uz osnovnu pretplatu.',
+      icon: Icons.smart_toy_outlined,
+      tiles: aiTiles,
+    );
+
+    return out;
   }
 
   List<Widget> _withTileGaps(List<Widget> tiles) {
@@ -347,8 +439,19 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
   }
 
   List<Widget> _buildHomeQuickActions(BuildContext context) {
+    const sectionGap = 18.0;
+    const afterHeader = 8.0;
     final tiles = <Widget>[];
+
     if (_canViewCard(ProductionDashboardCard.registrations)) {
+      tiles.add(
+        const _ModuleGroupHeader(
+          title: 'Korisnici',
+          subtitle: 'Administracija tenant računa (odobravanje novih prijava).',
+          icon: Icons.manage_accounts_outlined,
+        ),
+      );
+      tiles.add(const SizedBox(height: afterHeader));
       tiles.add(
         _DashboardActionTile(
           icon: Icons.person_add_alt_1,
@@ -364,8 +467,22 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           },
         ),
       );
+      tiles.add(const SizedBox(height: sectionGap));
     }
+
     tiles.addAll(_buildProductionActions(context));
+
+    if (tiles.isNotEmpty) {
+      tiles.add(const SizedBox(height: sectionGap));
+    }
+    tiles.add(
+      const _ModuleGroupHeader(
+        title: 'Općenito',
+        subtitle: 'Informacije o aplikaciji.',
+        icon: Icons.info_outline,
+      ),
+    );
+    tiles.add(const SizedBox(height: afterHeader));
     tiles.add(
       _DashboardActionTile(
         icon: Icons.article_outlined,
@@ -403,6 +520,21 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         ),
       ),
     ];
+
+    if (_hasModule('production') &&
+        _hasAiProductionAiHubAccess() &&
+        _canViewCard(ProductionDashboardCard.aiAssistant)) {
+      items.add(
+        _ProdNavItem(
+          builder: (_) => ProductionAiHubScreen(companyData: cd),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.smart_toy_outlined),
+            selectedIcon: Icon(Icons.smart_toy),
+            label: kOperonixAiShortLabel,
+          ),
+        ),
+      );
+    }
 
     if (_hasModule('production') &&
         _canViewCard(ProductionDashboardCard.products)) {
@@ -1017,6 +1149,15 @@ class _ProductionHomePage extends StatelessWidget {
           ),
           SizedBox(height: gap),
           const _SectionTitle(title: 'Brze akcije'),
+          SizedBox(height: gap * 0.35),
+          Text(
+            'Grupirano po modulima pretplate i funkciji. Pojedina kartica ovisi o ulozi.',
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.35,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
           SizedBox(height: gap * 0.75),
           ...quickActionChildren,
         ],
@@ -1365,6 +1506,53 @@ class _SectionTitle extends StatelessWidget {
     return Text(
       title,
       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+    );
+  }
+}
+
+/// Naslov bloka na početnoj: koji SaaS / poslovni modul pokriva kartice ispod.
+class _ModuleGroupHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+
+  const _ModuleGroupHeader({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 22, color: kOperonixProductionBrandGreen),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

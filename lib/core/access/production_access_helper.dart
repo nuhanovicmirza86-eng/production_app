@@ -11,6 +11,9 @@ enum ProductionDashboardCard {
   reports,
   registrations,
   carbonFootprint,
+
+  /// SaaS modul [ProductionModuleKeys.aiAssistant]: OperonixAI (chat + operativni asistent).
+  aiAssistant,
 }
 
 enum ProductionAccessLevel { hidden, view, manage }
@@ -146,6 +149,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.reports: ProductionAccessLevel.hidden,
       ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
     },
     roleSupervisor: {
       ProductionDashboardCard.products: ProductionAccessLevel.view,
@@ -160,6 +164,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.reports: ProductionAccessLevel.view,
       ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
     },
     roleProductionManager: {
       ProductionDashboardCard.products: ProductionAccessLevel.manage,
@@ -174,6 +179,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.reports: ProductionAccessLevel.manage,
       ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.manage,
+      ProductionDashboardCard.aiAssistant: ProductionAccessLevel.manage,
     },
     roleLogisticsManager: {
       ProductionDashboardCard.products: ProductionAccessLevel.hidden,
@@ -188,6 +194,8 @@ class ProductionAccessHelper {
       ProductionDashboardCard.reports: ProductionAccessLevel.hidden,
       ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
+      /// OperonixAI (narudžbe, rokovi) — usklađeno s Callable [productionTrackingAssistant].
+      ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
     },
     roleAdmin: {
       ProductionDashboardCard.products: ProductionAccessLevel.manage,
@@ -202,6 +210,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.reports: ProductionAccessLevel.manage,
       ProductionDashboardCard.registrations: ProductionAccessLevel.manage,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.manage,
+      ProductionDashboardCard.aiAssistant: ProductionAccessLevel.manage,
     },
     roleSuperAdmin: {
       ProductionDashboardCard.products: ProductionAccessLevel.manage,
@@ -216,6 +225,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.reports: ProductionAccessLevel.manage,
       ProductionDashboardCard.registrations: ProductionAccessLevel.manage,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.manage,
+      ProductionDashboardCard.aiAssistant: ProductionAccessLevel.manage,
     },
     roleMaintenanceManager: {
       ProductionDashboardCard.products: ProductionAccessLevel.hidden,
@@ -230,6 +240,8 @@ class ProductionAccessHelper {
       ProductionDashboardCard.reports: ProductionAccessLevel.hidden,
       ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.manage,
+      /// Kontekst proizvodnje (bez RN kvarova — oni su u Maintenance app).
+      ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
     },
   };
 

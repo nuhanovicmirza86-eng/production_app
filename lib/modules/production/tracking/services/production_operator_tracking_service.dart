@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -48,6 +50,81 @@ class ProductionOperatorTrackingService {
         );
   }
 
+  /// Uživo: sva tri toka (stanice 1–3 / faze) za isti [workDate], spojeno i sortirano po [createdAt] ↓.
+  /// Pretplata na Firestore počinje tek kad netko sluša stream.
+  Stream<List<ProductionOperatorTrackingEntry>> watchDayAllPhasesMerged({
+    required String companyId,
+    required String plantKey,
+    required String workDate,
+  }) {
+    final cid = companyId.trim();
+    final pk = plantKey.trim();
+    if (cid.isEmpty || pk.isEmpty) {
+      return const Stream.empty();
+    }
+
+    return Stream<List<ProductionOperatorTrackingEntry>>.multi((listener) {
+      var prep = <ProductionOperatorTrackingEntry>[];
+      var first = <ProductionOperatorTrackingEntry>[];
+      var fin = <ProductionOperatorTrackingEntry>[];
+
+      void emit() {
+        final merged = [...prep, ...first, ...fin];
+        merged.sort((a, b) {
+          final ta = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final tb = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return tb.compareTo(ta);
+        });
+        if (!listener.isClosed) {
+          listener.add(merged);
+        }
+      }
+
+      final sub1 = watchDayPhase(
+        companyId: cid,
+        plantKey: pk,
+        phase: ProductionOperatorTrackingEntry.phasePreparation,
+        workDate: workDate,
+      ).listen(
+        (v) {
+          prep = v;
+          emit();
+        },
+        onError: listener.addError,
+      );
+      final sub2 = watchDayPhase(
+        companyId: cid,
+        plantKey: pk,
+        phase: ProductionOperatorTrackingEntry.phaseFirstControl,
+        workDate: workDate,
+      ).listen(
+        (v) {
+          first = v;
+          emit();
+        },
+        onError: listener.addError,
+      );
+      final sub3 = watchDayPhase(
+        companyId: cid,
+        plantKey: pk,
+        phase: ProductionOperatorTrackingEntry.phaseFinalControl,
+        workDate: workDate,
+      ).listen(
+        (v) {
+          fin = v;
+          emit();
+        },
+        onError: listener.addError,
+      );
+
+      listener.onCancel = () {
+        sub1.cancel();
+        sub2.cancel();
+        sub3.cancel();
+      };
+    });
+  }
+
   /// Jednokratno učitavanje (npr. za PDF) — isti filtri kao [watchDayPhase].
   Future<List<ProductionOperatorTrackingEntry>> fetchDayPhase({
     required String companyId,
@@ -68,6 +145,64 @@ class ProductionOperatorTrackingService {
         .orderBy('createdAt', descending: true)
         .get();
     return snap.docs.map(ProductionOperatorTrackingEntry.fromDoc).toList();
+  }
+
+  /// Svi unosi jedne faze u rasponu [startWorkDate]–[endWorkDate] (uključivo), `workDate` = `yyyy-MM-dd`.
+  Future<List<ProductionOperatorTrackingEntry>> fetchPhaseDateRange({
+    required String companyId,
+    required String plantKey,
+    required String phase,
+    required String startWorkDate,
+    required String endWorkDate,
+  }) async {
+    final cid = companyId.trim();
+    final pk = plantKey.trim();
+    if (cid.isEmpty || pk.isEmpty) return const [];
+    final snap = await _col
+        .where('companyId', isEqualTo: cid)
+        .where('plantKey', isEqualTo: pk)
+        .where('phase', isEqualTo: phase)
+        .where('workDate', isGreaterThanOrEqualTo: startWorkDate)
+        .where('workDate', isLessThanOrEqualTo: endWorkDate)
+        .get();
+    return snap.docs.map(ProductionOperatorTrackingEntry.fromDoc).toList();
+  }
+
+  /// Svi unosi svih triju faza u rasponu [startWorkDate]–[endWorkDate], spojeno i sortirano (datum → createdAt ↓).
+  Future<List<ProductionOperatorTrackingEntry>> fetchAllPhasesDateRangeMerged({
+    required String companyId,
+    required String plantKey,
+    required String startWorkDate,
+    required String endWorkDate,
+  }) async {
+    final phases = <String>[
+      ProductionOperatorTrackingEntry.phasePreparation,
+      ProductionOperatorTrackingEntry.phaseFirstControl,
+      ProductionOperatorTrackingEntry.phaseFinalControl,
+    ];
+    final lists = await Future.wait(
+      phases.map(
+        (phase) => fetchPhaseDateRange(
+          companyId: companyId,
+          plantKey: plantKey,
+          phase: phase,
+          startWorkDate: startWorkDate,
+          endWorkDate: endWorkDate,
+        ),
+      ),
+    );
+    final merged = <ProductionOperatorTrackingEntry>[];
+    for (final l in lists) {
+      merged.addAll(l);
+    }
+    merged.sort((a, b) {
+      final wd = a.workDate.compareTo(b.workDate);
+      if (wd != 0) return wd;
+      final ta = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final tb = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return tb.compareTo(ta);
+    });
+    return merged;
   }
 
   /// Snimanje unosa — Callable `createProductionOperatorTrackingEntry` (createdAt samo na serveru).

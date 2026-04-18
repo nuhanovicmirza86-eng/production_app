@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/branding/operonix_ai_branding.dart';
+import '../../../../core/saas/production_module_keys.dart';
+import '../../ai_analysis/screens/ai_analysis_screen.dart';
+import '../../reports/screens/production_ai_report_screen.dart';
 import 'production_operator_tracking_day_report_screen.dart';
 
 /// Centralno mjesto za izvještaje iz praćenja proizvodnje (otpadi, dnevni sastav, IATF).
@@ -36,6 +40,58 @@ class ProductionReportsHubScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
+          if (ProductionModuleKeys.hasAnyProductionAiHubAccess(companyData) &&
+              ((ProductionModuleKeys.hasAiProductionMarkdownReportModule(
+                        companyData,
+                      ) &&
+                      productionAiReportVisibleForRole(companyData['role'])) ||
+                  (ProductionModuleKeys.hasAiProductionAnalyticsModule(
+                        companyData,
+                      ) &&
+                      aiStructuredAnalysisVisibleForRole(
+                        companyData['role'],
+                      )))) ...[
+            _SectionHeader(theme, kOperonixAiShortLabel),
+            if (ProductionModuleKeys.hasAiProductionMarkdownReportModule(
+                  companyData,
+                ) &&
+                productionAiReportVisibleForRole(companyData['role']))
+              _ReportTile(
+                icon: Icons.auto_awesome_outlined,
+                title: 'AI izvještaj — proizvodnja',
+                subtitle:
+                    'Sažetak praćenja i naloga za odabrani period (Gemini, backend).',
+                onTap: () {
+                  Navigator.push<void>(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          ProductionAiReportScreen(companyData: companyData),
+                    ),
+                  );
+                },
+              ),
+            if (ProductionModuleKeys.hasAiProductionAnalyticsModule(
+                  companyData,
+                ) &&
+                aiStructuredAnalysisVisibleForRole(companyData['role']))
+              _ReportTile(
+                icon: Icons.hub_outlined,
+                title: 'AI analiza — strukturirani podaci',
+                subtitle:
+                    'SCADA / OEE / tok proizvodnje (Callable runAiAnalysis, ne chat).',
+                onTap: () {
+                  Navigator.push<void>(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          AiAnalysisScreen(companyData: companyData),
+                    ),
+                  );
+                },
+              ),
+            const Divider(height: 24),
+          ],
           _SectionHeader(theme, 'Otpad i kvalitet'),
           _ReportTile(
             icon: Icons.pie_chart_outline,

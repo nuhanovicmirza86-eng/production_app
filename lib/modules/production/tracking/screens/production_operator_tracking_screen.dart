@@ -9,10 +9,13 @@ import '../config/station_screen_theme_store.dart';
 import '../config/station_tracking_setup_store.dart';
 import '../models/production_operator_tracking_entry.dart';
 import '../widgets/preparation_tracking_tab.dart';
+import '../widgets/production_tracking_hub_nav_strip.dart';
+import '../widgets/production_tracking_overview_tab.dart';
 import '../widgets/station_appearance_editor_dialog.dart';
 
-/// Operativno praćenje toka proizvodnje (pripremna → prva kontrola → završna kontrola).
-/// Svaki tab predstavlja zaseban dnevni radni list za unos; Firestore model i štampa se dodaju iterativno.
+/// Operativno praćenje toka proizvodnje: prvo **Pregled** (KPI, trend, strojevi, AI), zatim tri faze unosa
+/// (pripremna → prva kontrola → završna kontrola). Svaki tab faze predstavlja zaseban dnevni radni list za unos;
+/// Firestore model i štampa se dodaju iterativno.
 ///
 /// Na webu i u punoj aplikaciji: lokalna tema (boje) i postavke preglednika (etiketa) vrijede za sve tri faze.
 class ProductionOperatorTrackingScreen extends StatefulWidget {
@@ -40,7 +43,10 @@ class _ProductionOperatorTrackingScreenState
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _effectiveCompanyData = Map<String, dynamic>.from(widget.companyData);
     _applyLocalStationPrefsSync();
     _loadThemeAndStationPrefs();
@@ -177,6 +183,7 @@ class _ProductionOperatorTrackingScreenState
                 controller: _tabController,
                 isScrollable: true,
                 tabs: const [
+                  Tab(text: 'Pregled'),
                   Tab(text: 'Pripremna'),
                   Tab(text: 'Prva kontrola'),
                   Tab(text: 'Završna kontrola'),
@@ -186,36 +193,62 @@ class _ProductionOperatorTrackingScreenState
             body: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Material(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(
-                    alpha: 0.35,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.calendar_today_outlined,
-                          size: 20,
-                          color: theme.colorScheme.primary,
+                ProductionTrackingHubNavStrip(
+                  productionTabIndex: _tabController.index,
+                  onSelectPregled: () {
+                    _tabController.animateTo(0);
+                  },
+                  onSelectProizvodnjaFaze: () {
+                    if (_tabController.index == 0) {
+                      _tabController.animateTo(1);
+                    } else {
+                      _tabController.animateTo(_tabController.index.clamp(1, 3));
+                    }
+                  },
+                  onSelectPlaceholder: (label) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '$label — modul je u planu (uskoro u Operonix Production).',
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Radni dan: ${_todayLine(context)}',
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
+                      ),
+                    );
+                  },
+                ),
+                if (_tabController.index > 0)
+                  Material(
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.35,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            size: 20,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Radni dan: ${_todayLine(context)}',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
                 Expanded(
                   child: TabBarView(
                     controller: _tabController,
                     children: [
+                      ProductionTrackingOverviewTab(
+                        companyData: _effectiveCompanyData,
+                      ),
                       PreparationTrackingTab(companyData: _effectiveCompanyData),
                       PreparationTrackingTab(
                         companyData: _effectiveCompanyData,
