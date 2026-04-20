@@ -5,9 +5,11 @@ import 'capa_tracking_screen.dart';
 import 'control_plans_list_screen.dart';
 import 'execute_inspection_screen.dart';
 import 'inspection_plans_list_screen.dart';
+import 'inspection_results_list_screen.dart';
 import 'ncr_claim_create_screen.dart';
 import 'ncr_list_screen.dart';
 import 'quality_dashboard_screen.dart';
+import 'qms_management_report_screen.dart';
 import 'qms_methodology_reference_screen.dart';
 import 'qms_pfmea_list_screen.dart';
 
@@ -67,6 +69,17 @@ class QualityHubScreen extends StatelessWidget {
             onTap: () => _open(context, QualityDashboardScreen(companyData: companyData)),
           ),
           _HubTile(
+            icon: Icons.picture_as_pdf_outlined,
+            title: 'Izvještaj za vodstvo',
+            subtitle: 'NCR, CAPA, trend OK/NOK, top PFMEA · PDF',
+            iatfTitle: 'Izvještaj za vodstvo',
+            iatfMessage: QmsIatfStrings.managementReport,
+            onTap: () => _open(
+              context,
+              QmsManagementReportScreen(companyData: companyData),
+            ),
+          ),
+          _HubTile(
             icon: Icons.account_tree,
             title: 'PFMEA (proces)',
             subtitle: 'S, O, D, RPN, AP · po proizvodu',
@@ -101,6 +114,17 @@ class QualityHubScreen extends StatelessWidget {
             iatfTitle: 'Izvršenje inspekcije',
             iatfMessage: '${QmsIatfStrings.executeInspection}\n\n${QmsIatfStrings.termTraceability}',
             onTap: () => _open(context, ExecuteInspectionScreen(companyData: companyData)),
+          ),
+          _HubTile(
+            icon: Icons.history,
+            title: 'Povijest inspekcija',
+            subtitle: 'Zadnji OK/NOK, lot, plan, datum',
+            iatfTitle: 'Povijest inspekcija',
+            iatfMessage: QmsIatfStrings.listInspectionResults,
+            onTap: () => _open(
+              context,
+              InspectionResultsListScreen(companyData: companyData),
+            ),
           ),
           _HubTile(
             icon: Icons.support_agent_outlined,

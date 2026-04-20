@@ -27,6 +27,19 @@ class QualityCallableService {
     );
   }
 
+  /// Korak 5 QMS: jedan strani izvještaj za vodstvo (Callable [getQmsManagementReport]).
+  Future<Map<String, dynamic>> getQmsManagementReport({
+    required String companyId,
+    int daysBack = 30,
+  }) async {
+    final callable = _functions.httpsCallable('getQmsManagementReport');
+    final res = await callable.call({
+      'companyId': companyId,
+      'daysBack': daysBack,
+    });
+    return Map<String, dynamic>.from((res.data as Map?) ?? const <String, dynamic>{});
+  }
+
   Future<String> upsertControlPlan({
     required String companyId,
     String? plantKey,

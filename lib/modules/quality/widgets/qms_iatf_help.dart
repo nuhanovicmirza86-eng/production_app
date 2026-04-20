@@ -46,6 +46,11 @@ abstract final class QmsIatfStrings {
       'Kontrolni planovi i planovi inspekcije su „master” definicije; NCR su zapisani neskladi; '
       'CAPA su korektivne/preventivne akcije vezane uz NCR. Podaci dolaze samo preko sigurnih Callable-a.';
 
+  /// Korak 5 QMS plana — jedan strani izvještaj za vodstvo.
+  static const managementReport = 'Sažetak za menadžment: broj planova, otvoreni NCR i CAPA, '
+      'trend rezultata inspekcija (OK/NOK) u odabranom razdoblju, te najviši PFMEA RPN redovi. '
+      'Podaci su agregirani na poslužitelju (Callable); PDF je za arhivu ili sastanak.';
+
   static const kpiControlPlans = 'Kontrolni plan (control plan): dokument koji za proizvod/proces '
       'definira koje karakteristike se kontroliraju, kako i na kojim operacijama (APQP/PPAP kontekst). '
       'To je izvor tolerancija za inspekcije.';
