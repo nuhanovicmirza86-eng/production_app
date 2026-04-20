@@ -31,6 +31,8 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
   final _svc = QualityCallableService();
   final _lotId = TextEditingController();
   final _productionOrderId = TextEditingController();
+  final _customerId = TextEditingController();
+  final _supplierId = TextEditingController();
 
   bool _loadingPlans = true;
   String? _plansError;
@@ -61,6 +63,8 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
   void dispose() {
     _lotId.dispose();
     _productionOrderId.dispose();
+    _customerId.dispose();
+    _supplierId.dispose();
     for (final c in _valueByRef.values) {
       c.dispose();
     }
@@ -233,6 +237,10 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
         productionOrderId: _productionOrderId.text.trim().isEmpty
             ? null
             : _productionOrderId.text.trim(),
+        customerId:
+            _customerId.text.trim().isEmpty ? null : _customerId.text.trim(),
+        supplierId:
+            _supplierId.text.trim().isEmpty ? null : _supplierId.text.trim(),
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -268,7 +276,9 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
           QmsIatfInfoIcon(
             title: 'Izvršenje inspekcije',
             message:
-                '${QmsIatfStrings.executeInspection}\n\n${QmsIatfStrings.termLot}',
+                '${QmsIatfStrings.executeInspection}\n\n'
+                '${QmsIatfStrings.termPartnerIdsInspection}\n\n'
+                '${QmsIatfStrings.termLot}',
           ),
         ],
       ),
@@ -373,6 +383,30 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
               decoration: const InputDecoration(
                 labelText: 'ID proizvodnog naloga (opcionalno)',
                 border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _customerId,
+              decoration: InputDecoration(
+                labelText: 'ID kupca (opcionalno)',
+                border: const OutlineInputBorder(),
+                helperText: 'Za segment / automatski NCR pri NOK',
+                helperStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _supplierId,
+              decoration: InputDecoration(
+                labelText: 'ID dobavljača (opcionalno)',
+                border: const OutlineInputBorder(),
+                helperText: 'Za segment / automatski NCR pri NOK',
+                helperStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
             const SizedBox(height: 20),

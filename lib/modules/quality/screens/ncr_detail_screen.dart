@@ -40,6 +40,7 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
   final _svc = QualityCallableService();
   final _description = TextEditingController();
   final _containment = TextEditingController();
+  final _reactionPlan = TextEditingController();
 
   final List<_NcrAttRow> _attachmentRows = [];
 
@@ -75,6 +76,7 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
   void dispose() {
     _description.dispose();
     _containment.dispose();
+    _reactionPlan.dispose();
     for (final r in _attachmentRows) {
       r.dispose();
     }
@@ -105,6 +107,7 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
       if (!mounted) return;
       _description.text = (n['description'] ?? '').toString();
       _containment.text = (n['containmentAction'] ?? '').toString();
+      _reactionPlan.text = (n['reactionPlan'] ?? '').toString();
       final st = (n['status'] ?? 'OPEN').toString().toUpperCase();
       _status = _statuses.contains(st) ? st : 'OPEN';
       final sev = (n['severity'] ?? 'MEDIUM').toString().toUpperCase();
@@ -192,6 +195,7 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
         ncrId: widget.ncrId,
         status: _status,
         containmentAction: _containment.text,
+        reactionPlan: _reactionPlan.text,
         description: _description.text,
         severity: _severity,
         attachments: att,
@@ -433,6 +437,21 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                     const SizedBox(height: 6),
                     TextFormField(
                       controller: _containment,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    QmsIatfSectionTitle(
+                      label: 'Reakcijski plan (brzi odgovor)',
+                      iatfTitle: 'Reakcijski plan',
+                      iatfMessage: QmsIatfStrings.termReactionPlan,
+                    ),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: _reactionPlan,
                       maxLines: 3,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),

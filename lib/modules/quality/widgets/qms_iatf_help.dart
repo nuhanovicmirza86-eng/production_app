@@ -36,12 +36,13 @@ abstract final class QmsIatfStrings {
       'characteristicRefs (npr. 0:0) određuju koje stavke kontrolnog plana ulaze u ovo izvršenje; prazno = sve.';
 
   static const executeInspection = 'Izvršenje inspekcije: unos izmjerenih vrijednosti uz plan; '
-      'LOT i proizvodni nalog osiguravaju sljedljivost (traceability). Rezultat može automatski otvoriti NCR pri NOK.';
+      'LOT, proizvodni nalog te opcionalno ID kupca/dobavljača osiguravaju sljedljivost i segment. '
+      'Rezultat može automatski otvoriti NCR pri NOK.';
 
   static const listNcr = 'NCR: evidencija nesklada (IATF 10.2). Statusi vode životni ciklus od otvaranja do zatvaranja; '
       'prilozi pri zatvaranju služe kao dokaz (evidence).';
 
-  static const detailNcr = 'NCR: opis nesklada, ozbiljnost, containment (privremena zaštita od isporuke nesklada), '
+  static const detailNcr = 'NCR: opis nesklada, ozbiljnost, containment, reakcijski plan (brzi odgovor), '
       'prilozi (https). Prijelaz u Pregled/Contained može automatski otvoriti CAPA. Zatvoreno/Odbačeno zahtijeva prilog.';
 
   static const listCapa = 'CAPA: korektivne i preventivne akcije za uklanjanje uzroka nesklada; '
@@ -73,6 +74,12 @@ abstract final class QmsIatfStrings {
 
   static const termContainment = 'Containment: brza izolacija ili zaštita od daljnje isporuke ili uporabe nesklada '
       '(privremena mjera dok se ne riješi uzrok).';
+
+  static const termReactionPlan = 'Reakcijski plan (brzi odgovor): što radimo odmah u kratkom roku (npr. sortiranje, '
+      'zadržavanje, obavijest kupcu) — odvojeno od containmenta i od trajnog korektivnog plana (CAPA).';
+
+  static const termPartnerIdsInspection = 'ID kupca / dobavljača (opcionalno): ako su uneseni, šalju se uz rezultat '
+      'inspekcije i na automatski NCR pri NOK — korisno za segment i reklamacije.';
 
   static const termRootCause = 'Root cause: utvrđeni uzrok nesklada (ne simptom); osnova za trajnu korektivnu akciju.';
 
