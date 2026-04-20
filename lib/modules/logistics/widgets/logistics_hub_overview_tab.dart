@@ -173,7 +173,7 @@ class LogisticsHubOverviewTab extends StatelessWidget {
           onNavigateToHubTab != null
               ? 'Klik na zonu otvara odgovarajući tab ispod. Ili ručno: Master (MAG_*), '
                   'Prijem → Kvaliteta → Putaway → FIFO → Otpremna → Evidencija → Rute → '
-                  'Korekcije; QR je alat za sken (zadnji tab).'
+                  'Korekcije → Interne; QR je alat za sken (zadnji tab).'
               : 'Koristi tabove ispod. QR je alat za sken.',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.outline,

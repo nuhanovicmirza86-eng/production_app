@@ -11,6 +11,7 @@ import '../wms/screens/wms_receiving_screen.dart';
 import '../wms/screens/wms_shipping_screen.dart';
 import '../routes/screens/warehouse_routes_screen.dart';
 import '../adjustments/screens/inventory_adjustments_screen.dart';
+import '../internal_supply/screens/internal_supply_module_screen.dart';
 
 /// Glavni radni prostor logističkog menadžera: **pregled zona + master (MAG_*) + cijeli WMS tok + QR kao alat**.
 ///
@@ -25,7 +26,7 @@ class LogisticsHubEntryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 11,
+      length: 12,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Centralni magacin / Hub'),
@@ -43,6 +44,7 @@ class LogisticsHubEntryScreen extends StatelessWidget {
               Tab(text: 'Evidencija'),
               Tab(text: 'Rute'),
               Tab(text: 'Korekcije'),
+              Tab(text: 'Interne'),
               Tab(text: 'QR'),
             ],
           ),
@@ -88,6 +90,10 @@ class LogisticsHubEntryScreen extends StatelessWidget {
               embedInHubShell: true,
             ),
             InventoryAdjustmentsScreen(
+              companyData: companyData,
+              embedInHubShell: true,
+            ),
+            InternalSupplyModuleScreen(
               companyData: companyData,
               embedInHubShell: true,
             ),
