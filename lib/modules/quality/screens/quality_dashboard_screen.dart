@@ -71,7 +71,7 @@ class _QualityDashboardScreenState extends State<QualityDashboardScreen> {
               _KpiCard(
                 title: 'Kontrolni planovi',
                 value: '$_cp',
-                subtitle: 'Kolekcija control_plans (Callable + rules)',
+                subtitle: 'Podaci samo preko Callable (klijent nema read na kolekciju)',
               ),
               const SizedBox(height: 12),
               _KpiCard(
