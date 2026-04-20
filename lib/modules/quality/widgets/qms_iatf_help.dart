@@ -38,9 +38,9 @@ abstract final class QmsIatfStrings {
       'Dijeljenje koda s Maintenance-om moguće je izdvajanjem zajedničkih widgeta (S/O/D, RPN, AP) u zajednički paket; '
       'model podataka ipak treba prilagoditi (stroj vs proizvod/proces).';
 
-  static const termRiskRatings = 'Ocjene rizika: u sustavu se procjene (npr. kolekcija risk_assessments u jedinstvenom motoru) povezuju s entitetima '
-      'i izračunom razine rizika te po potrebi maksimalnim RPN-om. Služe za IATF trag i odluke (što prvo riješiti). '
-      'Kad postoji samo Production modul, isti motor može se hraniti iz QMS PFMEA Callable-a (proizvod/proces), ne samo iz Maintenance imovine.';
+  static const termRiskRatings = 'Ocjene rizika: kolekcija risk_assessments (jedinstveni motor) nakon spremanja PFMEA redova '
+      'po proizvodu dobiva agregat (max RPN, riskLevel) iz svih redova u qms_pfmea_rows — vidljivo u asistentu i analitici. '
+      'Deterministički ID procjene po proizvodu; ako nema redova za proizvod, agregat se briše.';
 
   static const dashboard = 'Pregled brojeva u tvojoj kompaniji. '
       'Kontrolni planovi i planovi inspekcije su „master” definicije; NCR su zapisani neskladi; '
