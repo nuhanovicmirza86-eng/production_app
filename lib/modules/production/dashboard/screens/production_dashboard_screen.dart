@@ -30,6 +30,7 @@ import '../../ai/screens/production_ai_hub_screen.dart';
 import '../../tracking/screens/production_reports_hub_screen.dart';
 import '../../issues/screens/production_problem_reporting_screen.dart';
 import '../../qr/production_qr_scan_flow.dart';
+import '../../../quality/screens/quality_hub_screen.dart';
 
 class _ProdNavItem {
   final WidgetBuilder builder;
@@ -146,7 +147,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
   }
 
   List<Widget> _buildProductionActions(BuildContext context) {
-    if (!_hasModule('production')) return [];
+    if (!_hasModule('production') && !_hasModule('quality')) return [];
 
     void open(Widget screen) {
       Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
@@ -173,6 +174,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     }
 
     final productionTiles = <Widget>[
+      if (_hasModule('production')) ...[
       if (_canConfigureStationDevice())
         _DashboardActionTile(
           icon: Icons.display_settings_outlined,
@@ -292,6 +294,19 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           onTap: () =>
               open(ProductionReportsHubScreen(companyData: companyData)),
         ),
+      ],
+    ];
+
+    final qualityTiles = <Widget>[
+      if (_hasModule('quality') &&
+          _canViewCard(ProductionDashboardCard.qualityManagement))
+        _DashboardActionTile(
+          icon: Icons.assignment_turned_in_outlined,
+          title: 'QMS — Hub kvaliteta',
+          subtitle:
+              'Kontrolni planovi, inspekcije (sken), NCR, CAPA (IATF).',
+          onTap: () => open(QualityHubScreen(companyData: companyData)),
+        ),
     ];
 
     final commercialTiles = <Widget>[
@@ -390,6 +405,13 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       tiles: productionTiles,
     );
     addModuleSection(
+      title: 'Kvalitet (QMS)',
+      subtitle:
+          'SaaS modul „quality“: IATF-friendly kontrola — plan, izvršenje, neskladi, CAPA.',
+      icon: Icons.fact_check_outlined,
+      tiles: qualityTiles,
+    );
+    addModuleSection(
       title: 'Komercijalno',
       subtitle:
           'Narudžbe i partneri u ovoj aplikaciji — dio iste „production“ pretplate (nije zaseban modul).',
@@ -470,6 +492,38 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     }
 
     tiles.addAll(_buildProductionActions(context));
+
+    if (_hasModule('quality') &&
+        _canViewCard(ProductionDashboardCard.qualityManagement)) {
+      if (tiles.isNotEmpty) {
+        tiles.add(const SizedBox(height: sectionGap));
+      }
+      tiles.add(
+        const _ModuleGroupHeader(
+          title: 'Kvalitet (QMS)',
+          subtitle:
+              'Pretplata uključuje modul „quality“: kontrolni plan, inspekcije, NCR, CAPA.',
+          icon: Icons.assignment_turned_in_outlined,
+        ),
+      );
+      tiles.add(const SizedBox(height: afterHeader));
+      tiles.add(
+        _DashboardActionTile(
+          icon: Icons.dashboard_customize_outlined,
+          title: 'QMS — Hub kvaliteta',
+          subtitle:
+              'Dashboard, planovi, izvršenje inspekcije (sken), NCR, CAPA.',
+          onTap: () {
+            Navigator.push<void>(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => QualityHubScreen(companyData: companyData),
+              ),
+            );
+          },
+        ),
+      );
+    }
 
     if (tiles.isNotEmpty) {
       tiles.add(const SizedBox(height: sectionGap));
@@ -571,6 +625,20 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             icon: Icon(Icons.receipt_long_outlined),
             selectedIcon: Icon(Icons.receipt_long),
             label: 'Narudžbe',
+          ),
+        ),
+      );
+    }
+
+    if (_hasModule('quality') &&
+        _canViewCard(ProductionDashboardCard.qualityManagement)) {
+      items.add(
+        _ProdNavItem(
+          builder: (_) => QualityHubScreen(companyData: cd),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.assignment_turned_in_outlined),
+            selectedIcon: Icon(Icons.assignment_turned_in),
+            label: 'Kvalitet',
           ),
         ),
       );
@@ -910,6 +978,27 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                               builder: (_) => LogisticsHubEntryScreen(
                                 companyData: cd,
                               ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                    if (_hasModule('quality') &&
+                        _canViewCard(
+                          ProductionDashboardCard.qualityManagement,
+                        )) ...[
+                      const SizedBox(height: 10),
+                      _DashboardActionTile(
+                        icon: Icons.assignment_turned_in_outlined,
+                        title: 'QMS — Hub kvaliteta',
+                        subtitle: 'Kontrolni plan, inspekcije, NCR, CAPA',
+                        onTap: () {
+                          _shellScaffoldKey.currentState?.closeDrawer();
+                          Navigator.push<void>(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  QualityHubScreen(companyData: cd),
                             ),
                           );
                         },

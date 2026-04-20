@@ -12,6 +12,9 @@ enum ProductionDashboardCard {
   registrations,
   carbonFootprint,
 
+  /// SaaS modul `quality`: QMS (kontrolni plan, inspekcije, NCR, CAPA).
+  qualityManagement,
+
   /// SaaS modul [ProductionModuleKeys.aiAssistant]: OperonixAI (chat + operativni asistent).
   aiAssistant,
 }
@@ -27,6 +30,9 @@ class ProductionAccessHelper {
   static const String roleLogisticsManager = 'logistics_manager';
   static const String roleMaintenanceManager = 'maintenance_manager';
   static const String roleAdmin = 'admin';
+
+  /// Operater / kontrolor kvaliteta (QMS ekrani).
+  static const String roleQualityOperator = 'quality_operator';
 
   /// Vlasnik projekta (SaaS) — izvan scopea pojedine kompanije u smislu `admin`.
   static const String roleSuperAdmin = 'super_admin';
@@ -73,6 +79,8 @@ class ProductionAccessHelper {
         return 'Supervizor';
       case roleProductionOperator:
         return 'Operater proizvodnje';
+      case roleQualityOperator:
+        return 'Operater kvaliteta';
       case roleMaintenanceManager:
         return 'Menadžer održavanja';
       default:
@@ -149,6 +157,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.reports: ProductionAccessLevel.hidden,
       ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.qualityManagement: ProductionAccessLevel.hidden,
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
     },
     roleSupervisor: {
@@ -164,6 +173,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.reports: ProductionAccessLevel.view,
       ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.qualityManagement: ProductionAccessLevel.view,
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
     },
     roleProductionManager: {
@@ -179,6 +189,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.reports: ProductionAccessLevel.manage,
       ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.manage,
+      ProductionDashboardCard.qualityManagement: ProductionAccessLevel.manage,
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.manage,
     },
     roleLogisticsManager: {
@@ -194,6 +205,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.reports: ProductionAccessLevel.hidden,
       ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.qualityManagement: ProductionAccessLevel.view,
       /// OperonixAI (narudžbe, rokovi) — usklađeno s Callable [productionTrackingAssistant].
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
     },
@@ -210,6 +222,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.reports: ProductionAccessLevel.manage,
       ProductionDashboardCard.registrations: ProductionAccessLevel.manage,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.manage,
+      ProductionDashboardCard.qualityManagement: ProductionAccessLevel.manage,
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.manage,
     },
     roleSuperAdmin: {
@@ -225,6 +238,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.reports: ProductionAccessLevel.manage,
       ProductionDashboardCard.registrations: ProductionAccessLevel.manage,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.manage,
+      ProductionDashboardCard.qualityManagement: ProductionAccessLevel.manage,
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.manage,
     },
     roleMaintenanceManager: {
@@ -240,7 +254,24 @@ class ProductionAccessHelper {
       ProductionDashboardCard.reports: ProductionAccessLevel.hidden,
       ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.manage,
+      ProductionDashboardCard.qualityManagement: ProductionAccessLevel.hidden,
       /// Kontekst proizvodnje (bez RN kvarova — oni su u Maintenance app).
+      ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
+    },
+    roleQualityOperator: {
+      ProductionDashboardCard.products: ProductionAccessLevel.view,
+      ProductionDashboardCard.productionOrders: ProductionAccessLevel.view,
+      ProductionDashboardCard.productionTracking: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.stationPages: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.workCenters: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.shifts: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.downtime: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.problemReporting: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.processExecution: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.reports: ProductionAccessLevel.view,
+      ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.qualityManagement: ProductionAccessLevel.manage,
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
     },
   };
