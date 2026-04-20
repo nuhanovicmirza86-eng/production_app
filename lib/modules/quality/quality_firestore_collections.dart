@@ -7,4 +7,7 @@ abstract final class QualityFirestoreCollections {
   static const actionPlans = 'action_plans';
   static const qualityHolds = 'quality_holds';
   static const qualityEvents = 'quality_events';
+
+  /// PFMEA redovi (proces / proizvod) — samo Callable; vidi `quality_qms_writes.js`.
+  static const qmsPfmeaRows = 'qms_pfmea_rows';
 }

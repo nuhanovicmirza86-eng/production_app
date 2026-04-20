@@ -67,7 +67,7 @@ class QmsMethodologyReferenceScreen extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'U aplikaciji: NCR nosi reakcijski plan i containment; CAPA je akcijski plan s 8D/Ishikawom. '
-            'PFMEA na stroju — Maintenance; puni PFMEA za QMS bez Maintenance modula — kroz budući QMS PFMEA u Productionu (Callable).',
+            'PFMEA na stroju — Maintenance; PFMEA procesa u Production QMS-u — hub „PFMEA (proces)” (Callable, qms_pfmea_rows).',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: cs.onSurfaceVariant,
               height: 1.45,

@@ -9,6 +9,7 @@ import 'ncr_claim_create_screen.dart';
 import 'ncr_list_screen.dart';
 import 'quality_dashboard_screen.dart';
 import 'qms_methodology_reference_screen.dart';
+import 'qms_pfmea_list_screen.dart';
 
 /// Centralni ulaz u QMS modul (pretplata `quality` + uloga iz matrice).
 class QualityHubScreen extends StatelessWidget {
@@ -64,6 +65,17 @@ class QualityHubScreen extends StatelessWidget {
             iatfTitle: 'QMS dashboard',
             iatfMessage: QmsIatfStrings.dashboard,
             onTap: () => _open(context, QualityDashboardScreen(companyData: companyData)),
+          ),
+          _HubTile(
+            icon: Icons.account_tree,
+            title: 'PFMEA (proces)',
+            subtitle: 'S, O, D, RPN, AP · po proizvodu',
+            iatfTitle: 'PFMEA u QMS-u',
+            iatfMessage: QmsIatfStrings.listPfmea,
+            onTap: () => _open(
+              context,
+              QmsPfmeaListScreen(companyData: companyData),
+            ),
           ),
           _HubTile(
             icon: Icons.engineering_outlined,

@@ -84,6 +84,13 @@ abstract final class QmsIatfStrings {
   static const listCapa = 'CAPA (akcijski plan): korektivne i preventivne akcije za uklanjanje uzroka nesklada; '
       'praćenje statusa, uzroka, akcija i verifikacije. Razlikuj od reakcijskog plana na NCR-u i od PFMEA-e.';
 
+  static const listPfmea = 'PFMEA (proces): redovi su vezani uz proizvod i opcionalno kontrolni plan u istoj kompaniji. '
+      'S, O, D i RPN služe prioritetu; AP može biti izračunat ili ručan (audit). Podaci su samo preko Callable-a.';
+
+  static const editPfmea = 'Jedan PFMEA red: korak procesa, način otkazivanja, posljedice, S/O/D, RPN i AP. '
+      'Kontrolni plan mora pripadati istom proizvodu ako je odabran. Ručni AP koristi se kad želite eksplicitno H/M/L '
+      'nezavisno o heuristici.';
+
   static const detailCapa = 'CAPA je akcijski plan: root cause (uzrok), plan trajnih akcija, odgovorna osoba, rok, verifikacija učinkovitosti. '
       'U sklopu zapisa mogu se ispuniti 8D disciplina i Ishikawa (riblja kost). Status vodi od otvaranja do zatvaranja uz audit trag. '
       'Ne miješati s reakcijskim planom na NCR-u (brzi odgovor) niti s PFMEA retkom (preventivno prije nesklada).';

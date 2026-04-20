@@ -364,6 +364,94 @@ class QualityCallableService {
     return id;
   }
 
+  Future<List<QmsPfmeaRow>> listQmsPfmeaRows({
+    required String companyId,
+    String? productId,
+    String? controlPlanId,
+    int limit = 300,
+  }) async {
+    final callable = _functions.httpsCallable('listQmsPfmeaRows');
+    final res = await callable.call({
+      'companyId': companyId,
+      'limit': limit,
+      if (productId != null && productId.isNotEmpty) 'productId': productId,
+      if (controlPlanId != null && controlPlanId.isNotEmpty)
+        'controlPlanId': controlPlanId,
+    });
+    return _parseRows(res.data, QmsPfmeaRow.fromMap);
+  }
+
+  Future<Map<String, dynamic>> getQmsPfmeaRowMap({
+    required String companyId,
+    required String pfmeaRowId,
+  }) async {
+    final callable = _functions.httpsCallable('getQmsPfmeaRow');
+    final res = await callable.call({
+      'companyId': companyId,
+      'pfmeaRowId': pfmeaRowId,
+    });
+    final m = Map<String, dynamic>.from((res.data as Map?) ?? {});
+    return Map<String, dynamic>.from(m['row'] as Map? ?? {});
+  }
+
+  Future<String> upsertQmsPfmeaRow({
+    required String companyId,
+    String? pfmeaRowId,
+    required String processStep,
+    required String failureMode,
+    String? plantKey,
+    String? productId,
+    String? controlPlanId,
+    String? effects,
+    int severity = 0,
+    int occurrence = 0,
+    int detection = 0,
+    bool apManual = false,
+    String apManualValue = 'M',
+    String? currentControls,
+    String? recommendedAction,
+    String rowStatus = 'draft',
+    int sortOrder = 0,
+  }) async {
+    final callable = _functions.httpsCallable('upsertQmsPfmeaRow');
+    final res = await callable.call({
+      'companyId': companyId,
+      if (pfmeaRowId != null && pfmeaRowId.isNotEmpty) 'pfmeaRowId': pfmeaRowId,
+      'processStep': processStep,
+      'failureMode': failureMode,
+      if (plantKey != null && plantKey.isNotEmpty) 'plantKey': plantKey,
+      if (productId != null && productId.isNotEmpty) 'productId': productId,
+      if (controlPlanId != null && controlPlanId.isNotEmpty)
+        'controlPlanId': controlPlanId,
+      if (effects != null) 'effects': effects,
+      'severity': severity,
+      'occurrence': occurrence,
+      'detection': detection,
+      'apManual': apManual,
+      'apManualValue': apManualValue,
+      if (currentControls != null) 'currentControls': currentControls,
+      if (recommendedAction != null) 'recommendedAction': recommendedAction,
+      'rowStatus': rowStatus,
+      'sortOrder': sortOrder,
+    });
+    final id = (res.data as Map?)?['pfmeaRowId']?.toString().trim();
+    if (id == null || id.isEmpty) {
+      throw StateError('upsertQmsPfmeaRow: nije vraćen pfmeaRowId');
+    }
+    return id;
+  }
+
+  Future<void> deleteQmsPfmeaRow({
+    required String companyId,
+    required String pfmeaRowId,
+  }) async {
+    final callable = _functions.httpsCallable('deleteQmsPfmeaRow');
+    await callable.call({
+      'companyId': companyId,
+      'pfmeaRowId': pfmeaRowId,
+    });
+  }
+
   static List<T> _parseRows<T>(
     dynamic raw,
     T Function(Map<String, dynamic>) fromMap,

@@ -147,3 +147,64 @@ class QmsCapaRow {
     );
   }
 }
+
+/// Sažetak reda PFMEA (lista Callable).
+class QmsPfmeaRow {
+  final String id;
+  final String productId;
+  final String controlPlanId;
+  final String? plantKey;
+  final String processStep;
+  final String failureMode;
+  final int severity;
+  final int occurrence;
+  final int detection;
+  final int rpn;
+  final String ap;
+  final String rowStatus;
+  final int sortOrder;
+  final String? updatedAtIso;
+
+  const QmsPfmeaRow({
+    required this.id,
+    required this.productId,
+    required this.controlPlanId,
+    this.plantKey,
+    required this.processStep,
+    required this.failureMode,
+    required this.severity,
+    required this.occurrence,
+    required this.detection,
+    required this.rpn,
+    required this.ap,
+    required this.rowStatus,
+    required this.sortOrder,
+    this.updatedAtIso,
+  });
+
+  factory QmsPfmeaRow.fromMap(Map<String, dynamic> m) {
+    int gi(String k) {
+      final v = m[k];
+      if (v is int) return v;
+      if (v is double) return v.round();
+      return int.tryParse(v?.toString() ?? '') ?? 0;
+    }
+
+    return QmsPfmeaRow(
+      id: (m['id'] ?? '').toString(),
+      productId: (m['productId'] ?? '').toString(),
+      controlPlanId: (m['controlPlanId'] ?? '').toString(),
+      plantKey: m['plantKey']?.toString(),
+      processStep: (m['processStep'] ?? '').toString(),
+      failureMode: (m['failureMode'] ?? '').toString(),
+      severity: gi('severity'),
+      occurrence: gi('occurrence'),
+      detection: gi('detection'),
+      rpn: gi('rpn'),
+      ap: (m['ap'] ?? 'U').toString(),
+      rowStatus: (m['rowStatus'] ?? 'draft').toString(),
+      sortOrder: gi('sortOrder'),
+      updatedAtIso: m['updatedAt']?.toString(),
+    );
+  }
+}
