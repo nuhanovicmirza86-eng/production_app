@@ -1,0 +1,155 @@
+import 'package:cloud_functions/cloud_functions.dart';
+
+/// QMS Callable-i — jedini dozvoljeni način mutacije (Firestore rules: write false).
+class QualityCallableService {
+  QualityCallableService({FirebaseFunctions? functions})
+    : _functions =
+          functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
+
+  final FirebaseFunctions _functions;
+
+  Future<QmsDashboardSummary> getQmsDashboardSummary({
+    required String companyId,
+  }) async {
+    final callable = _functions.httpsCallable('getQmsDashboardSummary');
+    final res = await callable.call({'companyId': companyId});
+    final data = Map<String, dynamic>.from(
+      (res.data as Map?) ?? const <String, dynamic>{},
+    );
+    return QmsDashboardSummary(
+      controlPlanCount: _int(data['controlPlanCount']),
+      inspectionPlanCount: _int(data['inspectionPlanCount']),
+      openNcrCount: _int(data['openNcrCount']),
+      openCapaCount: _int(data['openCapaCount']),
+    );
+  }
+
+  Future<String> upsertControlPlan({
+    required String companyId,
+    String? plantKey,
+    String? controlPlanId,
+    required String title,
+    required String productId,
+    String status = 'draft',
+    List<dynamic>? operations,
+    String? controlPlanCode,
+  }) async {
+    final callable = _functions.httpsCallable('upsertControlPlan');
+    final res = await callable.call({
+      'companyId': companyId,
+      if (plantKey != null && plantKey.isNotEmpty) 'plantKey': plantKey,
+      if (controlPlanId != null && controlPlanId.isNotEmpty)
+        'controlPlanId': controlPlanId,
+      'title': title,
+      'productId': productId,
+      'status': status,
+      'operations': operations ?? const [],
+      if (controlPlanCode != null && controlPlanCode.isNotEmpty)
+        'controlPlanCode': controlPlanCode,
+    });
+    final id = (res.data as Map?)?['controlPlanId']?.toString().trim();
+    if (id == null || id.isEmpty) {
+      throw StateError('upsertControlPlan: nije vraćen controlPlanId');
+    }
+    return id;
+  }
+
+  Future<String> upsertInspectionPlan({
+    required String companyId,
+    String? plantKey,
+    String? inspectionPlanId,
+    required String productId,
+    required String controlPlanId,
+    required String inspectionType,
+    List<dynamic>? characteristicRefs,
+    String status = 'draft',
+    String? inspectionPlanCode,
+  }) async {
+    final callable = _functions.httpsCallable('upsertInspectionPlan');
+    final res = await callable.call({
+      'companyId': companyId,
+      if (plantKey != null && plantKey.isNotEmpty) 'plantKey': plantKey,
+      if (inspectionPlanId != null && inspectionPlanId.isNotEmpty)
+        'inspectionPlanId': inspectionPlanId,
+      'productId': productId,
+      'controlPlanId': controlPlanId,
+      'inspectionType': inspectionType,
+      'characteristicRefs': characteristicRefs ?? const [],
+      'status': status,
+      if (inspectionPlanCode != null && inspectionPlanCode.isNotEmpty)
+        'inspectionPlanCode': inspectionPlanCode,
+    });
+    final id = (res.data as Map?)?['inspectionPlanId']?.toString().trim();
+    if (id == null || id.isEmpty) {
+      throw StateError('upsertInspectionPlan: nije vraćen inspectionPlanId');
+    }
+    return id;
+  }
+
+  Future<SubmitInspectionResult> submitInspectionResult({
+    required String companyId,
+    String? plantKey,
+    required String inspectionPlanId,
+    required List<Map<String, dynamic>> measurements,
+    String? lotId,
+    String? productionOrderId,
+    String? operationId,
+    String? supplierId,
+    String? customerId,
+    String? scanPayload,
+    bool autoCreateNcr = true,
+  }) async {
+    final callable = _functions.httpsCallable('submitInspectionResult');
+    final res = await callable.call({
+      'companyId': companyId,
+      if (plantKey != null && plantKey.isNotEmpty) 'plantKey': plantKey,
+      'inspectionPlanId': inspectionPlanId,
+      'measurements': measurements,
+      if (lotId != null && lotId.isNotEmpty) 'lotId': lotId,
+      if (productionOrderId != null && productionOrderId.isNotEmpty)
+        'productionOrderId': productionOrderId,
+      if (operationId != null && operationId.isNotEmpty) 'operationId': operationId,
+      if (supplierId != null && supplierId.isNotEmpty) 'supplierId': supplierId,
+      if (customerId != null && customerId.isNotEmpty) 'customerId': customerId,
+      if (scanPayload != null && scanPayload.isNotEmpty) 'scanPayload': scanPayload,
+      'autoCreateNcr': autoCreateNcr,
+    });
+    final d = Map<String, dynamic>.from(
+      (res.data as Map?) ?? const <String, dynamic>{},
+    );
+    return SubmitInspectionResult(
+      inspectionResultId: d['inspectionResultId']?.toString() ?? '',
+      overallResult: d['overallResult']?.toString() ?? '',
+    );
+  }
+
+  static int _int(dynamic v) {
+    if (v is int) return v;
+    if (v is double) return v.round();
+    return int.tryParse(v?.toString() ?? '') ?? 0;
+  }
+}
+
+class QmsDashboardSummary {
+  final int controlPlanCount;
+  final int inspectionPlanCount;
+  final int openNcrCount;
+  final int openCapaCount;
+
+  const QmsDashboardSummary({
+    required this.controlPlanCount,
+    required this.inspectionPlanCount,
+    required this.openNcrCount,
+    required this.openCapaCount,
+  });
+}
+
+class SubmitInspectionResult {
+  final String inspectionResultId;
+  final String overallResult;
+
+  const SubmitInspectionResult({
+    required this.inspectionResultId,
+    required this.overallResult,
+  });
+}

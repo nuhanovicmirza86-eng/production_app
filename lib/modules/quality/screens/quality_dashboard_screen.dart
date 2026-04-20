@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../services/quality_query_service.dart';
+import '../../../../core/errors/app_error_mapper.dart';
+import '../services/quality_callable_service.dart';
 
-/// KPI / trend placeholder — puni sadržaj nakon povezivanja s izvještajima i Callable.
+/// KPI preko Callable-a [getQmsDashboardSummary] (bez direktnog pisanja u Firestore s klijenta).
 class QualityDashboardScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
 
@@ -13,7 +14,7 @@ class QualityDashboardScreen extends StatefulWidget {
 }
 
 class _QualityDashboardScreenState extends State<QualityDashboardScreen> {
-  final _svc = QualityQueryService();
+  final _svc = QualityCallableService();
   bool _loading = true;
   int _cp = 0;
   int _ip = 0;
@@ -36,20 +37,23 @@ class _QualityDashboardScreenState extends State<QualityDashboardScreen> {
       if (mounted) setState(() => _loading = false);
       return;
     }
-    final results = await Future.wait([
-      _svc.countControlPlans(companyId: cid),
-      _svc.countInspectionPlans(companyId: cid),
-      _svc.countOpenNcrs(companyId: cid),
-      _svc.countOpenCapas(companyId: cid),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      _cp = results[0];
-      _ip = results[1];
-      _ncr = results[2];
-      _capa = results[3];
-      _loading = false;
-    });
+    try {
+      final s = await _svc.getQmsDashboardSummary(companyId: cid);
+      if (!mounted) return;
+      setState(() {
+        _cp = s.controlPlanCount;
+        _ip = s.inspectionPlanCount;
+        _ncr = s.openNcrCount;
+        _capa = s.openCapaCount;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
+      );
+    }
   }
 
   @override
@@ -67,7 +71,7 @@ class _QualityDashboardScreenState extends State<QualityDashboardScreen> {
               _KpiCard(
                 title: 'Kontrolni planovi',
                 value: '$_cp',
-                subtitle: 'Odobreni master planovi (Firestore)',
+                subtitle: 'Kolekcija control_plans (Callable + rules)',
               ),
               const SizedBox(height: 12),
               _KpiCard(
