@@ -1,6 +1,8 @@
 import 'package:cloud_functions/cloud_functions.dart';
 
-/// QMS Callable-i — jedini dozvoljeni način mutacije (Firestore rules: write false).
+import '../models/qms_list_models.dart';
+
+/// QMS Callable-i — mutacije i liste (Firestore rules: klijent read/write false na QMS kolekcijama).
 class QualityCallableService {
   QualityCallableService({FirebaseFunctions? functions})
     : _functions =
@@ -121,6 +123,64 @@ class QualityCallableService {
       inspectionResultId: d['inspectionResultId']?.toString() ?? '',
       overallResult: d['overallResult']?.toString() ?? '',
     );
+  }
+
+  Future<List<QmsControlPlanRow>> listControlPlans({
+    required String companyId,
+    int limit = 100,
+  }) async {
+    final callable = _functions.httpsCallable('listQmsControlPlans');
+    final res = await callable.call({
+      'companyId': companyId,
+      'limit': limit,
+    });
+    return _parseRows(res.data, QmsControlPlanRow.fromMap);
+  }
+
+  Future<List<QmsInspectionPlanRow>> listInspectionPlans({
+    required String companyId,
+    int limit = 100,
+  }) async {
+    final callable = _functions.httpsCallable('listQmsInspectionPlans');
+    final res = await callable.call({
+      'companyId': companyId,
+      'limit': limit,
+    });
+    return _parseRows(res.data, QmsInspectionPlanRow.fromMap);
+  }
+
+  Future<List<QmsNcrRow>> listNonConformances({
+    required String companyId,
+    int limit = 100,
+    bool openOnly = true,
+  }) async {
+    final callable = _functions.httpsCallable('listQmsNonConformances');
+    final res = await callable.call({
+      'companyId': companyId,
+      'limit': limit,
+      'openOnly': openOnly,
+    });
+    return _parseRows(res.data, QmsNcrRow.fromMap);
+  }
+
+  Future<List<QmsCapaRow>> listOpenCapa({required String companyId}) async {
+    final callable = _functions.httpsCallable('listQmsOpenCapa');
+    final res = await callable.call({
+      'companyId': companyId,
+    });
+    return _parseRows(res.data, QmsCapaRow.fromMap);
+  }
+
+  static List<T> _parseRows<T>(
+    dynamic raw,
+    T Function(Map<String, dynamic>) fromMap,
+  ) {
+    final root = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
+    final items = root['items'];
+    if (items is! List) return [];
+    return items
+        .map((e) => fromMap(Map<String, dynamic>.from(e as Map)))
+        .toList();
   }
 
   static int _int(dynamic v) {
