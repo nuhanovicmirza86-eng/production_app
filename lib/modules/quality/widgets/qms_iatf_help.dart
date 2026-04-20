@@ -24,11 +24,23 @@ abstract final class QmsIatfStrings {
 
   static const termPfmea = 'PFMEA (Process Failure Mode and Effects Analysis): metodologija za identifikaciju mogućih '
       'grešaka procesa, njihovih učinaka i uzroka prije nego se dogode. Tipična polja: težina (S), učestalost (O), '
-      'otkrivanje (D), RPN = S×O×D, te AP (Action Priority) za rangiranje mjera. Kontrolni plan i inspekcije provode odabrane kontrole iz PFMEA konteksta.';
+      'otkrivanje (D), RPN = S×O×D, te AP (Action Priority) za rangiranje mjera. Kontrolni plan i inspekcije provode odabrane kontrole iz PFMEA konteksta.\n\n'
+      'U ovom projektu postoje dva konteksta: PFMEA na stroju (Maintenance app, polje risk na imovini) i — za automotive QMS bez Maintenance modula — '
+      'predviđena zasebna PFMEA po proizvodu/procesu unutar Production QMS-a (isti tenant, Callable).';
 
-  static const termRiskRatings = 'Ocjene rizika: u sustavu se procjene (npr. kolekcija risk_assessments) povezuju s entitetima '
+  /// Strategija kad kompanija ima samo Production; ne ovisi o Maintenance aplikaciji.
+  static const methodologyProductionOnlyPfmea =
+      'Maintenance aplikacija sadrži PFMEA vezan uz imovinu (stroj) i pripadajuće ekrane. '
+      'Production aplikacija ih ne uključuje: ako kompanija nema Maintenance pretplatu, ne može „otvoriti” taj dio sustava.\n\n'
+      'Za puni PFMEA u scenariju samo Production potrebna je implementacija u QMS modulu ove aplikacije: '
+      'master podaci PFMEA redova po proizvodu ili procesu (companyId, opcionalno plantKey, veza na proizvod iz kontrolnog plana), '
+      'čitanje i zapis isključivo preko Cloud Functions (Callable), kao i za kontrolne planove — tanki Firestore, jak backend.\n\n'
+      'Dijeljenje koda s Maintenance-om moguće je izdvajanjem zajedničkih widgeta (S/O/D, RPN, AP) u zajednički paket; '
+      'model podataka ipak treba prilagoditi (stroj vs proizvod/proces).';
+
+  static const termRiskRatings = 'Ocjene rizika: u sustavu se procjene (npr. kolekcija risk_assessments u jedinstvenom motoru) povezuju s entitetima '
       'i izračunom razine rizika te po potrebi maksimalnim RPN-om. Služe za IATF trag i odluke (što prvo riješiti). '
-      'Detaljno uređivanje PFMEA redova na stroju/proizvodu često je u administraciji održavanja; ovaj QMS modul naglašava NCR/CAPA trag.';
+      'Kad postoji samo Production modul, isti motor može se hraniti iz QMS PFMEA Callable-a (proizvod/proces), ne samo iz Maintenance imovine.';
 
   static const dashboard = 'Pregled brojeva u tvojoj kompaniji. '
       'Kontrolni planovi i planovi inspekcije su „master” definicije; NCR su zapisani neskladi; '

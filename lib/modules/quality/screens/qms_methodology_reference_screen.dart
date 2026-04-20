@@ -58,11 +58,16 @@ class QmsMethodologyReferenceScreen extends StatelessWidget {
             body: QmsIatfStrings.termRiskRatings,
             accent: cs.secondary,
           ),
+          _SectionCard(
+            icon: Icons.app_shortcut_outlined,
+            title: 'Samo Production (bez Maintenance modula)',
+            body: QmsIatfStrings.methodologyProductionOnlyPfmea,
+            accent: cs.tertiary,
+          ),
           const SizedBox(height: 8),
           Text(
-            'U aplikaciji: NCR nosi reakcijski plan i containment; CAPA je akcijski plan s 8D/Ishikawom; '
-            'PFMEA i detaljne ocjene često se vode u master podacima (stroj, proizvod) u administraciji, '
-            'dok ovaj modul osigurava trag i tok nesklada.',
+            'U aplikaciji: NCR nosi reakcijski plan i containment; CAPA je akcijski plan s 8D/Ishikawom. '
+            'PFMEA na stroju — Maintenance; puni PFMEA za QMS bez Maintenance modula — kroz budući QMS PFMEA u Productionu (Callable).',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: cs.onSurfaceVariant,
               height: 1.45,
