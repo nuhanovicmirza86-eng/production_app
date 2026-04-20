@@ -4,6 +4,7 @@ import '../../../../core/errors/app_error_mapper.dart';
 import '../models/capa_methodology_constants.dart';
 import '../services/quality_callable_service.dart';
 import '../widgets/qms_iatf_help.dart';
+import 'qms_methodology_reference_screen.dart';
 
 /// Detalj CAPA zapisa (action_plans · sourceType non_conformance).
 class CapaDetailScreen extends StatefulWidget {
@@ -211,8 +212,20 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
       appBar: AppBar(
         title: const Text('CAPA'),
         actions: [
+          IconButton(
+            tooltip: 'Metodologija · IATF',
+            icon: const Icon(Icons.menu_book_outlined),
+            onPressed: () {
+              Navigator.push<void>(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => const QmsMethodologyReferenceScreen(),
+                ),
+              );
+            },
+          ),
           QmsIatfInfoIcon(
-            title: 'CAPA',
+            title: 'CAPA (akcijski plan)',
             message: QmsIatfStrings.detailCapa,
           ),
         ],

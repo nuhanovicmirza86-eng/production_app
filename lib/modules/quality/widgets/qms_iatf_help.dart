@@ -4,7 +4,31 @@ import 'package:flutter/material.dart';
 abstract final class QmsIatfStrings {
   static const hubModule = 'QMS (Quality Management System) u smislu IATF 16949: '
       'strukturirano upravljanje kvalitetom kroz planiranje, kontrolu, nesklade i korektivne akcije. '
-      'Lanac u aplikaciji: kontrolni plan → plan inspekcije → evidencija rezultata → NCR → CAPA → sljedljivost (LOT/nalog).';
+      'Lanac u aplikaciji: kontrolni plan → plan inspekcije → evidencija rezultata → NCR (reakcijski plan) → CAPA (akcijski plan) → sljedljivost. '
+      'PFMEA i ocjene rizika u pozadini podržavaju prioritete; vidi ekran „Metodologija · IATF”.';
+
+  /// Kratak uvod za ekran [QmsMethodologyReferenceScreen].
+  static const methodologyWhy = 'Ovaj pregled povezuje četiri često miješana pojma: što je na NCR-u brzo, '
+      'što je u CAPA-i trajno, što je PFMEA prije nego što se problem dogodi, i gdje su „ocjene rizika” u sustavu.';
+
+  static const methodologyOverview = '1) PFMEA (procesna FMEA) procjenjuje moguća otkazivanja i posljedice procesa '
+      '(S, O, D → RPN; AP = prioritet akcije). Utječe na to što kontroliramo u kontrolnom planu i inspekcijama.\n\n'
+      '2) Ocjene rizika u sustavu agregiraju procjene po entitetima (npr. proizvod, stroj, partner) u jedinstveni motor — '
+      'vidljive su razine rizika i gdje postoji RPN.\n\n'
+      '3) Reakcijski plan na NCR-u je kratkoročan odgovor (što odmah radimo); containment je izolacija nesklada.\n\n'
+      '4) Akcijski plan (CAPA) uklanja uzrok trajno (8D, Ishikawa, verifikacija) — nije isto što reakcijski plan ni PFMEA red.';
+
+  static const termActionPlan = 'Akcijski plan: u smislu IATF-a strukturirani niz koraka za uklanjanje uzroka nesklada '
+      '(root cause, trajna korekcija, verifikacija učinkovitosti). U aplikaciji to je CAPA zapis (action_plan). '
+      'Razlikuje se od reakcijskog plana na NCR-u, koji je brzi odgovor u kratkom roku.';
+
+  static const termPfmea = 'PFMEA (Process Failure Mode and Effects Analysis): metodologija za identifikaciju mogućih '
+      'grešaka procesa, njihovih učinaka i uzroka prije nego se dogode. Tipična polja: težina (S), učestalost (O), '
+      'otkrivanje (D), RPN = S×O×D, te AP (Action Priority) za rangiranje mjera. Kontrolni plan i inspekcije provode odabrane kontrole iz PFMEA konteksta.';
+
+  static const termRiskRatings = 'Ocjene rizika: u sustavu se procjene (npr. kolekcija risk_assessments) povezuju s entitetima '
+      'i izračunom razine rizika te po potrebi maksimalnim RPN-om. Služe za IATF trag i odluke (što prvo riješiti). '
+      'Detaljno uređivanje PFMEA redova na stroju/proizvodu često je u administraciji održavanja; ovaj QMS modul naglašava NCR/CAPA trag.';
 
   static const dashboard = 'Pregled brojeva u tvojoj kompaniji. '
       'Kontrolni planovi i planovi inspekcije su „master” definicije; NCR su zapisani neskladi; '
@@ -45,11 +69,12 @@ abstract final class QmsIatfStrings {
   static const detailNcr = 'NCR: opis nesklada, ozbiljnost, containment, reakcijski plan (brzi odgovor), '
       'prilozi (https). Prijelaz u Pregled/Contained može automatski otvoriti CAPA. Zatvoreno/Odbačeno zahtijeva prilog.';
 
-  static const listCapa = 'CAPA: korektivne i preventivne akcije za uklanjanje uzroka nesklada; '
-      'praćenje statusa, uzroka, akcija i verifikacije.';
+  static const listCapa = 'CAPA (akcijski plan): korektivne i preventivne akcije za uklanjanje uzroka nesklada; '
+      'praćenje statusa, uzroka, akcija i verifikacije. Razlikuj od reakcijskog plana na NCR-u i od PFMEA-e.';
 
-  static const detailCapa = 'CAPA: root cause (uzrok), plan akcija, odgovorna osoba, rok, verifikacija učinkovitosti. '
-      'U sklopu zapisa mogu se ispuniti 8D disciplina i Ishikawa (riblja kost). Status vodi od otvaranja do zatvaranja uz audit trag.';
+  static const detailCapa = 'CAPA je akcijski plan: root cause (uzrok), plan trajnih akcija, odgovorna osoba, rok, verifikacija učinkovitosti. '
+      'U sklopu zapisa mogu se ispuniti 8D disciplina i Ishikawa (riblja kost). Status vodi od otvaranja do zatvaranja uz audit trag. '
+      'Ne miješati s reakcijskim planom na NCR-u (brzi odgovor) niti s PFMEA retkom (preventivno prije nesklada).';
 
   static const claimCustomer = 'Reklamacija kupca: NCR s izvorom CUSTOMER, vezan uz kupca iz master podataka (customers). '
       'IATF 10.2 — nesklad izvan tvornice (npr. pritužba kupca); dalje isti CAPA tok kao za interni NCR.';

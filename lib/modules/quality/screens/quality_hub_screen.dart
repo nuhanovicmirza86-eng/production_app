@@ -8,6 +8,7 @@ import 'inspection_plans_list_screen.dart';
 import 'ncr_claim_create_screen.dart';
 import 'ncr_list_screen.dart';
 import 'quality_dashboard_screen.dart';
+import 'qms_methodology_reference_screen.dart';
 
 /// Centralni ulaz u QMS modul (pretplata `quality` + uloga iz matrice).
 class QualityHubScreen extends StatelessWidget {
@@ -45,6 +46,17 @@ class QualityHubScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+          _HubTile(
+            icon: Icons.menu_book_outlined,
+            title: 'Metodologija · IATF',
+            subtitle: 'Reakcijski plan, CAPA, PFMEA, ocjene rizika',
+            iatfTitle: 'Metodologija',
+            iatfMessage: QmsIatfStrings.methodologyWhy,
+            onTap: () => _open(
+              context,
+              const QmsMethodologyReferenceScreen(),
+            ),
+          ),
           _HubTile(
             icon: Icons.dashboard_outlined,
             title: 'Dashboard',

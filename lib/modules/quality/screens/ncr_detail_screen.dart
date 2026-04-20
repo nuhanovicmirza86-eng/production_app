@@ -6,6 +6,7 @@ import '../models/qms_list_models.dart';
 import '../services/quality_callable_service.dart';
 import '../widgets/qms_iatf_help.dart';
 import 'capa_detail_screen.dart';
+import 'qms_methodology_reference_screen.dart';
 
 class _NcrAttRow {
   _NcrAttRow({String label = '', String url = ''})
@@ -306,6 +307,18 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
       appBar: AppBar(
         title: Text('NCR $code'),
         actions: [
+          IconButton(
+            tooltip: 'Metodologija · IATF',
+            icon: const Icon(Icons.menu_book_outlined),
+            onPressed: () {
+              Navigator.push<void>(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => const QmsMethodologyReferenceScreen(),
+                ),
+              );
+            },
+          ),
           QmsIatfInfoIcon(
             title: 'NCR',
             message: QmsIatfStrings.detailNcr,
