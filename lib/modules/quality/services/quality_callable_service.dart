@@ -318,6 +318,8 @@ class QualityCallableService {
     String? verificationNotes,
     String? responsibleUserId,
     String? dueDateIso,
+    Map<String, dynamic>? eightD,
+    Map<String, dynamic>? ishikawa,
   }) async {
     final callable = _functions.httpsCallable('updateQmsCapaActionPlan');
     await callable.call({
@@ -330,6 +332,8 @@ class QualityCallableService {
       if (verificationNotes != null) 'verificationNotes': verificationNotes,
       if (responsibleUserId != null) 'responsibleUserId': responsibleUserId,
       if (dueDateIso != null) 'dueDate': dueDateIso,
+      if (eightD != null) 'eightD': eightD,
+      if (ishikawa != null) 'ishikawa': ishikawa,
     });
   }
 

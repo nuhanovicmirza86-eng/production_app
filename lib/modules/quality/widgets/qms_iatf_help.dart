@@ -48,13 +48,19 @@ abstract final class QmsIatfStrings {
       'praćenje statusa, uzroka, akcija i verifikacije.';
 
   static const detailCapa = 'CAPA: root cause (uzrok), plan akcija, odgovorna osoba, rok, verifikacija učinkovitosti. '
-      'Status vodi od otvaranja do zatvaranja uz audit trag.';
+      'U sklopu zapisa mogu se ispuniti 8D disciplina i Ishikawa (riblja kost). Status vodi od otvaranja do zatvaranja uz audit trag.';
 
   static const claimCustomer = 'Reklamacija kupca: NCR s izvorom CUSTOMER, vezan uz kupca iz master podataka (customers). '
       'IATF 10.2 — nesklad izvan tvornice (npr. pritužba kupca); dalje isti CAPA tok kao za interni NCR.';
 
   static const claimSupplier = 'Reklamacija / prigovor prema dobavljaču: NCR s izvorom SUPPLIER, vezan uz dobavljača (suppliers). '
       'Tipično SCAR ili 8D s vanjske strane; u aplikaciji je evidencija i CAPA prema internom procesu.';
+
+  static const capaEightD = '8D disciplina: strukturirano rješavanje problema (tim, opis, privremene mjere, uzrok, trajna korekcija, '
+      'implementacija, prevencija, priznanje). Polja su vezana uz CAPA zapis za audit trag.';
+
+  static const capaIshikawa = 'Ishikawa (riblja kost): analiza uzroka po kategorijama (6M + okolina). Svaki red u polju je jedan potencijalni uzrok; '
+      'D4 u 8D može se nadopuniti ovim alatom.';
 
   static const termApqp = 'APQP (Advanced Product Quality Planning): strukturirano planiranje kvaliteta proizvoda; '
       'kontrolni plan je tipičan izlaz te faze.';

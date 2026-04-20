@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../models/capa_methodology_constants.dart';
 import '../services/quality_callable_service.dart';
 import '../widgets/qms_iatf_help.dart';
 
@@ -27,6 +28,9 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
   final _verification = TextEditingController();
   final _responsible = TextEditingController();
 
+  final Map<String, TextEditingController> _eightD = {};
+  final Map<String, TextEditingController> _ishikawa = {};
+
   bool _loading = true;
   String? _error;
   Map<String, dynamic>? _plan;
@@ -49,6 +53,12 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
   @override
   void initState() {
     super.initState();
+    for (final k in CapaEightDKeys.all) {
+      _eightD[k] = TextEditingController();
+    }
+    for (final k in CapaIshikawaKeys.all) {
+      _ishikawa[k] = TextEditingController();
+    }
     _load();
   }
 
@@ -59,7 +69,51 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
     _actionText.dispose();
     _verification.dispose();
     _responsible.dispose();
+    for (final c in _eightD.values) {
+      c.dispose();
+    }
+    for (final c in _ishikawa.values) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  void _applyEightD(dynamic raw) {
+    final m = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
+    for (final k in CapaEightDKeys.all) {
+      _eightD[k]!.text = (m[k] ?? '').toString();
+    }
+  }
+
+  void _applyIshikawa(dynamic raw) {
+    final m = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
+    for (final k in CapaIshikawaKeys.all) {
+      final list = m[k];
+      if (list is List) {
+        _ishikawa[k]!.text = list
+            .map((e) => e.toString().trim())
+            .where((s) => s.isNotEmpty)
+            .join('\n');
+      } else {
+        _ishikawa[k]!.text = '';
+      }
+    }
+  }
+
+  Map<String, dynamic> _eightDPayload() {
+    return {for (final k in CapaEightDKeys.all) k: _eightD[k]!.text};
+  }
+
+  Map<String, dynamic> _ishikawaPayload() {
+    return {
+      for (final k in CapaIshikawaKeys.all)
+        k: _ishikawa[k]!
+            .text
+            .split(RegExp(r'\r?\n'))
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList(),
+    };
   }
 
   Future<void> _load() async {
@@ -86,6 +140,8 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
       } else {
         _dueDate = null;
       }
+      _applyEightD(m['eightD']);
+      _applyIshikawa(m['ishikawa']);
       setState(() {
         _plan = m;
         _loading = false;
@@ -131,6 +187,8 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
         verificationNotes: _verification.text,
         responsibleUserId: _responsible.text.trim(),
         dueDateIso: dueIso,
+        eightD: _eightDPayload(),
+        ishikawa: _ishikawaPayload(),
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -196,7 +254,99 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
                       if (v != null) setState(() => _status = v);
                     },
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
+                  ExpansionTile(
+                    initiallyExpanded: false,
+                    title: Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            '8D disciplina',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        QmsIatfInfoIcon(
+                          title: '8D',
+                          message: QmsIatfStrings.capaEightD,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                    children: [
+                      for (final k in CapaEightDKeys.all) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                CapaEightDKeys.labelHr(k),
+                                style: Theme.of(context).textTheme.labelLarge,
+                              ),
+                              const SizedBox(height: 4),
+                              TextFormField(
+                                controller: _eightD[k],
+                                maxLines: 4,
+                                decoration: const InputDecoration(
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  ExpansionTile(
+                    initiallyExpanded: false,
+                    title: Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Ishikawa (riblja kost)',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        QmsIatfInfoIcon(
+                          title: 'Ishikawa',
+                          message: QmsIatfStrings.capaIshikawa,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                    subtitle: const Text(
+                      'Jedan potencijalni uzrok po retku u svakoj kategoriji.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    children: [
+                      for (final k in CapaIshikawaKeys.all) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                CapaIshikawaKeys.labelHr(k),
+                                style: Theme.of(context).textTheme.labelLarge,
+                              ),
+                              const SizedBox(height: 4),
+                              TextFormField(
+                                controller: _ishikawa[k],
+                                maxLines: 5,
+                                decoration: const InputDecoration(
+                                  border: OutlineInputBorder(),
+                                  hintText: 'Uzrok 1\nUzrok 2',
+                                  isDense: true,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   QmsIatfSectionTitle(
                     label: 'Uzrok (root cause)',
                     iatfTitle: 'Root cause',
