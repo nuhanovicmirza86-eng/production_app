@@ -65,6 +65,9 @@ abstract final class QmsIatfStrings {
   static const listInspectionPlans = 'Plan inspekcije određuje koji se dio kontrolnog plana provjerava '
       'za određeni tip kontrole (INCOMING / IN_PROCESS / FINAL).';
 
+  static const listInspectionResults = 'Povijest rezultata inspekcija: zadnji zapisi (OK/NOK) s '
+      'vezom na plan, tip, proizvod, LOT i nalog ako su uneseni — podaci isključivo preko Callable-a.';
+
   static const editControlPlan = 'Kontrolni plan: operacije (redoslijed procesa) i karakteristike '
       '(dimenzija, tolerancije, jedinica). Indeksi 0:0, 1:0… koriste se u planu inspekcije kao ref.';
 
@@ -79,7 +82,13 @@ abstract final class QmsIatfStrings {
       'prilozi pri zatvaranju služe kao dokaz (evidence).';
 
   static const detailNcr = 'NCR: opis nesklada, ozbiljnost, containment, reakcijski plan (brzi odgovor), '
-      'prilozi (https). Prijelaz u Pregled/Contained može automatski otvoriti CAPA. Zatvoreno/Odbačeno zahtijeva prilog.';
+      'prilozi (https). Prijelaz u Pregled/Contained može automatski otvoriti CAPA. Zatvoreno/Odbačeno zahtijeva prilog. '
+      'Za HIGH/CRITICAL: prije zatvaranja potrebna je otvorena CAPA ili odstupanje (razlog).';
+
+  /// Polje „odstupanje od CAPA” na NCR-u (korak 4 IATF plana).
+  static const termCapaGateHighSeverity = 'Za ozbiljnost HIGH ili CRITICAL sustav zahtijeva trag: '
+      'barem jedna otvorena CAPA (status open, in_progress ili waiting_verification) '
+      'ili eksplicitno odstupanje s razlogom ako CAPA nije primjerena.';
 
   static const listCapa = 'CAPA (akcijski plan): korektivne i preventivne akcije za uklanjanje uzroka nesklada; '
       'praćenje statusa, uzroka, akcija i verifikacije. Razlikuj od reakcijskog plana na NCR-u i od PFMEA-e.';

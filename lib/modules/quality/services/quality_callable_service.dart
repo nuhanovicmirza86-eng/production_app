@@ -101,6 +101,7 @@ class QualityCallableService {
     String? customerId,
     String? scanPayload,
     bool autoCreateNcr = true,
+    bool autoApplyHoldToLot = true,
   }) async {
     final callable = _functions.httpsCallable('submitInspectionResult');
     final res = await callable.call({
@@ -116,6 +117,7 @@ class QualityCallableService {
       if (customerId != null && customerId.isNotEmpty) 'customerId': customerId,
       if (scanPayload != null && scanPayload.isNotEmpty) 'scanPayload': scanPayload,
       'autoCreateNcr': autoCreateNcr,
+      'autoApplyHoldToLot': autoApplyHoldToLot,
     });
     final d = Map<String, dynamic>.from(
       (res.data as Map?) ?? const <String, dynamic>{},
@@ -123,6 +125,36 @@ class QualityCallableService {
     return SubmitInspectionResult(
       inspectionResultId: d['inspectionResultId']?.toString() ?? '',
       overallResult: d['overallResult']?.toString() ?? '',
+      lotHoldApplied: d['lotHoldApplied'] == true,
+      lotHoldSkipReason: d['lotHoldSkipReason']?.toString(),
+      inventoryLotDocId: d['inventoryLotDocId']?.toString(),
+    );
+  }
+
+  /// QMS: stavlja WMS lot na hold (npr. naknadno s NCR detalja ako auto-hold nije prošao).
+  Future<ApplyQmsLotHoldResult> applyQmsHoldOnInventoryLot({
+    required String companyId,
+    required String lotId,
+    String? ncrId,
+    String? inspectionResultId,
+    String sourceType = 'manual',
+  }) async {
+    final callable = _functions.httpsCallable('applyQmsHoldOnInventoryLot');
+    final res = await callable.call({
+      'companyId': companyId,
+      'lotId': lotId,
+      if (ncrId != null && ncrId.trim().isNotEmpty) 'ncrId': ncrId.trim(),
+      if (inspectionResultId != null && inspectionResultId.trim().isNotEmpty)
+        'inspectionResultId': inspectionResultId.trim(),
+      'sourceType': sourceType,
+    });
+    final d = Map<String, dynamic>.from(
+      (res.data as Map?) ?? const <String, dynamic>{},
+    );
+    return ApplyQmsLotHoldResult(
+      applied: d['applied'] == true,
+      lotDocId: d['lotDocId']?.toString() ?? '',
+      skipReason: d['skipReason']?.toString(),
     );
   }
 
@@ -148,6 +180,19 @@ class QualityCallableService {
       'limit': limit,
     });
     return _parseRows(res.data, QmsInspectionPlanRow.fromMap);
+  }
+
+  /// Zadnji rezultati inspekcija (OK/NOK, lot, plan, datum).
+  Future<List<QmsInspectionResultRow>> listInspectionResults({
+    required String companyId,
+    int limit = 80,
+  }) async {
+    final callable = _functions.httpsCallable('listQmsInspectionResults');
+    final res = await callable.call({
+      'companyId': companyId,
+      'limit': limit,
+    });
+    return _parseRows(res.data, QmsInspectionResultRow.fromMap);
   }
 
   Future<List<QmsNcrRow>> listNonConformances({
@@ -270,6 +315,8 @@ class QualityCallableService {
     String? description,
     String? severity,
     List<Map<String, String>>? attachments,
+    /// Za HIGH/CRITICAL NCR: ako nema otvorene CAPA, obavezno prije zatvaranja (IATF).
+    String? capaWaiverReason,
   }) async {
     final callable = _functions.httpsCallable('updateQmsNonConformance');
     final res = await callable.call({
@@ -281,6 +328,7 @@ class QualityCallableService {
       if (description != null) 'description': description,
       if (severity != null) 'severity': severity,
       if (attachments != null) 'attachments': attachments,
+      if (capaWaiverReason != null) 'capaWaiverReason': capaWaiverReason,
     });
     return Map<String, dynamic>.from((res.data as Map?) ?? const <String, dynamic>{});
   }
@@ -488,9 +536,27 @@ class QmsDashboardSummary {
 class SubmitInspectionResult {
   final String inspectionResultId;
   final String overallResult;
+  final bool lotHoldApplied;
+  final String? lotHoldSkipReason;
+  final String? inventoryLotDocId;
 
   const SubmitInspectionResult({
     required this.inspectionResultId,
     required this.overallResult,
+    this.lotHoldApplied = false,
+    this.lotHoldSkipReason,
+    this.inventoryLotDocId,
+  });
+}
+
+class ApplyQmsLotHoldResult {
+  final bool applied;
+  final String lotDocId;
+  final String? skipReason;
+
+  const ApplyQmsLotHoldResult({
+    required this.applied,
+    required this.lotDocId,
+    this.skipReason,
   });
 }

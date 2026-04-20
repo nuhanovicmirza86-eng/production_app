@@ -42,6 +42,7 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
   final _description = TextEditingController();
   final _containment = TextEditingController();
   final _reactionPlan = TextEditingController();
+  final _capaWaiverReason = TextEditingController();
 
   final List<_NcrAttRow> _attachmentRows = [];
 
@@ -53,9 +54,27 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
   String _status = 'OPEN';
   String _severity = 'MEDIUM';
   bool _saving = false;
+  bool _holdingLot = false;
 
   String get _cid =>
       (widget.companyData['companyId'] ?? '').toString().trim();
+
+  bool _hasLogisticsModule() {
+    final raw = widget.companyData['enabledModules'];
+    if (raw is List) {
+      final list =
+          raw.map((e) => e.toString().trim().toLowerCase()).toList();
+      if (list.isEmpty) return false;
+      return list.contains('logistics');
+    }
+    return false;
+  }
+
+  String? get _ncrLotIdForHold {
+    final v = _ncr?['lotId']?.toString().trim();
+    if (v == null || v.isEmpty) return null;
+    return v;
+  }
 
   static const _statuses = [
     'OPEN',
@@ -78,6 +97,7 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
     _description.dispose();
     _containment.dispose();
     _reactionPlan.dispose();
+    _capaWaiverReason.dispose();
     for (final r in _attachmentRows) {
       r.dispose();
     }
@@ -113,6 +133,7 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
       _status = _statuses.contains(st) ? st : 'OPEN';
       final sev = (n['severity'] ?? 'MEDIUM').toString().toUpperCase();
       _severity = _severities.contains(sev) ? sev : 'MEDIUM';
+      _capaWaiverReason.text = (n['capaWaiverReason'] ?? '').toString();
 
       _disposeAttachmentRows();
       final raw = n['attachments'];
@@ -144,6 +165,45 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
     }
   }
 
+  Future<void> _applyWmsHoldOnLot() async {
+    final lot = _ncrLotIdForHold;
+    if (lot == null || _holdingLot) return;
+    setState(() => _holdingLot = true);
+    try {
+      final refId = _ncr?['referenceId']?.toString().trim();
+      final refType = _ncr?['referenceType']?.toString().trim().toLowerCase();
+      final insId = refType == 'inspection_result' ? refId : null;
+      final r = await _svc.applyQmsHoldOnInventoryLot(
+        companyId: _cid,
+        lotId: lot,
+        ncrId: widget.ncrId,
+        inspectionResultId: insId,
+        sourceType: 'ncr',
+      );
+      if (!mounted) return;
+      if (r.applied) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lot zadržan u WMS (${r.lotDocId}).')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'WMS hold nije primijenjen: ${r.skipReason ?? "nepoznato"}.',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _holdingLot = false);
+    }
+  }
+
   bool _isPartnerClaimNcr(Map<String, dynamic> n) {
     final s = (n['source'] ?? '').toString().toUpperCase();
     return s == 'CUSTOMER' || s == 'SUPPLIER';
@@ -164,6 +224,15 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
       out.add({'label': label, 'url': url});
     }
     return out;
+  }
+
+  /// Otvorena CAPA u smislu backend pravila (OPEN_CAPA_STATUSES).
+  bool _hasOpenCapaLinked() {
+    const open = {'open', 'in_progress', 'waiting_verification'};
+    for (final r in _capaRows) {
+      if (open.contains(r.status.toLowerCase())) return true;
+    }
+    return false;
   }
 
   Future<void> _save() async {
@@ -188,6 +257,19 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
       );
       return;
     }
+    if ((_status == 'CLOSED' || _status == 'DISMISSED') &&
+        (_severity == 'HIGH' || _severity == 'CRITICAL') &&
+        !_hasOpenCapaLinked() &&
+        _capaWaiverReason.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Za HIGH/CRITICAL: potrebna je otvorena CAPA ili odstupanje (razlog) prije zatvaranja.',
+          ),
+        ),
+      );
+      return;
+    }
 
     setState(() => _saving = true);
     try {
@@ -200,6 +282,9 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
         description: _description.text,
         severity: _severity,
         attachments: att,
+        capaWaiverReason: (_severity == 'HIGH' || _severity == 'CRITICAL')
+            ? _capaWaiverReason.text.trim()
+            : '',
       );
       if (!mounted) return;
       final auto = res['capaAutoCreated'] == true;
@@ -433,6 +518,37 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                       },
                     ),
                     const SizedBox(height: 12),
+                    if (_severity == 'HIGH' || _severity == 'CRITICAL') ...[
+                      TextFormField(
+                        controller: _capaWaiverReason,
+                        maxLines: 3,
+                        decoration: InputDecoration(
+                          labelText: 'Odstupanje od CAPA (razlog, ako nije otvorena CAPA)',
+                          hintText:
+                              'Obavezno pri zatvaranju/odbacivanju ako nema otvorene CAPA',
+                          border: const OutlineInputBorder(),
+                          alignLabelWithHint: true,
+                          suffixIcon: QmsIatfInfoIcon(
+                            title: 'HIGH / CRITICAL',
+                            message: QmsIatfStrings.termCapaGateHighSeverity,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                      if (!_hasOpenCapaLinked() &&
+                          _capaWaiverReason.text.trim().isEmpty &&
+                          (_status == 'CLOSED' || _status == 'DISMISSED'))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Nema otvorene CAPA — unesi odstupanje ili otvori CAPA prije spremanja.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                          ),
+                        ),
+                      const SizedBox(height: 12),
+                    ],
                     TextFormField(
                       controller: _description,
                       maxLines: 4,
@@ -489,6 +605,26 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                         ),
                       ],
                     ),
+                    if (_hasLogisticsModule() &&
+                        (_ncrLotIdForHold ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: FilledButton.tonalIcon(
+                          onPressed: _holdingLot ? null : _applyWmsHoldOnLot,
+                          icon: _holdingLot
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.pause_circle_outline),
+                          label: const Text('Zadrži lot u WMS (hold)'),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 24),
                     Text(
                       'Prilozi (naziv + https URL)',
