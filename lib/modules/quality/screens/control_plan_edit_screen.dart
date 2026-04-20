@@ -71,6 +71,10 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
   final List<_OperationBlock> _operations = [_OperationBlock()];
 
   String _status = 'draft';
+  String? _approvedAtIso;
+  String? _approvedByUid;
+  String? _obsoleteAtIso;
+  String? _obsoleteByUid;
   bool _loading = true;
   bool _saving = false;
   String? _loadError;
@@ -100,6 +104,10 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
   Future<void> _loadExisting() async {
     final id = widget.controlPlanId;
     if (id == null || id.isEmpty) {
+      _approvedAtIso = null;
+      _approvedByUid = null;
+      _obsoleteAtIso = null;
+      _obsoleteByUid = null;
       setState(() => _loading = false);
       return;
     }
@@ -113,6 +121,10 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
       if (_status != 'draft' && _status != 'approved' && _status != 'obsolete') {
         _status = 'draft';
       }
+      _approvedAtIso = m['approvedAt']?.toString();
+      _approvedByUid = m['approvedByUid']?.toString();
+      _obsoleteAtIso = m['obsoleteAt']?.toString();
+      _obsoleteByUid = m['obsoleteByUid']?.toString();
 
       _clearOperations();
       final ops = m['operations'] as List? ?? [];
@@ -302,6 +314,43 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
                       if (v != null) setState(() => _status = v);
                     },
                   ),
+                  if (!isNew &&
+                      ((_approvedAtIso != null && _approvedAtIso!.trim().isNotEmpty) ||
+                          (_approvedByUid != null && _approvedByUid!.trim().isNotEmpty) ||
+                          (_obsoleteAtIso != null && _obsoleteAtIso!.trim().isNotEmpty) ||
+                          (_obsoleteByUid != null && _obsoleteByUid!.trim().isNotEmpty))) ...[
+                    const SizedBox(height: 12),
+                    Card(
+                      margin: EdgeInsets.zero,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Audit životnog ciklusa (ISO)',
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                            const SizedBox(height: 8),
+                            if ((_approvedAtIso != null && _approvedAtIso!.trim().isNotEmpty) ||
+                                (_approvedByUid != null && _approvedByUid!.trim().isNotEmpty))
+                              Text(
+                                'Odobreno: ${_approvedAtIso ?? "—"} · uid: ${_approvedByUid ?? "—"}',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            if ((_obsoleteAtIso != null && _obsoleteAtIso!.trim().isNotEmpty) ||
+                                (_obsoleteByUid != null && _obsoleteByUid!.trim().isNotEmpty)) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Zastarjelo: ${_obsoleteAtIso ?? "—"} · uid: ${_obsoleteByUid ?? "—"}',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,

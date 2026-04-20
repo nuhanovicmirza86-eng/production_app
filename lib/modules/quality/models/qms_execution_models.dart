@@ -37,6 +37,11 @@ class QmsInspectionExecutionContext {
   final String productId;
   final String controlPlanId;
   final String controlPlanTitle;
+  /// Raw status polje kontrolnog plana (draft / approved / obsolete).
+  final String controlPlanStatus;
+  final bool executionReady;
+  /// `obsolete` | `not_approved` kad [executionReady] je false.
+  final String? executionBlockedReason;
   final List<QmsMeasureSlot> measureSlots;
 
   const QmsInspectionExecutionContext({
@@ -46,6 +51,9 @@ class QmsInspectionExecutionContext {
     required this.productId,
     required this.controlPlanId,
     required this.controlPlanTitle,
+    this.controlPlanStatus = '',
+    this.executionReady = true,
+    this.executionBlockedReason,
     required this.measureSlots,
   });
 
@@ -66,6 +74,10 @@ class QmsInspectionExecutionContext {
       productId: (m['productId'] ?? '').toString(),
       controlPlanId: (m['controlPlanId'] ?? '').toString(),
       controlPlanTitle: (m['controlPlanTitle'] ?? '').toString(),
+      controlPlanStatus: (m['controlPlanStatus'] ?? '').toString(),
+      // Legacy Callable-i bez polja: ponašaj se kao „spremno“ (staro upozorenje u payloadu).
+      executionReady: m['executionReady'] != false,
+      executionBlockedReason: m['executionBlockedReason']?.toString(),
       measureSlots: slots,
     );
   }

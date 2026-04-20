@@ -6,6 +6,10 @@ class QmsControlPlanRow {
   final String productId;
   final String status;
   final String? plantKey;
+  final String? approvedAtIso;
+  final String? approvedByUid;
+  final String? obsoleteAtIso;
+  final String? obsoleteByUid;
   final String? updatedAtIso;
 
   const QmsControlPlanRow({
@@ -15,6 +19,10 @@ class QmsControlPlanRow {
     required this.productId,
     required this.status,
     this.plantKey,
+    this.approvedAtIso,
+    this.approvedByUid,
+    this.obsoleteAtIso,
+    this.obsoleteByUid,
     this.updatedAtIso,
   });
 
@@ -26,6 +34,10 @@ class QmsControlPlanRow {
       productId: (m['productId'] ?? '').toString(),
       status: (m['status'] ?? '').toString(),
       plantKey: m['plantKey']?.toString(),
+      approvedAtIso: m['approvedAt']?.toString(),
+      approvedByUid: m['approvedByUid']?.toString(),
+      obsoleteAtIso: m['obsoleteAt']?.toString(),
+      obsoleteByUid: m['obsoleteByUid']?.toString(),
       updatedAtIso: m['updatedAt']?.toString(),
     );
   }
@@ -39,6 +51,10 @@ class QmsInspectionPlanRow {
   final String controlPlanId;
   final String status;
   final String? plantKey;
+  final String? approvedAtIso;
+  final String? approvedByUid;
+  final String? obsoleteAtIso;
+  final String? obsoleteByUid;
   final String? updatedAtIso;
 
   const QmsInspectionPlanRow({
@@ -49,6 +65,10 @@ class QmsInspectionPlanRow {
     required this.controlPlanId,
     required this.status,
     this.plantKey,
+    this.approvedAtIso,
+    this.approvedByUid,
+    this.obsoleteAtIso,
+    this.obsoleteByUid,
     this.updatedAtIso,
   });
 
@@ -61,7 +81,47 @@ class QmsInspectionPlanRow {
       controlPlanId: (m['controlPlanId'] ?? '').toString(),
       status: (m['status'] ?? '').toString(),
       plantKey: m['plantKey']?.toString(),
+      approvedAtIso: m['approvedAt']?.toString(),
+      approvedByUid: m['approvedByUid']?.toString(),
+      obsoleteAtIso: m['obsoleteAt']?.toString(),
+      obsoleteByUid: m['obsoleteByUid']?.toString(),
       updatedAtIso: m['updatedAt']?.toString(),
+    );
+  }
+}
+
+/// Jedan red povijesti inspekcija ([listQmsInspectionResults]).
+class QmsInspectionResultRow {
+  final String id;
+  final String inspectionPlanId;
+  final String inspectionType;
+  final String productId;
+  final String overallResult;
+  final String? lotId;
+  final String? productionOrderId;
+  final String? inspectedAtIso;
+
+  const QmsInspectionResultRow({
+    required this.id,
+    required this.inspectionPlanId,
+    required this.inspectionType,
+    required this.productId,
+    required this.overallResult,
+    this.lotId,
+    this.productionOrderId,
+    this.inspectedAtIso,
+  });
+
+  factory QmsInspectionResultRow.fromMap(Map<String, dynamic> m) {
+    return QmsInspectionResultRow(
+      id: (m['id'] ?? '').toString(),
+      inspectionPlanId: (m['inspectionPlanId'] ?? '').toString(),
+      inspectionType: (m['inspectionType'] ?? '').toString(),
+      productId: (m['productId'] ?? '').toString(),
+      overallResult: (m['overallResult'] ?? '').toString(),
+      lotId: m['lotId']?.toString(),
+      productionOrderId: m['productionOrderId']?.toString(),
+      inspectedAtIso: m['inspectedAt']?.toString(),
     );
   }
 }

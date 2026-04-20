@@ -243,12 +243,18 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
             _supplierId.text.trim().isEmpty ? null : _supplierId.text.trim(),
       );
       if (!mounted) return;
+      var msg =
+          'Spremljeno. Rezultat: ${res.overallResult} (${res.inspectionResultId})';
+      if (res.overallResult.toUpperCase() == 'NOK') {
+        if (res.lotHoldApplied && (res.inventoryLotDocId ?? '').isNotEmpty) {
+          msg += '. Lot zadržan (hold) u WMS: ${res.inventoryLotDocId}.';
+        } else if ((res.lotHoldSkipReason ?? '').isNotEmpty) {
+          msg +=
+              ' WMS hold: ${res.lotHoldSkipReason} (provjeri LOT id ili modul logistike).';
+        }
+      }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Spremljeno. Rezultat: ${res.overallResult} (${res.inspectionResultId})',
-          ),
-        ),
+        SnackBar(content: Text(msg)),
       );
       Navigator.pop(context);
     } catch (e) {
@@ -358,6 +364,31 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
           ],
           if (_ctx != null) ...[
             const SizedBox(height: 20),
+            if (!_ctx!.executionReady) ...[
+              Material(
+                color: cs.errorContainer,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.block, color: cs.onErrorContainer),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _executionBlockedMessage(_ctx!),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: cs.onErrorContainer,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             Text(
               _ctx!.controlPlanTitle.isNotEmpty
                   ? _ctx!.controlPlanTitle
@@ -366,7 +397,9 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Tip: ${_ctx!.inspectionType} · status plana: ${_ctx!.inspectionPlanStatus} · proizvod: ${_ctx!.productId}',
+              'Tip: ${_ctx!.inspectionType} · plan inspekcije: ${_ctx!.inspectionPlanStatus} · '
+              'kontrolni plan: ${_ctx!.controlPlanStatus.isEmpty ? "—" : _ctx!.controlPlanStatus} · '
+              'proizvod: ${_ctx!.productId}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
@@ -430,7 +463,7 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
             }),
             const SizedBox(height: 16),
             FilledButton.icon(
-              onPressed: _submitting ? null : _submit,
+              onPressed: (_submitting || !_ctx!.executionReady) ? null : _submit,
               icon: _submitting
                   ? const SizedBox(
                       width: 18,
@@ -444,6 +477,14 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
         ],
       ),
     );
+  }
+
+  String _executionBlockedMessage(QmsInspectionExecutionContext ctx) {
+    final r = ctx.executionBlockedReason?.trim().toLowerCase();
+    if (r == 'obsolete') {
+      return 'Plan inspekcije ili kontrolni plan je zastarjel; unos rezultata nije dopušten.';
+    }
+    return 'Kontrolni plan i plan inspekcije moraju biti u statusu „approved“ prije unosa rezultata.';
   }
 
   String? _tolHint(QmsMeasureSlot slot) {
