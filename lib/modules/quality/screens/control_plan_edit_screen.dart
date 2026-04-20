@@ -3,7 +3,47 @@ import 'package:flutter/material.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../services/quality_callable_service.dart';
 
-/// Jedna operacija / jedna karakteristika (MVP); proširenje kasnije.
+class _CharBlock {
+  _CharBlock()
+    : name = TextEditingController(),
+      nominal = TextEditingController(text: '0'),
+      tolMin = TextEditingController(),
+      tolMax = TextEditingController(),
+      unit = TextEditingController(text: 'mm');
+
+  final TextEditingController name;
+  final TextEditingController nominal;
+  final TextEditingController tolMin;
+  final TextEditingController tolMax;
+  final TextEditingController unit;
+
+  void dispose() {
+    name.dispose();
+    nominal.dispose();
+    tolMin.dispose();
+    tolMax.dispose();
+    unit.dispose();
+  }
+}
+
+class _OperationBlock {
+  _OperationBlock({bool withDefaultChar = true})
+    : operationName = TextEditingController(text: 'Operacija'),
+      characteristics =
+          withDefaultChar ? <_CharBlock>[_CharBlock()] : <_CharBlock>[];
+
+  final TextEditingController operationName;
+  final List<_CharBlock> characteristics;
+
+  void dispose() {
+    operationName.dispose();
+    for (final c in characteristics) {
+      c.dispose();
+    }
+  }
+}
+
+/// Više operacija i više karakteristika po operaciji (indeksi 0:0, 0:1, …).
 class ControlPlanEditScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
   final String? controlPlanId;
@@ -25,12 +65,8 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
   late final TextEditingController _title;
   late final TextEditingController _productId;
   late final TextEditingController _plantKey;
-  late final TextEditingController _operationName;
-  late final TextEditingController _charName;
-  late final TextEditingController _nominal;
-  late final TextEditingController _tolMin;
-  late final TextEditingController _tolMax;
-  late final TextEditingController _unit;
+
+  final List<_OperationBlock> _operations = [_OperationBlock()];
 
   String _status = 'draft';
   bool _loading = true;
@@ -49,13 +85,14 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
     _title = TextEditingController();
     _productId = TextEditingController();
     _plantKey = TextEditingController(text: _defaultPlantKey);
-    _operationName = TextEditingController(text: 'Operacija 1');
-    _charName = TextEditingController(text: 'Karakteristika 1');
-    _nominal = TextEditingController(text: '0');
-    _tolMin = TextEditingController();
-    _tolMax = TextEditingController();
-    _unit = TextEditingController(text: 'mm');
     _loadExisting();
+  }
+
+  void _clearOperations() {
+    for (final o in _operations) {
+      o.dispose();
+    }
+    _operations.clear();
   }
 
   Future<void> _loadExisting() async {
@@ -74,20 +111,34 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
       if (_status != 'draft' && _status != 'approved' && _status != 'obsolete') {
         _status = 'draft';
       }
+
+      _clearOperations();
       final ops = m['operations'] as List? ?? [];
-      if (ops.isNotEmpty) {
-        final op0 = ops.first;
-        if (op0 is Map) {
-          _operationName.text = (op0['operationName'] ?? 'Operacija 1').toString();
-          final chars = op0['characteristics'] as List? ?? [];
-          if (chars.isNotEmpty && chars.first is Map) {
-            final c0 = Map<String, dynamic>.from(chars.first as Map);
-            _charName.text = (c0['name'] ?? '').toString();
-            _nominal.text = (c0['nominal'] ?? '0').toString();
-            _tolMin.text = '${c0['toleranceMin'] ?? ''}'.trim();
-            _tolMax.text = '${c0['toleranceMax'] ?? ''}'.trim();
-            _unit.text = (c0['unit'] ?? 'mm').toString();
+      if (ops.isEmpty) {
+        _operations.add(_OperationBlock());
+      } else {
+        for (final raw in ops) {
+          if (raw is! Map) continue;
+          final opMap = Map<String, dynamic>.from(raw);
+          final ob = _OperationBlock(withDefaultChar: false);
+          ob.operationName.text = (opMap['operationName'] ?? 'Operacija').toString();
+          final chars = opMap['characteristics'] as List? ?? [];
+          if (chars.isEmpty) {
+            ob.characteristics.add(_CharBlock());
+          } else {
+            for (final cr in chars) {
+              if (cr is! Map) continue;
+              final cMap = Map<String, dynamic>.from(cr);
+              final cb = _CharBlock();
+              cb.name.text = (cMap['name'] ?? '').toString();
+              cb.nominal.text = '${cMap['nominal'] ?? '0'}';
+              cb.tolMin.text = '${cMap['toleranceMin'] ?? ''}'.trim();
+              cb.tolMax.text = '${cMap['toleranceMax'] ?? ''}'.trim();
+              cb.unit.text = (cMap['unit'] ?? 'mm').toString();
+              ob.characteristics.add(cb);
+            }
           }
+          _operations.add(ob);
         }
       }
       setState(() {
@@ -108,36 +159,38 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
     _title.dispose();
     _productId.dispose();
     _plantKey.dispose();
-    _operationName.dispose();
-    _charName.dispose();
-    _nominal.dispose();
-    _tolMin.dispose();
-    _tolMax.dispose();
-    _unit.dispose();
+    _clearOperations();
     super.dispose();
+  }
+
+  List<Map<String, dynamic>> _buildOperationsPayload() {
+    final out = <Map<String, dynamic>>[];
+    for (final op in _operations) {
+      final chars = <Map<String, dynamic>>[];
+      for (final ch in op.characteristics) {
+        final tolMin = double.tryParse(ch.tolMin.text.trim());
+        final tolMax = double.tryParse(ch.tolMax.text.trim());
+        final nominal = double.tryParse(ch.nominal.text.trim());
+        chars.add({
+          'name': ch.name.text.trim(),
+          'nominal': nominal,
+          'toleranceMin': tolMin,
+          'toleranceMax': tolMax,
+          'unit': ch.unit.text.trim(),
+        });
+      }
+      out.add({
+        'operationName': op.operationName.text.trim(),
+        'characteristics': chars,
+      });
+    }
+    return out;
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
-      final tolMin = double.tryParse(_tolMin.text.trim());
-      final tolMax = double.tryParse(_tolMax.text.trim());
-      final nominal = double.tryParse(_nominal.text.trim());
-      final operations = [
-        {
-          'operationName': _operationName.text.trim(),
-          'characteristics': [
-            {
-              'name': _charName.text.trim(),
-              'nominal': nominal,
-              'toleranceMin': tolMin,
-              'toleranceMax': tolMax,
-              'unit': _unit.text.trim(),
-            },
-          ],
-        },
-      ];
       await _svc.upsertControlPlan(
         companyId: _cid,
         plantKey: _plantKey.text.trim().isEmpty ? null : _plantKey.text.trim(),
@@ -145,7 +198,7 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
         title: _title.text.trim(),
         productId: _productId.text.trim(),
         status: _status,
-        operations: operations,
+        operations: _buildOperationsPayload(),
       );
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -175,135 +228,229 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
                 child: Text(_loadError!, textAlign: TextAlign.center),
               ),
             )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextFormField(
-                      controller: _title,
-                      decoration: const InputDecoration(
-                        labelText: 'Naslov *',
-                        border: OutlineInputBorder(),
+          : Form(
+              key: _formKey,
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  TextFormField(
+                    controller: _title,
+                    decoration: const InputDecoration(
+                      labelText: 'Naslov *',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Obavezno' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _productId,
+                    decoration: const InputDecoration(
+                      labelText: 'ID proizvoda (Firestore) *',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Obavezno' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _plantKey,
+                    decoration: const InputDecoration(
+                      labelText: 'Plant key (opcionalno)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey<String>('cp_status_$_status'),
+                    initialValue: _status,
+                    decoration: const InputDecoration(
+                      labelText: 'Status',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'draft', child: Text('draft')),
+                      DropdownMenuItem(value: 'approved', child: Text('approved')),
+                      DropdownMenuItem(value: 'obsolete', child: Text('obsolete')),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) setState(() => _status = v);
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Text(
+                        'Operacije i karakteristike',
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Obavezno' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _productId,
-                      decoration: const InputDecoration(
-                        labelText: 'ID proizvoda (Firestore) *',
-                        border: OutlineInputBorder(),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: () {
+                          setState(() => _operations.add(_OperationBlock()));
+                        },
+                        icon: const Icon(Icons.add),
+                        label: const Text('Operacija'),
                       ),
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Obavezno' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _plantKey,
-                      decoration: const InputDecoration(
-                        labelText: 'Plant key (opcionalno)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      key: ValueKey<String>('cp_status_$_status'),
-                      initialValue: _status,
-                      decoration: const InputDecoration(
-                        labelText: 'Status',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'draft', child: Text('draft')),
-                        DropdownMenuItem(value: 'approved', child: Text('approved')),
-                        DropdownMenuItem(value: 'obsolete', child: Text('obsolete')),
-                      ],
-                      onChanged: (v) {
-                        if (v != null) setState(() => _status = v);
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Operacija i karakteristika (MVP: jedna stavka)',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _operationName,
-                      decoration: const InputDecoration(
-                        labelText: 'Naziv operacije',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _charName,
-                      decoration: const InputDecoration(
-                        labelText: 'Naziv karakteristike',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _nominal,
-                      decoration: const InputDecoration(
-                        labelText: 'Nominal',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _tolMin,
-                            decoration: const InputDecoration(
-                              labelText: 'Tolerancija min',
-                              border: OutlineInputBorder(),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ..._operations.asMap().entries.map((entry) {
+                    final oi = entry.key;
+                    final op = entry.value;
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  'Operacija ${oi + 1}',
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
+                                const Spacer(),
+                                if (_operations.length > 1)
+                                  IconButton(
+                                    tooltip: 'Ukloni operaciju',
+                                    onPressed: () {
+                                      setState(() {
+                                        op.dispose();
+                                        _operations.removeAt(oi);
+                                      });
+                                    },
+                                    icon: const Icon(Icons.delete_outline),
+                                  ),
+                              ],
                             ),
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _tolMax,
-                            decoration: const InputDecoration(
-                              labelText: 'Tolerancija max',
-                              border: OutlineInputBorder(),
+                            TextFormField(
+                              controller: op.operationName,
+                              decoration: const InputDecoration(
+                                labelText: 'Naziv operacije',
+                                border: OutlineInputBorder(),
+                              ),
                             ),
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          ),
+                            const SizedBox(height: 12),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: () {
+                                  setState(() => op.characteristics.add(_CharBlock()));
+                                },
+                                icon: const Icon(Icons.add),
+                                label: const Text('Karakteristika'),
+                              ),
+                            ),
+                            ...op.characteristics.asMap().entries.map((ce) {
+                              final ci = ce.key;
+                              final ch = ce.value;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    Text(
+                                      'Karakteristika ${ci + 1} (ref $oi:$ci)',
+                                      style: Theme.of(context).textTheme.labelLarge,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          flex: 2,
+                                          child: TextFormField(
+                                            controller: ch.name,
+                                            decoration: const InputDecoration(
+                                              labelText: 'Naziv',
+                                              border: OutlineInputBorder(),
+                                            ),
+                                          ),
+                                        ),
+                                        if (op.characteristics.length > 1)
+                                          IconButton(
+                                            onPressed: () {
+                                              setState(() {
+                                                ch.dispose();
+                                                op.characteristics.removeAt(ci);
+                                              });
+                                            },
+                                            icon: const Icon(Icons.close),
+                                          ),
+                                      ],
+                                    ),
+                                    TextFormField(
+                                      controller: ch.nominal,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Nominal',
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      keyboardType: const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: TextFormField(
+                                            controller: ch.tolMin,
+                                            decoration: const InputDecoration(
+                                              labelText: 'Tolerancija min',
+                                              border: OutlineInputBorder(),
+                                            ),
+                                            keyboardType:
+                                                const TextInputType.numberWithOptions(
+                                              decimal: true,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: TextFormField(
+                                            controller: ch.tolMax,
+                                            decoration: const InputDecoration(
+                                              labelText: 'Tolerancija max',
+                                              border: OutlineInputBorder(),
+                                            ),
+                                            keyboardType:
+                                                const TextInputType.numberWithOptions(
+                                              decimal: true,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    TextFormField(
+                                      controller: ch.unit,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Jedinica',
+                                        border: OutlineInputBorder(),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
+                          ],
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _unit,
-                      decoration: const InputDecoration(
-                        labelText: 'Jedinica',
-                        border: OutlineInputBorder(),
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    FilledButton.icon(
-                      onPressed: _saving ? null : _save,
-                      icon: _saving
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.save),
-                      label: Text(_saving ? 'Spremanje…' : 'Spremi'),
-                    ),
-                  ],
-                ),
+                    );
+                  }),
+                  const SizedBox(height: 8),
+                  FilledButton.icon(
+                    onPressed: _saving ? null : _save,
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save),
+                    label: Text(_saving ? 'Spremanje…' : 'Spremi'),
+                  ),
+                ],
               ),
             ),
     );

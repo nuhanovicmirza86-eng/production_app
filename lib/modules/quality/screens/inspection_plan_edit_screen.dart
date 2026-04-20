@@ -104,6 +104,105 @@ class _InspectionPlanEditScreenState extends State<InspectionPlanEditScreen> {
         .toList();
   }
 
+  /// Generiše refove 0:0, 0:1, … iz učitanog kontrolnog plana (isti red kao backend).
+  List<({String ref, String label})> _refsFromControlPlanMap(Map<String, dynamic> cp) {
+    final out = <({String ref, String label})>[];
+    final ops = cp['operations'] as List? ?? [];
+    for (var oi = 0; oi < ops.length; oi++) {
+      final op = ops[oi];
+      if (op is! Map) continue;
+      final chars = op['characteristics'] as List? ?? [];
+      for (var ci = 0; ci < chars.length; ci++) {
+        final ref = '$oi:$ci';
+        String name = ref;
+        final ch = chars[ci];
+        if (ch is Map) {
+          name = (ch['name'] ?? ref).toString();
+        }
+        out.add((ref: ref, label: '$ref — $name'));
+      }
+    }
+    return out;
+  }
+
+  Future<void> _pickRefsFromControlPlan() async {
+    final cpId = _controlPlanId.text.trim();
+    if (cpId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unesi ID kontrolnog plana.')),
+      );
+      return;
+    }
+    try {
+      final cp = await _svc.getQmsControlPlanMap(companyId: _cid, controlPlanId: cpId);
+      if (!mounted) return;
+      final options = _refsFromControlPlanMap(cp);
+      if (options.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Kontrolni plan nema karakteristika.')),
+        );
+        return;
+      }
+      final current = _parseRefs(_refs.text).toSet();
+      final selected = <String>{...current};
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          return StatefulBuilder(
+            builder: (context, setLocal) {
+              return AlertDialog(
+                title: const Text('Odaberi karakteristike (refs)'),
+                content: SizedBox(
+                  width: double.maxFinite,
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: options.map((o) {
+                      final checked = selected.contains(o.ref);
+                      return CheckboxListTile(
+                        value: checked,
+                        title: Text(o.label, style: const TextStyle(fontSize: 13)),
+                        onChanged: (v) {
+                          setLocal(() {
+                            if (v == true) {
+                              selected.add(o.ref);
+                            } else {
+                              selected.remove(o.ref);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Odustani'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Primijeni'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+      if (ok == true && mounted) {
+        final list = selected.toList()..sort();
+        setState(() {
+          _refs.text = list.join(', ');
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
+      );
+    }
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
@@ -228,6 +327,12 @@ class _InspectionPlanEditScreenState extends State<InspectionPlanEditScreen> {
                         border: OutlineInputBorder(),
                       ),
                       maxLines: 2,
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: _saving ? null : _pickRefsFromControlPlan,
+                      icon: const Icon(Icons.checklist_outlined),
+                      label: const Text('Odaberi karakteristike iz kontrolnog plana'),
                     ),
                     const SizedBox(height: 24),
                     FilledButton.icon(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../models/qms_list_models.dart';
 import '../services/quality_callable_service.dart';
+import 'ncr_detail_screen.dart';
 
 /// NCR lista — Callable [listQmsNonConformances] (default: samo otvoreni).
 class NcrListScreen extends StatefulWidget {
@@ -142,6 +143,19 @@ class _NcrListScreenState extends State<NcrListScreen> {
             style: Theme.of(context).textTheme.bodySmall,
           ),
           isThreeLine: true,
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () async {
+            await Navigator.push<void>(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => NcrDetailScreen(
+                  companyData: widget.companyData,
+                  ncrId: r.id,
+                ),
+              ),
+            );
+            if (mounted) await _load();
+          },
         );
       },
     );

@@ -211,6 +211,113 @@ class QualityCallableService {
     return QmsInspectionExecutionContext.fromMap(m);
   }
 
+  Future<Map<String, dynamic>> getQmsNonConformanceMap({
+    required String companyId,
+    required String ncrId,
+  }) async {
+    final callable = _functions.httpsCallable('getQmsNonConformance');
+    final res = await callable.call({
+      'companyId': companyId,
+      'ncrId': ncrId,
+    });
+    final m = Map<String, dynamic>.from((res.data as Map?) ?? {});
+    return Map<String, dynamic>.from(m['ncr'] as Map? ?? {});
+  }
+
+  Future<void> updateQmsNonConformance({
+    required String companyId,
+    required String ncrId,
+    String? status,
+    String? containmentAction,
+    String? description,
+    String? severity,
+  }) async {
+    final callable = _functions.httpsCallable('updateQmsNonConformance');
+    await callable.call({
+      'companyId': companyId,
+      'ncrId': ncrId,
+      if (status != null) 'status': status,
+      if (containmentAction != null) 'containmentAction': containmentAction,
+      if (description != null) 'description': description,
+      if (severity != null) 'severity': severity,
+    });
+  }
+
+  Future<List<QmsCapaRow>> listCapaForNcr({
+    required String companyId,
+    required String ncrId,
+  }) async {
+    final callable = _functions.httpsCallable('listQmsCapaForNcr');
+    final res = await callable.call({
+      'companyId': companyId,
+      'ncrId': ncrId,
+    });
+    return _parseRows(res.data, QmsCapaRow.fromMap);
+  }
+
+  Future<Map<String, dynamic>> getQmsCapaActionPlanMap({
+    required String companyId,
+    required String actionPlanId,
+  }) async {
+    final callable = _functions.httpsCallable('getQmsCapaActionPlan');
+    final res = await callable.call({
+      'companyId': companyId,
+      'actionPlanId': actionPlanId,
+    });
+    final m = Map<String, dynamic>.from((res.data as Map?) ?? {});
+    return Map<String, dynamic>.from(m['actionPlan'] as Map? ?? {});
+  }
+
+  Future<void> updateQmsCapaActionPlan({
+    required String companyId,
+    required String actionPlanId,
+    String? title,
+    String? status,
+    String? rootCause,
+    String? actionText,
+    String? verificationNotes,
+    String? responsibleUserId,
+    String? dueDateIso,
+  }) async {
+    final callable = _functions.httpsCallable('updateQmsCapaActionPlan');
+    await callable.call({
+      'companyId': companyId,
+      'actionPlanId': actionPlanId,
+      if (title != null) 'title': title,
+      if (status != null) 'status': status,
+      if (rootCause != null) 'rootCause': rootCause,
+      if (actionText != null) 'actionText': actionText,
+      if (verificationNotes != null) 'verificationNotes': verificationNotes,
+      if (responsibleUserId != null) 'responsibleUserId': responsibleUserId,
+      if (dueDateIso != null) 'dueDate': dueDateIso,
+    });
+  }
+
+  Future<String> createQmsCapaForNcr({
+    required String companyId,
+    required String ncrId,
+    required String title,
+    String? actionText,
+    String? responsibleUserId,
+    String? dueDateIso,
+  }) async {
+    final callable = _functions.httpsCallable('createQmsCapaForNcr');
+    final res = await callable.call({
+      'companyId': companyId,
+      'ncrId': ncrId,
+      'title': title,
+      if (actionText != null && actionText.isNotEmpty) 'actionText': actionText,
+      if (responsibleUserId != null && responsibleUserId.isNotEmpty)
+        'responsibleUserId': responsibleUserId,
+      if (dueDateIso != null && dueDateIso.isNotEmpty) 'dueDate': dueDateIso,
+    });
+    final id = (res.data as Map?)?['actionPlanId']?.toString().trim();
+    if (id == null || id.isEmpty) {
+      throw StateError('createQmsCapaForNcr: nije vraćen actionPlanId');
+    }
+    return id;
+  }
+
   static List<T> _parseRows<T>(
     dynamic raw,
     T Function(Map<String, dynamic>) fromMap,

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
-import '../../production/qr/production_qr_scan_flow.dart';
+import '../../production/qr/production_qr_resolver.dart';
+import '../../production/qr/screens/production_qr_scan_screen.dart';
 import '../models/qms_execution_models.dart';
 import '../models/qms_list_models.dart';
 import '../services/quality_callable_service.dart';
@@ -66,6 +67,35 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
       c.dispose();
     }
     _valueByRef.clear();
+  }
+
+  /// Sken naloga (`po:v1`) ili WMS lota (`wmslot:v1`) → puni polja konteksta inspekcije.
+  Future<void> _scanQr() async {
+    final resolution = await Navigator.push<ProductionQrScanResolution>(
+      context,
+      MaterialPageRoute<ProductionQrScanResolution>(
+        fullscreenDialog: true,
+        builder: (_) => ProductionQrScanScreen(companyData: widget.companyData),
+      ),
+    );
+    if (!mounted || resolution == null) return;
+    switch (resolution.intent) {
+      case ProductionQrIntent.productionOrderReferenceV1:
+        final id = resolution.productionOrderId?.trim();
+        if (id != null && id.isNotEmpty) {
+          _productionOrderId.text = id;
+        }
+        break;
+      case ProductionQrIntent.wmsLotDocV1:
+        final lot = resolution.wmsLotDocId?.trim();
+        if (lot != null && lot.isNotEmpty) {
+          _lotId.text = lot;
+        }
+        break;
+      default:
+        break;
+    }
+    setState(() {});
   }
 
   Future<void> _loadPlans() async {
@@ -221,17 +251,12 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
         children: [
           FilledButton.tonalIcon(
             icon: const Icon(Icons.qr_code_scanner),
-            label: const Text('Skeniraj LOT ili nalog (proizvodni tok)'),
-            onPressed: () async {
-              await runProductionQrScanFlow(
-                context: context,
-                companyData: widget.companyData,
-              );
-            },
+            label: const Text('Skeniraj LOT (wmslot) ili nalog (po:v1)'),
+            onPressed: _scanQr,
           ),
           const SizedBox(height: 8),
           Text(
-            'Za QMS unos rezultata odaberi plan inspekcije ispod, učitaj mjerenja i unesi vrijednosti.',
+            'Sken puni polja LOT ID / ID proizvodnog naloga. Zatim odaberi plan inspekcije, učitaj mjerenja i unesi vrijednosti.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: 20),

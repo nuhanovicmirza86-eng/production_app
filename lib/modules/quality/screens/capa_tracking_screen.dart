@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../models/qms_list_models.dart';
 import '../services/quality_callable_service.dart';
+import 'capa_detail_screen.dart';
 
 /// CAPA — action_plans s sourceType = non_conformance (Callable [listQmsOpenCapa]).
 class CapaTrackingScreen extends StatefulWidget {
@@ -121,6 +122,19 @@ class _CapaTrackingScreenState extends State<CapaTrackingScreen> {
             style: Theme.of(context).textTheme.bodySmall,
           ),
           isThreeLine: true,
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () async {
+            await Navigator.push<void>(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => CapaDetailScreen(
+                  companyData: widget.companyData,
+                  actionPlanId: r.id,
+                ),
+              ),
+            );
+            if (mounted) await _load();
+          },
         );
       },
     );
