@@ -1,11 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
 import '../models/qms_list_models.dart';
 import '../services/quality_callable_service.dart';
 import 'capa_detail_screen.dart';
 
-/// Detalj NCR-a + povezane CAPA + kreiranje nove CAPA (Callable).
+class _NcrAttRow {
+  _NcrAttRow({String label = '', String url = ''})
+    : label = TextEditingController(text: label),
+      url = TextEditingController(text: url);
+
+  final TextEditingController label;
+  final TextEditingController url;
+
+  void dispose() {
+    label.dispose();
+    url.dispose();
+  }
+}
+
+/// Detalj NCR-a + povezane CAPA + prilozi (https — obavezni pri zatvaranju/odbacivanju).
 class NcrDetailScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
   final String ncrId;
@@ -24,6 +39,8 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
   final _svc = QualityCallableService();
   final _description = TextEditingController();
   final _containment = TextEditingController();
+
+  final List<_NcrAttRow> _attachmentRows = [];
 
   bool _loading = true;
   String? _error;
@@ -57,7 +74,17 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
   void dispose() {
     _description.dispose();
     _containment.dispose();
+    for (final r in _attachmentRows) {
+      r.dispose();
+    }
     super.dispose();
+  }
+
+  void _disposeAttachmentRows() {
+    for (final r in _attachmentRows) {
+      r.dispose();
+    }
+    _attachmentRows.clear();
   }
 
   Future<void> _load() async {
@@ -81,6 +108,23 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
       _status = _statuses.contains(st) ? st : 'OPEN';
       final sev = (n['severity'] ?? 'MEDIUM').toString().toUpperCase();
       _severity = _severities.contains(sev) ? sev : 'MEDIUM';
+
+      _disposeAttachmentRows();
+      final raw = n['attachments'];
+      if (raw is List) {
+        for (final e in raw) {
+          if (e is Map) {
+            final m = Map<String, dynamic>.from(e);
+            _attachmentRows.add(
+              _NcrAttRow(
+                label: (m['label'] ?? '').toString(),
+                url: (m['url'] ?? '').toString(),
+              ),
+            );
+          }
+        }
+      }
+
       setState(() {
         _ncr = n;
         _capaRows = caps;
@@ -95,21 +139,87 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
     }
   }
 
+  List<Map<String, String>> _buildAttachmentsPayload() {
+    final out = <Map<String, String>>[];
+    for (final r in _attachmentRows) {
+      final label = r.label.text.trim();
+      final url = r.url.text.trim();
+      if (label.isEmpty && url.isEmpty) continue;
+      if (label.isEmpty || url.isEmpty) {
+        throw StateError('Svaki prilog mora imati naziv i https URL.');
+      }
+      if (!url.toLowerCase().startsWith('https://')) {
+        throw StateError('URL mora početi s https://');
+      }
+      out.add({'label': label, 'url': url});
+    }
+    return out;
+  }
+
   Future<void> _save() async {
+    late final List<Map<String, String>> att;
+    try {
+      att = _buildAttachmentsPayload();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+      return;
+    }
+    if ((_status == 'CLOSED' || _status == 'DISMISSED') && att.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Za status Zatvoreno / Odbačeno potreban je barem jedan prilog (https).',
+          ),
+        ),
+      );
+      return;
+    }
+
     setState(() => _saving = true);
     try {
-      await _svc.updateQmsNonConformance(
+      final res = await _svc.updateQmsNonConformance(
         companyId: _cid,
         ncrId: widget.ncrId,
         status: _status,
         containmentAction: _containment.text,
         description: _description.text,
         severity: _severity,
+        attachments: att,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('NCR je spremljen.')),
-      );
+      final auto = res['capaAutoCreated'] == true;
+      final idCapa = res['actionPlanId']?.toString();
+      if (auto && idCapa != null && idCapa.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'NCR spremljen. Automatski je otvorena CAPA za ovaj NCR.',
+            ),
+            action: SnackBarAction(
+              label: 'Otvori CAPA',
+              onPressed: () {
+                Navigator.push<void>(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => CapaDetailScreen(
+                      companyData: widget.companyData,
+                      actionPlanId: idCapa,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('NCR je spremljen.')),
+        );
+      }
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -118,6 +228,14 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
       );
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _openUrl(String url) async {
+    final u = Uri.tryParse(url.trim());
+    if (u == null) return;
+    if (await canLaunchUrl(u)) {
+      await launchUrl(u, mode: LaunchMode.externalApplication);
     }
   }
 
@@ -250,6 +368,80 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                       'LOT: ${_ncr!['lotId'] ?? '—'} · Nalog: ${_ncr!['productionOrderId'] ?? '—'}',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Prilozi (naziv + https URL)',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Za Zatvoreno ili Odbačeno potreban je barem jedan prilog. '
+                      'Učitaj datoteku u Storage ili drugi sustav i zalijepi javni https link.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: () {
+                        setState(() => _attachmentRows.add(_NcrAttRow()));
+                      },
+                      icon: const Icon(Icons.attach_file),
+                      label: const Text('Dodaj red priloga'),
+                    ),
+                    ..._attachmentRows.asMap().entries.map((e) {
+                      final i = e.key;
+                      final r = e.value;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: TextField(
+                                controller: r.label,
+                                decoration: const InputDecoration(
+                                  labelText: 'Naziv',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 3,
+                              child: TextField(
+                                controller: r.url,
+                                decoration: const InputDecoration(
+                                  labelText: 'https://…',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Otvori u pregledniku',
+                              onPressed: () {
+                                final u = r.url.text.trim();
+                                if (u.isNotEmpty) _openUrl(u);
+                              },
+                              icon: const Icon(Icons.open_in_new),
+                            ),
+                            IconButton(
+                              tooltip: 'Ukloni',
+                              onPressed: () {
+                                setState(() {
+                                  r.dispose();
+                                  _attachmentRows.removeAt(i);
+                                });
+                              },
+                              icon: const Icon(Icons.delete_outline),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
                     const SizedBox(height: 20),
                     FilledButton.icon(
                       onPressed: _saving ? null : _save,
@@ -270,7 +462,7 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                     const SizedBox(height: 8),
                     if (_capaRows.isEmpty)
                       Text(
-                        'Nema CAPA zapisa. Koristi „Nova CAPA”.',
+                        'Nema CAPA zapisa. Koristi „Nova CAPA” ili prijelaz u status Pregled / Contained za automatsko otvaranje.',
                         style: Theme.of(context).textTheme.bodyMedium,
                       )
                     else

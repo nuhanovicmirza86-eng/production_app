@@ -224,23 +224,27 @@ class QualityCallableService {
     return Map<String, dynamic>.from(m['ncr'] as Map? ?? {});
   }
 
-  Future<void> updateQmsNonConformance({
+  /// Vraća [capaAutoCreated], [actionPlanId] kad backend automatski otvori CAPA.
+  Future<Map<String, dynamic>> updateQmsNonConformance({
     required String companyId,
     required String ncrId,
     String? status,
     String? containmentAction,
     String? description,
     String? severity,
+    List<Map<String, String>>? attachments,
   }) async {
     final callable = _functions.httpsCallable('updateQmsNonConformance');
-    await callable.call({
+    final res = await callable.call({
       'companyId': companyId,
       'ncrId': ncrId,
       if (status != null) 'status': status,
       if (containmentAction != null) 'containmentAction': containmentAction,
       if (description != null) 'description': description,
       if (severity != null) 'severity': severity,
+      if (attachments != null) 'attachments': attachments,
     });
+    return Map<String, dynamic>.from((res.data as Map?) ?? const <String, dynamic>{});
   }
 
   Future<List<QmsCapaRow>> listCapaForNcr({
