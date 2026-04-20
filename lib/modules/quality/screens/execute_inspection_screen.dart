@@ -13,10 +13,14 @@ class ExecuteInspectionScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
   final String? initialInspectionPlanId;
 
+  /// Kad nema [initialInspectionPlanId], prvi se odabire plan s ovim tipom (npr. IN_PROCESS / FINAL).
+  final String? preferredInspectionType;
+
   const ExecuteInspectionScreen({
     super.key,
     required this.companyData,
     this.initialInspectionPlanId,
+    this.preferredInspectionType,
   });
 
   @override
@@ -70,6 +74,18 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
     _valueByRef.clear();
   }
 
+  /// Preferirani tip (npr. stanica prva/završna kontrola), inače prvi plan u listi.
+  String? _firstMatchingPlanId(List<QmsInspectionPlanRow> rows) {
+    if (rows.isEmpty) return null;
+    final pref = widget.preferredInspectionType?.trim().toUpperCase();
+    if (pref != null && pref.isNotEmpty) {
+      for (final r in rows) {
+        if (r.inspectionType.toUpperCase() == pref) return r.id;
+      }
+    }
+    return rows.first.id;
+  }
+
   /// Sken naloga (`po:v1`) ili WMS lota (`wmslot:v1`) → puni polja konteksta inspekcije.
   Future<void> _scanQr() async {
     final resolution = await Navigator.push<ProductionQrScanResolution>(
@@ -117,9 +133,9 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
       if (!mounted) return;
       String? sel = _selectedPlanId;
       if (sel != null && sel.isNotEmpty && !rows.any((r) => r.id == sel)) {
-        sel = rows.isNotEmpty ? rows.first.id : null;
+        sel = _firstMatchingPlanId(rows);
       } else if ((sel == null || sel.isEmpty) && rows.isNotEmpty) {
-        sel = rows.first.id;
+        sel = _firstMatchingPlanId(rows);
       }
       setState(() {
         _planRows = rows;

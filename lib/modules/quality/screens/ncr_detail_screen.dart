@@ -369,17 +369,18 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
+                    QmsIatfSectionTitle(
+                      label: 'Containment / privremena mjera',
+                      iatfTitle: 'Containment',
+                      iatfMessage: QmsIatfStrings.termContainment,
+                    ),
+                    const SizedBox(height: 6),
                     TextFormField(
                       controller: _containment,
                       maxLines: 3,
-                      decoration: InputDecoration(
-                        labelText: 'Containment / privremena mjera',
-                        border: const OutlineInputBorder(),
-                        suffixIcon: QmsIatfInfoIcon(
-                          title: 'Containment',
-                          message: QmsIatfStrings.termContainment,
-                          size: 20,
-                        ),
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
                       ),
                     ),
                     const SizedBox(height: 8),

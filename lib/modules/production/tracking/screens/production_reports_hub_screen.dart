@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/branding/operonix_ai_branding.dart';
 import '../../../../core/saas/production_module_keys.dart';
+import '../../../quality/screens/capa_tracking_screen.dart';
+import '../../../quality/screens/execute_inspection_screen.dart';
+import '../../../quality/screens/ncr_list_screen.dart';
+import '../../../quality/screens/quality_dashboard_screen.dart';
 import '../../ai_analysis/screens/ai_analysis_screen.dart';
 import '../../reports/screens/production_ai_report_screen.dart';
 import 'production_operator_tracking_day_report_screen.dart';
@@ -32,9 +36,23 @@ class ProductionReportsHubScreen extends StatelessWidget {
     );
   }
 
+  void _openQms(
+    BuildContext context,
+    Widget screen,
+  ) {
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(builder: (_) => screen),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final qms = ProductionModuleKeys.hasModule(
+      companyData,
+      ProductionModuleKeys.quality,
+    );
     return Scaffold(
       appBar: AppBar(title: const Text('Izvještaji proizvodnje')),
       body: ListView(
@@ -92,6 +110,46 @@ class ProductionReportsHubScreen extends StatelessWidget {
               ),
             const Divider(height: 24),
           ],
+          if (qms) ...[
+            _SectionHeader(theme, 'QMS — kvalitet (pretplata)'),
+            _ReportTile(
+              icon: Icons.dashboard_outlined,
+              title: 'Dashboard kvaliteta',
+              subtitle: 'KPI: planovi, otvoreni NCR i CAPA.',
+              onTap: () => _openQms(
+                context,
+                QualityDashboardScreen(companyData: companyData),
+              ),
+            ),
+            _ReportTile(
+              icon: Icons.qr_code_scanner,
+              title: 'Izvrši inspekciju',
+              subtitle: 'Sken LOT-a ili naloga, mjerenja, NCR pri NOK.',
+              onTap: () => _openQms(
+                context,
+                ExecuteInspectionScreen(companyData: companyData),
+              ),
+            ),
+            _ReportTile(
+              icon: Icons.warning_amber_outlined,
+              title: 'NCR — neskladi',
+              subtitle: 'Evidencija i statusi (IATF 10.2).',
+              onTap: () => _openQms(
+                context,
+                NcrListScreen(companyData: companyData),
+              ),
+            ),
+            _ReportTile(
+              icon: Icons.task_alt_outlined,
+              title: 'CAPA — praćenje',
+              subtitle: 'Korektivne i preventivne akcije.',
+              onTap: () => _openQms(
+                context,
+                CapaTrackingScreen(companyData: companyData),
+              ),
+            ),
+            const Divider(height: 24),
+          ],
           _SectionHeader(theme, 'Otpad i kvalitet'),
           _ReportTile(
             icon: Icons.pie_chart_outline,
@@ -122,34 +180,47 @@ class ProductionReportsHubScreen extends StatelessWidget {
           _ReportTile(
             icon: Icons.assignment_turned_in_outlined,
             title: 'Evidencija naloga i veza na narudžbe',
-            subtitle: 'Traceability sirovina → gotov proizvod.',
-            onTap: () => _soon(context, 'Traceability'),
+            subtitle: qms
+                ? 'Sljedljivost: u QMS modulu unesi LOT i nalog pri inspekciji.'
+                : 'Traceability sirovina → gotov proizvod.',
+            onTap: qms
+                ? () => _openQms(
+                      context,
+                      ExecuteInspectionScreen(companyData: companyData),
+                    )
+                : () => _soon(context, 'Traceability'),
           ),
           const Divider(height: 24),
-          _SectionHeader(theme, 'IATF i akcije'),
-          _ReportTile(
-            icon: Icons.warning_amber_rounded,
-            title: 'Proizvodi s povećanim udjelom škarta',
-            subtitle: 'Pragovi po kompaniji; prikaz kandidata za CAPA.',
-            onTap: () => _soon(context, 'Povećani škart'),
-          ),
-          _ReportTile(
-            icon: Icons.task_alt_outlined,
-            title: 'Akcioni planovi',
-            subtitle: 'IATF 10.2 — planirane i otvorene akcije.',
-            onTap: () => _soon(context, 'Akcioni plan'),
-          ),
-          _ReportTile(
-            icon: Icons.bolt_outlined,
-            title: 'Reakcioni planovi',
-            subtitle: 'Brzi odgovori na odstupanja (containment).',
-            onTap: () => _soon(context, 'Reakcioni plan'),
-          ),
+          if (!qms) ...[
+            _SectionHeader(theme, 'IATF i akcije'),
+            _ReportTile(
+              icon: Icons.warning_amber_rounded,
+              title: 'Proizvodi s povećanim udjelom škarta',
+              subtitle: 'Pragovi po kompaniji; prikaz kandidata za CAPA.',
+              onTap: () => _soon(context, 'Povećani škart'),
+            ),
+            _ReportTile(
+              icon: Icons.task_alt_outlined,
+              title: 'Akcioni planovi',
+              subtitle: 'IATF 10.2 — planirane i otvorene akcije.',
+              onTap: () => _soon(context, 'Akcioni plan'),
+            ),
+            _ReportTile(
+              icon: Icons.bolt_outlined,
+              title: 'Reakcioni planovi',
+              subtitle: 'Brzi odgovori na odstupanja (containment).',
+              onTap: () => _soon(context, 'Reakcioni plan'),
+            ),
+          ],
           const SizedBox(height: 24),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              'Napomena: detaljne kalkulacije i izvoz (PDF/Excel) vezat će se na iste kolekcije kao operativni unos u tabovima praćenja.',
+              qms
+                  ? 'QMS modul: operativni podaci (inspekcije, NCR, CAPA) dolaze preko Callable-a. '
+                      'Agregacije otpada po tipu i trendovi i dalje zahtijevaju dodatne izvještaje (u pripremi).'
+                  : 'Napomena: detaljne kalkulacije i izvoz (PDF/Excel) vezat će se na iste kolekcije kao operativni unos u tabovima praćenja. '
+                      'Za QMS aktiviraj pretplatu na modul „quality“.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),

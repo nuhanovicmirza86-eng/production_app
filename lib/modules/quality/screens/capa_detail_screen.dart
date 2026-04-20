@@ -197,17 +197,18 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
                     },
                   ),
                   const SizedBox(height: 12),
+                  QmsIatfSectionTitle(
+                    label: 'Uzrok (root cause)',
+                    iatfTitle: 'Root cause',
+                    iatfMessage: QmsIatfStrings.termRootCause,
+                  ),
+                  const SizedBox(height: 6),
                   TextFormField(
                     controller: _rootCause,
                     maxLines: 3,
-                    decoration: InputDecoration(
-                      labelText: 'Uzrok (root cause)',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: QmsIatfInfoIcon(
-                        title: 'Root cause',
-                        message: QmsIatfStrings.termRootCause,
-                        size: 20,
-                      ),
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      alignLabelWithHint: true,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -220,17 +221,18 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  QmsIatfSectionTitle(
+                    label: 'Verifikacija',
+                    iatfTitle: 'Verifikacija CAPA',
+                    iatfMessage: QmsIatfStrings.termVerification,
+                  ),
+                  const SizedBox(height: 6),
                   TextFormField(
                     controller: _verification,
                     maxLines: 2,
-                    decoration: InputDecoration(
-                      labelText: 'Verifikacija',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: QmsIatfInfoIcon(
-                        title: 'Verifikacija CAPA',
-                        message: QmsIatfStrings.termVerification,
-                        size: 20,
-                      ),
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      alignLabelWithHint: true,
                     ),
                   ),
                   const SizedBox(height: 12),

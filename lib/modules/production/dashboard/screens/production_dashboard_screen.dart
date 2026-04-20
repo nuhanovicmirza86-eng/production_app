@@ -30,6 +30,7 @@ import '../../ai/screens/production_ai_hub_screen.dart';
 import '../../tracking/screens/production_reports_hub_screen.dart';
 import '../../issues/screens/production_problem_reporting_screen.dart';
 import '../../qr/production_qr_scan_flow.dart';
+import '../../../quality/screens/execute_inspection_screen.dart';
 import '../../../quality/screens/quality_hub_screen.dart';
 
 class _ProdNavItem {
@@ -173,6 +174,22 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       );
     }
 
+    /// U QMS pretplati prva/završna kontrola vodi na izvršenje inspekcije (IATF); inače stanica praćenja.
+    void openQmsInspectionForStationPhase(String phase) {
+      final pref = phase == ProductionOperatorTrackingEntry.phaseFirstControl
+          ? 'IN_PROCESS'
+          : 'FINAL';
+      Navigator.push<void>(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => ExecuteInspectionScreen(
+            companyData: companyData,
+            preferredInspectionType: pref,
+          ),
+        ),
+      );
+    }
+
     final productionTiles = <Widget>[
       if (_hasModule('production')) ...[
       if (_canConfigureStationDevice())
@@ -227,18 +244,30 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         _DashboardActionTile(
           icon: Icons.fact_check_outlined,
           title: 'Stanica: prva kontrola',
-          subtitle: 'Puni zaslon — faza u izradi (placeholder do punog unosa).',
-          onTap: () => openTrackingStation(
-            ProductionOperatorTrackingEntry.phaseFirstControl,
-          ),
+          subtitle: _hasModule('quality')
+              ? 'QMS: izvršenje inspekcije (plan IN_PROCESS). Za tab praćenja koristi „Praćenje proizvodnje“.'
+              : 'Puni zaslon — faza u izradi (placeholder do punog unosa).',
+          onTap: () => _hasModule('quality')
+              ? openQmsInspectionForStationPhase(
+                  ProductionOperatorTrackingEntry.phaseFirstControl,
+                )
+              : openTrackingStation(
+                  ProductionOperatorTrackingEntry.phaseFirstControl,
+                ),
         ),
         _DashboardActionTile(
           icon: Icons.verified_outlined,
           title: 'Stanica: završna kontrola',
-          subtitle: 'Puni zaslon — faza u izradi (placeholder do punog unosa).',
-          onTap: () => openTrackingStation(
-            ProductionOperatorTrackingEntry.phaseFinalControl,
-          ),
+          subtitle: _hasModule('quality')
+              ? 'QMS: izvršenje inspekcije (plan FINAL). Za tab praćenja koristi „Praćenje proizvodnje“.'
+              : 'Puni zaslon — faza u izradi (placeholder do punog unosa).',
+          onTap: () => _hasModule('quality')
+              ? openQmsInspectionForStationPhase(
+                  ProductionOperatorTrackingEntry.phaseFinalControl,
+                )
+              : openTrackingStation(
+                  ProductionOperatorTrackingEntry.phaseFinalControl,
+                ),
         ),
       ],
       if (_canViewCard(ProductionDashboardCard.stationPages))

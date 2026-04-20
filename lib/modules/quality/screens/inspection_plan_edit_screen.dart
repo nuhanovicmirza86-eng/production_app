@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../services/quality_callable_service.dart';
 import '../widgets/qms_iatf_help.dart';
+import '../widgets/qms_pickers.dart';
 
 /// Plan inspekcije: productId + controlPlanId + tip + refs karakteristika (npr. 0:0,0:1).
 /// Prazan unos refs = sve karakteristike kontrolnog plana pri izvršenju (backend).
@@ -269,6 +270,22 @@ class _InspectionPlanEditScreenState extends State<InspectionPlanEditScreen> {
                       validator: (v) =>
                           (v == null || v.trim().isEmpty) ? 'Obavezno' : null,
                     ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () async {
+                          final id = await showQmsProductPicker(
+                            context: context,
+                            companyId: _cid,
+                          );
+                          if (id != null && mounted) {
+                            setState(() => _productId.text = id);
+                          }
+                        },
+                        icon: const Icon(Icons.inventory_2_outlined, size: 20),
+                        label: const Text('Odaberi proizvod'),
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _controlPlanId,
@@ -278,6 +295,25 @@ class _InspectionPlanEditScreenState extends State<InspectionPlanEditScreen> {
                       ),
                       validator: (v) =>
                           (v == null || v.trim().isEmpty) ? 'Obavezno' : null,
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () async {
+                          final id = await showQmsControlPlanPicker(
+                            context: context,
+                            companyId: _cid,
+                            productIdFilter: _productId.text.trim().isEmpty
+                                ? null
+                                : _productId.text.trim(),
+                          );
+                          if (id != null && mounted) {
+                            setState(() => _controlPlanId.text = id);
+                          }
+                        },
+                        icon: const Icon(Icons.engineering_outlined, size: 20),
+                        label: const Text('Odaberi kontrolni plan'),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(

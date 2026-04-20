@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../services/quality_callable_service.dart';
 import '../widgets/qms_iatf_help.dart';
+import '../widgets/qms_pickers.dart';
 
 class _CharBlock {
   _CharBlock()
@@ -259,6 +260,22 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
                     ),
                     validator: (v) =>
                         (v == null || v.trim().isEmpty) ? 'Obavezno' : null,
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () async {
+                        final id = await showQmsProductPicker(
+                          context: context,
+                          companyId: _cid,
+                        );
+                        if (id != null && mounted) {
+                          setState(() => _productId.text = id);
+                        }
+                      },
+                      icon: const Icon(Icons.inventory_2_outlined, size: 20),
+                      label: const Text('Odaberi proizvod'),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
