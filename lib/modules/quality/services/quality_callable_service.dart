@@ -1,5 +1,6 @@
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../models/qms_execution_models.dart';
 import '../models/qms_list_models.dart';
 
 /// QMS Callable-i — mutacije i liste (Firestore rules: klijent read/write false na QMS kolekcijama).
@@ -169,6 +170,45 @@ class QualityCallableService {
       'companyId': companyId,
     });
     return _parseRows(res.data, QmsCapaRow.fromMap);
+  }
+
+  Future<Map<String, dynamic>> getQmsControlPlanMap({
+    required String companyId,
+    required String controlPlanId,
+  }) async {
+    final callable = _functions.httpsCallable('getQmsControlPlan');
+    final res = await callable.call({
+      'companyId': companyId,
+      'controlPlanId': controlPlanId,
+    });
+    final m = Map<String, dynamic>.from((res.data as Map?) ?? {});
+    return Map<String, dynamic>.from(m['controlPlan'] as Map? ?? {});
+  }
+
+  Future<Map<String, dynamic>> getQmsInspectionPlanMap({
+    required String companyId,
+    required String inspectionPlanId,
+  }) async {
+    final callable = _functions.httpsCallable('getQmsInspectionPlan');
+    final res = await callable.call({
+      'companyId': companyId,
+      'inspectionPlanId': inspectionPlanId,
+    });
+    final m = Map<String, dynamic>.from((res.data as Map?) ?? {});
+    return Map<String, dynamic>.from(m['inspectionPlan'] as Map? ?? {});
+  }
+
+  Future<QmsInspectionExecutionContext> getInspectionExecutionContext({
+    required String companyId,
+    required String inspectionPlanId,
+  }) async {
+    final callable = _functions.httpsCallable('getQmsInspectionExecutionContext');
+    final res = await callable.call({
+      'companyId': companyId,
+      'inspectionPlanId': inspectionPlanId,
+    });
+    final m = Map<String, dynamic>.from((res.data as Map?) ?? {});
+    return QmsInspectionExecutionContext.fromMap(m);
   }
 
   static List<T> _parseRows<T>(

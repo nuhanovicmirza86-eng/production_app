@@ -1,40 +1,378 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/errors/app_error_mapper.dart';
 import '../../production/qr/production_qr_scan_flow.dart';
+import '../models/qms_execution_models.dart';
+import '../models/qms_list_models.dart';
+import '../services/quality_callable_service.dart';
 
-/// Sken-first tok: LOT ili nalog → učitavanje plana → mjerenje → OK/NOK.
-class ExecuteInspectionScreen extends StatelessWidget {
+/// Odabir plana inspekcije → [getQmsInspectionExecutionContext] → unos mjerenja → [submitInspectionResult].
+class ExecuteInspectionScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
+  final String? initialInspectionPlanId;
 
-  const ExecuteInspectionScreen({super.key, required this.companyData});
+  const ExecuteInspectionScreen({
+    super.key,
+    required this.companyData,
+    this.initialInspectionPlanId,
+  });
+
+  @override
+  State<ExecuteInspectionScreen> createState() => _ExecuteInspectionScreenState();
+}
+
+class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
+  final _svc = QualityCallableService();
+  final _lotId = TextEditingController();
+  final _productionOrderId = TextEditingController();
+
+  bool _loadingPlans = true;
+  String? _plansError;
+  var _planRows = const <QmsInspectionPlanRow>[];
+
+  String? _selectedPlanId;
+  bool _loadingContext = false;
+  String? _contextError;
+  QmsInspectionExecutionContext? _ctx;
+  final Map<String, TextEditingController> _valueByRef = {};
+
+  bool _submitting = false;
+
+  String get _cid =>
+      (widget.companyData['companyId'] ?? '').toString().trim();
+
+  String get _defaultPlantKey =>
+      (widget.companyData['plantKey'] ?? '').toString().trim();
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedPlanId = widget.initialInspectionPlanId;
+    _loadPlans();
+  }
+
+  @override
+  void dispose() {
+    _lotId.dispose();
+    _productionOrderId.dispose();
+    for (final c in _valueByRef.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _disposeMeasureControllers() {
+    for (final c in _valueByRef.values) {
+      c.dispose();
+    }
+    _valueByRef.clear();
+  }
+
+  Future<void> _loadPlans() async {
+    final cid = _cid;
+    if (cid.isEmpty) {
+      setState(() {
+        _loadingPlans = false;
+        _plansError = 'Nedostaje companyId.';
+      });
+      return;
+    }
+    setState(() {
+      _loadingPlans = true;
+      _plansError = null;
+    });
+    try {
+      final rows = await _svc.listInspectionPlans(companyId: cid);
+      if (!mounted) return;
+      String? sel = _selectedPlanId;
+      if (sel != null && sel.isNotEmpty && !rows.any((r) => r.id == sel)) {
+        sel = rows.isNotEmpty ? rows.first.id : null;
+      } else if ((sel == null || sel.isEmpty) && rows.isNotEmpty) {
+        sel = rows.first.id;
+      }
+      setState(() {
+        _planRows = rows;
+        _selectedPlanId = sel;
+        _loadingPlans = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _plansError = AppErrorMapper.toMessage(e);
+        _loadingPlans = false;
+      });
+    }
+  }
+
+  Future<void> _loadExecutionContext() async {
+    final planId = _selectedPlanId;
+    final cid = _cid;
+    if (planId == null || planId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Odaberi plan inspekcije.')),
+      );
+      return;
+    }
+    setState(() {
+      _loadingContext = true;
+      _contextError = null;
+      _ctx = null;
+      _disposeMeasureControllers();
+    });
+    try {
+      final ctx = await _svc.getInspectionExecutionContext(
+        companyId: cid,
+        inspectionPlanId: planId,
+      );
+      if (!mounted) return;
+      for (final s in ctx.measureSlots) {
+        _valueByRef[s.characteristicRef] = TextEditingController();
+      }
+      setState(() {
+        _ctx = ctx;
+        _loadingContext = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _contextError = AppErrorMapper.toMessage(e);
+        _loadingContext = false;
+      });
+    }
+  }
+
+  Future<void> _submit() async {
+    final ctx = _ctx;
+    final planId = _selectedPlanId;
+    if (ctx == null || planId == null || planId.isEmpty) return;
+
+    final measurements = <Map<String, dynamic>>[];
+    for (final slot in ctx.measureSlots) {
+      final c = _valueByRef[slot.characteristicRef];
+      final raw = (c?.text ?? '').trim();
+      if (raw.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unesi vrijednost za: ${slot.name}')),
+        );
+        return;
+      }
+      final v = double.tryParse(raw.replaceAll(',', '.'));
+      if (v == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Neispravan broj za: ${slot.name}')),
+        );
+        return;
+      }
+      measurements.add({
+        'characteristicRef': slot.characteristicRef,
+        'measuredValue': v,
+      });
+    }
+    if (measurements.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nema mjernih mjesta u planu.')),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      final res = await _svc.submitInspectionResult(
+        companyId: _cid,
+        plantKey: _defaultPlantKey.isEmpty ? null : _defaultPlantKey,
+        inspectionPlanId: planId,
+        measurements: measurements,
+        lotId: _lotId.text.trim().isEmpty ? null : _lotId.text.trim(),
+        productionOrderId: _productionOrderId.text.trim().isEmpty
+            ? null
+            : _productionOrderId.text.trim(),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Spremljeno. Rezultat: ${res.overallResult} (${res.inspectionResultId})',
+          ),
+        ),
+      );
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  String _planLabel(QmsInspectionPlanRow r) {
+    final code = r.inspectionPlanCode ?? r.id;
+    return '$code · ${r.inspectionType} · ${r.status}';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Izvrši inspekciju')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          FilledButton.icon(
+          FilledButton.tonalIcon(
             icon: const Icon(Icons.qr_code_scanner),
-            label: const Text('Skeniraj LOT ili nalog'),
+            label: const Text('Skeniraj LOT ili nalog (proizvodni tok)'),
             onPressed: () async {
               await runProductionQrScanFlow(
                 context: context,
-                companyData: companyData,
+                companyData: widget.companyData,
               );
             },
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
           Text(
-            'Nakon skena, aplikacija će učitati odgovarajući inspection_plan i prikazati karakteristike iz kontrolnog plana (bez ručnog biranja mjerenja). '
-            'Implementacija: povezivanje s ProductionQrResolver i Callable za snimanje inspection_results.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+            'Za QMS unos rezultata odaberi plan inspekcije ispod, učitaj mjerenja i unesi vrijednosti.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
+          const SizedBox(height: 20),
+          if (_loadingPlans)
+            const Center(child: Padding(
+              padding: EdgeInsets.all(24),
+              child: CircularProgressIndicator(),
+            ))
+          else if (_plansError != null)
+            Text(_plansError!, style: TextStyle(color: cs.error))
+          else if (_planRows.isEmpty)
+            Text(
+              'Nema planova inspekcije. U „Planovi inspekcije“ kreiraj plan (Callable).',
+              style: Theme.of(context).textTheme.bodyMedium,
+            )
+          else ...[
+            DropdownButtonFormField<String>(
+              key: ValueKey<String?>('plan_${_selectedPlanId ?? "none"}'),
+              initialValue: _selectedPlanId != null &&
+                      _planRows.any((r) => r.id == _selectedPlanId)
+                  ? _selectedPlanId
+                  : null,
+              decoration: const InputDecoration(
+                labelText: 'Plan inspekcije',
+                border: OutlineInputBorder(),
+              ),
+              items: _planRows
+                  .map(
+                    (r) => DropdownMenuItem<String>(
+                      value: r.id,
+                      child: Text(
+                        _planLabel(r),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) {
+                setState(() {
+                  _selectedPlanId = v;
+                  _ctx = null;
+                  _contextError = null;
+                  _disposeMeasureControllers();
+                });
+              },
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: _loadingContext ? null : _loadExecutionContext,
+              icon: _loadingContext
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.download_outlined),
+              label: Text(_loadingContext ? 'Učitavanje…' : 'Učitaj mjerna mjesta'),
+            ),
+          ],
+          if (_contextError != null) ...[
+            const SizedBox(height: 16),
+            Text(_contextError!, style: TextStyle(color: cs.error)),
+          ],
+          if (_ctx != null) ...[
+            const SizedBox(height: 20),
+            Text(
+              _ctx!.controlPlanTitle.isNotEmpty
+                  ? _ctx!.controlPlanTitle
+                  : 'Kontrolni plan',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Tip: ${_ctx!.inspectionType} · status plana: ${_ctx!.inspectionPlanStatus} · proizvod: ${_ctx!.productId}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _lotId,
+              decoration: const InputDecoration(
+                labelText: 'Lot ID (opcionalno)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _productionOrderId,
+              decoration: const InputDecoration(
+                labelText: 'ID proizvodnog naloga (opcionalno)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text('Mjerenja', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            ..._ctx!.measureSlots.map((slot) {
+              final ctrl = _valueByRef[slot.characteristicRef];
+              final tol = _tolHint(slot);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: TextField(
+                  controller: ctrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                  decoration: InputDecoration(
+                    labelText: slot.name.isEmpty ? slot.characteristicRef : slot.name,
+                    helperText: tol,
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              );
+            }),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _submitting ? null : _submit,
+              icon: _submitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.check_circle_outline),
+              label: Text(_submitting ? 'Slanje…' : 'Pošalji rezultat inspekcije'),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  String? _tolHint(QmsMeasureSlot slot) {
+    final parts = <String>[];
+    if (slot.nominal != null) parts.add('nom. ${slot.nominal}');
+    if (slot.toleranceMin != null || slot.toleranceMax != null) {
+      parts.add(
+        '${slot.toleranceMin ?? "—"} … ${slot.toleranceMax ?? "—"}'
+        '${slot.unit != null ? " ${slot.unit}" : ""}',
+      );
+    } else if (slot.unit != null && slot.unit!.isNotEmpty) {
+      parts.add(slot.unit!);
+    }
+    if (parts.isEmpty) return null;
+    return parts.join(' · ');
   }
 }

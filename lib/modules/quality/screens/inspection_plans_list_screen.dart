@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../models/qms_list_models.dart';
 import '../services/quality_callable_service.dart';
+import 'inspection_plan_edit_screen.dart';
 
 class InspectionPlansListScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
@@ -62,6 +63,19 @@ class _InspectionPlansListScreenState extends State<InspectionPlansListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Planovi inspekcije')),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final ok = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute<bool>(
+              builder: (_) => InspectionPlanEditScreen(companyData: widget.companyData),
+            ),
+          );
+          if (ok == true && mounted) await _load();
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Novi'),
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: _buildBody(context),
@@ -106,9 +120,12 @@ class _InspectionPlansListScreenState extends State<InspectionPlansListScreen> {
       separatorBuilder: (context, index) => const Divider(height: 1),
       itemBuilder: (context, i) {
         final r = _rows[i];
+        final title = r.inspectionPlanCode != null && r.inspectionPlanCode!.isNotEmpty
+            ? '${r.inspectionPlanCode} · ${r.inspectionType}'
+            : r.inspectionType;
         return ListTile(
           title: Text(
-            r.inspectionType,
+            title,
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
           subtitle: Text(
@@ -119,6 +136,18 @@ class _InspectionPlansListScreenState extends State<InspectionPlansListScreen> {
             style: Theme.of(context).textTheme.bodySmall,
           ),
           isThreeLine: true,
+          onTap: () async {
+            final ok = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute<bool>(
+                builder: (_) => InspectionPlanEditScreen(
+                  companyData: widget.companyData,
+                  inspectionPlanId: r.id,
+                ),
+              ),
+            );
+            if (ok == true && mounted) await _load();
+          },
         );
       },
     );

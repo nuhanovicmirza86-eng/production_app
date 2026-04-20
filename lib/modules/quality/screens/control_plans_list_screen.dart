@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../models/qms_list_models.dart';
 import '../services/quality_callable_service.dart';
+import 'control_plan_edit_screen.dart';
 
 /// Kontrolni planovi — lista preko Callable-a [listQmsControlPlans].
 class ControlPlansListScreen extends StatefulWidget {
@@ -62,6 +63,19 @@ class _ControlPlansListScreenState extends State<ControlPlansListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Kontrolni planovi')),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final ok = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute<bool>(
+              builder: (_) => ControlPlanEditScreen(companyData: widget.companyData),
+            ),
+          );
+          if (ok == true && mounted) await _load();
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Novi'),
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: _buildBody(context),
@@ -114,6 +128,18 @@ class _ControlPlansListScreenState extends State<ControlPlansListScreen> {
           title: Text(r.title.isEmpty ? code : r.title, maxLines: 2, overflow: TextOverflow.ellipsis),
           subtitle: Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
           isThreeLine: true,
+          onTap: () async {
+            final ok = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute<bool>(
+                builder: (_) => ControlPlanEditScreen(
+                  companyData: widget.companyData,
+                  controlPlanId: r.id,
+                ),
+              ),
+            );
+            if (ok == true && mounted) await _load();
+          },
         );
       },
     );
