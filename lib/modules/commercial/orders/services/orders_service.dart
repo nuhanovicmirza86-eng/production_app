@@ -76,6 +76,13 @@ class OrdersService {
     String? shippingTerms,
     String? currency,
     String? notes,
+    bool isExport = false,
+    String? incoterms,
+    String? customerCountryCode,
+    String? vatExemptionNote,
+    String? customsDeclarationRef,
+    String? cmrNumber,
+    String? awbNumber,
     required List<Map<String, dynamic>> items,
   }) async {
     final companyId = _requireCompanyId(companyData);
@@ -100,6 +107,16 @@ class OrdersService {
       'shippingTerms': shippingTerms,
       'currency': currency,
       'notes': notes,
+      'isExport': isExport,
+      if ((incoterms ?? '').trim().isNotEmpty) 'incoterms': incoterms!.trim(),
+      if ((customerCountryCode ?? '').trim().isNotEmpty)
+        'customerCountryCode': customerCountryCode!.trim().toUpperCase(),
+      if ((vatExemptionNote ?? '').trim().isNotEmpty)
+        'vatExemptionNote': vatExemptionNote!.trim(),
+      if ((customsDeclarationRef ?? '').trim().isNotEmpty)
+        'customsDeclarationRef': customsDeclarationRef!.trim(),
+      if ((cmrNumber ?? '').trim().isNotEmpty) 'cmrNumber': cmrNumber!.trim(),
+      if ((awbNumber ?? '').trim().isNotEmpty) 'awbNumber': awbNumber!.trim(),
       'items': items.map(_itemForCallable).toList(),
     };
 
@@ -258,6 +275,13 @@ class OrdersService {
     String? customerReference,
     String? supplierReference,
     String? currency,
+    bool? isExport,
+    String? incoterms,
+    String? customerCountryCode,
+    String? vatExemptionNote,
+    String? customsDeclarationRef,
+    String? cmrNumber,
+    String? awbNumber,
   }) async {
     final data = await _callUpdateCommercialOrder({
       'companyId': companyId,
@@ -270,6 +294,13 @@ class OrdersService {
       'customerReference': customerReference,
       'supplierReference': supplierReference,
       'currency': currency,
+      if (isExport != null) 'isExport': isExport,
+      'incoterms': incoterms,
+      'customerCountryCode': customerCountryCode,
+      'vatExemptionNote': vatExemptionNote,
+      'customsDeclarationRef': customsDeclarationRef,
+      'cmrNumber': cmrNumber,
+      'awbNumber': awbNumber,
     });
     if (data['success'] != true) {
       throw Exception('Ažuriranje zaglavlja nije uspjelo.');

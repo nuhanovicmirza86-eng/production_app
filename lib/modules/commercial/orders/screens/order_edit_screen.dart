@@ -47,6 +47,15 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
   final _supplierRefController = TextEditingController();
   final _currencyController = TextEditingController();
 
+  final _incotermsController = TextEditingController();
+  final _customerCountryCodeController = TextEditingController();
+  final _vatExemptionNoteController = TextEditingController();
+  final _customsDeclarationRefController = TextEditingController();
+  final _cmrNumberController = TextEditingController();
+  final _awbNumberController = TextEditingController();
+
+  late bool _isExport;
+
   late DateTime _orderDate;
   DateTime? _requestedDeliveryDate;
   DateTime? _confirmedDeliveryDate;
@@ -74,6 +83,14 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
     _customerRefController.text = (o.customerReference ?? '').trim();
     _supplierRefController.text = (o.supplierReference ?? '').trim();
     _currencyController.text = (o.currency ?? '').trim();
+    _isExport = o.isExport;
+    _incotermsController.text = (o.incoterms ?? '').trim();
+    _customerCountryCodeController.text = (o.customerCountryCode ?? '').trim();
+    _vatExemptionNoteController.text = (o.vatExemptionNote ?? '').trim();
+    _customsDeclarationRefController.text =
+        (o.customsDeclarationRef ?? '').trim();
+    _cmrNumberController.text = (o.cmrNumber ?? '').trim();
+    _awbNumberController.text = (o.awbNumber ?? '').trim();
     _orderDate = o.orderDate ?? o.createdAt ?? DateTime.now();
     _requestedDeliveryDate = o.requestedDeliveryDate;
     _confirmedDeliveryDate = o.confirmedDeliveryDate;
@@ -104,6 +121,12 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
     _customerRefController.dispose();
     _supplierRefController.dispose();
     _currencyController.dispose();
+    _incotermsController.dispose();
+    _customerCountryCodeController.dispose();
+    _vatExemptionNoteController.dispose();
+    _customsDeclarationRefController.dispose();
+    _cmrNumberController.dispose();
+    _awbNumberController.dispose();
     for (final l in _lines) {
       l.qtyController.dispose();
       l.unitPriceController.dispose();
@@ -163,6 +186,19 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
       return;
     }
 
+    if (widget.order.orderType == OrderType.customer) {
+      final cc = _customerCountryCodeController.text.trim().toUpperCase();
+      if (cc.isNotEmpty &&
+          (cc.length != 2 || !RegExp(r'^[A-Z]{2}$').hasMatch(cc))) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ISO država: točno 2 slova (npr. DE) ili prazno.'),
+          ),
+        );
+        return;
+      }
+    }
+
     for (var i = 0; i < _lines.length; i++) {
       final le = _lines[i];
       if (!_lineQtyEditable(le.item)) continue;
@@ -197,6 +233,27 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
         currency: _currencyController.text.trim().isEmpty
             ? null
             : _currencyController.text.trim(),
+        isExport: widget.order.orderType == OrderType.customer
+            ? _isExport
+            : null,
+        incoterms: widget.order.orderType == OrderType.customer
+            ? _incotermsController.text.trim()
+            : null,
+        customerCountryCode: widget.order.orderType == OrderType.customer
+            ? _customerCountryCodeController.text.trim()
+            : null,
+        vatExemptionNote: widget.order.orderType == OrderType.customer
+            ? _vatExemptionNoteController.text.trim()
+            : null,
+        customsDeclarationRef: widget.order.orderType == OrderType.customer
+            ? _customsDeclarationRefController.text.trim()
+            : null,
+        cmrNumber: widget.order.orderType == OrderType.customer
+            ? _cmrNumberController.text.trim()
+            : null,
+        awbNumber: widget.order.orderType == OrderType.customer
+            ? _awbNumberController.text.trim()
+            : null,
       );
 
       for (final le in _lines) {
@@ -409,6 +466,58 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
               decoration: const InputDecoration(labelText: 'Napomena'),
               maxLines: 4,
             ),
+            if (o.orderType == OrderType.customer) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Izvoz i fiskalni podaci (BiH)',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Izvoz (INO kupac)'),
+                value: _isExport,
+                onChanged: (v) => setState(() => _isExport = v),
+              ),
+              TextFormField(
+                controller: _customerCountryCodeController,
+                decoration: const InputDecoration(
+                  labelText: 'ISO država kupca (2 slova)',
+                  counterText: '',
+                ),
+                maxLength: 2,
+                textCapitalization: TextCapitalization.characters,
+              ),
+              TextFormField(
+                controller: _incotermsController,
+                decoration: const InputDecoration(
+                  labelText: 'INCOTERMS (opcionalno)',
+                ),
+              ),
+              TextFormField(
+                controller: _vatExemptionNoteController,
+                decoration: const InputDecoration(
+                  labelText: 'Napomena oslobođenja PDV-a',
+                ),
+                maxLines: 2,
+              ),
+              TextFormField(
+                controller: _customsDeclarationRefController,
+                decoration: const InputDecoration(
+                  labelText: 'Referenca carinske deklaracije',
+                ),
+              ),
+              TextFormField(
+                controller: _cmrNumberController,
+                decoration: const InputDecoration(labelText: 'CMR broj'),
+              ),
+              TextFormField(
+                controller: _awbNumberController,
+                decoration: const InputDecoration(labelText: 'AWB broj'),
+              ),
+            ],
             const SizedBox(height: 24),
             Text(
               'Stavke',

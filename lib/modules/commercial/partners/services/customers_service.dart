@@ -98,6 +98,7 @@ class CustomersService {
       status: draft.status.trim(),
       customerType: draft.customerType.trim(),
       country: draft.country,
+      countryCode: draft.countryCode,
       city: draft.city,
       address: draft.address,
       taxId: draft.taxId,

@@ -1605,6 +1605,17 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
         _focusQuickEntryAfterQr();
         break;
 
+      case ProductionQrIntent.wmsLotDocV1:
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Ovo je WMS etiketa lota. Koristi modul WMS — centralni magacin (putaway / otprem).',
+            ),
+          ),
+        );
+        break;
+
       case ProductionQrIntent.nepoznat:
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(

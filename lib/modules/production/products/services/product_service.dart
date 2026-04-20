@@ -27,6 +27,60 @@ class ProductService {
     return (cur - next).abs() < 1e-9;
   }
 
+  /// Maks. broj vanjskih barkodova/QR po dokumentu `products`.
+  static const int maxScanAliasesForProduct = 20;
+
+  List<String> _normalizeScanAliasesList(List<String>? input) {
+    if (input == null || input.isEmpty) return [];
+    final out = <String>[];
+    final seen = <String>{};
+    for (final s in input) {
+      final a = ProductLookupService.normalizeScanAlias(s);
+      if (a.isEmpty) continue;
+      if (seen.add(a)) out.add(a);
+    }
+    return out;
+  }
+
+  List<String> _readScanAliasesFromDoc(Map<String, dynamic> data) {
+    final raw = data['scanAliases'];
+    if (raw is! List) return [];
+    return _normalizeScanAliasesList(raw.map((e) => e.toString()).toList());
+  }
+
+  bool _scanAliasListsEqual(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    final sa = [...a]..sort();
+    final sb = [...b]..sort();
+    for (var i = 0; i < sa.length; i++) {
+      if (sa[i] != sb[i]) return false;
+    }
+    return true;
+  }
+
+  Future<void> _ensureScanAliasesUnique({
+    required String companyId,
+    required List<String> aliases,
+    String? excludeProductId,
+  }) async {
+    for (final a in aliases) {
+      final q = await _products
+          .where('companyId', isEqualTo: companyId)
+          .where('scanAliases', arrayContains: a)
+          .limit(5)
+          .get();
+
+      for (final doc in q.docs) {
+        if (excludeProductId != null && doc.id == excludeProductId) {
+          continue;
+        }
+        throw Exception(
+          'Vanjski barkod/QR "$a" je već dodijeljen drugom proizvodu.',
+        );
+      }
+    }
+  }
+
   Future<void> _ensureUniqueProductCode({
     required String companyId,
     required String productCode,
@@ -69,6 +123,11 @@ class ProductService {
     double? standardUnitPrice,
     String? currency,
     bool isActive = true,
+    bool? lotTrackingRequired,
+    int? shelfLifeDays,
+    double? minStockQty,
+    double? maxStockQty,
+    List<String> scanAliases = const [],
   }) {
     final now = DateTime.now();
 
@@ -92,6 +151,13 @@ class ProductService {
     final secDesc = _s(secondaryClassificationDescription);
     final cur = _s(currency);
 
+    final aliasList = _normalizeScanAliasesList(scanAliases);
+    if (aliasList.length > maxScanAliasesForProduct) {
+      throw Exception(
+        'Najviše $maxScanAliasesForProduct vanjskih barkodova/QR po proizvodu.',
+      );
+    }
+
     final payload = <String, dynamic>{
       'companyId': normalizedCompanyId,
       'productCode': normalizedProductCode,
@@ -105,8 +171,13 @@ class ProductService {
       'searchTokens': ProductLookupService.buildSearchTokens(
         productCode: normalizedProductCode,
         productName: normalizedProductName,
+        scanAliases: aliasList,
       ),
     };
+
+    if (aliasList.isNotEmpty) {
+      payload['scanAliases'] = aliasList;
+    }
 
     if (normalizedUnit.isNotEmpty) {
       payload['unit'] = normalizedUnit;
@@ -162,6 +233,19 @@ class ProductService {
       payload['currency'] = cur;
     }
 
+    if (lotTrackingRequired != null) {
+      payload['lotTrackingRequired'] = lotTrackingRequired;
+    }
+    if (shelfLifeDays != null && shelfLifeDays > 0) {
+      payload['shelfLifeDays'] = shelfLifeDays;
+    }
+    if (minStockQty != null && minStockQty > 0) {
+      payload['minStockQty'] = minStockQty;
+    }
+    if (maxStockQty != null && maxStockQty > 0) {
+      payload['maxStockQty'] = maxStockQty;
+    }
+
     return payload;
   }
 
@@ -186,6 +270,11 @@ class ProductService {
     double? standardUnitPrice,
     String? currency,
     bool isActive = true,
+    bool? lotTrackingRequired,
+    int? shelfLifeDays,
+    double? minStockQty,
+    double? maxStockQty,
+    List<String>? scanAliases,
   }) async {
     final normalizedCompanyId = companyId.trim();
     final normalizedProductCode = productCode.trim();
@@ -218,6 +307,14 @@ class ProductService {
       productCode: normalizedProductCode,
     );
 
+    final normalizedAliases = _normalizeScanAliasesList(scanAliases);
+    if (normalizedAliases.isNotEmpty) {
+      await _ensureScanAliasesUnique(
+        companyId: normalizedCompanyId,
+        aliases: normalizedAliases,
+      );
+    }
+
     final docRef = _products.doc();
 
     final payload = _buildCreatePayload(
@@ -242,6 +339,11 @@ class ProductService {
       standardUnitPrice: standardUnitPrice,
       currency: currency,
       isActive: isActive,
+      lotTrackingRequired: lotTrackingRequired,
+      shelfLifeDays: shelfLifeDays,
+      minStockQty: minStockQty,
+      maxStockQty: maxStockQty,
+      scanAliases: normalizedAliases,
     );
 
     await docRef.set(payload);
@@ -271,6 +373,11 @@ class ProductService {
     double? standardUnitPrice,
     String? currency,
     bool? isActive,
+    bool? lotTrackingRequired,
+    int? shelfLifeDays,
+    double? minStockQty,
+    double? maxStockQty,
+    List<String>? scanAliases,
   }) async {
     final normalizedProductId = productId.trim();
     final normalizedCompanyId = companyId.trim();
@@ -335,6 +442,27 @@ class ProductService {
       );
     }
 
+    final currentAliases = _readScanAliasesFromDoc(current);
+    final List<String> aliasesForTokens;
+    if (scanAliases == null) {
+      aliasesForTokens = currentAliases;
+    } else {
+      final n = _normalizeScanAliasesList(scanAliases);
+      if (n.length > maxScanAliasesForProduct) {
+        throw Exception(
+          'Najviše $maxScanAliasesForProduct vanjskih barkodova/QR po proizvodu.',
+        );
+      }
+      if (n.isNotEmpty) {
+        await _ensureScanAliasesUnique(
+          companyId: normalizedCompanyId,
+          aliases: n,
+          excludeProductId: normalizedProductId,
+        );
+      }
+      aliasesForTokens = n;
+    }
+
     final updates = <String, dynamic>{
       'productCode': nextProductCode,
       'productName': nextProductName,
@@ -344,8 +472,17 @@ class ProductService {
       'searchTokens': ProductLookupService.buildSearchTokens(
         productCode: nextProductCode,
         productName: nextProductName,
+        scanAliases: aliasesForTokens,
       ),
     };
+
+    if (scanAliases != null) {
+      if (aliasesForTokens.isEmpty) {
+        updates['scanAliases'] = FieldValue.delete();
+      } else {
+        updates['scanAliases'] = aliasesForTokens;
+      }
+    }
 
     if (isActive != null) {
       updates['isActive'] = isActive;
@@ -477,6 +614,31 @@ class ProductService {
       }
     }
 
+    if (lotTrackingRequired != null) {
+      updates['lotTrackingRequired'] = lotTrackingRequired;
+    }
+    if (shelfLifeDays != null) {
+      if (shelfLifeDays <= 0) {
+        updates['shelfLifeDays'] = FieldValue.delete();
+      } else {
+        updates['shelfLifeDays'] = shelfLifeDays;
+      }
+    }
+    if (minStockQty != null) {
+      if (minStockQty <= 0) {
+        updates['minStockQty'] = FieldValue.delete();
+      } else {
+        updates['minStockQty'] = minStockQty;
+      }
+    }
+    if (maxStockQty != null) {
+      if (maxStockQty <= 0) {
+        updates['maxStockQty'] = FieldValue.delete();
+      } else {
+        updates['maxStockQty'] = maxStockQty;
+      }
+    }
+
     final currentUnit = _s(current['unit']);
     final currentDescription = _s(current['description']);
     final currentCustomerId = _s(current['customerId']);
@@ -493,11 +655,26 @@ class ProductService {
     final currentCurrency = _s(current['currency']);
     final currentStatus = _s(current['status']).toLowerCase();
     final currentIsActive = (current['isActive'] as bool?) ?? true;
+    final currentLotTr = (current['lotTrackingRequired'] as bool?) ?? false;
+    final currentShelf = current['shelfLifeDays'];
+    int? currentShelfDays;
+    if (currentShelf is int) {
+      currentShelfDays = currentShelf;
+    } else if (currentShelf is num) {
+      currentShelfDays = currentShelf.toInt();
+    }
+    final currentMinStock = _readDouble(current['minStockQty']);
+    final currentMaxStock = _readDouble(current['maxStockQty']);
 
     final nothingChanged =
         nextProductCode == currentProductCode &&
         nextProductName == _s(current['productName']) &&
         nextStatus == currentStatus &&
+        (scanAliases == null ||
+            _scanAliasListsEqual(
+              currentAliases,
+              _normalizeScanAliasesList(scanAliases),
+            )) &&
         (isActive == null || isActive == currentIsActive) &&
         (unit == null || _s(unit) == currentUnit) &&
         (description == null || _s(description) == currentDescription) &&
@@ -521,7 +698,15 @@ class ProductService {
             _s(secondaryClassificationDescription) == currentSecDesc) &&
         (standardUnitPrice == null ||
             _almostEqualDouble(currentStdPrice, standardUnitPrice)) &&
-        (currency == null || _s(currency) == currentCurrency);
+        (currency == null || _s(currency) == currentCurrency) &&
+        (lotTrackingRequired == null || lotTrackingRequired == currentLotTr) &&
+        (shelfLifeDays == null ||
+            (shelfLifeDays <= 0 && currentShelfDays == null) ||
+            (shelfLifeDays > 0 && currentShelfDays == shelfLifeDays)) &&
+        (minStockQty == null ||
+            _almostEqualDouble(currentMinStock, minStockQty)) &&
+        (maxStockQty == null ||
+            _almostEqualDouble(currentMaxStock, maxStockQty));
 
     if (nothingChanged) {
       return;

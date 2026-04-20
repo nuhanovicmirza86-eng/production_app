@@ -47,6 +47,19 @@ class OrdersListPdfExport {
         DateTime.fromMillisecondsSinceEpoch(0);
   }
 
+  /// Sažetak izvoza / fiskala za kupca (lista narudžbi).
+  static String _fiscalSummaryCell(OrderModel o) {
+    if (o.orderType != OrderType.customer) return '—';
+    final parts = <String>[];
+    if (o.isExport) parts.add('Izvoz');
+    final cc = (o.customerCountryCode ?? '').trim();
+    if (cc.isNotEmpty) parts.add(cc);
+    final inc = (o.incoterms ?? '').trim();
+    if (inc.isNotEmpty) parts.add(inc);
+    if (parts.isEmpty) return '—';
+    return parts.join(' · ');
+  }
+
   static String? _partnerRef(OrderModel o) {
     switch (o.orderType) {
       case OrderType.customer:
@@ -174,6 +187,7 @@ class OrdersListPdfExport {
           cell('Ref.', header: true),
           cell('Rok isp.', header: true),
           cell('Tip', header: true),
+          cell('Izvoz/fiskal', header: true),
           cell('Status', header: true),
           cell('Šifra', header: true),
           cell('Naziv', header: true),
@@ -210,6 +224,7 @@ class OrdersListPdfExport {
           cell(ref ?? '—'),
           cell(rok),
           cell(o.orderType == OrderType.customer ? 'Kupac' : 'Dobavljač'),
+          cell(_fiscalSummaryCell(o)),
           cell(orderStatusLabel(o.status)),
           cell(it?.productCode ?? '—'),
           cell(it?.productName ?? 'Nema učitanih stavki'),
@@ -306,19 +321,20 @@ class OrdersListPdfExport {
         pw.Table(
           border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.35),
           columnWidths: {
-            0: const pw.FixedColumnWidth(52),
-            1: const pw.FixedColumnWidth(46),
-            2: const pw.FixedColumnWidth(44),
-            3: const pw.FixedColumnWidth(46),
-            4: const pw.FixedColumnWidth(36),
-            5: const pw.FixedColumnWidth(52),
+            0: const pw.FixedColumnWidth(50),
+            1: const pw.FixedColumnWidth(44),
+            2: const pw.FixedColumnWidth(40),
+            3: const pw.FixedColumnWidth(44),
+            4: const pw.FixedColumnWidth(34),
+            5: const pw.FixedColumnWidth(56),
             6: const pw.FixedColumnWidth(48),
-            7: const pw.FlexColumnWidth(2.2),
-            8: const pw.FixedColumnWidth(22),
-            9: const pw.FixedColumnWidth(38),
-            10: const pw.FixedColumnWidth(40),
-            11: const pw.FixedColumnWidth(34),
-            12: const pw.FixedColumnWidth(38),
+            7: const pw.FixedColumnWidth(46),
+            8: const pw.FlexColumnWidth(2.0),
+            9: const pw.FixedColumnWidth(20),
+            10: const pw.FixedColumnWidth(36),
+            11: const pw.FixedColumnWidth(38),
+            12: const pw.FixedColumnWidth(32),
+            13: const pw.FixedColumnWidth(36),
           },
           children: [
             headerRow(),

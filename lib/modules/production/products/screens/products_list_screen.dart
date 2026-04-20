@@ -11,6 +11,7 @@ import '../../../logistics/inventory/services/product_warehouse_stock_service.da
 import '../services/product_service.dart';
 import 'product_create_screen.dart';
 import 'product_details_screen.dart';
+import 'product_register_from_scan_screen.dart';
 
 class ProductsListScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
@@ -392,6 +393,22 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => ProductCreateScreen(companyData: widget.companyData),
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (created == true) {
+      await _loadProducts();
+    }
+  }
+
+  Future<void> _openRegisterFromScan() async {
+    final created = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            ProductRegisterFromScanScreen(companyData: widget.companyData),
       ),
     );
 
@@ -1456,12 +1473,28 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
         ],
       ),
       floatingActionButton: _canCreateProduct
-          ? FloatingActionButton.extended(
-              onPressed: (_isImporting || _isLoading)
-                  ? null
-                  : _openCreateProduct,
-              icon: const Icon(Icons.add),
-              label: const Text('Novi proizvod'),
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                FloatingActionButton.small(
+                  heroTag: 'product_register_scan',
+                  tooltip: 'Novi proizvod iz postojećeg barkoda / QR',
+                  onPressed: (_isImporting || _isLoading)
+                      ? null
+                      : _openRegisterFromScan,
+                  child: const Icon(Icons.qr_code_scanner_outlined),
+                ),
+                const SizedBox(height: 12),
+                FloatingActionButton.extended(
+                  heroTag: 'product_create',
+                  onPressed: (_isImporting || _isLoading)
+                      ? null
+                      : _openCreateProduct,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Novi proizvod'),
+                ),
+              ],
             )
           : null,
       body: _buildBody(),

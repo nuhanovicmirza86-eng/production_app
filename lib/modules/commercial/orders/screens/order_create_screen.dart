@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../production/products/services/product_lookup_service.dart';
 import '../models/order_model.dart';
+import '../../partners/services/customers_service.dart';
 import '../services/orders_service.dart';
 import '../services/partners_lookup_service.dart';
 
@@ -36,6 +37,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
   final OrdersService _ordersService = OrdersService();
   final PartnersLookupService _partnersLookup = PartnersLookupService();
   final ProductLookupService _productLookup = ProductLookupService();
+  final CustomersService _customersService = CustomersService();
 
   OrderType _orderType = OrderType.customer;
   PartnerPick? _partner;
@@ -44,6 +46,18 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
   DateTime? _requestedDeliveryDate;
 
   final TextEditingController _notesController = TextEditingController();
+
+  final TextEditingController _incotermsController = TextEditingController();
+  final TextEditingController _customerCountryCodeController =
+      TextEditingController();
+  final TextEditingController _vatExemptionNoteController =
+      TextEditingController();
+  final TextEditingController _customsDeclarationRefController =
+      TextEditingController();
+  final TextEditingController _cmrNumberController = TextEditingController();
+  final TextEditingController _awbNumberController = TextEditingController();
+
+  bool _isExport = false;
 
   final List<_DraftLine> _lines = <_DraftLine>[_DraftLine()];
 
@@ -55,6 +69,12 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
   @override
   void dispose() {
     _notesController.dispose();
+    _incotermsController.dispose();
+    _customerCountryCodeController.dispose();
+    _vatExemptionNoteController.dispose();
+    _customsDeclarationRefController.dispose();
+    _cmrNumberController.dispose();
+    _awbNumberController.dispose();
     for (final line in _lines) {
       line.qtyController.dispose();
       line.unitPriceController.dispose();
@@ -116,6 +136,20 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
 
     if (picked != null) {
       setState(() => _partner = picked);
+      if (_orderType == OrderType.customer) {
+        final c = await _customersService.getById(
+          companyId: _companyId,
+          customerId: picked.id,
+        );
+        if (!mounted) return;
+        final cc = (c?.countryCode ?? '').trim();
+        if (cc.isNotEmpty &&
+            _customerCountryCodeController.text.trim().isEmpty) {
+          setState(() {
+            _customerCountryCodeController.text = cc.toUpperCase();
+          });
+        }
+      }
     }
   }
 
@@ -222,6 +256,19 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
       }
     }
 
+    if (_orderType == OrderType.customer) {
+      final cc = _customerCountryCodeController.text.trim().toUpperCase();
+      if (cc.isNotEmpty &&
+          (cc.length != 2 || !RegExp(r'^[A-Z]{2}$').hasMatch(cc))) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ISO država: točno 2 slova (npr. DE) ili prazno.'),
+          ),
+        );
+        return;
+      }
+    }
+
     setState(() => _submitting = true);
 
     try {
@@ -273,6 +320,31 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
         notes: _notesController.text.trim().isEmpty
             ? null
             : _notesController.text.trim(),
+        isExport: _orderType == OrderType.customer ? _isExport : false,
+        incoterms: _orderType == OrderType.customer &&
+                _incotermsController.text.trim().isNotEmpty
+            ? _incotermsController.text.trim()
+            : null,
+        customerCountryCode: _orderType == OrderType.customer &&
+                _customerCountryCodeController.text.trim().isNotEmpty
+            ? _customerCountryCodeController.text.trim().toUpperCase()
+            : null,
+        vatExemptionNote: _orderType == OrderType.customer &&
+                _vatExemptionNoteController.text.trim().isNotEmpty
+            ? _vatExemptionNoteController.text.trim()
+            : null,
+        customsDeclarationRef: _orderType == OrderType.customer &&
+                _customsDeclarationRefController.text.trim().isNotEmpty
+            ? _customsDeclarationRefController.text.trim()
+            : null,
+        cmrNumber: _orderType == OrderType.customer &&
+                _cmrNumberController.text.trim().isNotEmpty
+            ? _cmrNumberController.text.trim()
+            : null,
+        awbNumber: _orderType == OrderType.customer &&
+                _awbNumberController.text.trim().isNotEmpty
+            ? _awbNumberController.text.trim()
+            : null,
         items: items,
       );
 
@@ -321,6 +393,13 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                 setState(() {
                   _orderType = set.first;
                   _partner = null;
+                  _isExport = false;
+                  _incotermsController.clear();
+                  _customerCountryCodeController.clear();
+                  _vatExemptionNoteController.clear();
+                  _customsDeclarationRefController.clear();
+                  _cmrNumberController.clear();
+                  _awbNumberController.clear();
                 });
               },
             ),
@@ -378,6 +457,69 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
               decoration: const InputDecoration(labelText: 'Napomena'),
               maxLines: 3,
             ),
+            if (_orderType == OrderType.customer) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Izvoz i fiskalni podaci (BiH)',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Izvoz (INO kupac)'),
+                subtitle: const Text(
+                  'Ako je uključeno, stavke bez PDV % dobit će 0% (izvoz); '
+                  'napomena za oslobođenje može se predložiti na backendu.',
+                ),
+                value: _isExport,
+                onChanged: (v) => setState(() => _isExport = v),
+              ),
+              TextFormField(
+                controller: _customerCountryCodeController,
+                decoration: const InputDecoration(
+                  labelText: 'ISO država kupca (2 slova)',
+                  hintText: 'npr. DE',
+                  counterText: '',
+                ),
+                maxLength: 2,
+                textCapitalization: TextCapitalization.characters,
+              ),
+              TextFormField(
+                controller: _incotermsController,
+                decoration: const InputDecoration(
+                  labelText: 'INCOTERMS (opcionalno)',
+                  hintText: 'npr. DAP, EXW',
+                ),
+              ),
+              TextFormField(
+                controller: _vatExemptionNoteController,
+                decoration: const InputDecoration(
+                  labelText: 'Napomena oslobođenja PDV-a (opcionalno)',
+                  hintText: 'Ako je prazno pri izvozu, koristi se predložak',
+                ),
+                maxLines: 2,
+              ),
+              TextFormField(
+                controller: _customsDeclarationRefController,
+                decoration: const InputDecoration(
+                  labelText: 'Referenca carinske deklaracije',
+                ),
+              ),
+              TextFormField(
+                controller: _cmrNumberController,
+                decoration: const InputDecoration(
+                  labelText: 'CMR broj',
+                ),
+              ),
+              TextFormField(
+                controller: _awbNumberController,
+                decoration: const InputDecoration(
+                  labelText: 'AWB broj',
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             Row(
               children: [

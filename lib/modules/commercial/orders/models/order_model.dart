@@ -48,6 +48,22 @@ class OrderModel {
   /// Pogon prijema (interno).
   final String? receiptPlantKey;
 
+  /// Izvoz (INO) — BiH praksa: PDV 0% uz dokaz; vidi BIH_COMMERCIAL_FISCAL_EXPORT_GUIDE.
+  final bool isExport;
+
+  /// INCOTERMS (npr. EXW, DAP).
+  final String? incoterms;
+
+  /// ISO 3166-1 alpha-2 zemlje kupca (na narudžbi; može nadopuniti partnera).
+  final String? customerCountryCode;
+
+  /// Napomena na fakturi za oslobođenje PDV-a (izvoz).
+  final String? vatExemptionNote;
+
+  final String? customsDeclarationRef;
+  final String? cmrNumber;
+  final String? awbNumber;
+
   const OrderModel({
     required this.id,
     required this.companyId,
@@ -75,6 +91,13 @@ class OrderModel {
     this.deliveryAddress,
     this.shippingTerms,
     this.receiptPlantKey,
+    this.isExport = false,
+    this.incoterms,
+    this.customerCountryCode,
+    this.vatExemptionNote,
+    this.customsDeclarationRef,
+    this.cmrNumber,
+    this.awbNumber,
   });
 
   OrderModel copyWith({
@@ -94,6 +117,13 @@ class OrderModel {
     String? deliveryAddress,
     String? shippingTerms,
     String? receiptPlantKey,
+    bool? isExport,
+    String? incoterms,
+    String? customerCountryCode,
+    String? vatExemptionNote,
+    String? customsDeclarationRef,
+    String? cmrNumber,
+    String? awbNumber,
   }) {
     return OrderModel(
       id: id,
@@ -124,6 +154,13 @@ class OrderModel {
       deliveryAddress: deliveryAddress ?? this.deliveryAddress,
       shippingTerms: shippingTerms ?? this.shippingTerms,
       receiptPlantKey: receiptPlantKey ?? this.receiptPlantKey,
+      isExport: isExport ?? this.isExport,
+      incoterms: incoterms ?? this.incoterms,
+      customerCountryCode: customerCountryCode ?? this.customerCountryCode,
+      vatExemptionNote: vatExemptionNote ?? this.vatExemptionNote,
+      customsDeclarationRef: customsDeclarationRef ?? this.customsDeclarationRef,
+      cmrNumber: cmrNumber ?? this.cmrNumber,
+      awbNumber: awbNumber ?? this.awbNumber,
     );
   }
 
@@ -167,6 +204,13 @@ class OrderModel {
       deliveryAddress: _nullableString(map['deliveryAddress']),
       shippingTerms: _nullableString(map['shippingTerms']),
       receiptPlantKey: _nullableString(map['receiptPlantKey']),
+      isExport: map['isExport'] == true,
+      incoterms: _nullableString(map['incoterms']),
+      customerCountryCode: _nullableString(map['customerCountryCode']),
+      vatExemptionNote: _nullableString(map['vatExemptionNote']),
+      customsDeclarationRef: _nullableString(map['customsDeclarationRef']),
+      cmrNumber: _nullableString(map['cmrNumber']),
+      awbNumber: _nullableString(map['awbNumber']),
     );
   }
 

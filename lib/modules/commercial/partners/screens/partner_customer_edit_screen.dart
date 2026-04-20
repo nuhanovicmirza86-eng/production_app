@@ -35,6 +35,7 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
   late final TextEditingController _nameController;
   late final TextEditingController _legalNameController;
   late final TextEditingController _countryController;
+  late final TextEditingController _countryCodeController;
   late final TextEditingController _cityController;
   late final TextEditingController _addressController;
   late final TextEditingController _taxIdController;
@@ -67,6 +68,7 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
     _nameController = TextEditingController();
     _legalNameController = TextEditingController();
     _countryController = TextEditingController();
+    _countryCodeController = TextEditingController();
     _cityController = TextEditingController();
     _addressController = TextEditingController();
     _taxIdController = TextEditingController();
@@ -84,6 +86,7 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
     _nameController.dispose();
     _legalNameController.dispose();
     _countryController.dispose();
+    _countryCodeController.dispose();
     _cityController.dispose();
     _addressController.dispose();
     _taxIdController.dispose();
@@ -132,6 +135,7 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
       _nameController.text = m.name;
       _legalNameController.text = m.legalName;
       _countryController.text = m.country ?? '';
+      _countryCodeController.text = m.countryCode ?? '';
       _cityController.text = m.city ?? '';
       _addressController.text = m.address ?? '';
       _taxIdController.text = m.taxId ?? '';
@@ -204,6 +208,16 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
         country: _countryController.text.trim().isEmpty
             ? null
             : _countryController.text.trim(),
+        countryCode: () {
+          final cc = _countryCodeController.text.trim().toUpperCase();
+          if (cc.isEmpty) return null;
+          if (cc.length != 2 || !RegExp(r'^[A-Z]{2}$').hasMatch(cc)) {
+            throw Exception(
+              'ISO država mora biti točno 2 slova (npr. BA, DE).',
+            );
+          }
+          return cc;
+        }(),
         city: _cityController.text.trim().isEmpty
             ? null
             : _cityController.text.trim(),
@@ -375,6 +389,16 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
                       TextFormField(
                         controller: _countryController,
                         decoration: _dec('Država'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _countryCodeController,
+                        decoration: _dec('ISO država (2 slova)').copyWith(
+                          hintText: 'npr. BA, DE',
+                          counterText: '',
+                        ),
+                        maxLength: 2,
+                        textCapitalization: TextCapitalization.characters,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(

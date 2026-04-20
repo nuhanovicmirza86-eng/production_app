@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../logistics/wms/wms_scan_helpers.dart';
 import '../services/product_service.dart';
 
 class ProductCreateScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
 
-  const ProductCreateScreen({super.key, required this.companyData});
+  /// Jedan ili više vanjskih kodova (EAN, QR sadržaj) vezanih uz ovaj proizvod.
+  final List<String>? initialScanAliases;
+
+  const ProductCreateScreen({
+    super.key,
+    required this.companyData,
+    this.initialScanAliases,
+  });
 
   @override
   State<ProductCreateScreen> createState() => _ProductCreateScreenState();
@@ -41,6 +49,8 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
   final TextEditingController _currencyController = TextEditingController(
     text: 'KM',
   );
+  final TextEditingController _externalScanController =
+      TextEditingController();
 
   bool _isLoading = false;
   bool _isActive = true;
@@ -54,6 +64,24 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
       (widget.companyData['userId'] ?? widget.companyData['uid'] ?? 'system')
           .toString()
           .trim();
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initialScanAliases;
+    if (initial != null && initial.isNotEmpty) {
+      _externalScanController.text = initial.first.trim();
+    }
+  }
+
+  Future<void> _scanExternalCode() async {
+    final raw = await wmsScanBarcodeRaw(
+      context,
+      companyData: widget.companyData,
+    );
+    if (!mounted || raw == null || raw.isEmpty) return;
+    setState(() => _externalScanController.text = raw);
+  }
 
   InputDecoration _dec(String label, {String? hint}) {
     return InputDecoration(labelText: label, hintText: hint);
@@ -97,6 +125,10 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
     });
 
     try {
+      final scanAliases = _externalScanController.text.trim().isEmpty
+          ? null
+          : [_externalScanController.text.trim()];
+
       await _productService.createProduct(
         companyId: _companyId,
         productCode: _productCodeController.text.trim(),
@@ -146,6 +178,7 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
             ? null
             : _currencyController.text.trim(),
         isActive: _isActive,
+        scanAliases: scanAliases,
       );
 
       if (!mounted) return;
@@ -183,6 +216,7 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
     _packagingQtyController.dispose();
     _standardUnitPriceController.dispose();
     _currencyController.dispose();
+    _externalScanController.dispose();
     super.dispose();
   }
 
@@ -205,6 +239,42 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
             key: _formKey,
             child: ListView(
               children: [
+                Text(
+                  'Vanjski barkod / QR (postojeći)',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Operonix interna šifra može ostati GK/PP…; ovdje vežeš stvarnu '
+                  'etiketu s linije da skeniranje u prijemu pronalazi proizvod.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _externalScanController,
+                        decoration: _dec(
+                          'Sadržaj etikete',
+                          hint: 'EAN, QR ili interni kod',
+                        ),
+                        maxLines: 2,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Skeniraj',
+                      onPressed: _isLoading ? null : _scanExternalCode,
+                      icon: const Icon(Icons.qr_code_scanner_outlined),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
                 TextFormField(
                   controller: _productCodeController,
                   decoration: _dec(

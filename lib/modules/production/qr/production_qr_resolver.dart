@@ -17,6 +17,7 @@ import '../production_orders/printing/production_order_qr_payload.dart';
 /// | [ProductionQrIntent.unknown] | nepoznat string | Ručni unos ili poruka |
 ///
 /// Buduće (dodati ovdje i u [resolveProductionQrScan]):
+/// - `wmslot:v1;<lotDocId>` → Firestore id dokumenta u `inventory_lots` (WMS sken).
 /// - `lot:v1` → detalj lota, FIFO, prenos između magacina
 /// - `mv:v1` / `rcpt:v1` → potvrda prijema / otpreme
 ///
@@ -32,8 +33,9 @@ enum ProductionQrIntent {
   /// Zatvorena kutija Stanica 1 (`type`: packing_box_station1).
   packedStation1BoxV1,
 
-  /// Placeholder za buduće lot-based QR (zaliha, prenos).
-  // inventoryLotV1,
+  /// WMS lot: `wmslot:v1;<inventory_lots doc id>`.
+  wmsLotDocV1,
+
   nepoznat,
 }
 
@@ -46,6 +48,7 @@ class ProductionQrScanResolution {
     this.productionOrderCode,
     this.labelFields,
     this.packingBoxId,
+    this.wmsLotDocId,
   });
 
   final ProductionQrIntent intent;
@@ -62,6 +65,9 @@ class ProductionQrScanResolution {
 
   /// Kad je [intent] [ProductionQrIntent.packedStation1BoxV1] — `packing_boxes` id.
   final String? packingBoxId;
+
+  /// Kad je [intent] [ProductionQrIntent.wmsLotDocV1] — `inventory_lots` id.
+  final String? wmsLotDocId;
 
   bool get isKnown => intent != ProductionQrIntent.nepoznat;
 }
@@ -82,6 +88,18 @@ ProductionQrScanResolution resolveProductionQrScan(String raw) {
       rawPayload: trimmed,
       productionOrderId: tryParseProductionOrderIdFromQr(trimmed),
       productionOrderCode: tryParseProductionOrderCodeFromQr(trimmed),
+    );
+  }
+
+  if (trimmed.startsWith('wmslot:v1;')) {
+    var rest = trimmed.substring('wmslot:v1;'.length).trim();
+    if (rest.startsWith('docId=')) {
+      rest = rest.substring('docId='.length).trim();
+    }
+    return ProductionQrScanResolution(
+      intent: ProductionQrIntent.wmsLotDocV1,
+      rawPayload: trimmed,
+      wmsLotDocId: rest.isEmpty ? null : rest,
     );
   }
 

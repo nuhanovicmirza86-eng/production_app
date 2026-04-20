@@ -189,10 +189,90 @@ class _ProductionTrackingAssistantScreenState
     );
   }
 
+  Widget _buildMessageBubble(
+    BuildContext context,
+    ProductionAiChatMessage m,
+    ColorScheme scheme,
+    ThemeData theme,
+  ) {
+    final maxW = MediaQuery.sizeOf(context).width * 0.88;
+    Widget bubble;
+    if (m.isUser) {
+      bubble = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: scheme.primaryContainer.withValues(alpha: 0.85),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(16),
+            topRight: Radius.circular(16),
+            bottomLeft: Radius.circular(16),
+            bottomRight: Radius.circular(4),
+          ),
+        ),
+        child: SelectableText(
+          m.text,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: scheme.onPrimaryContainer,
+          ),
+        ),
+      );
+    } else if (m.isError) {
+      bubble = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: scheme.errorContainer.withValues(alpha: 0.5),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(16),
+            topRight: Radius.circular(16),
+            bottomRight: Radius.circular(16),
+            bottomLeft: Radius.circular(4),
+          ),
+          border: Border.all(color: scheme.error.withValues(alpha: 0.4)),
+        ),
+        child: SelectableText(
+          m.text,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: scheme.onErrorContainer,
+          ),
+        ),
+      );
+    } else {
+      bubble = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest.withValues(alpha: 0.85),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(4),
+            topRight: Radius.circular(16),
+            bottomLeft: Radius.circular(16),
+            bottomRight: Radius.circular(16),
+          ),
+          border: Border.all(
+            color: scheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+        child: MarkdownBody(
+          data: m.text,
+          selectable: true,
+          styleSheet: _md(theme),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Align(
+        alignment: m.isUser ? Alignment.centerRight : Alignment.centerLeft,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxW),
+          child: bubble,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final scheme = theme.colorScheme;
 
     return Scaffold(
@@ -207,205 +287,122 @@ class _ProductionTrackingAssistantScreenState
             ),
         ],
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Text(
-              'Kontekst za vaš pogon učitava podatke iz sustava. '
-              'Povijest razgovora sinkronizira se u oblaku (isti korisnik i pogon na svim uređajima); '
-              'lokalno se drži kopija za offline.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+      body: !_restored
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              controller: _scroll,
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              itemCount: 1 + _turns.length + (_loading ? 1 : 0),
+              itemBuilder: (context, i) {
+                if (i == 0) {
+                  return _buildIntroSection(context, theme, scheme);
+                }
+                if (i <= _turns.length) {
+                  return _buildMessageBubble(
+                    context,
+                    _turns[i - 1],
+                    scheme,
+                    theme,
+                  );
+                }
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: scheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Asistent priprema odgovor…',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+      bottomNavigationBar: Material(
+        color: scheme.surface,
+        elevation: 8,
+        shadowColor: Colors.black26,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: _prompt,
+                  enabled: !_loading && _restored,
+                  minLines: 1,
+                  maxLines: 5,
+                  decoration: const InputDecoration(
+                    labelText: 'Pitanje',
+                    hintText: 'Npr. Koji je omjer škarta ovaj tjedan?',
+                    border: OutlineInputBorder(),
+                    alignLabelWithHint: true,
+                    isDense: true,
+                  ),
+                  onSubmitted: (_) => _ask(),
+                ),
+                const SizedBox(height: 10),
+                FilledButton.icon(
+                  onPressed: (_loading || !_restored) ? null : _ask,
+                  icon: _loading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.psychology_outlined),
+                  label: Text(_loading ? 'Odgovor…' : 'Pošalji'),
+                ),
+              ],
             ),
           ),
-          Expanded(
-            child: !_restored
-                ? const Center(child: CircularProgressIndicator())
-                : _turns.isEmpty && !_loading
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            'Postavite pitanje ispod. Stariji razgovor učitava se automatski ako je spremljen.',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      )
-                    : ListView.builder(
-                        controller: _scroll,
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                        itemCount: _turns.length + (_loading ? 1 : 0),
-                        itemBuilder: (context, i) {
-                          if (i == _turns.length && _loading) {
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              child: Row(
-                                children: [
-                                  SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: scheme.primary,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    'Asistent priprema odgovor…',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: scheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
-                          final m = _turns[i];
-                          final maxW = MediaQuery.sizeOf(context).width * 0.88;
-                          Widget bubble;
-                          if (m.isUser) {
-                            bubble = Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: scheme.primaryContainer.withValues(
-                                  alpha: 0.85,
-                                ),
-                                borderRadius: const BorderRadius.only(
-                                  topLeft: Radius.circular(16),
-                                  topRight: Radius.circular(16),
-                                  bottomLeft: Radius.circular(16),
-                                  bottomRight: Radius.circular(4),
-                                ),
-                              ),
-                              child: SelectableText(
-                                m.text,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: scheme.onPrimaryContainer,
-                                ),
-                              ),
-                            );
-                          } else if (m.isError) {
-                            bubble = Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: scheme.errorContainer.withValues(
-                                  alpha: 0.5,
-                                ),
-                                borderRadius: const BorderRadius.only(
-                                  topLeft: Radius.circular(16),
-                                  topRight: Radius.circular(16),
-                                  bottomRight: Radius.circular(16),
-                                  bottomLeft: Radius.circular(4),
-                                ),
-                                border: Border.all(
-                                  color: scheme.error.withValues(alpha: 0.4),
-                                ),
-                              ),
-                              child: SelectableText(
-                                m.text,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: scheme.onErrorContainer,
-                                ),
-                              ),
-                            );
-                          } else {
-                            bubble = Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: scheme.surfaceContainerHighest.withValues(
-                                  alpha: 0.85,
-                                ),
-                                borderRadius: const BorderRadius.only(
-                                  topLeft: Radius.circular(4),
-                                  topRight: Radius.circular(16),
-                                  bottomLeft: Radius.circular(16),
-                                  bottomRight: Radius.circular(16),
-                                ),
-                                border: Border.all(
-                                  color: scheme.outlineVariant.withValues(
-                                    alpha: 0.5,
-                                  ),
-                                ),
-                              ),
-                              child: MarkdownBody(
-                                data: m.text,
-                                selectable: true,
-                                styleSheet: _md(theme),
-                              ),
-                            );
-                          }
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Align(
-                              alignment: m.isUser
-                                  ? Alignment.centerRight
-                                  : Alignment.centerLeft,
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(maxWidth: maxW),
-                                child: bubble,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIntroSection(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme scheme,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Kontekst za vaš pogon učitava podatke iz sustava. '
+          'Povijest razgovora sinkronizira se u oblaku (isti korisnik i pogon na svim uređajima); '
+          'lokalno se drži kopija za offline.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: scheme.onSurfaceVariant,
           ),
-          const Divider(height: 1),
-          Material(
-            color: scheme.surface,
-            elevation: 6,
-            shadowColor: Colors.black26,
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + bottomInset),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: _prompt,
-                    enabled: !_loading && _restored,
-                    minLines: 2,
-                    maxLines: 6,
-                    decoration: const InputDecoration(
-                      labelText: 'Pitanje',
-                      hintText: 'Npr. Koji je omjer škarta ovaj tjedan?',
-                      border: OutlineInputBorder(),
-                      alignLabelWithHint: true,
-                    ),
-                    onSubmitted: (_) => _ask(),
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton.icon(
-                    onPressed: (_loading || !_restored) ? null : _ask,
-                    icon: _loading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.psychology_outlined),
-                    label: Text(_loading ? 'Odgovor…' : 'Pošalji'),
-                  ),
-                ],
-              ),
+        ),
+        if (_turns.isEmpty && !_loading) ...[
+          const SizedBox(height: 24),
+          Text(
+            'Postavite pitanje ispod. Stariji razgovor učitava se automatski ako je spremljen.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: scheme.onSurfaceVariant,
             ),
           ),
         ],
-      ),
+        const SizedBox(height: 12),
+      ],
     );
   }
 }

@@ -71,6 +71,16 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
 
   String _s(dynamic value) => (value ?? '').toString().trim();
 
+  String _formatScanAliases(dynamic raw) {
+    if (raw is! List || raw.isEmpty) return '-';
+    final parts = raw
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return '-';
+    return parts.join(', ');
+  }
+
   double _d(dynamic value) {
     if (value is num) return value.toDouble();
     return double.tryParse(_s(value).replaceAll(',', '.')) ?? 0;
@@ -1178,6 +1188,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
             _infoRow('Customer ID', _s(product['customerId'])),
             _infoRow('Default plantKey', _s(product['defaultPlantKey'])),
             _infoRow('Opis', _s(product['description'])),
+            _infoRow('Vanjski barkod / QR', _formatScanAliases(product['scanAliases'])),
             _infoRow(
               'Sek. klasifikacija (šifra)',
               _s(product['secondaryClassificationCode']),

@@ -16,11 +16,9 @@ import '../../../commercial/partners/screens/partners_screen.dart';
 import '../../../commercial/orders/screens/document_pdf_settings_screen.dart';
 import '../../../commercial/orders/screens/orders_list_screen.dart';
 import '../../products/screens/products_list_screen.dart';
-import '../../../logistics/receipt/screens/packing_box_receipt_screen.dart';
-import '../../../logistics/receipt/screens/production_label_receipt_screen.dart';
 import '../../../logistics/receipt/screens/station1_packed_boxes_logistics_screen.dart';
+import '../../../logistics/screens/logistics_hub_entry_screen.dart';
 import '../../../sustainability/screens/carbon_footprint_screen.dart';
-import '../../production_orders/screens/production_order_details_screen.dart';
 import '../../production_orders/screens/production_orders_list_screen.dart';
 import '../../tracking/models/production_operator_tracking_entry.dart';
 import '../../tracking/screens/production_operator_tracking_screen.dart';
@@ -31,8 +29,7 @@ import '../../tracking/screens/production_preparation_station_screen.dart';
 import '../../ai/screens/production_ai_hub_screen.dart';
 import '../../tracking/screens/production_reports_hub_screen.dart';
 import '../../issues/screens/production_problem_reporting_screen.dart';
-import '../../qr/production_qr_resolver.dart';
-import '../../qr/screens/production_qr_scan_screen.dart';
+import '../../qr/production_qr_scan_flow.dart';
 
 class _ProdNavItem {
   final WidgetBuilder builder;
@@ -143,9 +140,9 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
 
   String _logisticsSectionSubtitle() {
     if (_hasModule('logistics')) {
-      return 'Pretplata uključuje modul „logistics“. Kartice: skladište, prijem kutija (ovisno o ulozi).';
+      return 'Pretplata uključuje modul „logistics“. Centralni hub, skladište, prijem kutija (ovisno o ulozi).';
     }
-    return 'Skladište i prijemi na liniji; puni modul logistike traži pretplatu „logistics“ (ovisno o ulozi).';
+    return 'Centralni magacin / Hub nije dostupan bez modula „logistics“ u pretplati. Ostale kartice ovise o ulozi.';
   }
 
   List<Widget> _buildProductionActions(BuildContext context) {
@@ -323,13 +320,16 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     ];
 
     final logisticsTiles = <Widget>[
-      if (_canAccessCentralWarehouse()) ...[
+      if (_canAccessCentralWarehouse() && _hasModule('logistics'))
         _DashboardActionTile(
-          icon: Icons.warehouse_outlined,
-          title: 'Centralni magacin',
-          subtitle: 'Prijem i knjiženje preko QR etiketa.',
-          onTap: () => _openProductionQrScan(context),
+          icon: Icons.hub_outlined,
+          title: 'Centralni magacin / Hub',
+          subtitle:
+              'Pregled zona, master MAG_*, WMS (prijem, kvaliteta, putaway, FIFO, otpremna), evidencija, QR.',
+          onTap: () =>
+              open(LogisticsHubEntryScreen(companyData: companyData)),
         ),
+      if (_canAccessCentralWarehouse())
         _DashboardActionTile(
           icon: Icons.move_to_inbox_outlined,
           title: 'Upakovane kutije Stanica 1',
@@ -339,7 +339,6 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             Station1PackedBoxesLogisticsScreen(companyData: companyData),
           ),
         ),
-      ],
     ];
 
     final sustainabilityTiles = <Widget>[
@@ -896,15 +895,23 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                         },
                       ),
                     ],
-                    if (_canAccessCentralWarehouse()) ...[
+                    if (_canAccessCentralWarehouse() &&
+                        _hasModule('logistics')) ...[
                       const SizedBox(height: 10),
                       _DashboardActionTile(
-                        icon: Icons.warehouse_outlined,
-                        title: 'Centralni magacin',
-                        subtitle: 'Prijem i knjiženje preko QR etiketa',
+                        icon: Icons.hub_outlined,
+                        title: 'Centralni magacin / Hub',
+                        subtitle: 'Pregled, master, WMS, QR',
                         onTap: () {
                           _shellScaffoldKey.currentState?.closeDrawer();
-                          _openProductionQrScan(context);
+                          Navigator.push<void>(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (_) => LogisticsHubEntryScreen(
+                                companyData: cd,
+                              ),
+                            ),
+                          );
                         },
                       ),
                     ],
@@ -1027,77 +1034,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
   }
 
   Future<void> _openProductionQrScan(BuildContext context) async {
-    final resolution = await Navigator.push<ProductionQrScanResolution>(
-      context,
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => ProductionQrScanScreen(companyData: companyData),
-      ),
-    );
-
-    if (!context.mounted || resolution == null) return;
-
-    switch (resolution.intent) {
-      case ProductionQrIntent.productionOrderReferenceV1:
-        final id = resolution.productionOrderId?.trim();
-        if (id == null || id.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'QR ne sadrži ID naloga. Koristite noviji ispis (po:v1 sa poljem id).',
-              ),
-            ),
-          );
-          return;
-        }
-        await Navigator.push<void>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ProductionOrderDetailsScreen(
-              companyData: companyData,
-              productionOrderId: id,
-            ),
-          ),
-        );
-        break;
-
-      case ProductionQrIntent.printedClassificationLabelV1:
-        await Navigator.push<void>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ProductionLabelReceiptScreen(
-              companyData: companyData,
-              resolution: resolution,
-            ),
-          ),
-        );
-        break;
-
-      case ProductionQrIntent.packedStation1BoxV1:
-        final boxId = resolution.packingBoxId?.trim();
-        if (boxId == null || boxId.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('QR kutije nije valjan.')),
-          );
-          return;
-        }
-        await Navigator.push<void>(
-          context,
-          MaterialPageRoute(
-            builder: (_) =>
-                PackingBoxReceiptScreen(companyData: companyData, boxId: boxId),
-          ),
-        );
-        break;
-
-      case ProductionQrIntent.nepoznat:
-        final raw = resolution.rawPayload;
-        final preview = raw.length > 120 ? '${raw.substring(0, 120)}…' : raw;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Nepoznat QR. Sadržaj: $preview')),
-        );
-        break;
-    }
+    await runProductionQrScanFlow(context: context, companyData: companyData);
   }
 }
 

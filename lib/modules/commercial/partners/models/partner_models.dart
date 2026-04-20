@@ -8,6 +8,10 @@ class CustomerModel {
   final String customerType; // direct, distributor, internal, other
 
   final String? country;
+
+  /// ISO 3166-1 alpha-2 (npr. BA, DE) — za izvoz / fakture.
+  final String? countryCode;
+
   final String? city;
   final String? address;
   final String? taxId;
@@ -43,6 +47,7 @@ class CustomerModel {
     required this.status,
     required this.customerType,
     this.country,
+    this.countryCode,
     this.city,
     this.address,
     this.taxId,
@@ -68,6 +73,7 @@ class CustomerModel {
           ? 'direct'
           : _s(map['customerType']),
       country: _nullable(map['country']),
+      countryCode: _nullable(map['countryCode']),
       city: _nullable(map['city']),
       address: _nullable(map['address']),
       taxId: _nullable(map['taxId']),
@@ -92,6 +98,7 @@ class CustomerModel {
       'status': status,
       'customerType': customerType,
       if ((country ?? '').trim().isNotEmpty) 'country': country,
+      'countryCode': (countryCode ?? '').trim(),
       if ((city ?? '').trim().isNotEmpty) 'city': city,
       if ((address ?? '').trim().isNotEmpty) 'address': address,
       if ((taxId ?? '').trim().isNotEmpty) 'taxId': taxId,

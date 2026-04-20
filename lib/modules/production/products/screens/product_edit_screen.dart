@@ -2,6 +2,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../logistics/wms/wms_scan_helpers.dart';
+import '../services/product_lookup_service.dart';
 import '../services/product_service.dart';
 import '../services/product_tracking_label_service.dart';
 
@@ -39,15 +41,21 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
   late final TextEditingController _packagingQtyController;
   late final TextEditingController _standardUnitPriceController;
   late final TextEditingController _currencyController;
+  late final TextEditingController _shelfLifeDaysController;
+  late final TextEditingController _minStockQtyController;
+  late final TextEditingController _maxStockQtyController;
 
   bool _isLoading = false;
   late bool _isActive;
   late String _status;
+  late bool _lotTrackingRequired;
 
   /// Prilagođena etiketa za ispis na stanici (upload u Storage).
   bool _hasCustomTrackingLabel = false;
   String _customLabelFileName = '';
   bool _labelBusy = false;
+
+  late List<String> _scanAliases;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -68,6 +76,13 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
       final d = v.toDouble();
       return d == d.roundToDouble() ? d.toInt().toString() : d.toString();
     }
+    return _s(v);
+  }
+
+  String _formatIntForField(dynamic v) {
+    if (v == null) return '';
+    if (v is int) return v.toString();
+    if (v is num) return v.toInt().toString();
     return _s(v);
   }
 
@@ -126,11 +141,26 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
           : _s(widget.productData['currency']),
     );
 
+    _shelfLifeDaysController = TextEditingController(
+      text: _formatIntForField(widget.productData['shelfLifeDays']),
+    );
+    _minStockQtyController = TextEditingController(
+      text: _formatNumForField(widget.productData['minStockQty']),
+    );
+    _maxStockQtyController = TextEditingController(
+      text: _formatNumForField(widget.productData['maxStockQty']),
+    );
+
     _status = _s(widget.productData['status']).isEmpty
         ? 'active'
         : _s(widget.productData['status']).toLowerCase();
     _isActive =
         (widget.productData['isActive'] as bool?) ?? (_status == 'active');
+
+    _lotTrackingRequired =
+        (widget.productData['lotTrackingRequired'] as bool?) ?? false;
+
+    _scanAliases = _readScanAliasesFromProduct(widget.productData);
 
     _hasCustomTrackingLabel =
         _s(widget.productData['customTrackingLabelStoragePath']).isNotEmpty;
@@ -139,6 +169,58 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
 
   InputDecoration _dec(String label, {String? hint}) {
     return InputDecoration(labelText: label, hintText: hint);
+  }
+
+  List<String> _readScanAliasesFromProduct(Map<String, dynamic> data) {
+    final raw = data['scanAliases'];
+    if (raw is! List) return [];
+    return raw
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+
+  Future<void> _addScanAlias() async {
+    final raw = await wmsScanBarcodeRaw(
+      context,
+      companyData: widget.companyData,
+    );
+    if (!mounted || raw == null || raw.isEmpty) return;
+    final norm = ProductLookupService.normalizeScanAlias(raw);
+    if (norm.isEmpty) return;
+
+    final existing = await ProductLookupService().getByScanAlias(
+      companyId: _companyId,
+      raw: norm,
+    );
+    if (!mounted) return;
+    if (existing != null && existing.productId != _productId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Kod je već na proizvodu: ${existing.productCode}',
+          ),
+        ),
+      );
+      return;
+    }
+    if (_scanAliases.contains(norm)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Taj kod je već na listi.')),
+      );
+      return;
+    }
+    if (_scanAliases.length >= ProductService.maxScanAliasesForProduct) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Najviše ${ProductService.maxScanAliasesForProduct} kodova.',
+          ),
+        ),
+      );
+      return;
+    }
+    setState(() => _scanAliases = [..._scanAliases, norm]);
   }
 
   Future<void> _save() async {
@@ -168,6 +250,33 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
       label: 'Količina pakovanja',
     );
     if (packUp == null) return;
+
+    int? shelfDaysUp;
+    final shelfRaw = _shelfLifeDaysController.text.trim();
+    if (shelfRaw.isEmpty) {
+      shelfDaysUp = 0;
+    } else {
+      final si = int.tryParse(shelfRaw.replaceAll(',', '.'));
+      if (si == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Neispravan broj: rok trajanja (dani)')),
+        );
+        return;
+      }
+      shelfDaysUp = si;
+    }
+
+    final minUp = parseUpdateDouble(
+      _minStockQtyController.text,
+      label: 'Min. zaliha',
+    );
+    if (minUp == null) return;
+
+    final maxUp = parseUpdateDouble(
+      _maxStockQtyController.text,
+      label: 'Max. zaliha',
+    );
+    if (maxUp == null) return;
 
     if (_companyId.isEmpty || _productId.isEmpty || _userId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -204,6 +313,11 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
         standardUnitPrice: priceUp,
         currency: _currencyController.text.trim(),
         isActive: _isActive,
+        lotTrackingRequired: _lotTrackingRequired,
+        shelfLifeDays: shelfDaysUp,
+        minStockQty: minUp,
+        maxStockQty: maxUp,
+        scanAliases: _scanAliases,
       );
 
       if (!mounted) return;
@@ -308,6 +422,9 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     _packagingQtyController.dispose();
     _standardUnitPriceController.dispose();
     _currencyController.dispose();
+    _shelfLifeDaysController.dispose();
+    _minStockQtyController.dispose();
+    _maxStockQtyController.dispose();
     super.dispose();
   }
 
@@ -399,6 +516,45 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                 ),
                 const SizedBox(height: 20),
                 const Text(
+                  'Vanjski barkodovi / QR (postojeće etikete)',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Skeniranje u prijemu i WMS-u pronalazi proizvod po ovim kodovima.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _scanAliases
+                      .map(
+                        (a) => InputChip(
+                          label: Text(
+                            a.length > 40 ? '${a.substring(0, 40)}…' : a,
+                          ),
+                          onDeleted: () => setState(
+                            () => _scanAliases =
+                                _scanAliases.where((x) => x != a).toList(),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: _isLoading ? null : _addScanAlias,
+                    icon: const Icon(Icons.qr_code_scanner_outlined),
+                    label: const Text('Dodaj kod skeniranjem'),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
                   'Sekundarna klasifikacija i cijena (lista)',
                   style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                 ),
@@ -465,6 +621,42 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                 TextFormField(
                   controller: _routingVersionController,
                   decoration: _dec('Aktivna Routing verzija'),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Zaliha / magacin (IATF)',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Obavezno praćenje lota / šarže'),
+                  value: _lotTrackingRequired,
+                  onChanged: (v) => setState(() => _lotTrackingRequired = v),
+                ),
+                TextFormField(
+                  controller: _shelfLifeDaysController,
+                  keyboardType: TextInputType.number,
+                  decoration: _dec(
+                    'Rok trajanja (dani)',
+                    hint: 'Prazno = ukloni',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _minStockQtyController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: _dec('Min. zaliha', hint: 'Prazno = ukloni'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _maxStockQtyController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: _dec('Max. zaliha', hint: 'Prazno = ukloni'),
                 ),
                 const SizedBox(height: 24),
                 const Text(

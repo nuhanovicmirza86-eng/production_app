@@ -223,9 +223,16 @@ class ProductLookupService {
     return value.trim().toLowerCase();
   }
 
+  /// Kanonski zapis barkoda/QR-a za polje [scanAliases] (čuva vodeće nule).
+  static String normalizeScanAlias(String value) {
+    return value.trim();
+  }
+
+  /// Jedinstveni prefiksi za pretragu; uključuje i vanjske kodove.
   static List<String> buildSearchTokens({
     required String productCode,
     required String productName,
+    List<String> scanAliases = const [],
   }) {
     final tokens = <String>{};
 
@@ -252,6 +259,58 @@ class ProductLookupService {
     addPrefixesFromText(productCode);
     addPrefixesFromText(productName);
 
+    for (final a in scanAliases) {
+      final s = normalizeScanAlias(a);
+      if (s.isEmpty) continue;
+      addPrefixesFromText(s);
+      final digits = s.replaceAll(RegExp(r'[^0-9]'), '');
+      if (digits.length >= 4) {
+        addPrefixesFromText(digits);
+      }
+    }
+
     return tokens.toList()..sort();
+  }
+
+  /// Točan pogodak na jedan od upisanih vanjskih kodova (EAN, QR sadržaj, …).
+  Future<ProductLookupItem?> getByScanAlias({
+    required String companyId,
+    required String raw,
+  }) async {
+    final key = normalizeScanAlias(raw);
+    if (key.isEmpty || companyId.trim().isEmpty) return null;
+
+    final snap = await _products
+        .where('companyId', isEqualTo: companyId.trim())
+        .where('scanAliases', arrayContains: key)
+        .limit(1)
+        .get();
+
+    if (snap.docs.isEmpty) return null;
+    return ProductLookupItem.fromDoc(snap.docs.first);
+  }
+
+  /// Pokušaj: vanjski kod → zatim direktan [productId].
+  Future<ProductLookupItem?> findProductByScanContent({
+    required String companyId,
+    required String raw,
+    bool onlyActive = true,
+  }) async {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+
+    final byAlias = await getByScanAlias(companyId: companyId, raw: trimmed);
+    if (byAlias != null) {
+      if (onlyActive && (!byAlias.isActive || byAlias.status != 'active')) {
+        return null;
+      }
+      return byAlias;
+    }
+
+    return getByProductId(
+      companyId: companyId,
+      productId: trimmed,
+      onlyActive: onlyActive,
+    );
   }
 }
