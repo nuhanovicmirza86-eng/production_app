@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
 import '../services/quality_callable_service.dart';
+import '../widgets/qms_iatf_help.dart';
 
 /// Detalj CAPA zapisa (action_plans · sourceType non_conformance).
 class CapaDetailScreen extends StatefulWidget {
@@ -149,7 +150,15 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('CAPA')),
+      appBar: AppBar(
+        title: const Text('CAPA'),
+        actions: [
+          QmsIatfInfoIcon(
+            title: 'CAPA',
+            message: QmsIatfStrings.detailCapa,
+          ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -191,9 +200,14 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
                   TextFormField(
                     controller: _rootCause,
                     maxLines: 3,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Uzrok (root cause)',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: QmsIatfInfoIcon(
+                        title: 'Root cause',
+                        message: QmsIatfStrings.termRootCause,
+                        size: 20,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -209,9 +223,14 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
                   TextFormField(
                     controller: _verification,
                     maxLines: 2,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Verifikacija',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: QmsIatfInfoIcon(
+                        title: 'Verifikacija CAPA',
+                        message: QmsIatfStrings.termVerification,
+                        size: 20,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),

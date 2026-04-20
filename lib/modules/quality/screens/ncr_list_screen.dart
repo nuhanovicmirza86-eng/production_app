@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
 import '../models/qms_list_models.dart';
+import '../widgets/qms_iatf_help.dart';
 import '../services/quality_callable_service.dart';
 import 'ncr_detail_screen.dart';
 
@@ -74,6 +75,10 @@ class _NcrListScreenState extends State<NcrListScreen> {
       appBar: AppBar(
         title: const Text('NCR — neskladi'),
         actions: [
+          QmsIatfInfoIcon(
+            title: 'NCR',
+            message: QmsIatfStrings.listNcr,
+          ),
           IconButton(
             tooltip: _openOnly
                 ? 'Prikaži sve (uzorkom do limita)'

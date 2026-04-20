@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/qms_iatf_help.dart';
 import 'capa_tracking_screen.dart';
 import 'control_plans_list_screen.dart';
 import 'execute_inspection_screen.dart';
@@ -26,6 +27,12 @@ class QualityHubScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Kvalitet (QMS)'),
+        actions: [
+          QmsIatfInfoIcon(
+            title: 'QMS i IATF 16949',
+            message: QmsIatfStrings.hubModule,
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -41,18 +48,24 @@ class QualityHubScreen extends StatelessWidget {
             icon: Icons.dashboard_outlined,
             title: 'Dashboard',
             subtitle: 'KPI, otvoreni NCR/CAPA',
+            iatfTitle: 'QMS dashboard',
+            iatfMessage: QmsIatfStrings.dashboard,
             onTap: () => _open(context, QualityDashboardScreen(companyData: companyData)),
           ),
           _HubTile(
             icon: Icons.engineering_outlined,
             title: 'Kontrolni planovi',
             subtitle: 'Master data (APQP)',
+            iatfTitle: 'Kontrolni plan (APQP)',
+            iatfMessage: '${QmsIatfStrings.kpiControlPlans}\n\n${QmsIatfStrings.termApqp}',
             onTap: () => _open(context, ControlPlansListScreen(companyData: companyData)),
           ),
           _HubTile(
             icon: Icons.fact_check_outlined,
             title: 'Planovi inspekcije',
             subtitle: 'Ulaz / u procesu / finalno',
+            iatfTitle: 'Plan inspekcije',
+            iatfMessage: QmsIatfStrings.kpiInspectionPlans,
             onTap: () =>
                 _open(context, InspectionPlansListScreen(companyData: companyData)),
           ),
@@ -60,18 +73,24 @@ class QualityHubScreen extends StatelessWidget {
             icon: Icons.qr_code_scanner,
             title: 'Izvrši inspekciju',
             subtitle: 'Sken LOT-a ili naloga',
+            iatfTitle: 'Izvršenje inspekcije',
+            iatfMessage: '${QmsIatfStrings.executeInspection}\n\n${QmsIatfStrings.termTraceability}',
             onTap: () => _open(context, ExecuteInspectionScreen(companyData: companyData)),
           ),
           _HubTile(
             icon: Icons.report_gmailerrorred_outlined,
             title: 'NCR',
             subtitle: 'Neskladi',
+            iatfTitle: 'NCR (nesklad)',
+            iatfMessage: QmsIatfStrings.listNcr,
             onTap: () => _open(context, NcrListScreen(companyData: companyData)),
           ),
           _HubTile(
             icon: Icons.task_alt_outlined,
             title: 'CAPA',
             subtitle: 'Korektivne akcije',
+            iatfTitle: 'CAPA',
+            iatfMessage: QmsIatfStrings.listCapa,
             onTap: () => _open(context, CapaTrackingScreen(companyData: companyData)),
           ),
         ],
@@ -85,12 +104,16 @@ class _HubTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final String? iatfTitle;
+  final String? iatfMessage;
 
   const _HubTile({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.iatfTitle,
+    this.iatfMessage,
   });
 
   @override
@@ -101,7 +124,21 @@ class _HubTile extends StatelessWidget {
         leading: Icon(icon, size: 32),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (iatfTitle != null &&
+                iatfMessage != null &&
+                iatfTitle!.isNotEmpty &&
+                iatfMessage!.isNotEmpty)
+              QmsIatfInfoIcon(
+                title: iatfTitle!,
+                message: iatfMessage!,
+                size: 20,
+              ),
+            const Icon(Icons.chevron_right),
+          ],
+        ),
         onTap: onTap,
       ),
     );

@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../models/qms_list_models.dart';
 import '../services/quality_callable_service.dart';
+import '../widgets/qms_iatf_help.dart';
 import 'capa_detail_screen.dart';
 
 class _NcrAttRow {
@@ -293,7 +294,15 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
         ? widget.ncrId
         : ((_ncr!['ncrCode'] ?? widget.ncrId).toString());
     return Scaffold(
-      appBar: AppBar(title: Text('NCR $code')),
+      appBar: AppBar(
+        title: Text('NCR $code'),
+        actions: [
+          QmsIatfInfoIcon(
+            title: 'NCR',
+            message: QmsIatfStrings.detailNcr,
+          ),
+        ],
+      ),
       floatingActionButton: _loading || _error != null
           ? null
           : FloatingActionButton.extended(
@@ -334,9 +343,14 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                     DropdownButtonFormField<String>(
                       key: ValueKey<String>('ncr_sev_$_severity'),
                       initialValue: _severity,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Ozbiljnost',
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
+                        suffixIcon: QmsIatfInfoIcon(
+                          title: 'Ozbiljnost',
+                          message: QmsIatfStrings.termSeverity,
+                          size: 20,
+                        ),
                       ),
                       items: _severities
                           .map((s) => DropdownMenuItem(value: s, child: Text(s)))
@@ -358,15 +372,33 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                     TextFormField(
                       controller: _containment,
                       maxLines: 3,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Containment / privremena mjera',
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
+                        suffixIcon: QmsIatfInfoIcon(
+                          title: 'Containment',
+                          message: QmsIatfStrings.termContainment,
+                          size: 20,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      'LOT: ${_ncr!['lotId'] ?? '—'} · Nalog: ${_ncr!['productionOrderId'] ?? '—'}',
-                      style: Theme.of(context).textTheme.bodySmall,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'LOT: ${_ncr!['lotId'] ?? '—'} · Nalog: ${_ncr!['productionOrderId'] ?? '—'}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                        QmsIatfInfoIcon(
+                          title: 'LOT i sljedljivost',
+                          message:
+                              '${QmsIatfStrings.termLot}\n\n${QmsIatfStrings.termTraceability}',
+                          size: 20,
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 24),
                     Text(

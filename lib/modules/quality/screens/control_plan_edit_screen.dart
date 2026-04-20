@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
 import '../services/quality_callable_service.dart';
+import '../widgets/qms_iatf_help.dart';
 
 class _CharBlock {
   _CharBlock()
@@ -218,6 +219,13 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(isNew ? 'Novi kontrolni plan' : 'Uredi kontrolni plan'),
+        actions: [
+          QmsIatfInfoIcon(
+            title: 'Kontrolni plan',
+            message:
+                '${QmsIatfStrings.editControlPlan}\n\n${QmsIatfStrings.termApqp}',
+          ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -279,12 +287,24 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
                   ),
                   const SizedBox(height: 24),
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Operacije i karakteristike',
-                        style: Theme.of(context).textTheme.titleMedium,
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Text(
+                              'Operacije i karakteristike',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(width: 4),
+                            QmsIatfInfoIcon(
+                              title: 'Operacije i karakteristike',
+                              message: QmsIatfStrings.editControlPlan,
+                              size: 20,
+                            ),
+                          ],
+                        ),
                       ),
-                      const Spacer(),
                       TextButton.icon(
                         onPressed: () {
                           setState(() => _operations.add(_OperationBlock()));

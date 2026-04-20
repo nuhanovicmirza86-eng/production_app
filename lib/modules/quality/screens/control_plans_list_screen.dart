@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
 import '../models/qms_list_models.dart';
+import '../widgets/qms_iatf_help.dart';
 import '../services/quality_callable_service.dart';
 import 'control_plan_edit_screen.dart';
 
@@ -62,7 +63,15 @@ class _ControlPlansListScreenState extends State<ControlPlansListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Kontrolni planovi')),
+      appBar: AppBar(
+        title: const Text('Kontrolni planovi'),
+        actions: [
+          QmsIatfInfoIcon(
+            title: 'Kontrolni plan',
+            message: QmsIatfStrings.listControlPlans,
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           final ok = await Navigator.push<bool>(

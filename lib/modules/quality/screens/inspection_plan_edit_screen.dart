@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
 import '../services/quality_callable_service.dart';
+import '../widgets/qms_iatf_help.dart';
 
 /// Plan inspekcije: productId + controlPlanId + tip + refs karakteristika (npr. 0:0,0:1).
 /// Prazan unos refs = sve karakteristike kontrolnog plana pri izvršenju (backend).
@@ -235,6 +236,13 @@ class _InspectionPlanEditScreenState extends State<InspectionPlanEditScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(isNew ? 'Novi plan inspekcije' : 'Uredi plan inspekcije'),
+        actions: [
+          QmsIatfInfoIcon(
+            title: 'Plan inspekcije',
+            message:
+                '${QmsIatfStrings.editInspectionPlan}\n\n${QmsIatfStrings.termInspectionType}',
+          ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -283,9 +291,14 @@ class _InspectionPlanEditScreenState extends State<InspectionPlanEditScreen> {
                     DropdownButtonFormField<String>(
                       key: ValueKey<String>('ip_type_$_inspectionType'),
                       initialValue: _inspectionType,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Tip inspekcije',
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
+                        suffixIcon: QmsIatfInfoIcon(
+                          title: 'Tip inspekcije',
+                          message: QmsIatfStrings.termInspectionType,
+                          size: 20,
+                        ),
                       ),
                       items: const [
                         DropdownMenuItem(value: 'INCOMING', child: Text('INCOMING (ulazna)')),
@@ -314,8 +327,12 @@ class _InspectionPlanEditScreenState extends State<InspectionPlanEditScreen> {
                       },
                     ),
                     const SizedBox(height: 24),
-                    Text(
-                      'Karakteristike (refs u formatu operacija:indeks, npr. 0:0). Prazno = sve iz kontrolnog plana.',
+                    QmsIatfSectionTitle(
+                      label:
+                          'Karakteristike (refs u formatu operacija:indeks, npr. 0:0). '
+                          'Prazno = sve iz kontrolnog plana.',
+                      iatfTitle: 'Refs na kontrolni plan',
+                      iatfMessage: QmsIatfStrings.termCharacteristicRefs,
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     const SizedBox(height: 8),

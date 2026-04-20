@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
 import '../services/quality_callable_service.dart';
+import '../widgets/qms_iatf_help.dart';
 
 /// KPI preko Callable-a [getQmsDashboardSummary] (bez direktnog pisanja u Firestore s klijenta).
 class QualityDashboardScreen extends StatefulWidget {
@@ -59,7 +60,15 @@ class _QualityDashboardScreenState extends State<QualityDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('QMS dashboard')),
+      appBar: AppBar(
+        title: const Text('QMS dashboard'),
+        actions: [
+          QmsIatfInfoIcon(
+            title: 'QMS dashboard',
+            message: QmsIatfStrings.dashboard,
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -72,24 +81,32 @@ class _QualityDashboardScreenState extends State<QualityDashboardScreen> {
                 title: 'Kontrolni planovi',
                 value: '$_cp',
                 subtitle: 'Podaci samo preko Callable (klijent nema read na kolekciju)',
+                iatfTitle: 'Kontrolni plan',
+                iatfMessage: QmsIatfStrings.kpiControlPlans,
               ),
               const SizedBox(height: 12),
               _KpiCard(
                 title: 'Planovi inspekcije',
                 value: '$_ip',
                 subtitle: 'Ulaz / u procesu / finalno',
+                iatfTitle: 'Plan inspekcije',
+                iatfMessage: QmsIatfStrings.kpiInspectionPlans,
               ),
               const SizedBox(height: 12),
               _KpiCard(
                 title: 'Otvoreni NCR',
                 value: '$_ncr',
                 subtitle: 'Statusi OPEN / UNDER_REVIEW / CONTAINED',
+                iatfTitle: 'NCR',
+                iatfMessage: QmsIatfStrings.kpiNcr,
               ),
               const SizedBox(height: 12),
               _KpiCard(
                 title: 'Otvoreni CAPA',
                 value: '$_capa',
                 subtitle: 'action_plans · sourceType = non_conformance',
+                iatfTitle: 'CAPA',
+                iatfMessage: QmsIatfStrings.kpiCapa,
               ),
             ],
             const SizedBox(height: 24),
@@ -110,11 +127,15 @@ class _KpiCard extends StatelessWidget {
   final String title;
   final String value;
   final String subtitle;
+  final String? iatfTitle;
+  final String? iatfMessage;
 
   const _KpiCard({
     required this.title,
     required this.value,
     required this.subtitle,
+    this.iatfTitle,
+    this.iatfMessage,
   });
 
   @override
@@ -126,19 +147,35 @@ class _KpiCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                if (iatfTitle != null &&
+                    iatfMessage != null &&
+                    iatfTitle!.isNotEmpty &&
+                    iatfMessage!.isNotEmpty)
+                  QmsIatfInfoIcon(
+                    title: iatfTitle!,
+                    message: iatfMessage!,
+                    size: 20,
+                  ),
+              ],
             ),
             const SizedBox(height: 8),
             Text(
               value,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: cs.primary,
-                fontWeight: FontWeight.w800,
-              ),
+                    color: cs.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
             ),
             const SizedBox(height: 4),
             Text(

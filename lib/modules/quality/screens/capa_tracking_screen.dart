@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
 import '../models/qms_list_models.dart';
+import '../widgets/qms_iatf_help.dart';
 import '../services/quality_callable_service.dart';
 import 'capa_detail_screen.dart';
 
@@ -62,7 +63,15 @@ class _CapaTrackingScreenState extends State<CapaTrackingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('CAPA — praćenje')),
+      appBar: AppBar(
+        title: const Text('CAPA — praćenje'),
+        actions: [
+          QmsIatfInfoIcon(
+            title: 'CAPA',
+            message: QmsIatfStrings.listCapa,
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: _buildBody(context),

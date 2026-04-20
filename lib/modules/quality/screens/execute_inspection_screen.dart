@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../widgets/qms_iatf_help.dart';
 import '../../production/qr/production_qr_resolver.dart';
 import '../../production/qr/screens/production_qr_scan_screen.dart';
 import '../models/qms_execution_models.dart';
@@ -245,7 +246,16 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Izvrši inspekciju')),
+      appBar: AppBar(
+        title: const Text('Izvrši inspekciju'),
+        actions: [
+          QmsIatfInfoIcon(
+            title: 'Izvršenje inspekcije',
+            message:
+                '${QmsIatfStrings.executeInspection}\n\n${QmsIatfStrings.termLot}',
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
