@@ -23,6 +23,9 @@ class _NcrListScreenState extends State<NcrListScreen> {
   var _rows = const <QmsNcrRow>[];
   bool _openOnly = true;
 
+  /// Prazno = svi; `customer` | `supplier` | `internal` (PROCESS/INCOMING).
+  String _sourceFilter = '';
+
   String get _cid =>
       (widget.companyData['companyId'] ?? '').toString().trim();
 
@@ -49,6 +52,7 @@ class _NcrListScreenState extends State<NcrListScreen> {
       final rows = await _svc.listNonConformances(
         companyId: cid,
         openOnly: _openOnly,
+        sourceFilter: _sourceFilter.isEmpty ? null : _sourceFilter,
       );
       if (!mounted) return;
       setState(() {
@@ -88,9 +92,63 @@ class _NcrListScreenState extends State<NcrListScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        child: _buildBody(context),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                ChoiceChip(
+                  label: const Text('Svi izvori'),
+                  selected: _sourceFilter.isEmpty,
+                  onSelected: (v) {
+                    if (!v) return;
+                    setState(() => _sourceFilter = '');
+                    _load();
+                  },
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('Kupac'),
+                  selected: _sourceFilter == 'customer',
+                  onSelected: (v) {
+                    if (!v) return;
+                    setState(() => _sourceFilter = 'customer');
+                    _load();
+                  },
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('Dobavljač'),
+                  selected: _sourceFilter == 'supplier',
+                  onSelected: (v) {
+                    if (!v) return;
+                    setState(() => _sourceFilter = 'supplier');
+                    _load();
+                  },
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('Inspekcija'),
+                  selected: _sourceFilter == 'internal',
+                  onSelected: (v) {
+                    if (!v) return;
+                    setState(() => _sourceFilter = 'internal');
+                    _load();
+                  },
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _load,
+              child: _buildBody(context),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -141,6 +199,8 @@ class _NcrListScreenState extends State<NcrListScreen> {
           ),
           subtitle: Text(
             '${r.status} · ${r.severity} · ${r.source}\n'
+            '${r.partnerDisplayName != null && r.partnerDisplayName!.trim().isNotEmpty ? "Partner: ${r.partnerDisplayName}\n" : ""}'
+            '${r.externalClaimRef != null && r.externalClaimRef!.trim().isNotEmpty ? "Vanjski br.: ${r.externalClaimRef}\n" : ""}'
             '${r.description}'
             '${r.lotId != null ? "\nLOT: ${r.lotId}" : ""}'
             '${r.productionOrderId != null ? "\nNalog: ${r.productionOrderId}" : ""}'

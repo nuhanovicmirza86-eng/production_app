@@ -5,6 +5,7 @@ import 'capa_tracking_screen.dart';
 import 'control_plans_list_screen.dart';
 import 'execute_inspection_screen.dart';
 import 'inspection_plans_list_screen.dart';
+import 'ncr_claim_create_screen.dart';
 import 'ncr_list_screen.dart';
 import 'quality_dashboard_screen.dart';
 
@@ -78,9 +79,37 @@ class QualityHubScreen extends StatelessWidget {
             onTap: () => _open(context, ExecuteInspectionScreen(companyData: companyData)),
           ),
           _HubTile(
+            icon: Icons.support_agent_outlined,
+            title: 'Reklamacija kupca',
+            subtitle: 'NCR · izvor CUSTOMER',
+            iatfTitle: 'Reklamacija kupca',
+            iatfMessage: QmsIatfStrings.claimCustomer,
+            onTap: () => _open(
+              context,
+              NcrClaimCreateScreen(
+                companyData: companyData,
+                claimSource: 'CUSTOMER',
+              ),
+            ),
+          ),
+          _HubTile(
+            icon: Icons.local_shipping_outlined,
+            title: 'Reklamacija dobavljača',
+            subtitle: 'NCR · izvor SUPPLIER (SCAR)',
+            iatfTitle: 'Reklamacija dobavljača',
+            iatfMessage: QmsIatfStrings.claimSupplier,
+            onTap: () => _open(
+              context,
+              NcrClaimCreateScreen(
+                companyData: companyData,
+                claimSource: 'SUPPLIER',
+              ),
+            ),
+          ),
+          _HubTile(
             icon: Icons.report_gmailerrorred_outlined,
             title: 'NCR',
-            subtitle: 'Neskladi',
+            subtitle: 'Svi neskladi',
             iatfTitle: 'NCR (nesklad)',
             iatfMessage: QmsIatfStrings.listNcr,
             onTap: () => _open(context, NcrListScreen(companyData: companyData)),

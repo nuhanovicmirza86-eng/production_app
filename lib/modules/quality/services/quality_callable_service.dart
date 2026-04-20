@@ -154,14 +154,50 @@ class QualityCallableService {
     required String companyId,
     int limit = 100,
     bool openOnly = true,
+    /// `customer` | `supplier` | `internal` | `operations` ili prazno = sve.
+    String? sourceFilter,
   }) async {
     final callable = _functions.httpsCallable('listQmsNonConformances');
     final res = await callable.call({
       'companyId': companyId,
       'limit': limit,
       'openOnly': openOnly,
+      if (sourceFilter != null && sourceFilter.trim().isNotEmpty)
+        'sourceFilter': sourceFilter.trim(),
     });
     return _parseRows(res.data, QmsNcrRow.fromMap);
+  }
+
+  /// Reklamacija kupca (CUSTOMER) ili prigovor prema dobavljaču (SUPPLIER).
+  Future<String> createQmsPartnerClaimNcr({
+    required String companyId,
+    required String claimSource,
+    required String partnerKind,
+    required String partnerId,
+    required String description,
+    String? plantKey,
+    String? containmentAction,
+    String? externalClaimRef,
+    String? severity,
+  }) async {
+    final callable = _functions.httpsCallable('createQmsPartnerClaimNcr');
+    final res = await callable.call({
+      'companyId': companyId,
+      'claimSource': claimSource,
+      'partnerKind': partnerKind,
+      'partnerId': partnerId,
+      'description': description,
+      if (plantKey != null && plantKey.isNotEmpty) 'plantKey': plantKey,
+      if (containmentAction != null) 'containmentAction': containmentAction,
+      if (externalClaimRef != null && externalClaimRef.isNotEmpty)
+        'externalClaimRef': externalClaimRef,
+      if (severity != null && severity.isNotEmpty) 'severity': severity,
+    });
+    final id = (res.data as Map?)?['ncrId']?.toString().trim();
+    if (id == null || id.isEmpty) {
+      throw StateError('createQmsPartnerClaimNcr: nije vraćen ncrId');
+    }
+    return id;
   }
 
   Future<List<QmsCapaRow>> listOpenCapa({required String companyId}) async {

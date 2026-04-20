@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../commercial/partners/models/partner_models.dart';
+import '../../commercial/partners/services/customers_service.dart';
+import '../../commercial/partners/services/suppliers_service.dart';
 import '../../production/products/services/product_service.dart';
 import '../models/qms_list_models.dart';
 import '../services/quality_callable_service.dart';
@@ -337,6 +340,292 @@ class _QmsControlPlanPickerBodyState extends State<_QmsControlPlanPickerBody> {
                       '$code · proizvod: ${r.productId} · ${r.status}',
                     ),
                     onTap: () => Navigator.pop(context, r.id),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- Kupci / dobavljači (reklamacije) ---
+
+/// Vraća Firestore ID dokumenta `customers/`.
+Future<String?> showQmsCustomerPicker({
+  required BuildContext context,
+  required String companyId,
+}) async {
+  final cid = companyId.trim();
+  if (cid.isEmpty) return null;
+  return showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (ctx) => _QmsCustomerPickerBody(companyId: cid),
+  );
+}
+
+class _QmsCustomerPickerBody extends StatefulWidget {
+  const _QmsCustomerPickerBody({required this.companyId});
+
+  final String companyId;
+
+  @override
+  State<_QmsCustomerPickerBody> createState() => _QmsCustomerPickerBodyState();
+}
+
+class _QmsCustomerPickerBodyState extends State<_QmsCustomerPickerBody> {
+  final _svc = CustomersService();
+  final _search = TextEditingController();
+
+  bool _loading = true;
+  String? _error;
+  List<CustomerModel> _items = const [];
+  List<CustomerModel> _filtered = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _search.addListener(_applyFilter);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final list = await _svc.listCustomers(companyId: widget.companyId);
+      if (!mounted) return;
+      setState(() {
+        _items = list;
+        _filtered = list;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  void _applyFilter() {
+    final q = _search.text.trim().toLowerCase();
+    if (q.isEmpty) {
+      setState(() => _filtered = _items);
+      return;
+    }
+    setState(() {
+      _filtered = _items.where((m) {
+        final hay =
+            '${m.code.toLowerCase()} ${m.name.toLowerCase()} ${m.legalName.toLowerCase()}';
+        return hay.contains(q);
+      }).toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final h = MediaQuery.sizeOf(context).height * 0.72;
+    return SizedBox(
+      height: h,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text(
+              'Odaberi kupca',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              controller: _search,
+              decoration: const InputDecoration(
+                hintText: 'Pretraži šifru ili naziv…',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (_loading)
+            const Expanded(child: Center(child: CircularProgressIndicator()))
+          else if (_error != null)
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(_error!, textAlign: TextAlign.center),
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: ListView.builder(
+                itemCount: _filtered.length,
+                itemBuilder: (context, i) {
+                  final m = _filtered[i];
+                  return ListTile(
+                    title: Text(m.name.isNotEmpty ? m.name : m.code),
+                    subtitle: Text('${m.code} · ${m.id}'),
+                    onTap: () => Navigator.pop(context, m.id),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Vraća Firestore ID dokumenta `suppliers/`.
+Future<String?> showQmsSupplierPicker({
+  required BuildContext context,
+  required String companyId,
+}) async {
+  final cid = companyId.trim();
+  if (cid.isEmpty) return null;
+  return showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (ctx) => _QmsSupplierPickerBody(companyId: cid),
+  );
+}
+
+class _QmsSupplierPickerBody extends StatefulWidget {
+  const _QmsSupplierPickerBody({required this.companyId});
+
+  final String companyId;
+
+  @override
+  State<_QmsSupplierPickerBody> createState() => _QmsSupplierPickerBodyState();
+}
+
+class _QmsSupplierPickerBodyState extends State<_QmsSupplierPickerBody> {
+  final _svc = SuppliersService();
+  final _search = TextEditingController();
+
+  bool _loading = true;
+  String? _error;
+  List<SupplierModel> _items = const [];
+  List<SupplierModel> _filtered = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _search.addListener(_applyFilter);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final list = await _svc.listSuppliers(companyId: widget.companyId);
+      if (!mounted) return;
+      setState(() {
+        _items = list;
+        _filtered = list;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  void _applyFilter() {
+    final q = _search.text.trim().toLowerCase();
+    if (q.isEmpty) {
+      setState(() => _filtered = _items);
+      return;
+    }
+    setState(() {
+      _filtered = _items.where((m) {
+        final hay =
+            '${m.code.toLowerCase()} ${m.name.toLowerCase()} ${m.legalName.toLowerCase()}';
+        return hay.contains(q);
+      }).toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final h = MediaQuery.sizeOf(context).height * 0.72;
+    return SizedBox(
+      height: h,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text(
+              'Odaberi dobavljača',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              controller: _search,
+              decoration: const InputDecoration(
+                hintText: 'Pretraži šifru ili naziv…',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (_loading)
+            const Expanded(child: Center(child: CircularProgressIndicator()))
+          else if (_error != null)
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(_error!, textAlign: TextAlign.center),
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: ListView.builder(
+                itemCount: _filtered.length,
+                itemBuilder: (context, i) {
+                  final m = _filtered[i];
+                  return ListTile(
+                    title: Text(m.name.isNotEmpty ? m.name : m.code),
+                    subtitle: Text('${m.code} · ${m.id}'),
+                    onTap: () => Navigator.pop(context, m.id),
                   );
                 },
               ),

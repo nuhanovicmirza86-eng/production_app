@@ -75,6 +75,9 @@ class QmsNcrRow {
   final String description;
   final String? lotId;
   final String? productionOrderId;
+  final String? partnerKind;
+  final String? partnerDisplayName;
+  final String? externalClaimRef;
   final String? createdAtIso;
 
   const QmsNcrRow({
@@ -86,6 +89,9 @@ class QmsNcrRow {
     required this.description,
     this.lotId,
     this.productionOrderId,
+    this.partnerKind,
+    this.partnerDisplayName,
+    this.externalClaimRef,
     this.createdAtIso,
   });
 
@@ -99,6 +105,9 @@ class QmsNcrRow {
       description: (m['description'] ?? '').toString(),
       lotId: m['lotId']?.toString(),
       productionOrderId: m['productionOrderId']?.toString(),
+      partnerKind: m['partnerKind']?.toString(),
+      partnerDisplayName: m['partnerDisplayName']?.toString(),
+      externalClaimRef: m['externalClaimRef']?.toString(),
       createdAtIso: m['createdAt']?.toString(),
     );
   }

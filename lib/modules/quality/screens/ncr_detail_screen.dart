@@ -140,6 +140,11 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
     }
   }
 
+  bool _isPartnerClaimNcr(Map<String, dynamic> n) {
+    final s = (n['source'] ?? '').toString().toUpperCase();
+    return s == 'CUSTOMER' || s == 'SUPPLIER';
+  }
+
   List<Map<String, String>> _buildAttachmentsPayload() {
     final out = <Map<String, String>>[];
     for (final r in _attachmentRows) {
@@ -324,6 +329,57 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                       'Izvor: ${_ncr!['source'] ?? ''} · ref: ${_ncr!['referenceType'] ?? ''} ${_ncr!['referenceId'] ?? ''}',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
+                    if (_isPartnerClaimNcr(_ncr!)) ...[
+                      const SizedBox(height: 12),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                (_ncr!['source'] ?? '').toString().toUpperCase() ==
+                                        'CUSTOMER'
+                                    ? 'Kupac'
+                                    : 'Dobavljač',
+                                style: Theme.of(context).textTheme.titleSmall,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                (_ncr!['partnerDisplayName'] ?? '').toString().isEmpty
+                                    ? (_ncr!['partnerId'] ?? '').toString()
+                                    : (_ncr!['partnerDisplayName'] ?? '').toString(),
+                              ),
+                              if ((_ncr!['externalClaimRef'] ?? '')
+                                  .toString()
+                                  .trim()
+                                  .isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    'Vanjski broj: ${_ncr!['externalClaimRef']}',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                    if ((_ncr!['supplierId'] ?? '').toString().trim().isNotEmpty ||
+                        (_ncr!['customerId'] ?? '').toString().trim().isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        [
+                          'Sljedljivost (inspekcija)',
+                          if ((_ncr!['customerId'] ?? '').toString().trim().isNotEmpty)
+                            'kupac: ${_ncr!['customerId']}',
+                          if ((_ncr!['supplierId'] ?? '').toString().trim().isNotEmpty)
+                            'dobavljač: ${_ncr!['supplierId']}',
+                        ].join(' · '),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       key: ValueKey<String>('ncr_st_$_status'),
