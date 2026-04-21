@@ -59,6 +59,14 @@ class _ProductionFaultAssetQrScanScreenState
 
   String _s(dynamic v) => (v ?? '').toString().trim();
 
+  String _userFacingError(Object e) {
+    final raw = e.toString();
+    if (raw.startsWith('Exception: ')) {
+      return raw.substring('Exception: '.length);
+    }
+    return AppErrorMapper.toMessage(e);
+  }
+
   String? _parseAssetId(String raw) {
     final t = raw.trim();
     if (t.isEmpty) return null;
@@ -115,7 +123,7 @@ class _ProductionFaultAssetQrScanScreenState
           .get();
 
       if (!snap.exists) {
-        throw Exception('Uređaj ne postoji (assets/$assetId).');
+        throw Exception('Uređaj nije pronađen u šifrarniku.');
       }
 
       final d = snap.data() ?? <String, dynamic>{};
@@ -137,9 +145,12 @@ class _ProductionFaultAssetQrScanScreenState
       Navigator.of(context).pop(out);
     } catch (e) {
       if (!mounted) return;
+      final msg = e is FirebaseException
+          ? AppErrorMapper.toMessage(e)
+          : _userFacingError(e);
       setState(() {
         _locked = false;
-        _err = e.toString();
+        _err = msg;
       });
       if (_useDeviceCamera) {
         try {
