@@ -71,7 +71,7 @@ class _DocumentPdfSettingsScreenState extends State<DocumentPdfSettingsScreen> {
     if (_companyId.isEmpty) {
       setState(() {
         _loading = false;
-        _error = 'Nedostaje companyId.';
+        _error = 'Nedostaje podatak o kompaniji. Obrati se administratoru.';
       });
       return;
     }

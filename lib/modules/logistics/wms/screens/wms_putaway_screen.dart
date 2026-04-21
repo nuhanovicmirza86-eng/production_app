@@ -99,8 +99,8 @@ class _WmsPutawayScreenState extends State<WmsPutawayScreen> {
                   child: TextField(
                     controller: _lotDocId,
                     decoration: const InputDecoration(
-                      labelText: 'lotDocId',
-                      hintText: 'ID u inventory_lots ili wmslot:v1;…',
+                      labelText: 'Oznaka lota',
+                      hintText: 'Skeniraj lot ili unesi oznaku iz skladišta',
                     ),
                   ),
                 ),

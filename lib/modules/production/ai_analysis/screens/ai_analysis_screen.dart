@@ -127,7 +127,7 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
 
   Future<void> _loadOeeFromTracking() async {
     if (_companyId.isEmpty || _plantKey.isEmpty) {
-      setState(() => _error = 'Nedostaje companyId ili plantKey.');
+      setState(() => _error = 'Nedostaje podatak o kompaniji ili pogonu. Obrati se administratoru.');
       return;
     }
     if (_rejectIfPeriodTooLongForFirestore()) return;
@@ -160,7 +160,7 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
 
   Future<void> _loadScadaFromTracking() async {
     if (_companyId.isEmpty || _plantKey.isEmpty) {
-      setState(() => _error = 'Nedostaje companyId ili plantKey.');
+      setState(() => _error = 'Nedostaje podatak o kompaniji ili pogonu. Obrati se administratoru.');
       return;
     }
     if (_rejectIfPeriodTooLongForFirestore()) return;
@@ -193,7 +193,7 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
 
   Future<void> _loadFlowFromOrders() async {
     if (_companyId.isEmpty || _plantKey.isEmpty) {
-      setState(() => _error = 'Nedostaje companyId ili plantKey.');
+      setState(() => _error = 'Nedostaje podatak o kompaniji ili pogonu. Obrati se administratoru.');
       return;
     }
     if (_rejectIfPeriodTooLongForFirestore()) return;
@@ -296,7 +296,7 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
 
   Future<void> _run() async {
     if (_companyId.isEmpty || _plantKey.isEmpty) {
-      setState(() => _error = 'Nedostaje companyId ili plantKey.');
+      setState(() => _error = 'Nedostaje podatak o kompaniji ili pogonu. Obrati se administratoru.');
       return;
     }
     if (_payload == null) {

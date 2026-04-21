@@ -181,7 +181,9 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_companyId.isEmpty || _userId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nedostaje companyId ili userId.')),
+        const SnackBar(
+          content: Text('Nedostaje sesija. Ponovo se prijavi.'),
+        ),
       );
       return;
     }

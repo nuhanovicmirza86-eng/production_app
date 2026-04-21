@@ -135,7 +135,7 @@ class _WmsPickingScreenState extends State<WmsPickingScreen> {
                 child: TextField(
                   controller: _itemId,
                   decoration: const InputDecoration(
-                    labelText: 'ID artikla',
+                    labelText: 'Artikl (šifarnik)',
                   ),
                 ),
               ),

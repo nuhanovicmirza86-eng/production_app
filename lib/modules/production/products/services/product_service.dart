@@ -283,7 +283,7 @@ class ProductService {
     final normalizedStatus = status.trim().toLowerCase();
 
     if (normalizedCompanyId.isEmpty) {
-      throw Exception('Nedostaje companyId.');
+      throw Exception('Nedostaje podatak o kompaniji. Obrati se administratoru.');
     }
 
     if (normalizedProductCode.isEmpty) {

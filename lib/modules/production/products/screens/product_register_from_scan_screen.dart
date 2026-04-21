@@ -53,7 +53,7 @@ class _ProductRegisterFromScanScreenState
 
     if (_companyId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nedostaje companyId.')),
+        const SnackBar(content: Text('Nedostaje podatak o kompaniji. Obrati se administratoru.')),
       );
       return;
     }

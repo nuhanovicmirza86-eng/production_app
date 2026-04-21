@@ -17,7 +17,7 @@ class ProductionAiAssistantService {
     final pk = plantKey.trim();
     final p = prompt.trim();
     if (cid.isEmpty) {
-      throw ArgumentError('Nedostaje companyId.');
+      throw ArgumentError('Nedostaje podatak o kompaniji. Obrati se administratoru.');
     }
     if (pk.isEmpty) {
       throw ArgumentError('Nedostaje plantKey.');

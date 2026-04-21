@@ -65,14 +65,14 @@ class _InventoryAdjustmentsScreenState
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'ID dokumenta lota u Firestoreu (npr. wms_…).',
+                    'Unesi internu oznaku lota iz skladišta (npr. nakon skeniranja ili iz pregleda zaliha).',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: lotCtrl,
                     decoration: const InputDecoration(
-                      labelText: 'lotDocId',
+                      labelText: 'Oznaka lota',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -83,7 +83,7 @@ class _InventoryAdjustmentsScreenState
                       decimal: true,
                     ),
                     decoration: const InputDecoration(
-                      labelText: 'Nova količina (available)',
+                      labelText: 'Nova raspoloživa količina',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -213,7 +213,7 @@ class _InventoryAdjustmentsScreenState
           padding: const EdgeInsets.all(24),
           child: Text(
             _companyId.isEmpty
-                ? 'Nedostaje companyId.'
+                ? 'Nedostaje podatak o kompaniji. Obrati se administratoru.'
                 : 'Modul logistike nije uključen za ovu kompaniju.',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyLarge,

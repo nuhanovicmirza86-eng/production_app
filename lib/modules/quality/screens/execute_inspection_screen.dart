@@ -46,6 +46,7 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
   bool _loadingContext = false;
   String? _contextError;
   QmsInspectionExecutionContext? _ctx;
+  String? _ctxProductLine;
   final Map<String, TextEditingController> _valueByRef = {};
 
   bool _submitting = false;
@@ -128,7 +129,7 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
     if (cid.isEmpty) {
       setState(() {
         _loadingPlans = false;
-        _plansError = 'Nedostaje companyId.';
+        _plansError = 'Nedostaje podatak o kompaniji. Obrati se administratoru.';
       });
       return;
     }
@@ -182,6 +183,7 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
       _loadingContext = true;
       _contextError = null;
       _ctx = null;
+      _ctxProductLine = null;
       _disposeMeasureControllers();
     });
     try {
@@ -197,6 +199,7 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
         _ctx = ctx;
         _loadingContext = false;
       });
+      await _loadCtxProductLine(ctx);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -204,6 +207,35 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
         _loadingContext = false;
       });
     }
+  }
+
+  Future<void> _loadCtxProductLine(QmsInspectionExecutionContext ctx) async {
+    final pid = ctx.productId.trim();
+    if (pid.isEmpty) {
+      if (mounted) setState(() => _ctxProductLine = null);
+      return;
+    }
+    try {
+      final p = await _productService.getProductById(
+        companyId: _cid,
+        productId: pid,
+      );
+      if (!mounted) return;
+      if (p == null) {
+        setState(() => _ctxProductLine = null);
+        return;
+      }
+      setState(() => _ctxProductLine = QmsDisplayFormatters.productLine(p));
+    } catch (_) {
+      if (mounted) setState(() => _ctxProductLine = null);
+    }
+  }
+
+  String _submitResultLabel(String r) {
+    final u = r.trim().toUpperCase();
+    if (u == 'OK') return 'U redu';
+    if (u == 'NOK') return 'Nije u redu';
+    return r;
   }
 
   Future<void> _submit() async {
@@ -258,13 +290,13 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
       );
       if (!mounted) return;
       var msg =
-          'Spremljeno. Rezultat: ${res.overallResult} (${res.inspectionResultId})';
+          'Spremljeno. Rezultat: ${_submitResultLabel(res.overallResult)}.';
       if (res.overallResult.toUpperCase() == 'NOK') {
-        if (res.lotHoldApplied && (res.inventoryLotDocId ?? '').isNotEmpty) {
-          msg += '. Lot zadržan (hold) u WMS: ${res.inventoryLotDocId}.';
+        if (res.lotHoldApplied) {
+          msg += ' Lot je označen kao zadržan (hold) u skladištu.';
         } else if ((res.lotHoldSkipReason ?? '').isNotEmpty) {
           msg +=
-              ' WMS hold: ${res.lotHoldSkipReason} (provjeri LOT id ili modul logistike).';
+              ' Skladišni hold nije primijenjen (${res.lotHoldSkipReason}).';
         }
       }
       ScaffoldMessenger.of(context).showSnackBar(
@@ -420,16 +452,17 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Tip: ${_ctx!.inspectionType} · plan inspekcije: ${_ctx!.inspectionPlanStatus} · '
-              'kontrolni plan: ${_ctx!.controlPlanStatus.isEmpty ? "—" : _ctx!.controlPlanStatus} · '
-              'proizvod: ${_ctx!.productId}',
+              'Tip: ${QmsDisplayFormatters.inspectionType(_ctx!.inspectionType)} · '
+              'plan inspekcije: ${QmsDisplayFormatters.qmsDocStatus(_ctx!.inspectionPlanStatus)} · '
+              'kontrolni plan: ${_ctx!.controlPlanStatus.isEmpty ? "—" : QmsDisplayFormatters.qmsDocStatus(_ctx!.controlPlanStatus)} · '
+              'proizvod: ${_ctxProductLine ?? "…"}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _lotId,
               decoration: const InputDecoration(
-                labelText: 'Lot ID (opcionalno)',
+                labelText: 'Lot (opcionalno)',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -437,7 +470,7 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
             TextFormField(
               controller: _productionOrderId,
               decoration: const InputDecoration(
-                labelText: 'ID proizvodnog naloga (opcionalno)',
+                labelText: 'Proizvodni nalog (opcionalno)',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -445,7 +478,7 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
             TextFormField(
               controller: _customerId,
               decoration: InputDecoration(
-                labelText: 'ID kupca (opcionalno)',
+                labelText: 'Kupac (opcionalno)',
                 border: const OutlineInputBorder(),
                 helperText: 'Za segment / automatski NCR pri NOK',
                 helperStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -457,7 +490,7 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
             TextFormField(
               controller: _supplierId,
               decoration: InputDecoration(
-                labelText: 'ID dobavljača (opcionalno)',
+                labelText: 'Dobavljač (opcionalno)',
                 border: const OutlineInputBorder(),
                 helperText: 'Za segment / automatski NCR pri NOK',
                 helperStyle: Theme.of(context).textTheme.bodySmall?.copyWith(

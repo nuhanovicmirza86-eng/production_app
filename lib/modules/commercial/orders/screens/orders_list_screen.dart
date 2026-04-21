@@ -141,7 +141,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
   Future<void> _loadOrders() async {
     if (_companyId.isEmpty) {
       setState(() {
-        _errorMessage = 'Nedostaje companyId';
+        _errorMessage = 'Nedostaje podatak o kompaniji. Obrati se administratoru.';
         _isLoading = false;
       });
       return;

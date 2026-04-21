@@ -103,7 +103,7 @@ class _ProductionFaultAssetQrScanScreenState
     try {
       final cid = widget.companyId.trim();
       if (cid.isEmpty) {
-        throw Exception('Nedostaje companyId.');
+        throw Exception('Nedostaje podatak o kompaniji. Obrati se administratoru.');
       }
 
       final snap = await FirebaseFirestore.instance

@@ -95,7 +95,7 @@ class _ProductionAiReportScreenState extends State<ProductionAiReportScreen> {
 
   Future<void> _generate() async {
     if (_companyId.isEmpty || _plantKey.isEmpty) {
-      setState(() => _error = 'Nedostaje companyId ili plantKey.');
+      setState(() => _error = 'Nedostaje podatak o kompaniji ili pogonu. Obrati se administratoru.');
       return;
     }
     if (!_periodOrderOk) {

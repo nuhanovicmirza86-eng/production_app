@@ -496,7 +496,9 @@ class _QmsCustomerPickerBodyState extends State<_QmsCustomerPickerBody> {
                   final m = _filtered[i];
                   return ListTile(
                     title: Text(m.name.isNotEmpty ? m.name : m.code),
-                    subtitle: Text('${m.code} · ${m.id}'),
+                    subtitle: m.code.isNotEmpty && m.name.isNotEmpty
+                        ? Text('Šifra: ${m.code}')
+                        : null,
                     onTap: () => Navigator.pop(context, m.id),
                   );
                 },
@@ -638,7 +640,9 @@ class _QmsSupplierPickerBodyState extends State<_QmsSupplierPickerBody> {
                   final m = _filtered[i];
                   return ListTile(
                     title: Text(m.name.isNotEmpty ? m.name : m.code),
-                    subtitle: Text('${m.code} · ${m.id}'),
+                    subtitle: m.code.isNotEmpty && m.name.isNotEmpty
+                        ? Text('Šifra: ${m.code}')
+                        : null,
                     onTap: () => Navigator.pop(context, m.id),
                   );
                 },

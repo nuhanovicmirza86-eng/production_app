@@ -207,7 +207,7 @@ class _OrderLineProductionCreateScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Nedostaje plantKey u sesiji (pogon) — potreban za kreiranje proizvodnog naloga.',
+            'U sesiji nije postavljen pogon — potreban je za kreiranje proizvodnog naloga. Obrati se administratoru.',
           ),
         ),
       );

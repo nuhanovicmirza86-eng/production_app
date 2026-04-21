@@ -801,8 +801,7 @@ class _PartnerPickerSheetState extends State<_PartnerPickerSheet> {
                 : _results.isEmpty
                 ? const Center(
                     child: Text(
-                      'Nema rezultata. Provjeri da li postoje zapisi u Firestore '
-                      '(kolekcije customers / suppliers) za ovu kompaniju.',
+                      'Nema rezultata. Provjeri jesu li u sustavu uneseni kupci ili dobavljači za ovu tvrtku.',
                       textAlign: TextAlign.center,
                     ),
                   )

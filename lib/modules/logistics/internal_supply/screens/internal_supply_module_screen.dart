@@ -101,7 +101,7 @@ class _InternalSupplyModuleScreenState extends State<InternalSupplyModuleScreen>
             padding: const EdgeInsets.all(24),
             child: Text(
               _cid.isEmpty
-                  ? 'Nedostaje companyId.'
+                  ? 'Nedostaje podatak o kompaniji. Obrati se administratoru.'
                   : 'Modul logistike nije uključen.',
             ),
           ),

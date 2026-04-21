@@ -40,7 +40,7 @@ class _NcrListScreenState extends State<NcrListScreen> {
     if (cid.isEmpty) {
       setState(() {
         _loading = false;
-        _error = 'Nedostaje companyId.';
+        _error = 'Nedostaje podatak o kompaniji. Obrati se administratoru.';
       });
       return;
     }

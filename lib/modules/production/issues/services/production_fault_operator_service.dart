@@ -48,7 +48,7 @@ class ProductionFaultOperatorService {
       throw FirebaseException(
         plugin: 'cloud_firestore',
         code: 'failed-precondition',
-        message: 'Nedostaje companyId.',
+        message: 'Nedostaje podatak o kompaniji. Obrati se administratoru.',
       );
     }
 

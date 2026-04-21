@@ -433,7 +433,9 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     if (_companyId.isEmpty || _productId.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Uredi proizvod')),
-        body: const Center(child: Text('Nedostaje companyData ili productId')),
+        body: const Center(
+          child: Text('Nedostaje proizvod ili podatak o kompaniji.'),
+        ),
       );
     }
 

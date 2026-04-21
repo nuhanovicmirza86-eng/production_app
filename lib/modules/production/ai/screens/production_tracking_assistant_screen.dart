@@ -120,7 +120,7 @@ class _ProductionTrackingAssistantScreenState
     if (_companyId.isEmpty || _plantKey.isEmpty) {
       setState(() {
         _turns.add(
-          const ProductionAiChatMessage.error('Nedostaje companyId ili plantKey.'),
+          const ProductionAiChatMessage.error('Nedostaje podatak o kompaniji ili pogonu. Obrati se administratoru.'),
         );
       });
       _schedulePersist();

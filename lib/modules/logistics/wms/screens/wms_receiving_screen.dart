@@ -271,7 +271,7 @@ class _WmsReceivingScreenState extends State<WmsReceivingScreen> {
                             child: TextField(
                               controller: l.itemId,
                               decoration: const InputDecoration(
-                                labelText: 'ID artikla (products)',
+                                labelText: 'Artikl (šifarnik)',
                               ),
                             ),
                           ),
@@ -284,7 +284,7 @@ class _WmsReceivingScreenState extends State<WmsReceivingScreen> {
                               );
                               if (!mounted || id == null || id.isEmpty) {
                                 if (mounted && id == null) {
-                                  _snack('Skeniraj ID proizvoda ili JSON etiketu.');
+                                  _snack('Skeniraj oznaku proizvoda ili JSON etiketu.');
                                 }
                                 return;
                               }

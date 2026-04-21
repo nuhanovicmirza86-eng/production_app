@@ -292,7 +292,7 @@ class _EditUserDialogState extends State<EditUserDialog> {
                     DropdownButtonFormField<String>(
                       initialValue: _selectedRole,
                       decoration: const InputDecoration(
-                        labelText: 'Production uloga',
+                        labelText: 'Uloga u proizvodnji',
                       ),
                       items: _productionRoles
                           .map(

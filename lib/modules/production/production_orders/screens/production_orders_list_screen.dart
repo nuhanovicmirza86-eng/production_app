@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/theme/operonix_production_brand.dart';
 import '../../../../core/date/date_range_utils.dart';
@@ -71,6 +72,9 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
   String? _filterCustomerName;
   String? _filterOperationName;
 
+  /// Ljudski naziv pogona (iz šifrarnika); `null` = još učitavanje.
+  String? _plantResolvedLabel;
+
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
   String get _plantKey =>
@@ -90,6 +94,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     if (widget.initialStatusFilter != null) {
       _selectedStatus = widget.initialStatusFilter!;
     }
+    _resolvePlantLabel();
     _searchController.addListener(() {
       if (mounted) setState(() {});
       _scheduleStockRefresh();
@@ -103,6 +108,24 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     _stockDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _resolvePlantLabel() async {
+    final cid = _companyId;
+    final pk = _plantKey;
+    if (cid.isEmpty || pk.isEmpty) return;
+    final label = await CompanyPlantDisplayName.resolve(
+      companyId: cid,
+      plantKey: pk,
+    );
+    if (!mounted) return;
+    setState(() => _plantResolvedLabel = label);
+  }
+
+  String _plantLineForDisplay() {
+    if (_plantKey.isEmpty) return '—';
+    if (_plantResolvedLabel == null) return '…';
+    return _plantResolvedLabel!;
   }
 
   void _scheduleStockRefresh() {
@@ -161,8 +184,8 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
       setState(() {
         _isLoading = false;
         _error = _companyId.isEmpty
-            ? 'Nedostaje companyId u companyData.'
-            : 'Nedostaje plantKey u companyData.';
+            ? 'Nedostaje podatak o kompaniji u sesiji. Obrati se administratoru.'
+            : 'Nedostaje podatak o pogonu u sesiji. Obrati se administratoru.';
       });
       return;
     }
@@ -447,7 +470,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
           ),
         ];
 
-        final plantLabel = _plantKey.isEmpty ? '—' : _plantKey;
+        final plantLabel = _plantLineForDisplay();
 
         if (narrow) {
           return Column(
@@ -622,7 +645,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
         orders: list,
         reportTitle: 'Pregled proizvodnih naloga (detaljno)',
         companyLine:
-            '${_companyDisplayName()}  ·  Pogon: ${_plantKey.isEmpty ? "—" : _plantKey}',
+            '${_companyDisplayName()}  ·  Pogon: ${_plantLineForDisplay()}',
         filterDescription: _filterDescriptionForPdf(),
         stockByProductId: _stockByProductId.isEmpty
             ? null
@@ -1483,7 +1506,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Text(
-        '${_companyDisplayName()}  ·  Pogon: ${_plantKey.isEmpty ? "—" : _plantKey}'
+        '${_companyDisplayName()}  ·  Pogon: ${_plantLineForDisplay()}'
         '  ·  Datum ispisa: ${_formatDate(now)}$op',
         style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
       ),

@@ -99,7 +99,7 @@ class _CarbonFootprintScreenState extends State<CarbonFootprintScreen>
     if (_cid.isEmpty) {
       setState(() {
         _loading = false;
-        _loadError = 'Nedostaje companyId';
+        _loadError = 'Nedostaje podatak o kompaniji. Obrati se administratoru.';
       });
       return;
     }
@@ -1334,15 +1334,15 @@ class _DashboardTab extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           'Kompanijski ukupni tCO2e uključuje sve uključene aktivnosti za godinu. '
-          'Ispod su razrade po pogonu (plantKey na aktivnosti) i po proizvodu ako ste '
-          'unijeli ID proizvoda na redovima.',
+          'Ispod su razrade po pogonu i po proizvodu ako su na redovima aktivnosti '
+          'odabrani proizvodi iz šifrarnika.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 16),
         _tile(bg, 'Ukupno', '${s.totalTCO2e.toStringAsFixed(3)} tCO2e'),
-        _tile(bg, 'Scope 1', '${(s.scope1Kg / 1000).toStringAsFixed(3)} t'),
-        _tile(bg, 'Scope 2', '${(s.scope2Kg / 1000).toStringAsFixed(3)} t'),
-        _tile(bg, 'Scope 3', '${(s.scope3Kg / 1000).toStringAsFixed(3)} t'),
+        _tile(bg, 'Doseg 1', '${(s.scope1Kg / 1000).toStringAsFixed(3)} t'),
+        _tile(bg, 'Doseg 2', '${(s.scope2Kg / 1000).toStringAsFixed(3)} t'),
+        _tile(bg, 'Doseg 3', '${(s.scope3Kg / 1000).toStringAsFixed(3)} t'),
         _tile(
           bg,
           'Aktivni redovi / s količinom',
@@ -1981,7 +1981,7 @@ class _AuditLogTabState extends State<_AuditLogTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Zadnje izmjene dokumenata (Firestore)',
+              'Zadnje izmjene postavki',
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -1996,14 +1996,14 @@ class _AuditLogTabState extends State<_AuditLogTab> {
             const SizedBox(height: 12),
             _metaRow(
               theme,
-              'Postavke (carbon_settings)',
+              'Postavke izvještaja',
               h.settingsUpdatedAt,
               h.settingsUpdatedBy,
             ),
             const SizedBox(height: 8),
             _metaRow(
               theme,
-              'Kvote (carbon_quotas)',
+              'Kvote emisija',
               h.quotasUpdatedAt,
               h.quotasUpdatedBy,
             ),

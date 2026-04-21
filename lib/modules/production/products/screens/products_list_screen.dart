@@ -260,7 +260,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
     if (_companyId.isEmpty) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Nedostaje companyData';
+        _errorMessage = 'Nedostaje podatak o kompaniji. Obrati se administratoru.';
         _products = <Map<String, dynamic>>[];
       });
       return;
@@ -424,7 +424,11 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
     if (productId.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Nedostaje productId.')));
+      ).showSnackBar(
+        const SnackBar(
+          content: Text('Nedostaje odabir proizvoda. Osvježi ekran.'),
+        ),
+      );
       return;
     }
 
@@ -514,7 +518,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
     if (_companyId.isEmpty || _userId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Nedostaje companyId ili userId za import.'),
+          content: Text('Nedostaje sesija za uvoz. Ponovo se prijavi.'),
         ),
       );
       return;
@@ -1412,7 +1416,9 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
     if (_companyId.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Proizvodi')),
-        body: const Center(child: Text('Nedostaje companyData')),
+        body: const Center(
+          child: Text('Nedostaje podatak o kompaniji. Ponovo se prijavi.'),
+        ),
       );
     }
 
@@ -1431,7 +1437,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
                     'Master šifrarnik proizvoda za planiranje i izvršenje.\n\n'
                     '• Lista po kupcu i tipu komada (prefiks šifre: GK, PP, SK, MA, PM)\n'
                     '• Filteri: kupac, klasifikacija, magacin (zaliha po magacinu ili sve ukupno)\n'
-                    '• Opcionalno u Firestoreu: standardUnitPrice, currency, sek. klasifikacija (import)\n'
+                    '• Opcionalno: standardna cijena, valuta, sekundarna klasifikacija (import)\n'
                     '• Kreiranje i uređivanje proizvoda, status, Excel import\n'
                     '• Ulaz u BOM, routing i povezane naloge',
                   ),

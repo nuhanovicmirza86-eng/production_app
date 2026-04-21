@@ -130,8 +130,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
       if (role.isEmpty) {
         _error =
-            'Nedostaje role u users dokumentu.\n'
-            'Bez role korisnik ne može ući u aplikaciju.';
+            'U korisničkom profilu nije postavljena uloga.\n'
+            'Administrator mora dodijeliti ulogu prije prijave.';
         if (!mounted) return;
         setState(() => _loading = false);
         return;
@@ -139,8 +139,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
       if (companyId.isEmpty) {
         _error =
-            'Nedostaje companyId u users dokumentu.\n'
-            'Bez company konteksta aplikacija ne može raditi.';
+            'Korisnik nije povezan s kompanijom.\n'
+            'Obrati se administratoru da se profil poveže s tvrtkom.';
         if (!mounted) return;
         setState(() => _loading = false);
         return;
@@ -148,8 +148,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
       if (plantKey.isEmpty) {
         _error =
-            'Nedostaje plantKey u users dokumentu.\n'
-            'Bez plant konteksta Production app ne može raditi.';
+            'U profilu nije postavljen pogon (tvornica / lokacija).\n'
+            'Administrator mora dodijeliti pogon prije korištenja aplikacije.';
         if (!mounted) return;
         setState(() => _loading = false);
         return;
@@ -161,7 +161,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
           .get();
 
       if (!companyDoc.exists) {
-        _error = 'Company dokument ne postoji za companyId "$companyId".';
+        _error =
+            'Podaci o kompaniji nisu pronađeni. Obrati se administratoru.';
         if (!mounted) return;
         setState(() => _loading = false);
         return;

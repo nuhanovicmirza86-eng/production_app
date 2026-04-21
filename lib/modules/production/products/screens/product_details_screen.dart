@@ -117,7 +117,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
 
   Future<String> _createNextBomVersionForChange() async {
     if (_companyId.isEmpty || _productId.isEmpty || _userId.isEmpty) {
-      throw Exception('Nedostaje companyId, productId ili userId.');
+      throw Exception('Nedostaje podatak o kompaniji, proizvodu ili korisniku.');
     }
 
     return _bomService.createNewBomVersion(
@@ -223,7 +223,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     if (_companyId.isEmpty || _productId.isEmpty) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Nedostaje companyData ili productId';
+        _errorMessage = 'Nedostaje proizvod ili podatak o kompaniji.';
         _product = null;
       });
       return;
@@ -275,7 +275,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
         _activeBom = null;
         _bomHistory = [];
         _bomError = _userId.isEmpty
-            ? 'Nedostaje userId za učitavanje sastavnice.'
+            ? 'Nije moguće učitati sastavnicu (nema podatka o korisniku).'
             : null;
       });
       return;
@@ -1667,7 +1667,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     if (_companyId.isEmpty || _productId.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Detalji proizvoda')),
-        body: const Center(child: Text('Nedostaje companyData ili productId')),
+        body: const Center(
+          child: Text('Nedostaje proizvod ili podatak o kompaniji.'),
+        ),
       );
     }
 

@@ -68,7 +68,7 @@ class _ProductionOperatorTrackingDayReportScreenState
     if (_companyId.isEmpty || _plantKey.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Nedostaje companyId ili plantKey u sesiji.'),
+          content: Text('Nedostaje podatak o kompaniji ili pogonu u sesiji.'),
         ),
       );
       return;

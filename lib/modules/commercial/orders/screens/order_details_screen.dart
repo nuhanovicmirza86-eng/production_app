@@ -149,7 +149,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     if (go != true || !mounted) return;
     if (_companyId.isEmpty || _userId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nedostaje companyId ili userId.')),
+        const SnackBar(
+          content: Text('Nedostaje sesija. Ponovo se prijavi.'),
+        ),
       );
       return;
     }
@@ -222,7 +224,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     }
     if (_companyId.isEmpty || _userId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nedostaje companyId ili userId.')),
+        const SnackBar(
+          content: Text('Nedostaje sesija. Ponovo se prijavi.'),
+        ),
       );
       reasonController.dispose();
       return;
@@ -482,7 +486,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   Future<void> _load() async {
     if (_companyId.isEmpty) {
       setState(() {
-        _error = 'Nedostaje companyId';
+        _error = 'Nedostaje podatak o kompaniji. Obrati se administratoru.';
       });
       return;
     }

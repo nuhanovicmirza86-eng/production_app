@@ -42,7 +42,7 @@ class WarehouseRoutesService {
     String? notes,
   }) async {
     final cid = companyId.trim();
-    if (cid.isEmpty) throw Exception('Nedostaje companyId.');
+    if (cid.isEmpty) throw Exception('Nedostaje podatak o kompaniji. Obrati se administratoru.');
 
     final res = await _functions
         .httpsCallable('upsertWarehouseRoute')

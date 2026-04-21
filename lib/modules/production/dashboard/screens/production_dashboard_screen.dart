@@ -1081,7 +1081,9 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     if (_companyId.isEmpty || _plantKey.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Proizvodnja')),
-        body: const Center(child: Text('Nedostaje companyData')),
+        body: const Center(
+          child: Text('Nedostaje podatak o kompaniji. Ponovo se prijavi.'),
+        ),
       );
     }
 

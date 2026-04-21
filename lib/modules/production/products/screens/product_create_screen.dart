@@ -108,7 +108,9 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
 
     if (_companyId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nedostaje companyData.companyId')),
+        const SnackBar(
+          content: Text('Nedostaje podatak o kompaniji. Ponovo se prijavi.'),
+        ),
       );
       return;
     }
@@ -116,7 +118,11 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
     if (_userId.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Nedostaje userId')));
+      ).showSnackBar(
+        const SnackBar(
+          content: Text('Nedostaje podatak o korisniku. Ponovo se prijavi.'),
+        ),
+      );
       return;
     }
 
@@ -225,7 +231,9 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
     if (_companyId.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Novi proizvod')),
-        body: const Center(child: Text('Nedostaje companyData')),
+        body: const Center(
+          child: Text('Nedostaje podatak o kompaniji. Ponovo se prijavi.'),
+        ),
       );
     }
 

@@ -91,7 +91,7 @@ class ProductionStationPageService {
 
     if (cid.isEmpty || pk.isEmpty) {
       return StationPageGateResult.blocked(
-        'Nedostaje companyId ili plantKey u profilu korisnika.',
+        'Nedostaje podatak o kompaniji ili pogonu u profilu korisnika.',
       );
     }
 

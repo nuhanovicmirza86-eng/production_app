@@ -25,7 +25,7 @@ class WmsReceiptsListScreen extends StatelessWidget {
       return wmsTabScaffold(
         embedInHubShell: embedInHubShell,
         title: 'Prijemi robe (GR)',
-        body: const Center(child: Text('Nedostaje companyId.')),
+        body: const Center(child: Text('Nedostaje podatak o kompaniji. Obrati se administratoru.')),
       );
     }
 

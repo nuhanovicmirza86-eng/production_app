@@ -61,7 +61,7 @@ class _WarehouseRoutesScreenState extends State<WarehouseRoutesScreen> {
     if (_companyId.isEmpty) {
       setState(() {
         _loading = false;
-        _error = 'Nedostaje companyId.';
+        _error = 'Nedostaje podatak o kompaniji. Obrati se administratoru.';
       });
       return;
     }
@@ -143,16 +143,16 @@ class _WarehouseRoutesScreenState extends State<WarehouseRoutesScreen> {
                   TextField(
                     controller: fromCtrl,
                     decoration: const InputDecoration(
-                      labelText: 'Polazni magacin (ID)',
+                      labelText: 'Polazni magacin',
                       border: OutlineInputBorder(),
-                      helperText: 'ID dokumenta iz liste magacina',
+                      helperText: 'Unutrašnja oznaka magacina (kao u listi magacina)',
                     ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: toCtrl,
                     decoration: const InputDecoration(
-                      labelText: 'Odredišni magacin (ID)',
+                      labelText: 'Odredišni magacin',
                       border: OutlineInputBorder(),
                     ),
                   ),

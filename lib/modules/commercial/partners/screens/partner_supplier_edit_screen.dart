@@ -120,7 +120,7 @@ class _PartnerSupplierEditScreenState extends State<PartnerSupplierEditScreen> {
     if (_companyId.isEmpty) {
       setState(() {
         _loading = false;
-        _error = 'Nedostaje ID kompanije';
+        _error = 'Nedostaje podatak o kompaniji. Obrati se administratoru.';
       });
       return;
     }

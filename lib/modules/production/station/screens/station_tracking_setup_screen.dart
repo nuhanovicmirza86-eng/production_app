@@ -79,7 +79,7 @@ class _StationTrackingSetupScreenState extends State<StationTrackingSetupScreen>
     if (_companyId.isEmpty) {
       setState(() {
         _loading = false;
-        _loadError = 'Nedostaje companyId.';
+        _loadError = 'Nedostaje podatak o kompaniji. Obrati se administratoru.';
       });
       return;
     }
@@ -259,7 +259,7 @@ class _StationTrackingSetupScreenState extends State<StationTrackingSetupScreen>
                           labelText: 'Što se na ovoj stanici evidentira',
                           border: OutlineInputBorder(),
                           helperText:
-                              'Odabir utiče na to koja BOM iz Firestorea se veže na unos i etiketu.',
+                              'Odabir utiče na to koja se sastavnica veže na unos i etiketu.',
                         ),
                         isExpanded: true,
                         items: [

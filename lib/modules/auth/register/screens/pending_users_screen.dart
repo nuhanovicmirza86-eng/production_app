@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
+import '../../../../core/ui/company_plant_label_text.dart';
 import '../widgets/edit_user_dialog.dart';
 
 class PendingUsersScreen extends StatefulWidget {
@@ -183,11 +184,11 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
       case 'inactive':
         return 'Neaktivan';
       case 'pending':
-        return 'Pending';
+        return 'Na čekanju';
       case 'approved':
-        return 'Approved';
+        return 'Odobreno';
       case 'rejected':
-        return 'Rejected';
+        return 'Odbijeno';
       default:
         return status.isEmpty ? '-' : status;
     }
@@ -498,7 +499,6 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
     final loadingPlants = _loadingPlantsFor.contains(requestId);
 
     final email = _s(d['email']);
-    final companyId = _s(d['companyId']);
     final companyName = _s(d['companyName']);
     final companyCode = _s(d['companyCode']);
     final workEmail = _s(d['workEmail']);
@@ -546,13 +546,11 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
                         : 'Kompanija: $companyName ($companyCode)'),
             ),
             const SizedBox(height: 4),
-            Text('CompanyId: ${companyId.isEmpty ? '-' : companyId}'),
-            const SizedBox(height: 4),
             Text('Zahtjev kreiran: ${_formatDateTime(createdAt)}'),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: selectedRole,
-              decoration: const InputDecoration(labelText: 'Production uloga'),
+              decoration: const InputDecoration(labelText: 'Uloga u proizvodnji'),
               items: _productionRoles
                   .map(
                     (role) => DropdownMenuItem<String>(
@@ -600,7 +598,7 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
             ),
             const SizedBox(height: 10),
             const Text(
-              'Admin mora odabrati production ulogu i pogon prije odobrenja korisnika.',
+              'Administrator mora odabrati ulogu i pogon prije odobrenja korisnika.',
               style: TextStyle(fontSize: 12, color: Colors.black54),
             ),
             const SizedBox(height: 14),
@@ -823,7 +821,14 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
                   const SizedBox(height: 4),
                   Text('Rola: $roleLabel'),
                   const SizedBox(height: 4),
-                  Text('Pogon: ${plantKey.isEmpty ? '-' : plantKey}'),
+                  CompanyPlantLabelText(
+                    companyId: _myCompanyId,
+                    plantKey: plantKey,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade800,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   Text('Status: ${_statusLabel(status)}'),
                   const SizedBox(height: 4),

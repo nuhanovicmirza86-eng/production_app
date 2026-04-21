@@ -264,7 +264,7 @@ class _ProductionStationPagesAdminScreenState
     if (_companyId.isEmpty || _plantKey.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Nedostaje companyId ili plantKey u profilu.'),
+          content: Text('Nedostaje podatak o kompaniji ili pogonu u profilu.'),
         ),
       );
       return;
@@ -343,7 +343,7 @@ class _ProductionStationPagesAdminScreenState
               child: Padding(
                 padding: EdgeInsets.all(24),
                 child: Text(
-                  'U profilu nedostaje companyId ili plantKey — stranice stanica nisu dostupne.',
+                  'U profilu Nedostaje podatak o kompaniji ili pogonu — stranice stanica nisu dostupne.',
                   textAlign: TextAlign.center,
                 ),
               ),

@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../../../core/pdf/operonix_industrial_letterhead_pdf.dart';
 import '../../../core/pdf/operonix_pdf_footer.dart';
 
 /// PDF za [getQmsManagementReport] (korak 5 QMS — izvještaj za vodstvo).
@@ -28,6 +29,9 @@ class QmsManagementReportPdf {
         await rootBundle.load('assets/fonts/NotoSans-Bold.ttf').then(
               (b) => pw.Font.ttf(b),
             );
+
+    final operonixLogoBytes =
+        await OperonixIndustrialLetterheadPdf.loadLogoBytes();
 
     final generated = DateTime.now();
     final genIso = _s(report['generatedAt']);
@@ -86,6 +90,7 @@ class QmsManagementReportPdf {
           ),
         ),
         build: (ctx) => [
+          OperonixIndustrialLetterheadPdf.strip(logoBytes: operonixLogoBytes),
           pw.Text(
             'QMS — Izvještaj za vodstvo',
             style: pw.TextStyle(
@@ -96,14 +101,12 @@ class QmsManagementReportPdf {
           ),
           pw.SizedBox(height: 4),
           pw.Text(
-            companyLabel.isEmpty ? companyId : companyLabel,
+            companyLabel.isEmpty ? 'Kompanija' : companyLabel,
             style: pw.TextStyle(font: fontBold, fontSize: 12),
           ),
           pw.SizedBox(height: 2),
-          pw.Text('companyId: $companyId', style: small()),
-          pw.SizedBox(height: 2),
           pw.Text(
-            'Izvor podataka: Callable getQmsManagementReport · trend inspekcija: zadnjih $daysBack dana',
+            'Trend inspekcija: zadnjih $daysBack dana (iz sustava kvalitete)',
             style: small(),
           ),
           if (genIso.isNotEmpty)
@@ -202,7 +205,7 @@ class QmsManagementReportPdf {
         pw.TableRow(
           decoration: const pw.BoxDecoration(color: PdfColors.grey200),
           children: [
-            _cell('Kod / ID', bold, true),
+            _cell('Kod', bold, true),
             _cell('Status', bold, true),
             _cell('Sev.', bold, true),
             _cell('Opis', bold, true),
@@ -212,7 +215,11 @@ class QmsManagementReportPdf {
           final m = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
           return pw.TableRow(
             children: [
-              _cell(_s(m['ncrCode']).isEmpty ? _s(m['id']) : _s(m['ncrCode']), reg, false),
+              _cell(
+                _s(m['ncrCode']).isEmpty ? '—' : _s(m['ncrCode']),
+                reg,
+                false,
+              ),
               _cell(_s(m['status']), reg, false),
               _cell(_s(m['severity']), reg, false),
               _cell(_s(m['description']), reg, false),
@@ -244,7 +251,7 @@ class QmsManagementReportPdf {
             _cell('Naslov', bold, true),
             _cell('Status', bold, true),
             _cell('Rok', bold, true),
-            _cell('NCR id', bold, true),
+            _cell('Povezani NCR', bold, true),
             _cell('Prekorač.', bold, true),
           ],
         ),
@@ -292,10 +299,15 @@ class QmsManagementReportPdf {
         ),
         ...rows.map((raw) {
           final m = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
+          final pn = _s(m['productName']);
+          final pc = _s(m['productCode']);
+          final productCell = pn.isNotEmpty
+              ? (pc.isNotEmpty ? '$pn · $pc' : pn)
+              : (pc.isNotEmpty ? pc : '—');
           return pw.TableRow(
             children: [
               _cell('${_i(m['rpn'])}', reg, false),
-              _cell(_s(m['productId']), reg, false),
+              _cell(productCell, reg, false),
               _cell(_s(m['processStep']), reg, false),
               _cell(_s(m['failureMode']), reg, false),
               _cell(_s(m['ap']), reg, false),

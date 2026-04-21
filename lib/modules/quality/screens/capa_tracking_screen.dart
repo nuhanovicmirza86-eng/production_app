@@ -36,7 +36,7 @@ class _CapaTrackingScreenState extends State<CapaTrackingScreen> {
     if (cid.isEmpty) {
       setState(() {
         _loading = false;
-        _error = 'Nedostaje companyId.';
+        _error = 'Nedostaje podatak o kompaniji. Obrati se administratoru.';
       });
       return;
     }
