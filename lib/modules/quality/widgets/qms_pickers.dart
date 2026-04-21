@@ -6,6 +6,7 @@ import '../../commercial/partners/services/suppliers_service.dart';
 import '../../production/products/services/product_service.dart';
 import '../models/qms_list_models.dart';
 import '../services/quality_callable_service.dart';
+import 'qms_display_formatters.dart';
 
 /// Modalni odabir `products` dokumenta (Firestore ID).
 Future<String?> showQmsProductPicker({
@@ -91,10 +92,9 @@ class _QmsProductPickerBodyState extends State<_QmsProductPickerBody> {
     }
     setState(() {
       _filtered = _items.where((m) {
-        final id = _s(m['productId']).toLowerCase();
         final code = _s(m['productCode']).toLowerCase();
         final name = _s(m['productName']).toLowerCase();
-        return id.contains(q) || code.contains(q) || name.contains(q);
+        return code.contains(q) || name.contains(q);
       }).toList();
     });
   }
@@ -119,7 +119,7 @@ class _QmsProductPickerBodyState extends State<_QmsProductPickerBody> {
             child: TextField(
               controller: _search,
               decoration: const InputDecoration(
-                hintText: 'Pretraži šifru, naziv ili ID…',
+                hintText: 'Pretraži šifru ili naziv',
                 prefixIcon: Icon(Icons.search),
                 border: OutlineInputBorder(),
                 isDense: true,
@@ -147,18 +147,8 @@ class _QmsProductPickerBodyState extends State<_QmsProductPickerBody> {
                 itemBuilder: (context, i) {
                   final m = _filtered[i];
                   final id = _s(m['productId']);
-                  final code = _s(m['productCode']);
-                  final name = _s(m['productName']);
-                  final title = code.isNotEmpty
-                      ? code
-                      : (name.isNotEmpty ? name : id);
-                  final sub = [
-                    if (name.isNotEmpty && name != title) name,
-                    if (id.isNotEmpty) 'ID: $id',
-                  ].join(' · ');
                   return ListTile(
-                    title: Text(title),
-                    subtitle: sub.isEmpty ? null : Text(sub),
+                    title: Text(QmsDisplayFormatters.productLine(m)),
                     onTap: () => Navigator.pop(context, id),
                   );
                 },
@@ -208,12 +198,14 @@ class _QmsControlPlanPickerBody extends StatefulWidget {
 
 class _QmsControlPlanPickerBodyState extends State<_QmsControlPlanPickerBody> {
   final _svc = QualityCallableService();
+  final _productService = ProductService();
   final _search = TextEditingController();
 
   bool _loading = true;
   String? _error;
   List<QmsControlPlanRow> _rows = const [];
   List<QmsControlPlanRow> _filtered = const [];
+  List<Map<String, dynamic>> _products = const [];
 
   @override
   void initState() {
@@ -228,6 +220,19 @@ class _QmsControlPlanPickerBodyState extends State<_QmsControlPlanPickerBody> {
     super.dispose();
   }
 
+  String _s(dynamic v) => (v ?? '').toString().trim();
+
+  String _productLine(String productId) {
+    final id = productId.trim();
+    if (id.isEmpty) return '';
+    for (final m in _products) {
+      if (_s(m['productId']) == id) {
+        return QmsDisplayFormatters.productLine(m);
+      }
+    }
+    return 'Proizvod';
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -239,10 +244,15 @@ class _QmsControlPlanPickerBodyState extends State<_QmsControlPlanPickerBody> {
       if (pf != null && pf.isNotEmpty) {
         rows = rows.where((r) => r.productId == pf).toList();
       }
+      final products = await _productService.getProducts(
+        companyId: widget.companyId,
+        limit: 500,
+      );
       if (!mounted) return;
       setState(() {
         _rows = rows;
         _filtered = rows;
+        _products = products;
         _loading = false;
       });
     } catch (e) {
@@ -264,12 +274,8 @@ class _QmsControlPlanPickerBodyState extends State<_QmsControlPlanPickerBody> {
       _filtered = _rows.where((r) {
         final code = (r.controlPlanCode ?? '').toLowerCase();
         final title = r.title.toLowerCase();
-        final pid = r.productId.toLowerCase();
-        final id = r.id.toLowerCase();
-        return code.contains(q) ||
-            title.contains(q) ||
-            pid.contains(q) ||
-            id.contains(q);
+        final prod = _productLine(r.productId).toLowerCase();
+        return code.contains(q) || title.contains(q) || prod.contains(q);
       }).toList();
     });
   }
@@ -333,12 +339,20 @@ class _QmsControlPlanPickerBodyState extends State<_QmsControlPlanPickerBody> {
                 itemCount: _filtered.length,
                 itemBuilder: (context, i) {
                   final r = _filtered[i];
-                  final code = r.controlPlanCode ?? r.id;
+                  final code = (r.controlPlanCode ?? '').trim();
+                  final title = r.title.trim();
+                  final head = title.isNotEmpty
+                      ? title
+                      : (code.isNotEmpty ? code : 'Kontrolni plan');
+                  final prod = _productLine(r.productId);
+                  final sub = <String>[
+                    if (code.isNotEmpty && code != head) code,
+                    if (prod.isNotEmpty) prod,
+                    QmsDisplayFormatters.qmsDocStatus(r.status),
+                  ].join(' · ');
                   return ListTile(
-                    title: Text(r.title.isNotEmpty ? r.title : code),
-                    subtitle: Text(
-                      '$code · proizvod: ${r.productId} · ${r.status}',
-                    ),
+                    title: Text(head),
+                    subtitle: sub.isEmpty ? null : Text(sub),
                     onTap: () => Navigator.pop(context, r.id),
                   );
                 },

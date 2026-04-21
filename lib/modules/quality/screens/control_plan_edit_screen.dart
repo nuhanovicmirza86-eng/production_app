@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../production/products/services/product_service.dart';
 import '../services/quality_callable_service.dart';
+import '../widgets/qms_display_formatters.dart';
 import '../widgets/qms_iatf_help.dart';
 import '../widgets/qms_pickers.dart';
 
@@ -62,6 +65,7 @@ class ControlPlanEditScreen extends StatefulWidget {
 
 class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
   final _svc = QualityCallableService();
+  final _productService = ProductService();
   final _formKey = GlobalKey<FormState>();
 
   late final TextEditingController _title;
@@ -75,6 +79,9 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
   String? _approvedByUid;
   String? _obsoleteAtIso;
   String? _obsoleteByUid;
+  String? _productDisplayLine;
+  List<({String plantKey, String label})> _plants = [];
+  bool _plantsLoading = false;
   bool _loading = true;
   bool _saving = false;
   String? _loadError;
@@ -101,6 +108,51 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
     _operations.clear();
   }
 
+  Future<void> _loadPlants() async {
+    setState(() => _plantsLoading = true);
+    var list = await CompanyPlantDisplayName.listSelectablePlants(
+      companyId: _cid,
+    );
+    final current = _plantKey.text.trim();
+    if (current.isNotEmpty && !list.any((p) => p.plantKey == current)) {
+      final label = await CompanyPlantDisplayName.resolve(
+        companyId: _cid,
+        plantKey: current,
+      );
+      list = [...list, (plantKey: current, label: label)]
+        ..sort(
+          (a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()),
+        );
+    }
+    if (!mounted) return;
+    setState(() {
+      _plants = list;
+      _plantsLoading = false;
+    });
+  }
+
+  Future<void> _refreshProductLabel() async {
+    final id = _productId.text.trim();
+    if (id.isEmpty) {
+      setState(() => _productDisplayLine = null);
+      return;
+    }
+    try {
+      final p = await _productService.getProductById(
+        companyId: _cid,
+        productId: id,
+      );
+      if (!mounted) return;
+      if (p == null) {
+        setState(() => _productDisplayLine = null);
+        return;
+      }
+      setState(() => _productDisplayLine = QmsDisplayFormatters.productLine(p));
+    } catch (_) {
+      if (mounted) setState(() => _productDisplayLine = null);
+    }
+  }
+
   Future<void> _loadExisting() async {
     final id = widget.controlPlanId;
     if (id == null || id.isEmpty) {
@@ -109,6 +161,8 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
       _obsoleteAtIso = null;
       _obsoleteByUid = null;
       setState(() => _loading = false);
+      await _loadPlants();
+      await _refreshProductLabel();
       return;
     }
     try {
@@ -155,6 +209,8 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
           _operations.add(ob);
         }
       }
+      await _refreshProductLabel();
+      await _loadPlants();
       setState(() {
         _loading = false;
         _loadError = null;
@@ -203,6 +259,12 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_productId.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Odaberi proizvod.')),
+      );
+      return;
+    }
     setState(() => _saving = true);
     try {
       await _svc.upsertControlPlan(
@@ -264,14 +326,33 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
                         (v == null || v.trim().isEmpty) ? 'Obavezno' : null,
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _productId,
-                    decoration: const InputDecoration(
-                      labelText: 'ID proizvoda (Firestore) *',
-                      border: OutlineInputBorder(),
+                  Text(
+                    'Proizvod *',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
                     ),
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Obavezno' : null,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _productId.text.trim().isEmpty
+                          ? 'Nije odabran'
+                          : (_productDisplayLine ?? 'Učitavanje…'),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: _productId.text.trim().isEmpty
+                                ? Theme.of(context).colorScheme.error
+                                : null,
+                          ),
+                    ),
                   ),
                   Align(
                     alignment: Alignment.centerLeft,
@@ -283,19 +364,45 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
                         );
                         if (id != null && mounted) {
                           setState(() => _productId.text = id);
+                          await _refreshProductLabel();
                         }
                       },
                       icon: const Icon(Icons.inventory_2_outlined, size: 20),
-                      label: const Text('Odaberi proizvod'),
+                      label: Text(
+                        _productId.text.trim().isEmpty
+                            ? 'Odaberi proizvod'
+                            : 'Promijeni proizvod',
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _plantKey,
-                    decoration: const InputDecoration(
-                      labelText: 'Plant key (opcionalno)',
-                      border: OutlineInputBorder(),
+                  DropdownButtonFormField<String?>(
+                    key: ValueKey<String>(
+                      'cp_plant_${_plantKey.text}_${_plants.length}',
                     ),
+                    initialValue: _plantKey.text.trim().isEmpty
+                        ? null
+                        : _plantKey.text.trim(),
+                    decoration: InputDecoration(
+                      labelText: 'Pogon',
+                      border: const OutlineInputBorder(),
+                      helperText: _plantsLoading ? 'Učitavanje pogona…' : null,
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('(bez pogona)'),
+                      ),
+                      ..._plants.map(
+                        (p) => DropdownMenuItem<String?>(
+                          value: p.plantKey,
+                          child: Text(p.label),
+                        ),
+                      ),
+                    ],
+                    onChanged: (v) {
+                      setState(() => _plantKey.text = (v ?? '').trim());
+                    },
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
@@ -306,9 +413,15 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
                       border: OutlineInputBorder(),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'draft', child: Text('draft')),
-                      DropdownMenuItem(value: 'approved', child: Text('approved')),
-                      DropdownMenuItem(value: 'obsolete', child: Text('obsolete')),
+                      DropdownMenuItem(value: 'draft', child: Text('Nacrt')),
+                      DropdownMenuItem(
+                        value: 'approved',
+                        child: Text('Odobreno'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'obsolete',
+                        child: Text('Zastarjelo'),
+                      ),
                     ],
                     onChanged: (v) {
                       if (v != null) setState(() => _status = v);
@@ -332,17 +445,21 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
                               style: Theme.of(context).textTheme.titleSmall,
                             ),
                             const SizedBox(height: 8),
-                            if ((_approvedAtIso != null && _approvedAtIso!.trim().isNotEmpty) ||
-                                (_approvedByUid != null && _approvedByUid!.trim().isNotEmpty))
+                            if ((_approvedAtIso != null &&
+                                    _approvedAtIso!.trim().isNotEmpty) ||
+                                (_approvedByUid != null &&
+                                    _approvedByUid!.trim().isNotEmpty))
                               Text(
-                                'Odobreno: ${_approvedAtIso ?? "—"} · uid: ${_approvedByUid ?? "—"}',
+                                'Odobreno: ${_approvedAtIso ?? "—"}',
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
-                            if ((_obsoleteAtIso != null && _obsoleteAtIso!.trim().isNotEmpty) ||
-                                (_obsoleteByUid != null && _obsoleteByUid!.trim().isNotEmpty)) ...[
+                            if ((_obsoleteAtIso != null &&
+                                    _obsoleteAtIso!.trim().isNotEmpty) ||
+                                (_obsoleteByUid != null &&
+                                    _obsoleteByUid!.trim().isNotEmpty)) ...[
                               const SizedBox(height: 4),
                               Text(
-                                'Zastarjelo: ${_obsoleteAtIso ?? "—"} · uid: ${_obsoleteByUid ?? "—"}',
+                                'Zastarjelo: ${_obsoleteAtIso ?? "—"}',
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                             ],
@@ -438,7 +555,7 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.stretch,
                                   children: [
                                     Text(
-                                      'Karakteristika ${ci + 1} (ref $oi:$ci)',
+                                      'Karakteristika ${ci + 1}',
                                       style: Theme.of(context).textTheme.labelLarge,
                                     ),
                                     const SizedBox(height: 6),
@@ -469,7 +586,7 @@ class _ControlPlanEditScreenState extends State<ControlPlanEditScreen> {
                                     TextFormField(
                                       controller: ch.nominal,
                                       decoration: const InputDecoration(
-                                        labelText: 'Nominal',
+                                        labelText: 'Nominalna vrijednost',
                                         border: OutlineInputBorder(),
                                       ),
                                       keyboardType: const TextInputType.numberWithOptions(

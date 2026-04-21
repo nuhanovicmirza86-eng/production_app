@@ -63,4 +63,34 @@ class CompanyPlantDisplayName {
 
     return pKey;
   }
+
+  /// Pogoni za padajući izbor (vrijednost API-ja = [plantKey], prikaz = ljudski naziv).
+  static Future<List<({String plantKey, String label})>> listSelectablePlants({
+    required String companyId,
+    FirebaseFirestore? db,
+  }) async {
+    final fs = db ?? FirebaseFirestore.instance;
+    final cId = _s(companyId);
+    if (cId.isEmpty) return [];
+    try {
+      final q = await fs
+          .collection('company_plants')
+          .where('companyId', isEqualTo: cId)
+          .limit(100)
+          .get();
+      final out = <({String plantKey, String label})>[];
+      for (final doc in q.docs) {
+        final m = doc.data();
+        final key = _s(m['plantKey']);
+        if (key.isEmpty) continue;
+        out.add((plantKey: key, label: _labelFromPlantDoc(m, key)));
+      }
+      out.sort(
+        (a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()),
+      );
+      return out;
+    } catch (_) {
+      return [];
+    }
+  }
 }

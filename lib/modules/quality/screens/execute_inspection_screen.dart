@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../production/products/services/product_service.dart';
+import '../widgets/qms_display_formatters.dart';
 import '../widgets/qms_iatf_help.dart';
 import '../../production/qr/production_qr_resolver.dart';
 import '../../production/qr/screens/production_qr_scan_screen.dart';
@@ -29,6 +31,7 @@ class ExecuteInspectionScreen extends StatefulWidget {
 
 class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
   final _svc = QualityCallableService();
+  final _productService = ProductService();
   final _lotId = TextEditingController();
   final _productionOrderId = TextEditingController();
   final _customerId = TextEditingController();
@@ -37,6 +40,7 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
   bool _loadingPlans = true;
   String? _plansError;
   var _planRows = const <QmsInspectionPlanRow>[];
+  final Map<String, String> _productLineById = {};
 
   String? _selectedPlanId;
   bool _loadingContext = false;
@@ -134,6 +138,16 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
     });
     try {
       final rows = await _svc.listInspectionPlans(companyId: cid);
+      final products = await _productService.getProducts(
+        companyId: cid,
+        limit: 500,
+      );
+      _productLineById.clear();
+      for (final m in products) {
+        final pid = (m['productId'] ?? '').toString().trim();
+        if (pid.isEmpty) continue;
+        _productLineById[pid] = QmsDisplayFormatters.productLine(m);
+      }
       if (!mounted) return;
       String? sel = _selectedPlanId;
       if (sel != null && sel.isNotEmpty && !rows.any((r) => r.id == sel)) {
@@ -268,8 +282,17 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
   }
 
   String _planLabel(QmsInspectionPlanRow r) {
-    final code = r.inspectionPlanCode ?? r.id;
-    return '$code · ${r.inspectionType} · ${r.status}';
+    final code = (r.inspectionPlanCode ?? '').trim();
+    final product = _productLineById[r.productId] ?? '';
+    final type = QmsDisplayFormatters.inspectionType(r.inspectionType);
+    final status = QmsDisplayFormatters.qmsDocStatus(r.status);
+    final parts = <String>[
+      if (code.isNotEmpty) code,
+      if (product.isNotEmpty) product,
+      type,
+      status,
+    ];
+    return parts.join(' · ');
   }
 
   @override
@@ -298,7 +321,7 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Sken puni polja LOT ID / ID proizvodnog naloga. Zatim odaberi plan inspekcije, učitaj mjerenja i unesi vrijednosti.',
+            'Skeniraj lot ili proizvodni nalog da se popune polja. Zatim odaberi plan inspekcije, učitaj mjerenja i unesi vrijednosti.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: 20),
