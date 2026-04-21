@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 abstract final class QmsIatfStrings {
   static const hubModule = 'QMS (Quality Management System) u smislu IATF 16949: '
       'strukturirano upravljanje kvalitetom kroz planiranje, kontrolu, nesklade i korektivne akcije. '
-      'Lanac u aplikaciji: kontrolni plan → plan inspekcije → evidencija rezultata → NCR (reakcijski plan) → CAPA (akcijski plan) → sljedljivost. '
+      'Lanac u aplikaciji: kontrolni plan → plan kontrole → evidencija rezultata → NCR (reakcijski plan) → CAPA (akcijski plan) → sljedljivost. '
       'PFMEA i ocjene rizika u pozadini podržavaju prioritete; vidi ekran „Metodologija · IATF”.';
 
   /// Uvod za [QualityDocumentationScreen] — master lista dokumenata (upute, obrasci).
   static const documentationHub = 'Dokumentacija u smislu kontroliranih dokumenata (npr. radni uput, uput za pakovanje, obrazac): '
       'jedno mjesto za evidenciju i revizije, s kasnijom vezom na proizvode iz šifrarnika. '
-      'Time se u IATF kontekstu povezuje „što radimo“ (kontrolni plan, inspekcija) s „kako i pod kojim dokumentom“ — '
+      'Time se u IATF kontekstu povezuje „što radimo“ (kontrolni plan, kontrola) s „kako i pod kojim dokumentom“ — '
       'a iz detalja proizvoda brzo vidiš koji dokumenti vrijede za taj artikl (uključivo reklamacije i sljedljivost).';
 
   /// Kratak uvod za ekran [QmsMethodologyReferenceScreen].
@@ -18,7 +18,7 @@ abstract final class QmsIatfStrings {
       'što je u CAPA-i trajno, što je PFMEA prije nego što se problem dogodi, i gdje su „ocjene rizika” u sustavu.';
 
   static const methodologyOverview = '1) PFMEA (procesna FMEA) procjenjuje moguća otkazivanja i posljedice procesa '
-      '(S, O, D → RPN; AP = prioritet akcije). Utječe na to što kontroliramo u kontrolnom planu i inspekcijama.\n\n'
+      '(S, O, D → RPN; AP = prioritet akcije). Utječe na to što kontroliramo u kontrolnom planu i kontrolama.\n\n'
       '2) Ocjene rizika u sustavu agregiraju procjene po entitetima (npr. proizvod, stroj, partner) u jedinstveni motor — '
       'vidljive su razine rizika i gdje postoji RPN.\n\n'
       '3) Reakcijski plan na NCR-u je kratkoročan odgovor (što odmah radimo); containment je izolacija nesklada.\n\n'
@@ -30,7 +30,7 @@ abstract final class QmsIatfStrings {
 
   static const termPfmea = 'PFMEA (Process Failure Mode and Effects Analysis): metodologija za identifikaciju mogućih '
       'grešaka procesa, njihovih učinaka i uzroka prije nego se dogode. Tipična polja: težina (S), učestalost (O), '
-      'otkrivanje (D), RPN = S×O×D, te AP (Action Priority) za rangiranje mjera. Kontrolni plan i inspekcije provode odabrane kontrole iz PFMEA konteksta.\n\n'
+      'otkrivanje (D), RPN = S×O×D, te AP (Action Priority) za rangiranje mjera. Kontrolni plan i kontrole provode odabrane kontrole iz PFMEA konteksta.\n\n'
       'U ovom projektu postoje dva konteksta: PFMEA na stroju (Maintenance app, polje risk na imovini) i — za automotive QMS bez Maintenance modula — '
       'predviđena zasebna PFMEA po proizvodu/procesu unutar Production QMS-a (isti tenant, Callable).';
 
@@ -49,19 +49,19 @@ abstract final class QmsIatfStrings {
       'Deterministički ID procjene po proizvodu; ako nema redova za proizvod, agregat se briše.';
 
   static const dashboard = 'Pregled brojeva u tvojoj kompaniji. '
-      'Kontrolni planovi i planovi inspekcije su „master” definicije; NCR su zapisani neskladi; '
+      'Kontrolni planovi i planovi kontrole su „master” definicije; NCR su zapisani neskladi; '
       'CAPA su korektivne/preventivne akcije vezane uz NCR. Podaci dolaze samo preko sigurnih Callable-a.';
 
   /// Korak 5 QMS plana — jedan strani izvještaj za vodstvo.
   static const managementReport = 'Sažetak za menadžment: broj planova, otvoreni NCR i CAPA, '
-      'trend rezultata inspekcija (OK/NOK) u odabranom razdoblju, te najviši PFMEA RPN redovi. '
+      'trend rezultata kontrola (OK/NOK) u odabranom razdoblju, te najviši PFMEA RPN redovi. '
       'Podaci su agregirani na poslužitelju (Callable); PDF je za arhivu ili sastanak.';
 
   static const kpiControlPlans = 'Kontrolni plan (control plan): dokument koji za proizvod/proces '
       'definira koje karakteristike se kontroliraju, kako i na kojim operacijama (APQP/PPAP kontekst). '
-      'To je izvor tolerancija za inspekcije.';
+      'To je izvor tolerancija za kontrole.';
 
-  static const kpiInspectionPlans = 'Plan inspekcije veže tip kontrole (ulazna, u procesu, završna) '
+  static const kpiInspectionPlans = 'Plan kontrole veže tip kontrole (ulazna, u procesu, završna) '
       'na podskup karakteristika iz kontrolnog plana (pokazivači ref, npr. 0:0).';
 
   static const kpiNcr = 'NCR (Non-Conformance Report): formalni zapis nesklada — što je otkriveno, '
@@ -73,19 +73,19 @@ abstract final class QmsIatfStrings {
   static const listControlPlans = 'Lista kontrolnih planova po kompaniji. Uređivanje i čitanje '
       'master podataka ide preko poslužitelja (Callable), ne izravno iz klijenta — u skladu s tankim pravilima.';
 
-  static const listInspectionPlans = 'Plan inspekcije određuje koji se dio kontrolnog plana provjerava '
+  static const listInspectionPlans = 'Plan kontrole određuje koji se dio kontrolnog plana provjerava '
       'za određeni tip kontrole (INCOMING / IN_PROCESS / FINAL).';
 
-  static const listInspectionResults = 'Povijest rezultata inspekcija: zadnji zapisi (OK/NOK) s '
+  static const listInspectionResults = 'Povijest rezultata kontrola: zadnji zapisi (OK/NOK) s '
       'vezom na plan, tip, proizvod, LOT i nalog ako su uneseni — podaci isključivo preko Callable-a.';
 
   static const editControlPlan = 'Kontrolni plan: operacije (redoslijed procesa) i karakteristike '
-      '(dimenzija, tolerancije, jedinica). Indeksi 0:0, 1:0… koriste se u planu inspekcije kao ref.';
+      '(dimenzija, tolerancije, jedinica). Indeksi 0:0, 1:0… koriste se u planu kontrole kao ref.';
 
-  static const editInspectionPlan = 'Plan inspekcije: povezuje proizvod i kontrolni plan s tipom inspekcije. '
+  static const editInspectionPlan = 'Plan kontrole: povezuje proizvod i kontrolni plan s tipom kontrole. '
       'characteristicRefs (npr. 0:0) određuju koje stavke kontrolnog plana ulaze u ovo izvršenje; prazno = sve.';
 
-  static const executeInspection = 'Izvršenje inspekcije: unos izmjerenih vrijednosti uz plan; '
+  static const executeInspection = 'Izvršenje kontrole: unos izmjerenih vrijednosti uz plan; '
       'LOT, proizvodni nalog te opcionalno ID kupca/dobavljača osiguravaju sljedljivost i segment. '
       'Rezultat može automatski otvoriti NCR pri NOK.';
 
@@ -143,7 +143,7 @@ abstract final class QmsIatfStrings {
       'zadržavanje, obavijest kupcu) — odvojeno od containmenta i od trajnog korektivnog plana (CAPA).';
 
   static const termPartnerIdsInspection = 'ID kupca / dobavljača (opcionalno): ako su uneseni, šalju se uz rezultat '
-      'inspekcije i na automatski NCR pri NOK — korisno za segment i reklamacije.';
+      'kontrole i na automatski NCR pri NOK — korisno za segment i reklamacije.';
 
   static const termRootCause = 'Root cause: utvrđeni uzrok nesklada (ne simptom); osnova za trajnu korektivnu akciju.';
 

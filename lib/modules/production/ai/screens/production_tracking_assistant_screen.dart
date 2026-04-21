@@ -13,9 +13,13 @@ import '../services/production_tracking_assistant_client_service.dart';
 class ProductionTrackingAssistantScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
 
+  /// Unaprijed ispunjen upit (npr. iz „AI izvještaji“).
+  final String? initialPrompt;
+
   const ProductionTrackingAssistantScreen({
     super.key,
     required this.companyData,
+    this.initialPrompt,
   });
 
   @override
@@ -88,6 +92,10 @@ class _ProductionTrackingAssistantScreenState
         ..addAll(list);
       _restored = true;
     });
+    final seed = widget.initialPrompt?.trim();
+    if (seed != null && seed.isNotEmpty && _turns.isEmpty) {
+      _prompt.text = seed;
+    }
     _scrollToEnd();
   }
 

@@ -174,7 +174,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       );
     }
 
-    /// U QMS pretplati prva/završna kontrola vodi na izvršenje inspekcije (IATF); inače stanica praćenja.
+    /// U QMS pretplati prva/završna kontrola vodi na izvršenje kontrole (IATF); inače stanica praćenja.
     void openQmsInspectionForStationPhase(String phase) {
       final pref = phase == ProductionOperatorTrackingEntry.phaseFirstControl
           ? 'IN_PROCESS'
@@ -245,7 +245,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           icon: Icons.fact_check_outlined,
           title: 'Stanica: prva kontrola',
           subtitle: _hasModule('quality')
-              ? 'QMS: izvršenje inspekcije (plan IN_PROCESS). Za tab praćenja koristi „Praćenje proizvodnje“.'
+              ? 'QMS: izvršenje kontrole (plan IN_PROCESS). Za tab praćenja koristi „Praćenje proizvodnje“.'
               : 'Puni zaslon — faza u izradi (placeholder do punog unosa).',
           onTap: () => _hasModule('quality')
               ? openQmsInspectionForStationPhase(
@@ -259,7 +259,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           icon: Icons.verified_outlined,
           title: 'Stanica: završna kontrola',
           subtitle: _hasModule('quality')
-              ? 'QMS: izvršenje inspekcije (plan FINAL). Za tab praćenja koristi „Praćenje proizvodnje“.'
+              ? 'QMS: izvršenje kontrole (plan FINAL). Za tab praćenja koristi „Praćenje proizvodnje“.'
               : 'Puni zaslon — faza u izradi (placeholder do punog unosa).',
           onTap: () => _hasModule('quality')
               ? openQmsInspectionForStationPhase(
@@ -333,7 +333,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           icon: Icons.assignment_turned_in_outlined,
           title: 'QMS — Hub kvaliteta',
           subtitle:
-              'Kontrolni planovi, inspekcije (sken), NCR, CAPA (IATF).',
+              'Kontrolni planovi, kontrole (sken), NCR, CAPA (IATF).',
           onTap: () => open(QualityHubScreen(companyData: companyData)),
         ),
     ];
@@ -531,7 +531,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         const _ModuleGroupHeader(
           title: 'Kvalitet (QMS)',
           subtitle:
-              'Pretplata uključuje modul „quality“: kontrolni plan, inspekcije, NCR, CAPA.',
+              'Pretplata uključuje modul „quality“: kontrolni plan, kontrole, NCR, CAPA.',
           icon: Icons.assignment_turned_in_outlined,
         ),
       );
@@ -541,7 +541,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           icon: Icons.dashboard_customize_outlined,
           title: 'QMS — Hub kvaliteta',
           subtitle:
-              'Dashboard, planovi, izvršenje inspekcije (sken), NCR, CAPA.',
+              'Dashboard, planovi, izvršenje kontrole (sken), NCR, CAPA.',
           onTap: () {
             Navigator.push<void>(
               context,
@@ -1020,7 +1020,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                       _DashboardActionTile(
                         icon: Icons.assignment_turned_in_outlined,
                         title: 'QMS — Hub kvaliteta',
-                        subtitle: 'Kontrolni plan, inspekcije, NCR, CAPA',
+                        subtitle: 'Kontrolni plan, kontrole, NCR, CAPA',
                         onTap: () {
                           _shellScaffoldKey.currentState?.closeDrawer();
                           Navigator.push<void>(

@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../../../core/errors/app_error_mapper.dart';
+
 /// Sken QR mašine (`assetId:<id>` ili čisti id) — isti format kao Maintenance operator.
 /// Vraća mapu podataka asseta + ključ `__assetDocId` = Firestore id dokumenta.
 class ProductionFaultAssetQrScanScreen extends StatefulWidget {
@@ -86,7 +88,8 @@ class _ProductionFaultAssetQrScanScreenState
     final assetId = _parseAssetId(raw);
     if (assetId == null || assetId.isEmpty) {
       setState(() {
-        _err = 'QR nije prepoznat kao uređaj (očekujem assetId:<id> ili samo <id>).';
+        _err =
+            'QR nije prepoznat kao uređaj. Očekujem šifru iz šifrarnika ili oblik assetId: …';
       });
       return;
     }

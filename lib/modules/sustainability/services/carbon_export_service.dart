@@ -9,6 +9,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/pdf/operonix_industrial_letterhead_pdf.dart';
 import '../../../core/pdf/operonix_pdf_footer.dart';
 import '../models/carbon_models.dart';
 import 'carbon_calculation_service.dart';
@@ -224,6 +225,8 @@ class CarbonExportService {
   }) async {
     final fontRegular = await _loadFont('assets/fonts/NotoSans-Regular.ttf');
     final fontBold = await _loadFont('assets/fonts/NotoSans-Bold.ttf');
+    final operonixLogoBytes =
+        await OperonixIndustrialLetterheadPdf.loadLogoBytes();
     final generated = DateTime.now();
 
     pw.TextStyle labelStyle() =>
@@ -279,6 +282,7 @@ class CarbonExportService {
           ),
         ),
         build: (ctx) => [
+          OperonixIndustrialLetterheadPdf.strip(logoBytes: operonixLogoBytes),
           pw.Text(
             'Izvještaj o karbonskom otisku',
             style: pw.TextStyle(
@@ -619,6 +623,8 @@ class CarbonExportService {
   }) async {
     final fontRegular = await _loadFont('assets/fonts/NotoSans-Regular.ttf');
     final fontBold = await _loadFont('assets/fonts/NotoSans-Bold.ttf');
+    final operonixLogoBytes =
+        await OperonixIndustrialLetterheadPdf.loadLogoBytes();
     final generated = DateTime.now();
     final companySummary = CarbonCalculationService.summarize(
       setup: setup,
@@ -642,6 +648,7 @@ class CarbonExportService {
         margin: const pw.EdgeInsets.all(36),
         footer: (ctx) => _rollupPdfFooter(ctx, fontRegular, generated),
         build: (ctx) => [
+          OperonixIndustrialLetterheadPdf.strip(logoBytes: operonixLogoBytes),
           pw.Text(
             'Zbroj emisija po pogonu',
             style: pw.TextStyle(
@@ -745,6 +752,8 @@ class CarbonExportService {
   }) async {
     final fontRegular = await _loadFont('assets/fonts/NotoSans-Regular.ttf');
     final fontBold = await _loadFont('assets/fonts/NotoSans-Bold.ttf');
+    final operonixLogoBytes =
+        await OperonixIndustrialLetterheadPdf.loadLogoBytes();
     final generated = DateTime.now();
     final companySummary = CarbonCalculationService.summarize(
       setup: setup,
@@ -782,6 +791,7 @@ class CarbonExportService {
     );
 
     final body = <pw.Widget>[
+      OperonixIndustrialLetterheadPdf.strip(logoBytes: operonixLogoBytes),
       pw.Text(
         'Zbroj emisija po proizvodu (po pogonima)',
         style: pw.TextStyle(

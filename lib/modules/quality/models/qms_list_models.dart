@@ -90,7 +90,73 @@ class QmsInspectionPlanRow {
   }
 }
 
-/// Jedan red povijesti inspekcija ([listQmsInspectionResults]).
+/// Jedan red QMS dokumentacije ([listQmsDocuments]).
+class QmsDocumentRow {
+  final String id;
+  final String? documentCode;
+  final String title;
+  final String documentKind;
+  final String productId;
+  final String? productNameSnapshot;
+  final String? productCodeSnapshot;
+  final String status;
+  final String? plantKey;
+  final String? notes;
+  final String? fileName;
+  final String? fileStoragePath;
+  final String? externalUrl;
+  final String? approvedAtIso;
+  final String? approvedByUid;
+  final String? obsoleteAtIso;
+  final String? obsoleteByUid;
+  final String? updatedAtIso;
+
+  const QmsDocumentRow({
+    required this.id,
+    this.documentCode,
+    required this.title,
+    required this.documentKind,
+    required this.productId,
+    this.productNameSnapshot,
+    this.productCodeSnapshot,
+    required this.status,
+    this.plantKey,
+    this.notes,
+    this.fileName,
+    this.fileStoragePath,
+    this.externalUrl,
+    this.approvedAtIso,
+    this.approvedByUid,
+    this.obsoleteAtIso,
+    this.obsoleteByUid,
+    this.updatedAtIso,
+  });
+
+  factory QmsDocumentRow.fromMap(Map<String, dynamic> m) {
+    return QmsDocumentRow(
+      id: (m['id'] ?? '').toString(),
+      documentCode: m['documentCode']?.toString(),
+      title: (m['title'] ?? '').toString(),
+      documentKind: (m['documentKind'] ?? '').toString(),
+      productId: (m['productId'] ?? '').toString(),
+      productNameSnapshot: m['productNameSnapshot']?.toString(),
+      productCodeSnapshot: m['productCodeSnapshot']?.toString(),
+      status: (m['status'] ?? '').toString(),
+      plantKey: m['plantKey']?.toString(),
+      notes: m['notes']?.toString(),
+      fileName: m['fileName']?.toString(),
+      fileStoragePath: m['fileStoragePath']?.toString(),
+      externalUrl: m['externalUrl']?.toString(),
+      approvedAtIso: m['approvedAt']?.toString(),
+      approvedByUid: m['approvedByUid']?.toString(),
+      obsoleteAtIso: m['obsoleteAt']?.toString(),
+      obsoleteByUid: m['obsoleteByUid']?.toString(),
+      updatedAtIso: m['updatedAt']?.toString(),
+    );
+  }
+}
+
+/// Jedan red povijesti kontrola ([listQmsInspectionResults]).
 class QmsInspectionResultRow {
   final String id;
   final String inspectionPlanId;
@@ -267,4 +333,39 @@ class QmsPfmeaRow {
       updatedAtIso: m['updatedAt']?.toString(),
     );
   }
+}
+
+/// Jedna stranica liste [listQmsDocuments] (paginacija `pageToken`).
+class QmsDocumentsPage {
+  final List<QmsDocumentRow> items;
+  final String? nextPageToken;
+
+  const QmsDocumentsPage({
+    required this.items,
+    this.nextPageToken,
+  });
+}
+
+/// Odgovor [getQmsDocumentSignedUploadUrl] — HTTP PUT na [uploadUrl].
+class QmsSignedUploadInfo {
+  final String uploadUrl;
+  final String storagePath;
+  final String contentType;
+
+  const QmsSignedUploadInfo({
+    required this.uploadUrl,
+    required this.storagePath,
+    required this.contentType,
+  });
+}
+
+/// Odgovor [getQmsDocumentSignedDownloadUrl].
+class QmsSignedDownloadInfo {
+  final String downloadUrl;
+  final String? fileName;
+
+  const QmsSignedDownloadInfo({
+    required this.downloadUrl,
+    this.fileName,
+  });
 }

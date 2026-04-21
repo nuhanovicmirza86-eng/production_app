@@ -106,9 +106,9 @@ class QualityHubScreen extends StatelessWidget {
       ),
       (
         icon: Icons.fact_check_outlined,
-        title: 'Planovi inspekcije',
+        title: 'Planovi kontrole',
         subtitle: 'Ulaz / u procesu / finalno',
-        iatfTitle: 'Plan inspekcije',
+        iatfTitle: 'Plan kontrole',
         iatfMessage: QmsIatfStrings.kpiInspectionPlans,
         onTap: () => _pushQms(
           context,
@@ -117,9 +117,9 @@ class QualityHubScreen extends StatelessWidget {
       ),
       (
         icon: Icons.qr_code_scanner,
-        title: 'Izvrši inspekciju',
+        title: 'Izvrši kontrolu',
         subtitle: 'Sken LOT-a ili naloga',
-        iatfTitle: 'Izvršenje inspekcije',
+        iatfTitle: 'Izvršenje kontrole',
         iatfMessage:
             '${QmsIatfStrings.executeInspection}\n\n${QmsIatfStrings.termTraceability}',
         onTap: () => _pushQms(
@@ -129,9 +129,9 @@ class QualityHubScreen extends StatelessWidget {
       ),
       (
         icon: Icons.history,
-        title: 'Povijest inspekcija',
+        title: 'Povijest kontrola',
         subtitle: 'Zadnji OK/NOK, lot, plan, datum',
-        iatfTitle: 'Povijest inspekcija',
+        iatfTitle: 'Povijest kontrola',
         iatfMessage: QmsIatfStrings.listInspectionResults,
         onTap: () => _pushQms(
           context,
@@ -208,7 +208,7 @@ class QualityHubScreen extends StatelessWidget {
             return Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: Text(
-                'IATF-friendly QMS: kontrolni plan → inspekcija → NCR → CAPA → sljedljivost.',
+                'IATF-friendly QMS: kontrolni plan → kontrola → NCR → CAPA → sljedljivost.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: cs.onSurfaceVariant,
                     ),

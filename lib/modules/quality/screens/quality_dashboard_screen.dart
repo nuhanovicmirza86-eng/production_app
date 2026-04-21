@@ -86,10 +86,10 @@ class _QualityDashboardScreenState extends State<QualityDashboardScreen> {
               ),
               const SizedBox(height: 12),
               _KpiCard(
-                title: 'Planovi inspekcije',
+                title: 'Planovi kontrole',
                 value: '$_ip',
                 subtitle: 'Ulaz / u procesu / finalno',
-                iatfTitle: 'Plan inspekcije',
+                iatfTitle: 'Plan kontrole',
                 iatfMessage: QmsIatfStrings.kpiInspectionPlans,
               ),
               const SizedBox(height: 12),

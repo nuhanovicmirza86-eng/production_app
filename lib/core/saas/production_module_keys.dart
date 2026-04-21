@@ -2,7 +2,7 @@
 abstract final class ProductionModuleKeys {
   static const String production = 'production';
 
-  /// SaaS modul QMS: kontrolni plan, inspekcije, NCR, CAPA (IATF-friendly).
+  /// SaaS modul QMS: kontrolni plan, kontrole, NCR, CAPA (IATF-friendly).
   static const String quality = 'quality';
 
   /// Legacy puni AI sloj (Enterprise-ekvivalent).

@@ -134,7 +134,7 @@ class _QmsManagementReportScreenState extends State<QmsManagementReportScreen> {
                 padding: const EdgeInsets.all(16),
                 children: [
                   Text(
-                    'Razdoblje trenda inspekcija (OK/NOK)',
+                    'Razdoblje trenda kontrola (OK/NOK)',
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const SizedBox(height: 8),
@@ -164,7 +164,7 @@ class _QmsManagementReportScreenState extends State<QmsManagementReportScreen> {
                   ),
                   _kv(
                     context,
-                    'Planovi inspekcije',
+                    'Planovi kontrole',
                     '${_i(_report!['summary'] is Map ? (_report!['summary'] as Map)['inspectionPlanCount'] : 0)}',
                   ),
                   _kv(
@@ -184,7 +184,7 @@ class _QmsManagementReportScreenState extends State<QmsManagementReportScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Trend inspekcija (zadnjih $_daysBack dana)',
+                    'Trend kontrola (zadnjih $_daysBack dana)',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),

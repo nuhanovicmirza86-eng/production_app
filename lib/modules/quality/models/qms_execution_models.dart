@@ -1,4 +1,4 @@
-/// Kontekst za ekran „Izvrši inspekciju“ (Callable [getQmsInspectionExecutionContext]).
+/// Kontekst za ekran „Izvrši kontrolu“ (Callable [getQmsInspectionExecutionContext]).
 class QmsMeasureSlot {
   final String characteristicRef;
   final String name;

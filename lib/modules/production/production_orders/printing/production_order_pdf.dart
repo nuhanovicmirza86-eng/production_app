@@ -4,6 +4,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../../../../core/pdf/operonix_industrial_letterhead_pdf.dart';
 import '../../../../core/pdf/operonix_pdf_footer.dart';
 import '../../../commercial/orders/export/pdf_company_header.dart';
 import '../../../commercial/orders/services/company_print_identity_service.dart';
@@ -86,6 +87,9 @@ class ProductionOrderPdf {
     final fontRegular = await _loadFont('assets/fonts/NotoSans-Regular.ttf');
     final fontBold = await _loadFont('assets/fonts/NotoSans-Bold.ttf');
 
+    final operonixLogoBytes =
+        await OperonixIndustrialLetterheadPdf.loadLogoBytes();
+
     final qrPayload = buildProductionOrderQrPayload(
       companyId: order.companyId,
       plantKey: order.plantKey,
@@ -152,6 +156,11 @@ class ProductionOrderPdf {
                   maxLogoHeight: 52,
                 ),
                 pw.SizedBox(height: 14),
+              ] else ...[
+                OperonixIndustrialLetterheadPdf.strip(
+                  logoBytes: operonixLogoBytes,
+                  maxLogoHeight: 44,
+                ),
               ],
               pw.Row(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,

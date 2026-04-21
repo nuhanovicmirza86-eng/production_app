@@ -12,6 +12,7 @@ import '../../../../core/plant/production_plant_context_resolver.dart';
 import '../../qr/screens/production_qr_scan_screen.dart';
 import '../../qr/production_qr_resolver.dart';
 import '../../tracking/screens/production_operator_tracking_screen.dart';
+import '../../tracking/services/production_asset_display_lookup.dart';
 import '../services/production_fault_photo_storage.dart';
 import 'production_fault_asset_qr_scan_screen.dart';
 import 'production_fault_detail_screen.dart';
@@ -290,9 +291,9 @@ class _ProductionProblemReportingScreenState
           };
           final list = merged.values.toList()
             ..sort(
-              (a, b) => _assetLabel(a.data(), a.id)
+              (a, b) => _assetLabel(a.data())
                   .toLowerCase()
-                  .compareTo(_assetLabel(b.data(), b.id).toLowerCase()),
+                  .compareTo(_assetLabel(b.data()).toLowerCase()),
             );
           if (!controller.isClosed) {
             controller.add(list);
@@ -380,7 +381,7 @@ class _ProductionProblemReportingScreenState
           (doc) => DropdownMenuItem<String>(
             value: doc.id,
             child: Text(
-              _assetLabel(doc.data(), doc.id),
+              _assetLabel(doc.data()),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -395,7 +396,7 @@ class _ProductionProblemReportingScreenState
         DropdownMenuItem<String>(
           value: sid,
           child: Text(
-            _assetLabel(_assetPayloadOverride!, sid),
+            _assetLabel(_assetPayloadOverride!),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -494,17 +495,21 @@ class _ProductionProblemReportingScreenState
     });
   }
 
-  String _assetLabel(Map<String, dynamic> d, String fallbackId) {
-    final primary = _s(d['primaryName']).isNotEmpty
-        ? _s(d['primaryName'])
-        : _s(d['name']);
-    final secondary = _s(d['secondaryName']).isNotEmpty
-        ? _s(d['secondaryName'])
-        : _s(d['displayName']);
-    if (primary.isEmpty && secondary.isEmpty) return fallbackId;
-    if (secondary.isEmpty) return primary;
-    if (primary.isEmpty) return secondary;
-    return '$primary - $secondary';
+  String _assetLabel(Map<String, dynamic> d) =>
+      ProductionAssetDisplayLookup.labelFromAssetData(d);
+
+  /// Naslov u listi kvarova — bez Firestore ID-a uređaja.
+  String _faultDeviceTitle(Map<String, dynamic> d) {
+    final primary = _s(d['assetPrimaryName']);
+    final secondary = _s(d['assetSecondaryName']);
+    final dn = _s(d['deviceName']);
+    if (primary.isNotEmpty && secondary.isNotEmpty) {
+      return '$primary — $secondary';
+    }
+    if (primary.isNotEmpty) return primary;
+    if (secondary.isNotEmpty) return secondary;
+    if (dn.isNotEmpty) return dn;
+    return 'Uređaj (naziv nije u šifrarniku)';
   }
 
   Color _statusColor(String status) {
@@ -574,7 +579,7 @@ class _ProductionProblemReportingScreenState
       final locationPath = _s(assetData['locationPath']).isNotEmpty
           ? _s(assetData['locationPath'])
           : _queryPlantKey;
-      final deviceName = _assetLabel(assetData, assetId);
+      final deviceName = _assetLabel(assetData);
 
       final callable = FirebaseFunctions.instanceFor(
         region: 'europe-west1',
@@ -987,9 +992,7 @@ class _ProductionProblemReportingScreenState
                         final createdAt = created is Timestamp
                             ? created.toDate()
                             : null;
-                        final title = _s(d['deviceName']).isNotEmpty
-                            ? _s(d['deviceName'])
-                            : _s(d['assetId']);
+                        final title = _faultDeviceTitle(d);
                         return Card(
                           child: ListTile(
                             onTap: () {

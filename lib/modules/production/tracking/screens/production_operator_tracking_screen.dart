@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart'
     show ProductionAccessHelper, ProductionDashboardCard;
+import '../../../../core/saas/production_module_keys.dart';
+import '../../../quality/screens/quality_hub_screen.dart';
 import '../../station/screens/station_tracking_setup_screen.dart';
 import '../../station_pages/screens/production_station_pages_admin_screen.dart';
 import '../config/station_screen_theme.dart';
@@ -12,6 +14,9 @@ import '../widgets/preparation_tracking_tab.dart';
 import '../widgets/production_tracking_hub_nav_strip.dart';
 import '../widgets/production_tracking_overview_tab.dart';
 import '../widgets/station_appearance_editor_dialog.dart';
+import 'production_tracking_ai_reports_screen.dart';
+import 'production_tracking_devices_screen.dart';
+import 'production_tracking_shifts_screen.dart';
 
 /// Operativno praćenje toka proizvodnje: prvo **Pregled** (KPI, trend, strojevi, AI), zatim tri faze unosa
 /// (pripremna → prva kontrola → završna kontrola). Svaki tab faze predstavlja zaseban dnevni radni list za unos;
@@ -112,6 +117,61 @@ class _ProductionOperatorTrackingScreenState
     );
   }
 
+  void _openHubDestination(BuildContext context, String label) {
+    final cd = widget.companyData;
+    final role = (cd['role'] ?? '').toString();
+
+    void push(Widget page) {
+      Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(builder: (_) => page),
+      );
+    }
+
+    void needModule(String name) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Potreban je modul u pretplati: $name.')),
+      );
+    }
+
+    void noAccess() {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nemaš pravo pristupa ovom dijelu.'),
+        ),
+      );
+    }
+
+    switch (label) {
+      case 'Kvaliteta':
+        if (!ProductionModuleKeys.hasModule(cd, ProductionModuleKeys.quality)) {
+          needModule('quality');
+          return;
+        }
+        if (!ProductionAccessHelper.canView(
+          role: role,
+          card: ProductionDashboardCard.qualityManagement,
+        )) {
+          noAccess();
+          return;
+        }
+        push(QualityHubScreen(companyData: cd));
+        return;
+      case 'Stanje uređaja':
+        push(ProductionTrackingDevicesScreen(companyData: cd));
+        return;
+      case 'Smjene':
+        push(ProductionTrackingShiftsScreen(companyData: cd));
+        return;
+      case 'AI izvještaji':
+        push(ProductionTrackingAiReportsScreen(companyData: cd));
+        return;
+      default:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$label — nije prepoznato.')),
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final parentTheme = Theme.of(context);
@@ -205,15 +265,8 @@ class _ProductionOperatorTrackingScreenState
                       _tabController.animateTo(_tabController.index.clamp(1, 3));
                     }
                   },
-                  onSelectPlaceholder: (label) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          '$label — modul je u planu (uskoro u Operonix Production).',
-                        ),
-                      ),
-                    );
-                  },
+                  onSelectPlaceholder: (label) =>
+                      _openHubDestination(context, label),
                 ),
                 if (_tabController.index > 0)
                   Material(

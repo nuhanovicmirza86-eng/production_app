@@ -12,7 +12,7 @@ enum ProductionDashboardCard {
   registrations,
   carbonFootprint,
 
-  /// SaaS modul `quality`: QMS (kontrolni plan, inspekcije, NCR, CAPA).
+  /// SaaS modul `quality`: QMS (kontrolni plan, kontrole, NCR, CAPA).
   qualityManagement,
 
   /// SaaS modul [ProductionModuleKeys.aiAssistant]: OperonixAI (chat + operativni asistent).

@@ -131,7 +131,7 @@ class _NcrListScreenState extends State<NcrListScreen> {
                 ),
                 const SizedBox(width: 8),
                 ChoiceChip(
-                  label: const Text('Inspekcija'),
+                  label: const Text('Kontrola'),
                   selected: _sourceFilter == 'internal',
                   onSelected: (v) {
                     if (!v) return;

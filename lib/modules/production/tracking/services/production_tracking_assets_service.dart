@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'production_asset_display_lookup.dart';
+
 /// Čitanje `assets` za pregled strojeva i udio RUNNING (iskoristivost u smislu operativnog stanja).
 class ProductionTrackingAssetsService {
   ProductionTrackingAssetsService({FirebaseFirestore? firestore})
@@ -43,11 +45,7 @@ class ProductionTrackingAssetsService {
       final rt = _s(data['runtimeState']).toUpperCase();
       if (rt == _runtimeRunning) running++;
 
-      final name = _s(data['primaryName']).isNotEmpty
-          ? _s(data['primaryName'])
-          : _s(data['type']).isNotEmpty
-          ? _s(data['type'])
-          : d.id;
+      final name = ProductionAssetDisplayLookup.labelFromAssetData(data);
 
       final loc = _s(data['locationPath']);
       final subtitle = loc.isNotEmpty ? loc : _s(data['type']);

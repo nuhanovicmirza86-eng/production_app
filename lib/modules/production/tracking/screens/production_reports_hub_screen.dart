@@ -123,7 +123,7 @@ class ProductionReportsHubScreen extends StatelessWidget {
             ),
             _ReportTile(
               icon: Icons.qr_code_scanner,
-              title: 'Izvrši inspekciju',
+              title: 'Izvrši kontrolu',
               subtitle: 'Sken LOT-a ili naloga, mjerenja, NCR pri NOK.',
               onTap: () => _openQms(
                 context,
@@ -181,7 +181,7 @@ class ProductionReportsHubScreen extends StatelessWidget {
             icon: Icons.assignment_turned_in_outlined,
             title: 'Evidencija naloga i veza na narudžbe',
             subtitle: qms
-                ? 'Sljedljivost: u QMS modulu unesi LOT i nalog pri inspekciji.'
+                ? 'Sljedljivost: u QMS modulu unesi LOT i nalog pri kontroli.'
                 : 'Traceability sirovina → gotov proizvod.',
             onTap: qms
                 ? () => _openQms(
@@ -217,7 +217,7 @@ class ProductionReportsHubScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
               qms
-                  ? 'QMS modul: operativni podaci (inspekcije, NCR, CAPA) dolaze preko Callable-a. '
+                  ? 'QMS modul: operativni podaci (kontrole, NCR, CAPA) dolaze preko Callable-a. '
                       'Agregacije otpada po tipu i trendovi i dalje zahtijevaju dodatne izvještaje (u pripremi).'
                   : 'Napomena: detaljne kalkulacije i izvoz (PDF/Excel) vezat će se na iste kolekcije kao operativni unos u tabovima praćenja. '
                       'Za QMS aktiviraj pretplatu na modul „quality“.',

@@ -64,10 +64,10 @@ class _InspectionPlansListScreenState extends State<InspectionPlansListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Planovi inspekcije'),
+        title: const Text('Planovi kontrole'),
         actions: [
           QmsIatfInfoIcon(
-            title: 'Plan inspekcije',
+            title: 'Plan kontrole',
             message: QmsIatfStrings.listInspectionPlans,
           ),
         ],
@@ -117,7 +117,7 @@ class _InspectionPlansListScreenState extends State<InspectionPlansListScreen> {
         padding: const EdgeInsets.all(24),
         children: [
           Text(
-            'Nema planova inspekcije.',
+            'Nema planova kontrole.',
             style: Theme.of(context).textTheme.bodyLarge,
           ),
         ],

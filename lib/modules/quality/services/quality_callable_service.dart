@@ -195,7 +195,121 @@ class QualityCallableService {
     return _parseRows(res.data, QmsInspectionPlanRow.fromMap);
   }
 
-  /// Zadnji rezultati inspekcija (OK/NOK, lot, plan, datum).
+  /// Radni uputi, upute za pakovanje, obrasci (QMS dokumentacija).
+  Future<QmsDocumentsPage> listQmsDocuments({
+    required String companyId,
+    int limit = 50,
+    /// Filtar po `documentKind` (npr. `work_instruction`).
+    String? documentKind,
+    String? productId,
+    /// ID zadnjeg dokumenta s prethodne stranice ([nextPageToken] s poslužitelja).
+    String? pageToken,
+  }) async {
+    final callable = _functions.httpsCallable('listQmsDocuments');
+    final res = await callable.call({
+      'companyId': companyId,
+      'limit': limit,
+      if (documentKind != null && documentKind.trim().isNotEmpty)
+        'documentKind': documentKind.trim(),
+      if (productId != null && productId.trim().isNotEmpty)
+        'productId': productId.trim(),
+      if (pageToken != null && pageToken.trim().isNotEmpty)
+        'pageToken': pageToken.trim(),
+    });
+    final root = Map<String, dynamic>.from((res.data as Map?) ?? {});
+    final items = _parseRows(res.data, QmsDocumentRow.fromMap);
+    final nextRaw = root['nextPageToken']?.toString().trim();
+    return QmsDocumentsPage(
+      items: items,
+      nextPageToken: (nextRaw == null || nextRaw.isEmpty) ? null : nextRaw,
+    );
+  }
+
+  /// GCS v4 signed URL za PUT (nakon [upsertQmsDocument] koji vrati id).
+  Future<QmsSignedUploadInfo> getQmsDocumentSignedUploadUrl({
+    required String companyId,
+    required String qmsDocumentId,
+    required String fileName,
+    String contentType = 'application/octet-stream',
+  }) async {
+    final callable = _functions.httpsCallable('getQmsDocumentSignedUploadUrl');
+    final res = await callable.call({
+      'companyId': companyId,
+      'qmsDocumentId': qmsDocumentId,
+      'fileName': fileName,
+      'contentType': contentType,
+    });
+    final root = Map<String, dynamic>.from((res.data as Map?) ?? {});
+    return QmsSignedUploadInfo(
+      uploadUrl: (root['uploadUrl'] ?? '').toString(),
+      storagePath: (root['storagePath'] ?? '').toString(),
+      contentType: (root['contentType'] ?? contentType).toString(),
+    );
+  }
+
+  /// GCS v4 signed URL za čitanje / preuzimanje datoteke.
+  Future<QmsSignedDownloadInfo> getQmsDocumentSignedDownloadUrl({
+    required String companyId,
+    required String qmsDocumentId,
+  }) async {
+    final callable = _functions.httpsCallable('getQmsDocumentSignedDownloadUrl');
+    final res = await callable.call({
+      'companyId': companyId,
+      'qmsDocumentId': qmsDocumentId,
+    });
+    final root = Map<String, dynamic>.from((res.data as Map?) ?? {});
+    return QmsSignedDownloadInfo(
+      downloadUrl: (root['downloadUrl'] ?? '').toString(),
+      fileName: root['fileName']?.toString(),
+    );
+  }
+
+  Future<String> upsertQmsDocument({
+    required String companyId,
+    String? plantKey,
+    String? qmsDocumentId,
+    required String title,
+    required String productId,
+    required String documentKind,
+    String status = 'draft',
+    String? notes,
+    String? fileName,
+    String? fileStoragePath,
+    String? externalUrl,
+    String? productNameSnapshot,
+    String? productCodeSnapshot,
+    String? documentCode,
+  }) async {
+    final callable = _functions.httpsCallable('upsertQmsDocument');
+    final res = await callable.call({
+      'companyId': companyId,
+      if (plantKey != null && plantKey.isNotEmpty) 'plantKey': plantKey,
+      if (qmsDocumentId != null && qmsDocumentId.isNotEmpty)
+        'qmsDocumentId': qmsDocumentId,
+      'title': title,
+      'productId': productId,
+      'documentKind': documentKind,
+      'status': status,
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
+      if (fileName != null && fileName.isNotEmpty) 'fileName': fileName,
+      if (fileStoragePath != null && fileStoragePath.isNotEmpty)
+        'fileStoragePath': fileStoragePath,
+      if (externalUrl != null && externalUrl.isNotEmpty) 'externalUrl': externalUrl,
+      if (productNameSnapshot != null && productNameSnapshot.isNotEmpty)
+        'productNameSnapshot': productNameSnapshot,
+      if (productCodeSnapshot != null && productCodeSnapshot.isNotEmpty)
+        'productCodeSnapshot': productCodeSnapshot,
+      if (documentCode != null && documentCode.isNotEmpty)
+        'documentCode': documentCode,
+    });
+    final id = (res.data as Map?)?['qmsDocumentId']?.toString().trim();
+    if (id == null || id.isEmpty) {
+      throw StateError('upsertQmsDocument: nije vraćen qmsDocumentId');
+    }
+    return id;
+  }
+
+  /// Zadnji rezultati kontrola (OK/NOK, lot, plan, datum).
   Future<List<QmsInspectionResultRow>> listInspectionResults({
     required String companyId,
     int limit = 80,

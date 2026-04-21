@@ -7,7 +7,7 @@ import '../services/quality_callable_service.dart';
 import '../widgets/qms_display_formatters.dart';
 import '../widgets/qms_iatf_help.dart';
 
-/// Povijest rezultata inspekcija — Callable [listQmsInspectionResults].
+/// Povijest rezultata kontrola — Callable [listQmsInspectionResults].
 class InspectionResultsListScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
 
@@ -62,7 +62,7 @@ class _InspectionResultsListScreenState extends State<InspectionResultsListScree
       final pm = <String, String>{};
       for (final p in plans) {
         final code = (p.inspectionPlanCode ?? '').trim();
-        pm[p.id] = code.isNotEmpty ? code : 'Plan inspekcije';
+        pm[p.id] = code.isNotEmpty ? code : 'Plan kontrole';
       }
       if (!mounted) return;
       setState(() {
@@ -108,10 +108,10 @@ class _InspectionResultsListScreenState extends State<InspectionResultsListScree
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Povijest inspekcija'),
+        title: const Text('Povijest kontrola'),
         actions: [
           QmsIatfInfoIcon(
-            title: 'Povijest inspekcija',
+            title: 'Povijest kontrola',
             message: QmsIatfStrings.listInspectionResults,
           ),
           IconButton(
@@ -133,7 +133,7 @@ class _InspectionResultsListScreenState extends State<InspectionResultsListScree
           : _rows.isEmpty
           ? Center(
               child: Text(
-                'Nema zapisanih rezultata inspekcija.',
+                'Nema zapisanih rezultata kontrola.',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
             )
@@ -146,7 +146,7 @@ class _InspectionResultsListScreenState extends State<InspectionResultsListScree
                 final nok = _isNok(r.overallResult);
                 final when = r.inspectedAtIso ?? '—';
                 final planLine =
-                    _planTitleById[r.inspectionPlanId] ?? 'Plan inspekcije';
+                    _planTitleById[r.inspectionPlanId] ?? 'Plan kontrole';
                 final prodLine = _productLineById[r.productId] ??
                     'Proizvod (nije u šifarniku)';
                 final lot = _traceForDisplay(r.lotId);

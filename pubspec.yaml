@@ -46,6 +46,7 @@ flutter:
     - assets/fonts/NotoSans-Regular.ttf
     - assets/fonts/NotoSans-Bold.ttf
     - branding/operonix_production_icon.PNG
+    - branding/operonix_company_logo.png
 
 flutter_launcher_icons:
   android: true

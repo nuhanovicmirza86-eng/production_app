@@ -473,7 +473,7 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                       const SizedBox(height: 8),
                       Text(
                         [
-                          'Sljedljivost (inspekcija)',
+                          'Sljedljivost (kontrola)',
                           if ((_ncr!['customerId'] ?? '').toString().trim().isNotEmpty)
                             'kupac: ${_ncr!['customerId']}',
                           if ((_ncr!['supplierId'] ?? '').toString().trim().isNotEmpty)

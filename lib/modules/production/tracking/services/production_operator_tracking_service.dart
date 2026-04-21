@@ -147,6 +147,36 @@ class ProductionOperatorTrackingService {
     return snap.docs.map(ProductionOperatorTrackingEntry.fromDoc).toList();
   }
 
+  /// Jednokratno: sva tri toka (faze) za isti [workDate].
+  Future<List<ProductionOperatorTrackingEntry>> fetchDayAllPhasesMerged({
+    required String companyId,
+    required String plantKey,
+    required String workDate,
+  }) async {
+    final phases = <String>[
+      ProductionOperatorTrackingEntry.phasePreparation,
+      ProductionOperatorTrackingEntry.phaseFirstControl,
+      ProductionOperatorTrackingEntry.phaseFinalControl,
+    ];
+    final lists = await Future.wait(
+      phases.map(
+        (phase) => fetchDayPhase(
+          companyId: companyId,
+          plantKey: plantKey,
+          phase: phase,
+          workDate: workDate,
+        ),
+      ),
+    );
+    final merged = lists.expand((e) => e).toList();
+    merged.sort((a, b) {
+      final ta = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final tb = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return tb.compareTo(ta);
+    });
+    return merged;
+  }
+
   /// Svi unosi jedne faze u rasponu [startWorkDate]–[endWorkDate] (uključivo), `workDate` = `yyyy-MM-dd`.
   Future<List<ProductionOperatorTrackingEntry>> fetchPhaseDateRange({
     required String companyId,

@@ -10,7 +10,7 @@ import '../models/qms_execution_models.dart';
 import '../models/qms_list_models.dart';
 import '../services/quality_callable_service.dart';
 
-/// Odabir plana inspekcije → [getQmsInspectionExecutionContext] → unos mjerenja → [submitInspectionResult].
+/// Odabir plana kontrole → [getQmsInspectionExecutionContext] → unos mjerenja → [submitInspectionResult].
 class ExecuteInspectionScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
   final String? initialInspectionPlanId;
@@ -95,7 +95,7 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
     return rows.first.id;
   }
 
-  /// Sken naloga (`po:v1`) ili WMS lota (`wmslot:v1`) → puni polja konteksta inspekcije.
+  /// Sken naloga (`po:v1`) ili WMS lota (`wmslot:v1`) → puni polja konteksta kontrole.
   Future<void> _scanQr() async {
     final resolution = await Navigator.push<ProductionQrScanResolution>(
       context,
@@ -175,7 +175,7 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
     final cid = _cid;
     if (planId == null || planId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Odaberi plan inspekcije.')),
+        const SnackBar(content: Text('Odaberi plan kontrole.')),
       );
       return;
     }
@@ -332,10 +332,10 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Izvrši inspekciju'),
+        title: const Text('Izvrši kontrolu'),
         actions: [
           QmsIatfInfoIcon(
-            title: 'Izvršenje inspekcije',
+            title: 'Izvršenje kontrole',
             message:
                 '${QmsIatfStrings.executeInspection}\n\n'
                 '${QmsIatfStrings.termPartnerIdsInspection}\n\n'
@@ -353,7 +353,7 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Skeniraj lot ili proizvodni nalog da se popune polja. Zatim odaberi plan inspekcije, učitaj mjerenja i unesi vrijednosti.',
+            'Skeniraj lot ili proizvodni nalog da se popune polja. Zatim odaberi plan kontrole, učitaj mjerenja i unesi vrijednosti.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: 20),
@@ -366,7 +366,7 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
             Text(_plansError!, style: TextStyle(color: cs.error))
           else if (_planRows.isEmpty)
             Text(
-              'Nema planova inspekcije. U „Planovi inspekcije“ kreiraj plan (Callable).',
+              'Nema planova kontrole. U „Planovi kontrole“ kreiraj plan (Callable).',
               style: Theme.of(context).textTheme.bodyMedium,
             )
           else ...[
@@ -377,7 +377,7 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
                   ? _selectedPlanId
                   : null,
               decoration: const InputDecoration(
-                labelText: 'Plan inspekcije',
+                labelText: 'Plan kontrole',
                 border: OutlineInputBorder(),
               ),
               items: _planRows
@@ -453,7 +453,7 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
             const SizedBox(height: 4),
             Text(
               'Tip: ${QmsDisplayFormatters.inspectionType(_ctx!.inspectionType)} · '
-              'plan inspekcije: ${QmsDisplayFormatters.qmsDocStatus(_ctx!.inspectionPlanStatus)} · '
+              'plan kontrole: ${QmsDisplayFormatters.qmsDocStatus(_ctx!.inspectionPlanStatus)} · '
               'kontrolni plan: ${_ctx!.controlPlanStatus.isEmpty ? "—" : QmsDisplayFormatters.qmsDocStatus(_ctx!.controlPlanStatus)} · '
               'proizvod: ${_ctxProductLine ?? "…"}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
@@ -527,7 +527,7 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.check_circle_outline),
-              label: Text(_submitting ? 'Slanje…' : 'Pošalji rezultat inspekcije'),
+              label: Text(_submitting ? 'Slanje…' : 'Pošalji rezultat kontrole'),
             ),
           ],
         ],
@@ -538,9 +538,9 @@ class _ExecuteInspectionScreenState extends State<ExecuteInspectionScreen> {
   String _executionBlockedMessage(QmsInspectionExecutionContext ctx) {
     final r = ctx.executionBlockedReason?.trim().toLowerCase();
     if (r == 'obsolete') {
-      return 'Plan inspekcije ili kontrolni plan je zastarjel; unos rezultata nije dopušten.';
+      return 'Plan kontrole ili kontrolni plan je zastarjel; unos rezultata nije dopušten.';
     }
-    return 'Kontrolni plan i plan inspekcije moraju biti u statusu „approved“ prije unosa rezultata.';
+    return 'Kontrolni plan i plan kontrole moraju biti u statusu „approved“ prije unosa rezultata.';
   }
 
   String? _tolHint(QmsMeasureSlot slot) {

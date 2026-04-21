@@ -8,7 +8,7 @@ import '../widgets/qms_display_formatters.dart';
 import '../widgets/qms_iatf_help.dart';
 import '../widgets/qms_pickers.dart';
 
-/// Plan inspekcije: productId + controlPlanId + tip + refs karakteristika (npr. 0:0,0:1).
+/// Plan kontrole: productId + controlPlanId + tip + refs karakteristika (npr. 0:0,0:1).
 /// Prazan unos refs = sve karakteristike kontrolnog plana pri izvršenju (backend).
 class InspectionPlanEditScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
@@ -343,10 +343,10 @@ class _InspectionPlanEditScreenState extends State<InspectionPlanEditScreen> {
     final isNew = widget.inspectionPlanId == null || widget.inspectionPlanId!.isEmpty;
     return Scaffold(
       appBar: AppBar(
-        title: Text(isNew ? 'Novi plan inspekcije' : 'Uredi plan inspekcije'),
+        title: Text(isNew ? 'Novi plan kontrole' : 'Uredi plan kontrole'),
         actions: [
           QmsIatfInfoIcon(
-            title: 'Plan inspekcije',
+            title: 'Plan kontrole',
             message:
                 '${QmsIatfStrings.editInspectionPlan}\n\n${QmsIatfStrings.termInspectionType}',
           ),
@@ -505,10 +505,10 @@ class _InspectionPlanEditScreenState extends State<InspectionPlanEditScreen> {
                       key: ValueKey<String>('ip_type_$_inspectionType'),
                       initialValue: _inspectionType,
                       decoration: InputDecoration(
-                        labelText: 'Tip inspekcije',
+                        labelText: 'Tip kontrole',
                         border: const OutlineInputBorder(),
                         suffixIcon: QmsIatfInfoIcon(
-                          title: 'Tip inspekcije',
+                          title: 'Tip kontrole',
                           message: QmsIatfStrings.termInspectionType,
                           size: 20,
                         ),

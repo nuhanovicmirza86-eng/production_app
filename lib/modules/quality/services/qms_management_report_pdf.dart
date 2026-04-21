@@ -106,7 +106,7 @@ class QmsManagementReportPdf {
           ),
           pw.SizedBox(height: 2),
           pw.Text(
-            'Trend inspekcija: zadnjih $daysBack dana (iz sustava kvalitete)',
+            'Trend kontrola: zadnjih $daysBack dana (iz sustava kvalitete)',
             style: small(),
           ),
           if (genIso.isNotEmpty)
@@ -115,12 +115,12 @@ class QmsManagementReportPdf {
           pw.Text('Sažetak', style: h2()),
           pw.SizedBox(height: 6),
           _kv('Kontrolni planovi (broj zapisa)', '$cp', fontBold, fontRegular),
-          _kv('Planovi inspekcije', '$ip', fontBold, fontRegular),
+          _kv('Planovi kontrole', '$ip', fontBold, fontRegular),
           _kv('Otvoreni NCR', '$on', fontBold, fontRegular),
           _kv('Otvorene CAPA (ukupno)', '$oc', fontBold, fontRegular),
           _kv('CAPA s prekoračenim rokom (otvorene)', '$overdue', fontBold, fontRegular),
           pw.SizedBox(height: 10),
-          pw.Text('Trend inspekcija (OK / NOK)', style: h2()),
+          pw.Text('Trend kontrola (OK / NOK)', style: h2()),
           pw.SizedBox(height: 6),
           _kv('OK u razdoblju', '$ok', fontBold, fontRegular),
           _kv('NOK u razdoblju', '$nok', fontBold, fontRegular),
