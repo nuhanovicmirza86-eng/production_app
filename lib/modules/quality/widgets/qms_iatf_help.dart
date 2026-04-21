@@ -7,6 +7,12 @@ abstract final class QmsIatfStrings {
       'Lanac u aplikaciji: kontrolni plan → plan inspekcije → evidencija rezultata → NCR (reakcijski plan) → CAPA (akcijski plan) → sljedljivost. '
       'PFMEA i ocjene rizika u pozadini podržavaju prioritete; vidi ekran „Metodologija · IATF”.';
 
+  /// Uvod za [QualityDocumentationScreen] — master lista dokumenata (upute, obrasci).
+  static const documentationHub = 'Dokumentacija u smislu kontroliranih dokumenata (npr. radni uput, uput za pakovanje, obrazac): '
+      'jedno mjesto za evidenciju i revizije, s kasnijom vezom na proizvode iz šifrarnika. '
+      'Time se u IATF kontekstu povezuje „što radimo“ (kontrolni plan, inspekcija) s „kako i pod kojim dokumentom“ — '
+      'a iz detalja proizvoda brzo vidiš koji dokumenti vrijede za taj artikl (uključivo reklamacije i sljedljivost).';
+
   /// Kratak uvod za ekran [QmsMethodologyReferenceScreen].
   static const methodologyWhy = 'Ovaj pregled povezuje četiri često miješana pojma: što je na NCR-u brzo, '
       'što je u CAPA-i trajno, što je PFMEA prije nego što se problem dogodi, i gdje su „ocjene rizika” u sustavu.';
