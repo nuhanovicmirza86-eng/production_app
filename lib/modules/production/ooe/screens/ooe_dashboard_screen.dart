@@ -1,0 +1,455 @@
+import 'package:flutter/material.dart';
+
+import '../../../../core/access/production_access_helper.dart';
+import '../../../../core/errors/app_error_mapper.dart';
+import '../../tracking/services/production_tracking_assets_service.dart';
+import '../models/ooe_live_status.dart';
+import '../ooe_help_texts.dart';
+import '../services/ooe_live_service.dart';
+import '../widgets/ooe_info_icon.dart';
+import '../widgets/ooe_line_group_header.dart';
+import '../widgets/ooe_live_status_card.dart';
+import 'ooe_loss_analysis_screen.dart';
+import 'ooe_loss_reasons_screen.dart';
+import 'ooe_machine_details_screen.dart';
+import 'ooe_shift_context_screen.dart';
+import 'ooe_daily_overview_screen.dart';
+import 'capacity_overview_screen.dart';
+import 'teep_analysis_screen.dart';
+import 'ooe_shift_summary_screen.dart';
+
+enum _LiveCardSort { ooeDesc, nameAsc }
+
+enum _LineLayout { flat, byLine }
+
+/// Live pregled OOE po mašinama (čita [ooe_live_status]).
+class OoeDashboardScreen extends StatefulWidget {
+  final Map<String, dynamic> companyData;
+
+  const OoeDashboardScreen({super.key, required this.companyData});
+
+  @override
+  State<OoeDashboardScreen> createState() => _OoeDashboardScreenState();
+}
+
+class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
+  late final Future<ProductionPlantAssetsSnapshot> _assetsFuture;
+  _LiveCardSort _liveSort = _LiveCardSort.ooeDesc;
+  _LineLayout _lineLayout = _LineLayout.flat;
+
+  String get _companyId =>
+      (widget.companyData['companyId'] ?? '').toString().trim();
+  String get _plantKey =>
+      (widget.companyData['plantKey'] ?? '').toString().trim();
+  String get _role =>
+      ProductionAccessHelper.normalizeRole(widget.companyData['role']);
+
+  bool get _canAnalytics =>
+      ProductionAccessHelper.canView(role: _role, card: ProductionDashboardCard.ooe) &&
+      (ProductionAccessHelper.normalizeRole(_role) ==
+              ProductionAccessHelper.roleProductionManager ||
+          ProductionAccessHelper.normalizeRole(_role) ==
+              ProductionAccessHelper.roleAdmin ||
+          ProductionAccessHelper.normalizeRole(_role) ==
+              ProductionAccessHelper.roleSupervisor ||
+          ProductionAccessHelper.normalizeRole(_role) ==
+              ProductionAccessHelper.roleQualityOperator);
+
+  bool get _canManageOoe => ProductionAccessHelper.canManage(
+        role: _role,
+        card: ProductionDashboardCard.ooe,
+      );
+
+  @override
+  void initState() {
+    super.initState();
+    _assetsFuture = ProductionTrackingAssetsService().loadForPlant(
+      companyId: _companyId,
+      plantKey: _plantKey,
+      limit: 128,
+    );
+  }
+
+  void _push(Widget screen) {
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(builder: (_) => screen),
+    );
+  }
+
+  static List<OoeLiveStatus> _sortedLive(
+    List<OoeLiveStatus> list,
+    Map<String, String> labelMap,
+    _LiveCardSort sort,
+  ) {
+    final copy = List<OoeLiveStatus>.from(list);
+    switch (sort) {
+      case _LiveCardSort.ooeDesc:
+        copy.sort((a, b) => b.currentShiftOoe.compareTo(a.currentShiftOoe));
+      case _LiveCardSort.nameAsc:
+        copy.sort((a, b) {
+          final la = (labelMap[a.machineId] ?? a.machineId).toLowerCase();
+          final lb = (labelMap[b.machineId] ?? b.machineId).toLowerCase();
+          final c = la.compareTo(lb);
+          if (c != 0) return c;
+          return a.machineId.compareTo(b.machineId);
+        });
+    }
+    return copy;
+  }
+
+  String? _effectiveLineKey(
+    OoeLiveStatus st,
+    ProductionPlantAssetsSnapshot assets,
+  ) {
+    final live = st.lineId?.trim();
+    if (live != null && live.isNotEmpty) return live;
+    final fromAsset = assets.machineLineKeyByMachineId[st.machineId]?.trim();
+    if (fromAsset != null && fromAsset.isNotEmpty) return fromAsset;
+    return null;
+  }
+
+  List<String?> _orderedLineBuckets(
+    Set<String?> keys,
+    Map<String, String> lineNames,
+  ) {
+    final list = keys.toList();
+    list.sort((a, b) {
+      final aa = a?.trim() ?? '';
+      final bb = b?.trim() ?? '';
+      final aEmpty = aa.isEmpty;
+      final bEmpty = bb.isEmpty;
+      if (aEmpty && !bEmpty) return 1;
+      if (!aEmpty && bEmpty) return -1;
+      if (aEmpty && bEmpty) return 0;
+      final da = (lineNames[aa] ?? '').toLowerCase();
+      final db = (lineNames[bb] ?? '').toLowerCase();
+      final c = da.compareTo(db);
+      if (c != 0) return c;
+      return aa.compareTo(bb);
+    });
+    return list;
+  }
+
+  Widget _liveCard(OoeLiveStatus st, Map<String, String> labelMap) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: OoeLiveStatusCard(
+        status: st,
+        machineDisplayName: labelMap[st.machineId],
+        onOpenDetails: () {
+          Navigator.push<void>(
+            context,
+            MaterialPageRoute<void>(
+              builder: (_) => OoeMachineDetailsScreen(
+                companyData: widget.companyData,
+                machineId: st.machineId,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  List<Widget> _buildGroupedLiveList({
+    required List<OoeLiveStatus> sorted,
+    required Map<String, String> labelMap,
+    required ProductionPlantAssetsSnapshot assets,
+  }) {
+    final grouped = <String?, List<OoeLiveStatus>>{};
+    for (final st in sorted) {
+      final k = _effectiveLineKey(st, assets);
+      grouped.putIfAbsent(k, () => []).add(st);
+    }
+    final keys = _orderedLineBuckets(
+      grouped.keys.toSet(),
+      assets.lineDisplayNameByLineKey,
+    );
+    final children = <Widget>[];
+    for (final lineKey in keys) {
+      children.add(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 10, 4, 6),
+          child: OoeLineGroupHeader(
+            lineKey: lineKey,
+            lineDisplayNameByKey: assets.lineDisplayNameByLineKey,
+          ),
+        ),
+      );
+      final group = grouped[lineKey];
+      if (group == null) continue;
+      for (final st in group) {
+        children.add(_liveCard(st, labelMap));
+      }
+    }
+    return children;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final live = OoeLiveService();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('OOE — live'),
+        actions: [
+          OoeInfoIcon(
+            tooltip: OoeHelpTexts.liveDashboardTooltip,
+            dialogTitle: OoeHelpTexts.liveDashboardTitle,
+            dialogBody: OoeHelpTexts.liveDashboardBody,
+          ),
+          if (_canAnalytics || _canManageOoe)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              tooltip: 'Još opcija',
+              onSelected: (id) {
+                switch (id) {
+                  case 'loss_analysis':
+                    _push(OoeLossAnalysisScreen(companyData: widget.companyData));
+                  case 'shift_summary':
+                    _push(OoeShiftSummaryScreen(companyData: widget.companyData));
+                  case 'daily_overview':
+                    _push(OoeDailyOverviewScreen(companyData: widget.companyData));
+                  case 'capacity_overview':
+                    _push(CapacityOverviewScreen(companyData: widget.companyData));
+                  case 'teep_analysis':
+                    _push(TeepAnalysisScreen(companyData: widget.companyData));
+                  case 'shift_context':
+                    _push(OoeShiftContextScreen(companyData: widget.companyData));
+                  case 'loss_reasons':
+                    _push(OoeLossReasonsScreen(companyData: widget.companyData));
+                }
+              },
+              itemBuilder: (ctx) => [
+                if (_canAnalytics)
+                  const PopupMenuItem(
+                    value: 'loss_analysis',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.bar_chart_outlined),
+                      title: Text('Analiza gubitaka'),
+                    ),
+                  ),
+                if (_canAnalytics)
+                  const PopupMenuItem(
+                    value: 'shift_summary',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.calendar_today_outlined),
+                      title: Text('Sažetak smjene'),
+                    ),
+                  ),
+                if (_canAnalytics)
+                  const PopupMenuItem(
+                    value: 'daily_overview',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.view_day_outlined),
+                      title: Text('Dnevni pregled'),
+                    ),
+                  ),
+                if (_canAnalytics)
+                  const PopupMenuItem(
+                    value: 'capacity_overview',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.calendar_month_outlined),
+                      title: Text('Kapacitet i kalendar'),
+                    ),
+                  ),
+                if (_canAnalytics)
+                  const PopupMenuItem(
+                    value: 'teep_analysis',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.area_chart_outlined),
+                      title: Text('TEEP analitika'),
+                    ),
+                  ),
+                if (_canManageOoe)
+                  const PopupMenuItem(
+                    value: 'shift_context',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.schedule_outlined),
+                      title: Text('Kontekst smjene'),
+                    ),
+                  ),
+                if (_canManageOoe)
+                  const PopupMenuItem(
+                    value: 'loss_reasons',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.rule_folder_outlined),
+                      title: Text('Razlozi gubitaka'),
+                    ),
+                  ),
+              ],
+            ),
+        ],
+      ),
+      body: FutureBuilder<ProductionPlantAssetsSnapshot>(
+        future: _assetsFuture,
+        builder: (context, assetSnap) {
+          if (assetSnap.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  AppErrorMapper.toMessage(assetSnap.error!),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
+          }
+          if (!assetSnap.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final labelMap = <String, String>{};
+          for (final m in assetSnap.data!.machines) {
+            labelMap[m.id] = m.title;
+          }
+
+          final assets = assetSnap.data!;
+
+          return StreamBuilder(
+            stream: live.watchLiveForPlant(
+              companyId: _companyId,
+              plantKey: _plantKey,
+            ),
+            builder: (context, snap) {
+              if (snap.hasError) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      AppErrorMapper.toMessage(snap.error!),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                );
+              }
+              if (!snap.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final raw = snap.data ?? const [];
+              if (raw.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.precision_manufacturing_outlined,
+                          size: 48,
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Nema live zapisa za ovaj pogon',
+                          style: Theme.of(context).textTheme.titleMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Pokreni izvršenje naloga na stroju koji je u imovini '
+                          'pogona. OOE koristi istu šifru stroja kao praćenje.',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        OoeInfoIcon(
+                          tooltip: OoeHelpTexts.liveDashboardTooltip,
+                          dialogTitle: 'Kako se pojavi prikaz',
+                          dialogBody:
+                              'Nakon što postoji barem jedan zapis u ooe_live_status '
+                              'za pogon, ovdje će se pojaviti kartice po stroju.',
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              final list = _sortedLive(raw, labelMap, _liveSort);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                    child: SegmentedButton<_LineLayout>(
+                      segments: const [
+                        ButtonSegment(
+                          value: _LineLayout.flat,
+                          label: Text('Svi strojevi'),
+                          icon: Icon(Icons.view_list_outlined),
+                        ),
+                        ButtonSegment(
+                          value: _LineLayout.byLine,
+                          label: Text('Po liniji'),
+                          icon: Icon(Icons.account_tree_outlined),
+                        ),
+                      ],
+                      selected: {_lineLayout},
+                      onSelectionChanged: (s) {
+                        setState(() {
+                          _lineLayout = s.first;
+                        });
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+                    child: SegmentedButton<_LiveCardSort>(
+                      segments: const [
+                        ButtonSegment(
+                          value: _LiveCardSort.ooeDesc,
+                          label: Text('OOE'),
+                          icon: Icon(Icons.south),
+                        ),
+                        ButtonSegment(
+                          value: _LiveCardSort.nameAsc,
+                          label: Text('Naziv'),
+                          icon: Icon(Icons.sort_by_alpha),
+                        ),
+                      ],
+                      selected: {_liveSort},
+                      onSelectionChanged: (s) {
+                        setState(() {
+                          _liveSort = s.first;
+                        });
+                      },
+                    ),
+                  ),
+                  Expanded(
+                    child: _lineLayout == _LineLayout.flat
+                        ? ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                            itemCount: list.length,
+                            itemBuilder: (context, i) {
+                              return _liveCard(list[i], labelMap);
+                            },
+                          )
+                        : ListView(
+                            padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                            children: _buildGroupedLiveList(
+                              sorted: list,
+                              labelMap: labelMap,
+                              assets: assets,
+                            ),
+                          ),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}

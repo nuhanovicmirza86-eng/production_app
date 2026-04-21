@@ -29,6 +29,8 @@ import '../../tracking/screens/production_preparation_station_screen.dart';
 import '../../ai/screens/production_ai_hub_screen.dart';
 import '../../tracking/screens/production_reports_hub_screen.dart';
 import '../../issues/screens/production_problem_reporting_screen.dart';
+import '../../ooe/screens/ooe_dashboard_screen.dart';
+import '../../ooe/screens/teep_analysis_screen.dart';
 import '../../qr/production_qr_scan_flow.dart';
 import '../../../quality/screens/execute_inspection_screen.dart';
 import '../../../quality/screens/quality_hub_screen.dart';
@@ -298,6 +300,21 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           title: 'Zastoji',
           subtitle: 'Uskoro u aplikaciji.',
           onTap: () => _notImplemented(context),
+        ),
+      if (_canViewCard(ProductionDashboardCard.ooe))
+        _DashboardActionTile(
+          icon: Icons.speed_outlined,
+          title: 'OOE / OEE',
+          subtitle: 'Live stanje, gubici i sažeci smjene (iz događaja).',
+          onTap: () => open(OoeDashboardScreen(companyData: companyData)),
+        ),
+      if (_canViewCard(ProductionDashboardCard.ooe))
+        _DashboardActionTile(
+          icon: Icons.percent_outlined,
+          title: 'TEEP i kapacitet',
+          subtitle:
+              'Kalendar, iskorištenje, TEEP (dan / tjedan / mjesec, pogon ili stroj).',
+          onTap: () => open(TeepAnalysisScreen(companyData: companyData)),
         ),
       if (_canAccessMaintenanceFaultBridge() &&
           _canViewCard(ProductionDashboardCard.problemReporting))
@@ -803,6 +820,19 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             icon: Icon(Icons.warning_amber_outlined),
             selectedIcon: Icon(Icons.warning_amber),
             label: 'Zastoji',
+          ),
+        ),
+      );
+    }
+
+    if (_hasModule('production') && _canViewCard(ProductionDashboardCard.ooe)) {
+      items.add(
+        _ProdNavItem(
+          builder: (_) => OoeDashboardScreen(companyData: cd),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.speed_outlined),
+            selectedIcon: Icon(Icons.speed),
+            label: 'OOE',
           ),
         ),
       );
