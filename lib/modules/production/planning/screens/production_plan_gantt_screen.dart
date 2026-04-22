@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../tracking/services/production_asset_display_lookup.dart';
 import '../services/planning_gantt_dto.dart';
+import '../services/planning_gantt_zoom_prefs.dart';
 import '../services/production_plan_persistence_service.dart';
 
 /// Prikaz vremenske trake po resursu (red); u blokovima se prikazuje **šifra naloga**, ne interni ID.
@@ -143,6 +144,8 @@ class _ProductionPlanGanttScreenState extends State<ProductionPlanGanttScreen> {
         data: d,
         machineLabels: _machineLabels,
         showNowLine: true,
+        preferenceCompanyId: _cid,
+        preferencePlantKey: _pk,
       ),
     );
   }
@@ -208,11 +211,16 @@ class PlanningGanttChart extends StatefulWidget {
     required this.data,
     required this.machineLabels,
     this.showNowLine = true,
+    this.preferenceCompanyId,
+    this.preferencePlantKey,
   });
 
   final PlanningGanttDto data;
   final Map<String, String> machineLabels;
   final bool showNowLine;
+  /// Ako su oba zadana, zoom (sat/smjena/dan/tjedan) se pamti u [PlanningGanttZoomPrefs].
+  final String? preferenceCompanyId;
+  final String? preferencePlantKey;
 
   static String _fmtDateTime(DateTime d) {
     final t = d.toLocal();
@@ -229,6 +237,7 @@ class PlanningGanttChart extends StatefulWidget {
 
 class _PlanningGanttChartState extends State<PlanningGanttChart> {
   Timer? _nowTick;
+  PlanningGanttZoomPreset _zoom = PlanningGanttZoomPreset.day;
 
   @override
   void initState() {
@@ -236,6 +245,16 @@ class _PlanningGanttChartState extends State<PlanningGanttChart> {
     _nowTick = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted && widget.showNowLine) setState(() {});
     });
+    final cid = widget.preferenceCompanyId?.trim() ?? '';
+    final pk = widget.preferencePlantKey?.trim() ?? '';
+    if (cid.isNotEmpty || pk.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final z = await PlanningGanttZoomPrefs.read(cid, pk);
+        if (mounted && z != null) {
+          setState(() => _zoom = z);
+        }
+      });
+    }
   }
 
   @override
@@ -297,7 +316,7 @@ class _PlanningGanttChartState extends State<PlanningGanttChart> {
     final totalMin = data.windowEnd.difference(data.windowStart).inMinutes
         .clamp(1, 1 << 30);
     const minChartWidth = 720.0;
-    const width = minChartWidth;
+    final width = (minChartWidth * _zoom.widthMultiplier).clamp(360.0, 2800.0);
     final pxPerMinute = width / totalMin;
     final rowH = 64.0;
     final chartH = mKeys.length * rowH;
@@ -315,7 +334,54 @@ class _PlanningGanttChartState extends State<PlanningGanttChart> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              Text('Zoom vremenske ljestvice:', style: Theme.of(context).textTheme.labelLarge),
+              SegmentedButton<PlanningGanttZoomPreset>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(
+                    value: PlanningGanttZoomPreset.hour,
+                    label: Text('Sat'),
+                    icon: Icon(Icons.schedule, size: 16),
+                  ),
+                  ButtonSegment(
+                    value: PlanningGanttZoomPreset.shift,
+                    label: Text('Smjena'),
+                    icon: Icon(Icons.view_day, size: 16),
+                  ),
+                  ButtonSegment(
+                    value: PlanningGanttZoomPreset.day,
+                    label: Text('Dan'),
+                    icon: Icon(Icons.calendar_view_day, size: 16),
+                  ),
+                  ButtonSegment(
+                    value: PlanningGanttZoomPreset.week,
+                    label: Text('Tjedan'),
+                    icon: Icon(Icons.date_range, size: 16),
+                  ),
+                ],
+                selected: {_zoom},
+                onSelectionChanged: (s) async {
+                  if (s.isEmpty) return;
+                  final next = s.first;
+                  setState(() => _zoom = next);
+                  final cid = widget.preferenceCompanyId?.trim() ?? '';
+                  final pk = widget.preferencePlantKey?.trim() ?? '';
+                  if (cid.isNotEmpty || pk.isNotEmpty) {
+                    await PlanningGanttZoomPrefs.write(cid, pk, next);
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
           child: Text(
             'Vodoravno pomicanje. Lijevo: strojevi (iz šifrarnika). U traci: nalog, ispod toga operacija / korak routingsa kad je poznat.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(

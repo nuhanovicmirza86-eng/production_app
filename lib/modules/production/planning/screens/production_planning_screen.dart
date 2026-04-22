@@ -50,7 +50,7 @@ class ProductionPlanningScreen extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(10),
         children: [
-          const PlanningFiltersBar(),
+          PlanningFiltersBar(session: session),
           const SizedBox(height: 10),
           PlanningSummaryKpiRow(session: session),
           const Divider(height: 20),

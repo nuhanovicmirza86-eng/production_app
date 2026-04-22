@@ -47,17 +47,37 @@ class PlanningContextSidebar extends StatelessWidget {
               ),
             ],
             const Divider(height: 20),
-            Text('AI uvid (uskoro)', style: t.textTheme.labelLarge),
+            Text('Uvid (motor / LLM)', style: t.textTheme.labelLarge),
             const SizedBox(height: 4),
-            Card(
-              child: ListTile(
-                dense: true,
-                leading: Icon(Icons.auto_awesome, color: t.colorScheme.primary, size: 20),
-                title: const Text('Nema povezanog LLM u ovom ekranu'),
-                subtitle: const Text('Kasijeve kartice: „zašto kasni“, bottleneck, what-if preko simulacije.'),
-                isThreeLine: true,
+            if (session.result != null && session.result!.conflicts.isNotEmpty) ...[
+              ...session.result!.conflicts.take(3).map(
+                    (c) => Card(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      child: ListTile(
+                        dense: true,
+                        leading: Icon(Icons.warning_amber_outlined, color: t.colorScheme.tertiary, size: 22),
+                        title: Text(
+                          PlanningUiFormatters.conflictTypeLabel(c.type.name),
+                          style: t.textTheme.labelMedium,
+                        ),
+                        subtitle: Text(c.message, style: const TextStyle(fontSize: 12)),
+                      ),
+                    ),
+                  ),
+              Text(
+                'Generativni LLM nije povezan — kartice su iz pravila motora. Kasnije: prijedlozi akcija.',
+                style: t.textTheme.labelSmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
               ),
-            ),
+            ] else
+              Card(
+                child: ListTile(
+                  dense: true,
+                  leading: Icon(Icons.info_outline, color: t.colorScheme.primary, size: 20),
+                  title: const Text('Nema upozorenja u zadnjem planu'),
+                  subtitle: const Text('Generirajte plan ili provjerite tab Nalozi. LLM nije uključen.'),
+                  isThreeLine: true,
+                ),
+              ),
             if (session.result != null) ...[
               const Divider(height: 16),
               PlanningKpiStrip(
@@ -66,19 +86,6 @@ class PlanningContextSidebar extends StatelessWidget {
                 plantKey: session.plantKey,
                 compact: false,
               ),
-              if (session.result!.conflicts.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text('Najnovija upozorenja', style: t.textTheme.labelLarge),
-                ...session.result!.conflicts.take(4).map(
-                      (c) => Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          '• ${PlanningUiFormatters.conflictTypeLabel(c.type.name)}: ${c.message}',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    ),
-              ],
             ],
             const SizedBox(height: 8),
             Wrap(

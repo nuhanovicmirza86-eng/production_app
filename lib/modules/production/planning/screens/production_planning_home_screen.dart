@@ -70,9 +70,12 @@ class _ProductionPlanningHomeScreenState extends State<ProductionPlanningHomeScr
   }
 
   void _onSimulate() {
+    _session.setScenarioIndex(1);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Simulacija: uskoro (parametri + scenarij + ponovni pogon motora, bez pisanja u produkciju).'),
+        content: Text(
+          'Scenarij: Simulacija. Na tabu Nalozi podesite parametre pa kliknite Generiši plan (isti motor kao preračun, bez odvojenog MES pisanja).',
+        ),
       ),
     );
   }

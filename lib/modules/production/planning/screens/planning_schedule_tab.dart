@@ -72,6 +72,8 @@ class PlanningScheduleTab extends StatelessWidget {
               data: d,
               machineLabels: session.ganttMachineLabels,
               showNowLine: true,
+              preferenceCompanyId: session.companyId,
+              preferencePlantKey: session.plantKey,
             ),
           ),
         ),

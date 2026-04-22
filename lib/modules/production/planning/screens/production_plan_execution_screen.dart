@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../tracking/screens/production_operator_tracking_screen.dart';
 import '../planning_workflow_scope.dart';
+import '../widgets/planning_execution_shift_board.dart';
 
 /// Tab **Provedba**: plan vs stvarno, smjenska tabla — postupno povezivanje s MES.
 class ProductionPlanExecutionScreen extends StatelessWidget {
@@ -29,12 +30,19 @@ class ProductionPlanExecutionScreen extends StatelessWidget {
           ],
         ),
         const Divider(height: 28),
-        Text('Smjenska tabla (planirano)', style: t.textTheme.titleSmall),
+        Text('Smjenska tabla (plan)', style: t.textTheme.titleSmall),
         const SizedBox(height: 6),
         Text(
-          'Ovdje dolazi red–red: stroj, trenutni nalog, planirana količina smjene, stvarno, delta, zastoj, sljedeći nalog, rizik. '
-          'Podaci se povezuju s unosima iz modula Praćenje i stvarnim stanjem resursa.',
+          'Po jednom redu po stroju: prva operacija u planu. Stvarno/delta/zastoj dolaze iz MES-a (Praćenje).',
           style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 10),
+        Card(
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: PlanningExecutionShiftBoard(session: session),
+          ),
         ),
         const SizedBox(height: 12),
         Text('Varijanca / uzrok (placeholder)', style: t.textTheme.titleSmall),

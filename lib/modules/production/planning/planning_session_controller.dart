@@ -46,18 +46,41 @@ class PlanningSessionController extends ChangeNotifier {
   bool loadingPool = true;
   String? poolError;
   String searchQuery = '';
+  /// Brzi filteri prikaza poola (AND). Povezivanje s master filterima = kasnije.
+  bool poolFilterHasMachine = false;
+  bool poolFilterDueRisk = false;
+  bool poolFilterNoMachine = false;
   ProductionOrderModel? selectedOrder;
   Map<String, String> ganttMachineLabels = const {};
   String? ganttLabelForResultId;
 
   bool get isLocked => busy || saving;
 
-  /// Prikaz u tablici (samo pretraga); isključene stavke ostaju vidljive s oznakom.
-  List<ProductionOrderModel> get ordersForTable => _filterBySearch();
+  /// Prikaz u tablici / karticama: pretraga, zatim brzi filteri (AND).
+  List<ProductionOrderModel> get ordersForTable {
+    var list = _filterBySearch();
+    if (poolFilterHasMachine) {
+      list = list.where((o) => (o.machineId ?? '').trim().isNotEmpty).toList();
+    }
+    if (poolFilterDueRisk) {
+      list = list
+          .where(
+            (o) {
+              final d = o.requestedDeliveryDate;
+              return d != null && d.difference(DateTime.now()).inDays < 3;
+            },
+          )
+          .toList();
+    }
+    if (poolFilterNoMachine) {
+      list = list.where((o) => (o.machineId ?? '').trim().isEmpty).toList();
+    }
+    return list;
+  }
 
   List<ProductionOrderModel> _filterBySearch() {
     final q = searchQuery.trim().toLowerCase();
-    if (q.isEmpty) return pool;
+    if (q.isEmpty) return List<ProductionOrderModel>.from(pool);
     return pool
         .where(
           (o) =>
@@ -66,6 +89,28 @@ class PlanningSessionController extends ChangeNotifier {
               o.productCode.toLowerCase().contains(q),
         )
         .toList();
+  }
+
+  void setPoolFilterHasMachine(bool value) {
+    poolFilterHasMachine = value;
+    notifyListeners();
+  }
+
+  void setPoolFilterDueRisk(bool value) {
+    poolFilterDueRisk = value;
+    notifyListeners();
+  }
+
+  void setPoolFilterNoMachine(bool value) {
+    poolFilterNoMachine = value;
+    notifyListeners();
+  }
+
+  void clearPoolFilters() {
+    poolFilterHasMachine = false;
+    poolFilterDueRisk = false;
+    poolFilterNoMachine = false;
+    notifyListeners();
   }
 
   PlanningGanttDto? get ganttDto {
