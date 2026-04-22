@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../production_orders/models/production_order_model.dart';
+import '../planning_order_pool_view_mode.dart';
 import '../planning_session_controller.dart';
 import '../services/planning_engine_service.dart';
+import '../services/planning_pool_view_prefs.dart';
 import 'planning_order_card.dart';
 import 'planning_order_display_helpers.dart';
 
@@ -16,12 +20,26 @@ class PlanningOrderPoolTable extends StatefulWidget {
   State<PlanningOrderPoolTable> createState() => _PlanningOrderPoolTableState();
 }
 
-enum _PoolView { table, cards }
-
 class _PlanningOrderPoolTableState extends State<PlanningOrderPoolTable> {
-  _PoolView _view = _PoolView.table;
+  PlanningOrderPoolViewMode _view = PlanningOrderPoolViewMode.table;
 
   PlanningSessionController get session => widget.session;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadSavedView());
+  }
+
+  Future<void> _loadSavedView() async {
+    final m = await PlanningPoolViewPrefs.read(session.companyId, session.plantKey);
+    if (!mounted || m == null) return;
+    setState(() => _view = m);
+  }
+
+  Future<void> _persistView(PlanningOrderPoolViewMode m) async {
+    await PlanningPoolViewPrefs.write(session.companyId, session.plantKey, m);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,23 +54,26 @@ class _PlanningOrderPoolTableState extends State<PlanningOrderPoolTable> {
               children: [
                 Text('Order pool', style: Theme.of(context).textTheme.titleSmall),
                 const Spacer(),
-                SegmentedButton<_PoolView>(
+                SegmentedButton<PlanningOrderPoolViewMode>(
                   showSelectedIcon: false,
                   segments: const [
                     ButtonSegment(
-                      value: _PoolView.table,
+                      value: PlanningOrderPoolViewMode.table,
                       label: Text('Tablica'),
                       icon: Icon(Icons.table_rows, size: 18),
                     ),
                     ButtonSegment(
-                      value: _PoolView.cards,
+                      value: PlanningOrderPoolViewMode.cards,
                       label: Text('Kartice'),
                       icon: Icon(Icons.view_agenda_outlined, size: 18),
                     ),
                   ],
                   selected: {_view},
-                  onSelectionChanged: (s) {
-                    if (s.isNotEmpty) setState(() => _view = s.first);
+                  onSelectionChanged: (s) async {
+                    if (s.isEmpty) return;
+                    final next = s.first;
+                    setState(() => _view = next);
+                    await _persistView(next);
                   },
                 ),
               ],
@@ -102,7 +123,7 @@ class _PlanningOrderPoolTableState extends State<PlanningOrderPoolTable> {
                     ? Center(child: Text(session.poolError!))
                     : session.pool.isEmpty
                         ? const Center(child: Text('Nema naloga (pušten / u toku).'))
-                        : _view == _PoolView.table
+                        : _view == PlanningOrderPoolViewMode.table
                             ? _OrderDataTable(session: session)
                             : _OrderCardList(session: session),
           ),
