@@ -52,6 +52,11 @@ class PlanningSessionController extends ChangeNotifier {
   /// Povećava se ručno (gumb) da se u Provedbi ponovo učitaju MES očitavanja.
   int mesBoardRefreshToken = 0;
 
+  /// Nakon Gantt nudge-a; reset nakon uspješnog [generatePlan].
+  bool _localGanttNudged = false;
+
+  bool get hasLocalGanttNudges => _localGanttNudged;
+
   /// Brzi filteri prikaza poola (AND). Povezivanje s master filterima = kasnije.
   bool poolFilterHasMachine = false;
   /// `null` = ne filtrirati. Inače: [requestedDeliveryDate] u manje od toliko dana (isti prag kao prijašnji „rizik roka” za 3 d).
@@ -196,6 +201,48 @@ class PlanningSessionController extends ChangeNotifier {
     return PlanningGanttDto.fromEngineResult(r);
   }
 
+  /// Parovi operacija na istom stroju s vremenskim preklapanjem (nakon ručnog pomicanja).
+  List<String> get ganttMachineOverlapMessages {
+    final r = result;
+    if (r == null || r.scheduledOperations.isEmpty) {
+      return const [];
+    }
+    final byM = <String, List<ScheduledOperation>>{};
+    for (final o in r.scheduledOperations) {
+      final m = o.machineId.trim();
+      if (m.isEmpty) {
+        continue;
+      }
+      byM.putIfAbsent(m, () => []).add(o);
+    }
+    final out = <String>[];
+    for (final e in byM.entries) {
+      final list = List<ScheduledOperation>.from(e.value)
+        ..sort((a, b) => a.plannedStart.compareTo(b.plannedStart));
+      for (var i = 0; i < list.length - 1; i++) {
+        final a = list[i];
+        final b = list[i + 1];
+        if (a.plannedEnd.isAfter(b.plannedStart)) {
+          final ca = _productionOrderCodeFor(r, a.productionOrderId);
+          final cb = _productionOrderCodeFor(r, b.productionOrderId);
+          final lab = poolMachineLabel(e.key);
+          out.add('$lab: nalogi $ca i $cb se vremenski preklapaju.');
+        }
+      }
+    }
+    return out;
+  }
+
+  String _productionOrderCodeFor(PlanningEngineResult r, String orderId) {
+    for (final it in r.plan.items) {
+      if (it.productionOrderId == orderId) {
+        final c = (it.productionOrderCode ?? '').trim();
+        return c.isNotEmpty ? c : orderId;
+      }
+    }
+    return orderId;
+  }
+
   void setSearchQuery(String v) {
     searchQuery = v;
     notifyListeners();
@@ -253,6 +300,7 @@ class PlanningSessionController extends ChangeNotifier {
       resourceSnapshot: r.resourceSnapshot,
       kpi: r.kpi,
     );
+    _localGanttNudged = true;
     _onResultChanged();
     notifyListeners();
   }
@@ -516,6 +564,7 @@ class PlanningSessionController extends ChangeNotifier {
         setupMinutes: setup,
         cycleSecPerUnit: cyc,
       );
+      _localGanttNudged = false;
       _onResultChanged();
     } catch (e) {
       errorMessage = e.toString();
