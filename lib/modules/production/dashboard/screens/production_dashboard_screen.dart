@@ -20,7 +20,7 @@ import '../../../logistics/receipt/screens/station1_packed_boxes_logistics_scree
 import '../../../logistics/screens/logistics_hub_entry_screen.dart';
 import '../../../sustainability/screens/carbon_footprint_screen.dart';
 import '../../production_orders/screens/production_orders_list_screen.dart';
-import '../../planning/screens/production_planning_hub_screen.dart';
+import '../../planning/screens/production_planning_home_screen.dart';
 import '../../tracking/models/production_operator_tracking_entry.dart';
 import '../../tracking/screens/production_operator_tracking_screen.dart';
 import '../../tracking/screens/production_operator_tracking_station_screen.dart';
@@ -229,11 +229,11 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       if (_canViewCard(ProductionDashboardCard.productionOrders))
         _DashboardActionTile(
           icon: Icons.view_timeline_outlined,
-          title: 'Planiranje (FCS)',
+          title: 'Planiranje proizvodnje',
           subtitle:
-              'Komandna traka, pool, Gantt, KPI; donji tabovi (Plan, provedba, varijanca…).',
+              'Nalozi → Raspored → Provedba → Kapacitet; isti kontekst plana.',
           onTap: () =>
-              open(ProductionPlanningHubScreen(companyData: companyData)),
+              open(ProductionPlanningHomeScreen(companyData: companyData)),
         ),
       if (_canViewCard(ProductionDashboardCard.productionTracking)) ...[
         _DashboardActionTile(
