@@ -3,12 +3,25 @@ import 'package:flutter/material.dart';
 import '../../production_orders/models/production_order_model.dart';
 import '../planning_session_controller.dart';
 import '../services/planning_engine_service.dart';
+import 'planning_order_card.dart';
+import 'planning_order_display_helpers.dart';
 
-/// Tablica order poola: pretraga, gumbi odabira, [DataTable] s nalozima.
-class PlanningOrderPoolTable extends StatelessWidget {
+/// Panel order poola: pretraga, gumbi odabira, prikaz **tablica** ili **kartice**.
+class PlanningOrderPoolTable extends StatefulWidget {
   const PlanningOrderPoolTable({super.key, required this.session});
 
   final PlanningSessionController session;
+
+  @override
+  State<PlanningOrderPoolTable> createState() => _PlanningOrderPoolTableState();
+}
+
+enum _PoolView { table, cards }
+
+class _PlanningOrderPoolTableState extends State<PlanningOrderPoolTable> {
+  _PoolView _view = _PoolView.table;
+
+  PlanningSessionController get session => widget.session;
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +32,31 @@ class PlanningOrderPoolTable extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-            child: Text('Order pool', style: Theme.of(context).textTheme.titleSmall),
+            child: Row(
+              children: [
+                Text('Order pool', style: Theme.of(context).textTheme.titleSmall),
+                const Spacer(),
+                SegmentedButton<_PoolView>(
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment(
+                      value: _PoolView.table,
+                      label: Text('Tablica'),
+                      icon: Icon(Icons.table_rows, size: 18),
+                    ),
+                    ButtonSegment(
+                      value: _PoolView.cards,
+                      label: Text('Kartice'),
+                      icon: Icon(Icons.view_agenda_outlined, size: 18),
+                    ),
+                  ],
+                  selected: {_view},
+                  onSelectionChanged: (s) {
+                    if (s.isNotEmpty) setState(() => _view = s.first);
+                  },
+                ),
+              ],
+            ),
           ),
           Padding(
             padding: const EdgeInsets.all(8),
@@ -65,7 +102,9 @@ class PlanningOrderPoolTable extends StatelessWidget {
                     ? Center(child: Text(session.poolError!))
                     : session.pool.isEmpty
                         ? const Center(child: Text('Nema naloga (pušten / u toku).'))
-                        : _OrderDataTable(session: session),
+                        : _view == _PoolView.table
+                            ? _OrderDataTable(session: session)
+                            : _OrderCardList(session: session),
           ),
         ],
       ),
@@ -105,19 +144,34 @@ class _OrderDataTable extends StatelessWidget {
   }
 }
 
+class _OrderCardList extends StatelessWidget {
+  const _OrderCardList({required this.session});
+
+  final PlanningSessionController session;
+
+  @override
+  Widget build(BuildContext context) {
+    final list = session.ordersForTable;
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+      itemCount: list.length,
+      itemBuilder: (context, i) {
+        return PlanningOrderCard(
+          order: list[i],
+          session: session,
+        );
+      },
+    );
+  }
+}
+
 DataRow _dataRow(BuildContext context, PlanningSessionController session, ProductionOrderModel o) {
   final t = Theme.of(context);
   final hasMachine = (o.machineId ?? '').trim().isNotEmpty;
   final rem = (o.plannedQty - o.producedGoodQty).clamp(0, double.infinity);
   final due = o.requestedDeliveryDate;
   final ex = session.excludedOrderIds.contains(o.id);
-  final styleIfEx = ex
-      ? t.textTheme.bodySmall?.copyWith(
-          color: t.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-          decoration: TextDecoration.lineThrough,
-          decorationColor: t.colorScheme.onSurfaceVariant,
-        )
-      : null;
+  final exStyle = ex ? planningOrderExcludedStyle(t) : null;
   return DataRow(
     selected: !ex && session.selectedOrder?.id == o.id,
     onSelectChanged: ex || session.isLocked
@@ -136,9 +190,9 @@ DataRow _dataRow(BuildContext context, PlanningSessionController session, Produc
         o.productionOrderCode,
         style: TextStyle(
           fontWeight: FontWeight.w600,
-          color: styleIfEx?.color,
-          decoration: styleIfEx?.decoration,
-          decorationColor: styleIfEx?.decorationColor,
+          color: exStyle?.color,
+          decoration: exStyle?.decoration,
+          decorationColor: exStyle?.decorationColor,
         ),
       )),
       DataCell(
@@ -148,16 +202,16 @@ DataRow _dataRow(BuildContext context, PlanningSessionController session, Produc
             o.productName,
             overflow: TextOverflow.ellipsis,
             maxLines: 2,
-            style: styleIfEx,
+            style: exStyle,
           ),
         ),
       ),
-      DataCell(Text('${rem.toStringAsFixed(rem == rem.roundToDouble() ? 0 : 1)} ${o.unit}', style: styleIfEx)),
-      DataCell(Text(due != null ? _fmtDate(due) : '—', style: styleIfEx)),
+      DataCell(Text('${rem.toStringAsFixed(rem == rem.roundToDouble() ? 0 : 1)} ${o.unit}', style: exStyle)),
+      DataCell(Text(formatPlanningDueDate(due), style: exStyle)),
       DataCell(
         Text(
-          _customerLabel(o),
-          style: styleIfEx,
+          formatPlanningCustomerLine(o),
+          style: exStyle,
         ),
       ),
       DataCell(
@@ -165,14 +219,14 @@ DataRow _dataRow(BuildContext context, PlanningSessionController session, Produc
           o.routingId.isEmpty ? '—' : o.routingId,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: styleIfEx,
+          style: exStyle,
         ),
       ),
       DataCell(
         Text(
           ex ? 'isključen' : (hasMachine ? 'da' : 'ne'),
           style: ex
-              ? styleIfEx
+              ? exStyle
               : TextStyle(
                   color: hasMachine ? null : t.colorScheme.error,
                   fontWeight: FontWeight.w500,
@@ -198,17 +252,4 @@ DataRow _dataRow(BuildContext context, PlanningSessionController session, Produc
       ),
     ],
   );
-}
-
-String _fmtDate(DateTime d) {
-  final l = d.toLocal();
-  return '${l.day}.${l.month}.${l.year}';
-}
-
-String _customerLabel(ProductionOrderModel o) {
-  final a = o.customerName?.trim();
-  if (a != null && a.isNotEmpty) return a;
-  final b = o.sourceCustomerName?.trim();
-  if (b != null && b.isNotEmpty) return b;
-  return '—';
 }
