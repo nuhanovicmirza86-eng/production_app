@@ -231,7 +231,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           icon: Icons.view_timeline_outlined,
           title: 'Planiranje (FCS)',
           subtitle:
-              'Tri zone: ulaz i generisanje, raspored, provedba (ne sve na jednom ekranu).',
+              'Komandna traka, pool, Gantt, KPI; donji tabovi (Plan, provedba, varijanca…).',
           onTap: () =>
               open(ProductionPlanningHubScreen(companyData: companyData)),
         ),
