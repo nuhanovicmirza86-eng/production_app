@@ -10,6 +10,7 @@ class PlanningGanttOp {
     required this.machineId,
     required this.plannedStart,
     required this.plannedEnd,
+    this.scheduledOperationId,
     this.runStart,
     this.runEnd,
     this.operationLabel,
@@ -19,6 +20,8 @@ class PlanningGanttOp {
   final String machineId;
   final DateTime plannedStart;
   final DateTime plannedEnd;
+  /// Identitet operacije (motor / Firestore doc); potreban za DnD.
+  final String? scheduledOperationId;
   final DateTime? runStart;
   final DateTime? runEnd;
   /// Prikaz koraka (routings) ili sintetički; iz [ScheduledOperation.sourceFactors] / Firestorea.
@@ -61,6 +64,7 @@ class PlanningGanttDto {
             machineId: op.machineId,
             plannedStart: op.plannedStart,
             plannedEnd: op.plannedEnd,
+            scheduledOperationId: op.id,
             runStart: op.runStart,
             runEnd: op.runEnd,
             operationLabel: _operationLabelFromSource(op.sourceFactors),

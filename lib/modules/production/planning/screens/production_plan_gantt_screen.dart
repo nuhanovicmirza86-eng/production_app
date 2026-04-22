@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../tracking/services/production_asset_display_lookup.dart';
+import '../planning_session_controller.dart';
 import '../services/planning_gantt_dto.dart';
 import '../services/planning_gantt_zoom_prefs.dart';
 import '../services/production_plan_persistence_service.dart';
@@ -14,14 +15,19 @@ class ProductionPlanGanttScreen extends StatefulWidget {
     required this.companyData,
     this.gantt,
     this.planId,
+    this.planningSession,
   }) : assert(
-         gantt != null || (planId != null && planId.isNotEmpty),
-         'Ili gantt (memorija) ili planId (Firestore) mora biti zadan.',
+         gantt != null ||
+             (planId != null && planId.isNotEmpty) ||
+             planningSession != null,
+         'Gantt iz memorije, id plana, ili [planningSession] (živi nacrt).',
        );
 
   final Map<String, dynamic> companyData;
   final PlanningGanttDto? gantt;
   final String? planId;
+  /// Kad je zadan, prikaz slijedi [PlanningSessionController.ganttDto] (npr. pomicanje u Gantt-u).
+  final PlanningSessionController? planningSession;
 
   @override
   State<ProductionPlanGanttScreen> createState() =>
@@ -43,14 +49,34 @@ class _ProductionPlanGanttScreenState extends State<ProductionPlanGanttScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.gantt != null) {
+    if (widget.planningSession != null) {
+      widget.planningSession!.addListener(_syncFromSession);
+      _data = widget.planningSession!.ganttDto;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _resolveMachineLabels();
+        }
+      });
+    } else if (widget.gantt != null) {
       _data = widget.gantt;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _resolveMachineLabels();
+        if (mounted) {
+          _resolveMachineLabels();
+        }
       });
     } else {
       _load();
     }
+  }
+
+  void _syncFromSession() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _data = widget.planningSession?.ganttDto;
+    });
+    unawaited(_resolveMachineLabels());
   }
 
   Future<Map<String, String>> _labelsFor(PlanningGanttDto d) async {
@@ -109,6 +135,12 @@ class _ProductionPlanGanttScreenState extends State<ProductionPlanGanttScreen> {
   }
 
   @override
+  void dispose() {
+    widget.planningSession?.removeListener(_syncFromSession);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
@@ -146,6 +178,14 @@ class _ProductionPlanGanttScreenState extends State<ProductionPlanGanttScreen> {
         showNowLine: true,
         preferenceCompanyId: _cid,
         preferencePlantKey: _pk,
+        onOperationTimeNudge: widget.planningSession != null
+            ? (id, delta) {
+                if (widget.planningSession!.isLocked) {
+                  return;
+                }
+                widget.planningSession!.nudgeScheduledOperationById(id, delta);
+              }
+            : null,
       ),
     );
   }
@@ -213,6 +253,7 @@ class PlanningGanttChart extends StatefulWidget {
     this.showNowLine = true,
     this.preferenceCompanyId,
     this.preferencePlantKey,
+    this.onOperationTimeNudge,
   });
 
   final PlanningGanttDto data;
@@ -221,6 +262,8 @@ class PlanningGanttChart extends StatefulWidget {
   /// Ako su oba zadana, zoom (sat/smjena/dan/tjedan) se pamti u [PlanningGanttZoomPrefs].
   final String? preferenceCompanyId;
   final String? preferencePlantKey;
+  /// Pomicanje bloka u vremenu (lokalni nacrt); nema ponovnog FCS.
+  final void Function(String scheduledOperationId, Duration deltaTime)? onOperationTimeNudge;
 
   static String _fmtDateTime(DateTime d) {
     final t = d.toLocal();
@@ -383,7 +426,9 @@ class _PlanningGanttChartState extends State<PlanningGanttChart> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
           child: Text(
-            'Vodoravno pomicanje. Lijevo: strojevi (iz šifrarnika). U traci: nalog, ispod toga operacija / korak routingsa kad je poznat.',
+            widget.onOperationTimeNudge != null
+                ? 'Vodoravno pomicanje. Blok (nalog) povuci lijevo-desno: lokalno pomicanje u vremenu (bez preračuna FCS; KPI može zastariti). Isto za setup/rad — cijela operacija se miče.'
+                : 'Vodoravno pomicanje. Lijevo: strojevi (iz šifrarnika). U traci: nalog, ispod toga operacija / korak routingsa kad je poznat.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -445,6 +490,7 @@ class _PlanningGanttChartState extends State<PlanningGanttChart> {
                               data: data,
                               machineKey: mk,
                               pxPerMinute: pxPerMinute,
+                              onOperationTimeNudge: widget.onOperationTimeNudge,
                             );
                           }).toList(),
                         ),
@@ -475,11 +521,13 @@ class _GanttRow extends StatelessWidget {
     required this.data,
     required this.machineKey,
     required this.pxPerMinute,
+    this.onOperationTimeNudge,
   });
 
   final PlanningGanttDto data;
   final String machineKey;
   final double pxPerMinute;
+  final void Function(String scheduledOperationId, Duration deltaTime)? onOperationTimeNudge;
 
   @override
   Widget build(BuildContext context) {
@@ -496,7 +544,20 @@ class _GanttRow extends StatelessWidget {
               color: theme.colorScheme.surfaceContainerHigh,
             ),
           ),
-          for (final o in ops) ..._segments(theme, o),
+          for (final o in ops)
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              height: 64,
+              child: _GanttDraggableOp(
+                data: data,
+                op: o,
+                pxPerMinute: pxPerMinute,
+                theme: theme,
+                onNudge: onOperationTimeNudge,
+              ),
+            ),
           Positioned(
             left: 0,
             right: 0,
@@ -510,51 +571,174 @@ class _GanttRow extends StatelessWidget {
       ),
     );
   }
+}
 
-  List<Widget> _segments(ThemeData theme, PlanningGanttOp o) {
+class _GanttDraggableOp extends StatefulWidget {
+  const _GanttDraggableOp({
+    required this.data,
+    required this.op,
+    required this.pxPerMinute,
+    required this.theme,
+    this.onNudge,
+  });
+
+  final PlanningGanttDto data;
+  final PlanningGanttOp op;
+  final double pxPerMinute;
+  final ThemeData theme;
+  final void Function(String id, Duration delta)? onNudge;
+
+  @override
+  State<_GanttDraggableOp> createState() => _GanttDraggableOpState();
+}
+
+class _GanttDraggableOpState extends State<_GanttDraggableOp> {
+  double _dragPx = 0;
+
+  void _applyNudge() {
+    if (_dragPx.abs() < 3) {
+      return;
+    }
+    final id = widget.op.scheduledOperationId;
+    if (id == null || id.isEmpty || widget.onNudge == null) {
+      return;
+    }
+    final minutes = _dragPx / widget.pxPerMinute;
+    if (minutes.abs() < 0.2) {
+      return;
+    }
+    widget.onNudge!(
+      id,
+      Duration(
+        microseconds: (minutes * 60 * 1e6).round(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final o = widget.op;
+    final theme = widget.theme;
+    final d = widget.data;
+    final px = widget.pxPerMinute;
+    final segments = _GanttLayout.segments(d, o, px);
+    final union = _GanttLayout.unionLeftWidth(segments);
+    final segWidgets = <Widget>[];
+    for (final s in segments) {
+      segWidgets.add(
+        _GanttLayout.positionedBlock(
+          theme: theme,
+          left: s.left,
+          width: s.width,
+          orderCode: o.orderCode,
+          operationLabel: o.operationLabel,
+          isSetup: s.isSetup,
+        ),
+      );
+    }
+    final canDrag =
+        widget.onNudge != null && (o.scheduledOperationId ?? '').isNotEmpty;
+    final content = Transform.translate(
+      offset: Offset(_dragPx, 0),
+      child: Stack(clipBehavior: Clip.hardEdge, children: segWidgets),
+    );
+    if (!canDrag) {
+      return content;
+    }
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        content,
+        Positioned(
+          left: union.left,
+          top: 0,
+          width: union.width,
+          height: 64,
+          child: MouseRegion(
+            cursor: SystemMouseCursors.grab,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragUpdate: (e) {
+                setState(() {
+                  _dragPx += e.delta.dx;
+                });
+              },
+              onHorizontalDragEnd: (_) {
+                _applyNudge();
+                setState(() {
+                  _dragPx = 0;
+                });
+              },
+              child: const ColoredBox(color: Color(0x00000000)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GanttLayout {
+  _GanttLayout._();
+
+  static List<({double left, double width, bool isSetup})> segments(
+    PlanningGanttDto data,
+    PlanningGanttOp o,
+    double pxPerMinute,
+  ) {
     final rs = o.runStart;
     final re = o.runEnd;
     if (rs != null && re != null) {
-      final s = o.plannedStart.difference(data.windowStart).inMinutes *
-          pxPerMinute;
-      final setupEnd = rs.difference(data.windowStart).inMinutes * pxPerMinute;
+      final s =
+          o.plannedStart.difference(data.windowStart).inMinutes * pxPerMinute;
+      final setupEnd =
+          rs.difference(data.windowStart).inMinutes * pxPerMinute;
       var sw = (setupEnd - s).clamp(0.0, 1e6);
-      if (sw < 2) sw = 2;
+      if (sw < 2) {
+        sw = 2;
+      }
       final runL = re.difference(rs).inMinutes * pxPerMinute;
       final rx = rs.difference(data.windowStart).inMinutes * pxPerMinute;
       return [
-        _block(theme, s, sw, o.orderCode, o.operationLabel, isSetup: true),
-        if (runL > 0)
-          _block(
-            theme,
-            rx,
-            runL.clamp(4, 1e6),
-            o.orderCode,
-            o.operationLabel,
-            isSetup: false,
-          ),
+        (left: s, width: sw, isSetup: true),
+        if (runL > 0) (left: rx, width: runL.clamp(4, 1e6), isSetup: false),
       ];
     }
-    final l = o.plannedStart.difference(data.windowStart).inMinutes * pxPerMinute;
-    final w = o.plannedEnd.difference(o.plannedStart).inMinutes * pxPerMinute;
+    final l =
+        o.plannedStart.difference(data.windowStart).inMinutes * pxPerMinute;
+    final w =
+        o.plannedEnd.difference(o.plannedStart).inMinutes * pxPerMinute;
     return [
-      _block(
-        theme,
-        l,
-        w.clamp(4, 1e6),
-        o.orderCode,
-        o.operationLabel,
-        isSetup: false,
-      ),
+      (left: l, width: w.clamp(4, 1e6), isSetup: false),
     ];
   }
 
-  Widget _block(
-    ThemeData theme,
-    double left,
-    double w,
-    String orderCode,
-    String? operationLabel, {
+  static ({double left, double width}) unionLeftWidth(
+    List<({double left, double width, bool isSetup})> segments,
+  ) {
+    if (segments.isEmpty) {
+      return (left: 0.0, width: 0.0);
+    }
+    var l0 = segments.first.left;
+    var r0 = segments.first.left + segments.first.width;
+    for (final s in segments) {
+      final r = s.left + s.width;
+      if (s.left < l0) {
+        l0 = s.left;
+      }
+      if (r > r0) {
+        r0 = r;
+      }
+    }
+    return (left: l0, width: (r0 - l0).clamp(1, 1e6));
+  }
+
+  static Widget positionedBlock({
+    required ThemeData theme,
+    required double left,
+    required double width,
+    required String orderCode,
+    required String? operationLabel,
     required bool isSetup,
   }) {
     final bg = isSetup
@@ -566,7 +750,7 @@ class _GanttRow extends StatelessWidget {
     return Positioned(
       left: left,
       top: 4,
-      width: w,
+      width: width,
       height: 56,
       child: Material(
         color: bg,

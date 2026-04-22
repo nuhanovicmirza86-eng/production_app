@@ -6,6 +6,7 @@ import '../production_orders/models/production_order_model.dart';
 import '../production_orders/services/production_order_service.dart';
 import '../tracking/services/production_asset_display_lookup.dart';
 import 'models/planning_engine_result.dart';
+import 'models/scheduled_operation.dart';
 import 'services/planning_engine_service.dart';
 import 'services/planning_gantt_dto.dart';
 import 'services/production_plan_persistence_service.dart';
@@ -202,6 +203,57 @@ class PlanningSessionController extends ChangeNotifier {
 
   void bumpMesBoardRefresh() {
     mesBoardRefreshToken++;
+    notifyListeners();
+  }
+
+  /// Pomiče operaciju u nacrtu (vremenska os); **ne** pokreće ponovno FCS — KPI/konflikti mogu biti zastarjeli.
+  void nudgeScheduledOperationById(String operationId, Duration delta) {
+    if (isLocked) {
+      return;
+    }
+    final r = result;
+    if (r == null || operationId.isEmpty) {
+      return;
+    }
+    if (delta.inMilliseconds == 0) {
+      return;
+    }
+    final list = r.scheduledOperations;
+    final idx = list.indexWhere((e) => e.id == operationId);
+    if (idx < 0) {
+      return;
+    }
+    final op = list[idx];
+    var ns = op.plannedStart.add(delta);
+    var ne = op.plannedEnd.add(delta);
+    if (!ne.isAfter(ns)) {
+      return;
+    }
+    var nSetup = op.setupStart?.add(delta);
+    var nRunS = op.runStart?.add(delta);
+    var nRunE = op.runEnd?.add(delta);
+    if (nRunS != null && nRunE != null && !nRunE.isAfter(nRunS)) {
+      nRunE = nRunS.add(const Duration(minutes: 1));
+      if (!ne.isAfter(nRunE)) {
+        ne = nRunE;
+      }
+    }
+    final next = op.copyWith(
+      plannedStart: ns,
+      plannedEnd: ne,
+      setupStart: nSetup,
+      runStart: nRunS,
+      runEnd: nRunE,
+    );
+    final newList = List<ScheduledOperation>.from(list)..[idx] = next;
+    result = PlanningEngineResult(
+      plan: r.plan,
+      scheduledOperations: newList,
+      conflicts: r.conflicts,
+      resourceSnapshot: r.resourceSnapshot,
+      kpi: r.kpi,
+    );
+    _onResultChanged();
     notifyListeners();
   }
 

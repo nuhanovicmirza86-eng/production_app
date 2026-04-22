@@ -168,6 +168,7 @@ class ProductionPlanPersistenceService {
           machineId: (m['machineId'] as String?) ?? '',
           plannedStart: ps.toDate(),
           plannedEnd: pe.toDate(),
+          scheduledOperationId: d.id,
           runStart: runS,
           runEnd: runE,
           operationLabel: opLabel,

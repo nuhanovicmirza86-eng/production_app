@@ -105,7 +105,7 @@ class _ProductionPlanningHomeScreenState extends State<ProductionPlanningHomeScr
     Navigator.push<void>(
       context,
       MaterialPageRoute<void>(
-        builder: (_) => ProductionPlanGanttScreen(companyData: widget.companyData, gantt: d),
+        builder: (_) => ProductionPlanGanttScreen(companyData: widget.companyData, planningSession: _session),
       ),
     );
   }

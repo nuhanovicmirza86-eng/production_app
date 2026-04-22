@@ -44,4 +44,48 @@ class ScheduledOperation {
   final double? expectedCycleSec;
   final double? expectedRuntimeMin;
   final Map<String, dynamic> sourceFactors;
+
+  ScheduledOperation copyWith({
+    String? id,
+    String? planId,
+    String? productionOrderId,
+    String? routingOperationId,
+    int? operationSequence,
+    String? machineId,
+    String? workCenterId,
+    String? toolId,
+    List<String>? operatorIds,
+    DateTime? plannedStart,
+    DateTime? plannedEnd,
+    DateTime? setupStart,
+    DateTime? runStart,
+    DateTime? runEnd,
+    String? status,
+    double? expectedQty,
+    double? expectedCycleSec,
+    double? expectedRuntimeMin,
+    Map<String, dynamic>? sourceFactors,
+  }) {
+    return ScheduledOperation(
+      id: id ?? this.id,
+      planId: planId ?? this.planId,
+      productionOrderId: productionOrderId ?? this.productionOrderId,
+      routingOperationId: routingOperationId ?? this.routingOperationId,
+      operationSequence: operationSequence ?? this.operationSequence,
+      machineId: machineId ?? this.machineId,
+      workCenterId: workCenterId ?? this.workCenterId,
+      toolId: toolId ?? this.toolId,
+      operatorIds: operatorIds ?? this.operatorIds,
+      plannedStart: plannedStart ?? this.plannedStart,
+      plannedEnd: plannedEnd ?? this.plannedEnd,
+      setupStart: setupStart ?? this.setupStart,
+      runStart: runStart ?? this.runStart,
+      runEnd: runEnd ?? this.runEnd,
+      status: status ?? this.status,
+      expectedQty: expectedQty ?? this.expectedQty,
+      expectedCycleSec: expectedCycleSec ?? this.expectedCycleSec,
+      expectedRuntimeMin: expectedRuntimeMin ?? this.expectedRuntimeMin,
+      sourceFactors: sourceFactors ?? this.sourceFactors,
+    );
+  }
 }

@@ -53,7 +53,7 @@ class PlanningScheduleTab extends StatelessWidget {
                     MaterialPageRoute<void>(
                       builder: (_) => ProductionPlanGanttScreen(
                         companyData: companyData,
-                        gantt: d,
+                        planningSession: session,
                       ),
                     ),
                   );
@@ -74,6 +74,9 @@ class PlanningScheduleTab extends StatelessWidget {
               showNowLine: true,
               preferenceCompanyId: session.companyId,
               preferencePlantKey: session.plantKey,
+              onOperationTimeNudge: session.isLocked
+                  ? null
+                  : session.nudgeScheduledOperationById,
             ),
           ),
         ),
