@@ -33,7 +33,7 @@ class ProductionPlanExecutionScreen extends StatelessWidget {
         Text('Smjenska tabla (plan)', style: t.textTheme.titleSmall),
         const SizedBox(height: 6),
         Text(
-          'Po jednom redu po stroju: prva operacija u planu. Stvarno/delta/zastoj dolaze iz MES-a (Praćenje).',
+          'Po jednom redu po stroju: prva operacija u planu. Kolona „Stvarno (nalog)“: kumulativno očitano dobro u odnosu na plan cijelog naloga (ne jedna smjena). Delta po smjeni i zastoj — iz MES-a (Praćenje).',
           style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 10),

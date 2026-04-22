@@ -367,6 +367,37 @@ class ProductionOrderService {
     return ProductionOrderModel.fromMap(doc.id, data);
   }
 
+  /// Učitavanje više naloga paralelno (parovi tenant provjere kao kod [getById]; pogrešan tenant = preskače se).
+  Future<Map<String, ProductionOrderModel>> getByIds({
+    required String companyId,
+    required String plantKey,
+    required Iterable<String> ids,
+  }) async {
+    final list = <String>[];
+    final seen = <String>{};
+    for (final id in ids) {
+      final t = id.trim();
+      if (t.isEmpty || seen.contains(t)) continue;
+      seen.add(t);
+      list.add(t);
+    }
+    if (list.isEmpty) return {};
+
+    final snapshots = await Future.wait(list.map((id) => _orders.doc(id).get()));
+    final out = <String, ProductionOrderModel>{};
+    for (var i = 0; i < list.length; i++) {
+      final doc = snapshots[i];
+      if (!doc.exists) continue;
+      final data = doc.data();
+      if (data == null) continue;
+      if (data['companyId'] != companyId || data['plantKey'] != plantKey) {
+        continue;
+      }
+      out[doc.id] = ProductionOrderModel.fromMap(doc.id, data);
+    }
+    return out;
+  }
+
   // ================= COMPLETE / CLOSE / CANCEL (LIFECYCLE) =================
 
   Future<void> completeProductionOrder({
