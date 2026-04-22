@@ -7,6 +7,7 @@ import '../planning_session_controller.dart';
 import '../services/planning_gantt_dto.dart';
 import '../services/planning_gantt_zoom_prefs.dart';
 import '../services/production_plan_persistence_service.dart';
+import '../widgets/planning_fcs_reoptimize.dart';
 
 /// Prikaz vremenske trake po resursu (red); u blokovima se prikazuje **šifra naloga**, ne interni ID.
 class ProductionPlanGanttScreen extends StatefulWidget {
@@ -168,9 +169,20 @@ class _ProductionPlanGanttScreenState extends State<ProductionPlanGanttScreen> {
         ),
       );
     }
+    final sess = widget.planningSession;
     return Scaffold(
       appBar: AppBar(
         title: Text('Gantt: ${d.planCode}'),
+        actions: [
+          if (sess != null)
+            IconButton(
+              tooltip: 'Ponovno uklopi (FCS)',
+              onPressed: sess.isLocked
+                  ? null
+                  : () => reoptimizeFcsWithOptionalDialog(context, sess),
+              icon: const Icon(Icons.auto_mode),
+            ),
+        ],
       ),
       body: PlanningGanttChart(
         data: d,
@@ -178,24 +190,26 @@ class _ProductionPlanGanttScreenState extends State<ProductionPlanGanttScreen> {
         showNowLine: true,
         preferenceCompanyId: _cid,
         preferencePlantKey: _pk,
-        onOperationTimeNudge: widget.planningSession != null
+        onOperationTimeNudge: sess != null
             ? (id, delta) {
-                if (widget.planningSession!.isLocked) {
+                if (sess.isLocked) {
                   return;
                 }
-                widget.planningSession!.nudgeScheduledOperationById(id, delta);
+                sess.nudgeScheduledOperationById(id, delta);
               }
             : null,
+        overlappingOperationIds: sess?.overlappingScheduledOperationIds ?? const <String>{},
       ),
     );
   }
 }
 
-/// Boje blokova: setup (priprema) i rad — usklađeno s [_GanttRow._block].
+/// Boje blokova: setup (priprema) i rad — usklađeno s [_GanttLayout.positionedBlock].
 class _GanttLegendBar extends StatelessWidget {
-  const _GanttLegendBar({required this.theme});
+  const _GanttLegendBar({required this.theme, this.showOverlapHint = false});
 
   final ThemeData theme;
+  final bool showOverlapHint;
 
   @override
   Widget build(BuildContext context) {
@@ -239,6 +253,12 @@ class _GanttLegendBar extends StatelessWidget {
           c.onSurfaceVariant,
           'Rad (trajanje) — s planiranim krajem operacije; ako nema rastava, cijeli blok je rad',
         ),
+        if (showOverlapHint)
+          leg(
+            c.error.withValues(alpha: 0.35),
+            c.error,
+            'Crveni rub: preklapanje s drugom operacijom na istom stroju',
+          ),
       ],
     );
   }
@@ -254,6 +274,7 @@ class PlanningGanttChart extends StatefulWidget {
     this.preferenceCompanyId,
     this.preferencePlantKey,
     this.onOperationTimeNudge,
+    this.overlappingOperationIds = const <String>{},
   });
 
   final PlanningGanttDto data;
@@ -264,6 +285,8 @@ class PlanningGanttChart extends StatefulWidget {
   final String? preferencePlantKey;
   /// Pomicanje bloka u vremenu (lokalni nacrt); nema ponovnog FCS.
   final void Function(String scheduledOperationId, Duration deltaTime)? onOperationTimeNudge;
+  /// [ScheduledOperation.id] u paru s vremenskim preklapanjem (crveni rub bloka).
+  final Set<String> overlappingOperationIds;
 
   static String _fmtDateTime(DateTime d) {
     final t = d.toLocal();
@@ -436,7 +459,10 @@ class _PlanningGanttChartState extends State<PlanningGanttChart> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-          child: _GanttLegendBar(theme: Theme.of(context)),
+          child: _GanttLegendBar(
+            theme: Theme.of(context),
+            showOverlapHint: widget.overlappingOperationIds.isNotEmpty,
+          ),
         ),
         Expanded(
           child: Row(
@@ -491,6 +517,7 @@ class _PlanningGanttChartState extends State<PlanningGanttChart> {
                               machineKey: mk,
                               pxPerMinute: pxPerMinute,
                               onOperationTimeNudge: widget.onOperationTimeNudge,
+                              overlappingOperationIds: widget.overlappingOperationIds,
                             );
                           }).toList(),
                         ),
@@ -522,12 +549,14 @@ class _GanttRow extends StatelessWidget {
     required this.machineKey,
     required this.pxPerMinute,
     this.onOperationTimeNudge,
+    this.overlappingOperationIds = const <String>{},
   });
 
   final PlanningGanttDto data;
   final String machineKey;
   final double pxPerMinute;
   final void Function(String scheduledOperationId, Duration deltaTime)? onOperationTimeNudge;
+  final Set<String> overlappingOperationIds;
 
   @override
   Widget build(BuildContext context) {
@@ -556,6 +585,7 @@ class _GanttRow extends StatelessWidget {
                 pxPerMinute: pxPerMinute,
                 theme: theme,
                 onNudge: onOperationTimeNudge,
+                overlapHighlight: _opOverlap(o, overlappingOperationIds),
               ),
             ),
           Positioned(
@@ -571,6 +601,14 @@ class _GanttRow extends StatelessWidget {
       ),
     );
   }
+
+  static bool _opOverlap(PlanningGanttOp o, Set<String> ids) {
+    final id = o.scheduledOperationId;
+    if (id == null || id.isEmpty) {
+      return false;
+    }
+    return ids.contains(id);
+  }
 }
 
 class _GanttDraggableOp extends StatefulWidget {
@@ -580,6 +618,7 @@ class _GanttDraggableOp extends StatefulWidget {
     required this.pxPerMinute,
     required this.theme,
     this.onNudge,
+    this.overlapHighlight = false,
   });
 
   final PlanningGanttDto data;
@@ -587,6 +626,7 @@ class _GanttDraggableOp extends StatefulWidget {
   final double pxPerMinute;
   final ThemeData theme;
   final void Function(String id, Duration delta)? onNudge;
+  final bool overlapHighlight;
 
   @override
   State<_GanttDraggableOp> createState() => _GanttDraggableOpState();
@@ -633,6 +673,7 @@ class _GanttDraggableOpState extends State<_GanttDraggableOp> {
           orderCode: o.orderCode,
           operationLabel: o.operationLabel,
           isSetup: s.isSetup,
+          overlapHighlight: widget.overlapHighlight,
         ),
       );
     }
@@ -740,6 +781,7 @@ class _GanttLayout {
     required String orderCode,
     required String? operationLabel,
     required bool isSetup,
+    bool overlapHighlight = false,
   }) {
     final bg = isSetup
         ? theme.colorScheme.secondaryContainer
@@ -754,7 +796,12 @@ class _GanttLayout {
       height: 56,
       child: Material(
         color: bg,
-        borderRadius: BorderRadius.circular(4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(4),
+          side: overlapHighlight
+              ? BorderSide(color: theme.colorScheme.error, width: 2)
+              : BorderSide.none,
+        ),
         clipBehavior: Clip.antiAlias,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),

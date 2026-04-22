@@ -233,6 +233,40 @@ class PlanningSessionController extends ChangeNotifier {
     return out;
   }
 
+  /// ID-jevi [ScheduledOperation.id] uključeni u vremensko preklapanje na istom stroju.
+  Set<String> get overlappingScheduledOperationIds {
+    final r = result;
+    if (r == null || r.scheduledOperations.isEmpty) {
+      return const {};
+    }
+    final byM = <String, List<ScheduledOperation>>{};
+    for (final o in r.scheduledOperations) {
+      final m = o.machineId.trim();
+      if (m.isEmpty) {
+        continue;
+      }
+      byM.putIfAbsent(m, () => []).add(o);
+    }
+    final out = <String>{};
+    for (final e in byM.entries) {
+      final list = List<ScheduledOperation>.from(e.value)
+        ..sort((a, b) => a.plannedStart.compareTo(b.plannedStart));
+      for (var i = 0; i < list.length - 1; i++) {
+        final a = list[i];
+        final b = list[i + 1];
+        if (a.plannedEnd.isAfter(b.plannedStart)) {
+          if (a.id.isNotEmpty) {
+            out.add(a.id);
+          }
+          if (b.id.isNotEmpty) {
+            out.add(b.id);
+          }
+        }
+      }
+    }
+    return out;
+  }
+
   String _productionOrderCodeFor(PlanningEngineResult r, String orderId) {
     for (final it in r.plan.items) {
       if (it.productionOrderId == orderId) {

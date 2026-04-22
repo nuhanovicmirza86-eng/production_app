@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../planning_session_controller.dart';
 import '../planning_workflow_scope.dart';
+import '../widgets/planning_fcs_reoptimize.dart';
 import 'production_plan_gantt_screen.dart';
 
 /// Tab **Raspored**: Gantt iz zadnjeg rezultata + poveznica na puni ekran.
@@ -67,7 +67,7 @@ class PlanningScheduleTab extends StatelessWidget {
                 child: FilledButton.icon(
                   onPressed: session.isLocked
                       ? null
-                      : () => _reoptimizeWithFcs(context, session),
+                      : () => reoptimizeFcsWithOptionalDialog(context, session),
                   icon: const Icon(Icons.auto_mode, size: 18),
                   label: const Text('Ponovno uklopi (FCS)'),
                 ),
@@ -133,60 +133,11 @@ class PlanningScheduleTab extends StatelessWidget {
               onOperationTimeNudge: session.isLocked
                   ? null
                   : session.nudgeScheduledOperationById,
+              overlappingOperationIds: session.overlappingScheduledOperationIds,
             ),
           ),
         ),
       ],
-    );
-  }
-}
-
-Future<void> _reoptimizeWithFcs(
-  BuildContext context,
-  PlanningSessionController session,
-) async {
-  if (session.isLocked) {
-    return;
-  }
-  if (session.hasLocalGanttNudges) {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: const Text('Ponovno uklopi (FCS)'),
-          content: const Text(
-            'Ručna pomicanja u Gantt-u bit će poništena. '
-            'Motor će izgraditi novi nacrt od trenutno odabranih naloga i parametara (tab Nalozi). Nastaviti?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Odustani'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Uklopi'),
-            ),
-          ],
-        );
-      },
-    );
-    if (ok != true) {
-      return;
-    }
-  }
-  await session.generatePlan();
-  if (!context.mounted) {
-    return;
-  }
-  final err = session.errorMessage;
-  if (err != null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(err)),
-    );
-  } else {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('FCS: nacrt ponovno generiran.')),
     );
   }
 }
