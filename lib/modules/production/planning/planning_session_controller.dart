@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../production_orders/models/production_order_model.dart';
@@ -48,11 +50,18 @@ class PlanningSessionController extends ChangeNotifier {
   String searchQuery = '';
   /// Brzi filteri prikaza poola (AND). Povezivanje s master filterima = kasnije.
   bool poolFilterHasMachine = false;
-  bool poolFilterDueRisk = false;
+  /// `null` = ne filtrirati. Inače: [requestedDeliveryDate] u manje od toliko dana (isti prag kao staro „&lt;3d”).
+  int? poolFilterDueWithinDays;
   bool poolFilterNoMachine = false;
+  /// `null` = svi strojevi. Inače [ProductionOrderModel.machineId] (točan zapis s naloga).
+  String? poolFilterMachineId;
+  /// `null` = sve. Inače točno podudaranje [ProductionOrderModel.operationName].
+  String? poolFilterOperationName;
   ProductionOrderModel? selectedOrder;
   Map<String, String> ganttMachineLabels = const {};
   String? ganttLabelForResultId;
+  /// Ime stroja s poola (šifarnik) kada Gantt još nema taj resurs.
+  Map<String, String> _poolMachineIdLabels = const {};
 
   bool get isLocked => busy || saving;
 
@@ -62,12 +71,13 @@ class PlanningSessionController extends ChangeNotifier {
     if (poolFilterHasMachine) {
       list = list.where((o) => (o.machineId ?? '').trim().isNotEmpty).toList();
     }
-    if (poolFilterDueRisk) {
+    if (poolFilterDueWithinDays != null) {
+      final n = poolFilterDueWithinDays!;
       list = list
           .where(
             (o) {
               final d = o.requestedDeliveryDate;
-              return d != null && d.difference(DateTime.now()).inDays < 3;
+              return d != null && d.difference(DateTime.now()).inDays < n;
             },
           )
           .toList();
@@ -75,6 +85,55 @@ class PlanningSessionController extends ChangeNotifier {
     if (poolFilterNoMachine) {
       list = list.where((o) => (o.machineId ?? '').trim().isEmpty).toList();
     }
+    if (poolFilterMachineId != null) {
+      final m = poolFilterMachineId!.trim();
+      if (m.isNotEmpty) {
+        list = list.where((o) => (o.machineId ?? '').trim() == m).toList();
+      }
+    }
+    if (poolFilterOperationName != null) {
+      final on = poolFilterOperationName!.trim();
+      if (on.isNotEmpty) {
+        list = list.where((o) => (o.operationName ?? '').trim() == on).toList();
+      }
+    }
+    return list;
+  }
+
+  String poolMachineLabel(String machineId) {
+    final t = machineId.trim();
+    if (t.isEmpty) {
+      return '—';
+    }
+    return ganttMachineLabels[t] ?? _poolMachineIdLabels[t] ?? t;
+  }
+
+  /// Neparovi (id, kratki prikaz) za dropdown stroja, sortirano po labeli.
+  List<({String id, String label})> get machineFilterOptions {
+    final ids = <String>{};
+    for (final o in pool) {
+      final m = o.machineId?.trim();
+      if (m != null && m.isNotEmpty) {
+        ids.add(m);
+      }
+    }
+    final out = <({String id, String label})>[];
+    for (final id in ids) {
+      out.add((id: id, label: poolMachineLabel(id)));
+    }
+    out.sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
+    return out;
+  }
+
+  List<String> get poolDistinctOperationNames {
+    final s = <String>{};
+    for (final o in pool) {
+      final n = o.operationName?.trim();
+      if (n != null && n.isNotEmpty) {
+        s.add(n);
+      }
+    }
+    final list = s.toList()..sort();
     return list;
   }
 
@@ -96,8 +155,8 @@ class PlanningSessionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setPoolFilterDueRisk(bool value) {
-    poolFilterDueRisk = value;
+  void setPoolFilterDueWithinDays(int? value) {
+    poolFilterDueWithinDays = value;
     notifyListeners();
   }
 
@@ -106,10 +165,24 @@ class PlanningSessionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setPoolFilterMachineId(String? value) {
+    final v = value?.trim();
+    poolFilterMachineId = (v == null || v.isEmpty) ? null : v;
+    notifyListeners();
+  }
+
+  void setPoolFilterOperationName(String? value) {
+    final v = value?.trim();
+    poolFilterOperationName = (v == null || v.isEmpty) ? null : v;
+    notifyListeners();
+  }
+
   void clearPoolFilters() {
     poolFilterHasMachine = false;
-    poolFilterDueRisk = false;
+    poolFilterDueWithinDays = null;
     poolFilterNoMachine = false;
+    poolFilterMachineId = null;
+    poolFilterOperationName = null;
     notifyListeners();
   }
 
@@ -206,11 +279,59 @@ class PlanningSessionController extends ChangeNotifier {
     (id: 'live', label: 'U produkciji', enabled: false),
   ];
 
+  void _sanitizePoolFilters() {
+    if (poolFilterMachineId != null) {
+      final id = poolFilterMachineId!.trim();
+      if (id.isEmpty || !pool.any((o) => (o.machineId ?? '').trim() == id)) {
+        poolFilterMachineId = null;
+      }
+    }
+    if (poolFilterOperationName != null) {
+      final on = poolFilterOperationName!.trim();
+      if (on.isEmpty || !pool.any((o) => (o.operationName ?? '').trim() == on)) {
+        poolFilterOperationName = null;
+      }
+    }
+  }
+
+  Future<void> _rebuildPoolMachineLabels() async {
+    final ids = <String>{};
+    for (final o in pool) {
+      final m = o.machineId?.trim();
+      if (m != null && m.isNotEmpty) {
+        ids.add(m);
+      }
+    }
+    if (ids.isEmpty) {
+      if (_poolMachineIdLabels.isNotEmpty) {
+        _poolMachineIdLabels = {};
+        notifyListeners();
+      }
+      return;
+    }
+    try {
+      final lookup = await ProductionAssetDisplayLookup.loadForPlant(
+        companyId: companyId,
+        plantKey: plantKey,
+        limit: 500,
+      );
+      final m = <String, String>{};
+      for (final id in ids) {
+        m[id] = lookup.resolve(id);
+      }
+      _poolMachineIdLabels = m;
+    } catch (_) {
+      _poolMachineIdLabels = {};
+    }
+    notifyListeners();
+  }
+
   Future<void> loadPool() async {
     if (companyId.isEmpty || plantKey.isEmpty) {
       loadingPool = false;
       poolError = 'Nedostaje podatak o kompaniji ili pogonu.';
       pool = [];
+      _poolMachineIdLabels = {};
       selectedOrderIds.clear();
       selectedOrder = null;
       notifyListeners();
@@ -230,7 +351,9 @@ class PlanningSessionController extends ChangeNotifier {
         final db = b.requestedDeliveryDate;
         if (da != null && db != null) {
           final c = da.compareTo(db);
-          if (c != 0) return c;
+          if (c != 0) {
+            return c;
+          }
         } else if (da != null) {
           return -1;
         } else if (db != null) {
@@ -239,14 +362,17 @@ class PlanningSessionController extends ChangeNotifier {
         return b.createdAt.compareTo(a.createdAt);
       });
       pool = list;
+      _sanitizePoolFilters();
       selectedOrderIds
         ..clear()
         ..addAll(list.where((o) => !excludedOrderIds.contains(o.id)).map((e) => e.id));
       selectedOrder = list.isNotEmpty ? list.first : null;
       loadingPool = false;
+      unawaited(_rebuildPoolMachineLabels());
     } catch (_) {
       loadingPool = false;
       pool = [];
+      _poolMachineIdLabels = {};
       selectedOrderIds.clear();
       poolError = 'Učitavanje naloga nije uspjelo. Pokušajte kasnije.';
       selectedOrder = null;
