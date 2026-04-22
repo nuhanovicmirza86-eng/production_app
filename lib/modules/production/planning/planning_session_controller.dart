@@ -50,7 +50,7 @@ class PlanningSessionController extends ChangeNotifier {
   String searchQuery = '';
   /// Brzi filteri prikaza poola (AND). Povezivanje s master filterima = kasnije.
   bool poolFilterHasMachine = false;
-  /// `null` = ne filtrirati. Inače: [requestedDeliveryDate] u manje od toliko dana (isti prag kao staro „&lt;3d”).
+  /// `null` = ne filtrirati. Inače: [requestedDeliveryDate] u manje od toliko dana (isti prag kao prijašnji „rizik roka” za 3 d).
   int? poolFilterDueWithinDays;
   bool poolFilterNoMachine = false;
   /// `null` = svi strojevi. Inače [ProductionOrderModel.machineId] (točan zapis s naloga).
