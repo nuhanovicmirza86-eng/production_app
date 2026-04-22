@@ -32,9 +32,21 @@ class ProductionPlanExecutionScreen extends StatelessWidget {
         const Divider(height: 28),
         Text('Smjenska tabla (plan)', style: t.textTheme.titleSmall),
         const SizedBox(height: 6),
-        Text(
-          'Po jednom redu po stroju: prva operacija u planu. Kolona „Stvarno (nalog)“: kumulativno očitano dobro u odnosu na plan cijelog naloga (ne jedna smjena). Delta po smjeni i zastoj — iz MES-a (Praćenje).',
-          style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                'Po jednom redu po stroju: prva operacija u planu. „Stvarno (nalog)“: kumulativno s naloga. „Danas (MES, stroj)“: zbroj polja dobro iz execution zapisa za taj stroj i nalog u lokalnom danu (završeno danas ili u tijeku od danas).',
+                style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: session.isLocked ? null : session.bumpMesBoardRefresh,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Osvježi MES'),
+            ),
+          ],
         ),
         const SizedBox(height: 10),
         Card(

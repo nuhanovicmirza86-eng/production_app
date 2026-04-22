@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 
+import '../../execution/services/production_execution_service.dart';
 import '../../production_orders/models/production_order_model.dart';
 import '../../production_orders/services/production_order_service.dart';
 import '../models/scheduled_operation.dart';
 import '../planning_session_controller.dart';
+import '../services/planning_mes_today.dart';
 
-/// Smjenska tabla (plan): po stroju prva operacija u planu; „Stvarno” = očitano dobro u odnosu na plan na **nivou naloga** (nije po smjeni dok MES ne snimi smjenski presjek).
+typedef _BoardData = ({
+  Map<String, ProductionOrderModel> orders,
+  Map<String, List<Map<String, dynamic>>> mesByOrderId,
+});
+
+/// Smjenska tabla (plan): po stroju prva operacija u planu; „Stvarno” = očitano dobro u odnosu na plan na **nivou naloga**; „Danas” = suma MES [goodQty] za taj stroj/nalog u lokalnom danu.
 class PlanningExecutionShiftBoard extends StatefulWidget {
   const PlanningExecutionShiftBoard({super.key, required this.session});
 
@@ -17,8 +24,9 @@ class PlanningExecutionShiftBoard extends StatefulWidget {
 
 class _PlanningExecutionShiftBoardState extends State<PlanningExecutionShiftBoard> {
   static final _orderSvc = ProductionOrderService();
+  static final _execSvc = ProductionExecutionService();
 
-  Future<Map<String, ProductionOrderModel>>? _orderFuture;
+  Future<_BoardData>? _boardFuture;
   String? _loadKey;
 
   @override
@@ -69,6 +77,7 @@ class _PlanningExecutionShiftBoardState extends State<PlanningExecutionShiftBoar
         );
       }
     }
+    buf.write(':mes=${session.mesBoardRefreshToken}');
     return buf.toString();
   }
 
@@ -76,9 +85,9 @@ class _PlanningExecutionShiftBoardState extends State<PlanningExecutionShiftBoar
     final session = widget.session;
     final r = session.result;
     if (r == null || r.scheduledOperations.isEmpty) {
-      if (_orderFuture != null || _loadKey != null) {
+      if (_boardFuture != null || _loadKey != null) {
         setState(() {
-          _orderFuture = null;
+          _boardFuture = null;
           _loadKey = null;
         });
       }
@@ -88,13 +97,13 @@ class _PlanningExecutionShiftBoardState extends State<PlanningExecutionShiftBoar
     if (key == null) {
       return;
     }
-    if (key == _loadKey && _orderFuture != null) {
+    if (key == _loadKey && _boardFuture != null) {
       return;
     }
     _loadKey = key;
     final ids = r.scheduledOperations.map((e) => e.productionOrderId).toSet();
     setState(() {
-      _orderFuture = _loadOrdersForIds(ids);
+      _boardFuture = _loadBoardData(ids);
     });
   }
 
@@ -117,6 +126,25 @@ class _PlanningExecutionShiftBoardState extends State<PlanningExecutionShiftBoar
     );
     fromPool.addAll(fetched);
     return fromPool;
+  }
+
+  Future<_BoardData> _loadBoardData(Set<String> ids) async {
+    final session = widget.session;
+    final orders = await _loadOrdersForIds(ids);
+    try {
+      final Map<String, List<Map<String, dynamic>>> mes = await _execSvc.getExecutionsByOrderIds(
+        companyId: session.companyId,
+        plantKey: session.plantKey,
+        productionOrderIds: ids,
+      );
+      return (orders: orders, mesByOrderId: mes);
+    } catch (e, st) {
+      debugPrint('PlanningExecutionShiftBoard: MES $e\n$st');
+      return (
+        orders: orders,
+        mesByOrderId: <String, List<Map<String, dynamic>>>{},
+      );
+    }
   }
 
   @override
@@ -159,15 +187,17 @@ class _PlanningExecutionShiftBoardState extends State<PlanningExecutionShiftBoar
     }
 
     String labelFor(String id) {
-      if (id.isEmpty) return 'Nije dodijeljen stroj';
-      return session.ganttMachineLabels[id] ?? '…';
+      if (id.isEmpty) {
+        return 'Nije dodijeljen stroj';
+      }
+      return session.poolMachineLabel(id);
     }
 
     final machineKeys = byMachine.keys.toList()
       ..sort((a, b) => labelFor(a).compareTo(labelFor(b)));
 
-    return FutureBuilder<Map<String, ProductionOrderModel>>(
-      future: _orderFuture,
+    return FutureBuilder<_BoardData>(
+      future: _boardFuture,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Padding(
@@ -181,7 +211,9 @@ class _PlanningExecutionShiftBoardState extends State<PlanningExecutionShiftBoar
             style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.error),
           );
         }
-        final orders = snap.data ?? {};
+        final data = snap.data;
+        final orders = data?.orders ?? {};
+        final mesByOrder = data?.mesByOrderId ?? {};
         return SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: DataTable(
@@ -207,6 +239,21 @@ class _PlanningExecutionShiftBoardState extends State<PlanningExecutionShiftBoar
                   ),
                 ),
               ),
+              DataColumn(
+                label: Tooltip(
+                  message:
+                      'Suma polja dobro iz zapisa production_execution za ovaj stroj i nalog, '
+                      'pripisana lokalnom danu (završetak ili aktivni započeti danas).',
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Danas (MES, stroj)', style: t.textTheme.labelLarge),
+                      const SizedBox(width: 4),
+                      Icon(Icons.info_outline, size: 16, color: t.colorScheme.onSurfaceVariant),
+                    ],
+                  ),
+                ),
+              ),
               const DataColumn(label: Text('Status (plan)')),
             ],
             rows: machineKeys.map((mk) {
@@ -218,6 +265,7 @@ class _PlanningExecutionShiftBoardState extends State<PlanningExecutionShiftBoar
                   DataCell(Text(_fmtDt(op.plannedStart))),
                   DataCell(Text(_fmtDt(op.plannedEnd))),
                   DataCell(Text(_actualText(orders, op.productionOrderId))),
+                  DataCell(Text(_mesTodayText(orders, mesByOrder, op.productionOrderId, mk))),
                   DataCell(Text(_statusHr(op.status))),
                 ],
               );
@@ -226,6 +274,25 @@ class _PlanningExecutionShiftBoardState extends State<PlanningExecutionShiftBoar
         );
       },
     );
+  }
+
+  String _mesTodayText(
+    Map<String, ProductionOrderModel> orders,
+    Map<String, List<Map<String, dynamic>>> mesByOrderId,
+    String productionOrderId,
+    String machineId,
+  ) {
+    if (machineId.trim().isEmpty) {
+      return '—';
+    }
+    final list = mesByOrderId[productionOrderId] ?? const [];
+    final u = orders[productionOrderId]?.unit ?? 'kom';
+    final v = sumLocalDayGoodOnMachine(
+      list,
+      machineId,
+      day: DateTime.now(),
+    );
+    return '${_fmtQty(v)} $u';
   }
 
   String _actualText(

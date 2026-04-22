@@ -48,6 +48,9 @@ class PlanningSessionController extends ChangeNotifier {
   bool loadingPool = true;
   String? poolError;
   String searchQuery = '';
+  /// Povećava se ručno (gumb) da se u Provedbi ponovo učitaju MES očitavanja.
+  int mesBoardRefreshToken = 0;
+
   /// Brzi filteri prikaza poola (AND). Povezivanje s master filterima = kasnije.
   bool poolFilterHasMachine = false;
   /// `null` = ne filtrirati. Inače: [requestedDeliveryDate] u manje od toliko dana (isti prag kao prijašnji „rizik roka” za 3 d).
@@ -194,6 +197,11 @@ class PlanningSessionController extends ChangeNotifier {
 
   void setSearchQuery(String v) {
     searchQuery = v;
+    notifyListeners();
+  }
+
+  void bumpMesBoardRefresh() {
+    mesBoardRefreshToken++;
     notifyListeners();
   }
 

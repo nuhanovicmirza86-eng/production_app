@@ -1,4 +1,8 @@
+import 'dart:math' show min;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../ooe/services/ooe_execution_integration.dart';
 
 class ProductionExecutionService {
   final FirebaseFirestore _firestore;
@@ -308,6 +312,14 @@ class ProductionExecutionService {
       }
     });
 
+    await OoeExecutionIntegration.onExecutionStarted(
+      companyScope: <String, dynamic>{
+        'companyId': normalizedCompanyId,
+        'plantKey': normalizedPlantKey,
+      },
+      executionPayload: payload,
+    );
+
     return execRef.id;
   }
 
@@ -490,6 +502,21 @@ class ProductionExecutionService {
     }
 
     await _execution.doc(normalizedExecutionId).update(updates);
+
+    final afterPause = await getById(
+      executionId: normalizedExecutionId,
+      companyId: normalizedCompanyId,
+      plantKey: normalizedPlantKey,
+    );
+    if (afterPause != null) {
+      await OoeExecutionIntegration.onExecutionPaused(
+        companyScope: <String, dynamic>{
+          'companyId': normalizedCompanyId,
+          'plantKey': normalizedPlantKey,
+        },
+        executionPayload: afterPause,
+      );
+    }
   }
 
   Future<void> resumeExecution({
@@ -546,6 +573,21 @@ class ProductionExecutionService {
     }
 
     await _execution.doc(normalizedExecutionId).update(updates);
+
+    final afterResume = await getById(
+      executionId: normalizedExecutionId,
+      companyId: normalizedCompanyId,
+      plantKey: normalizedPlantKey,
+    );
+    if (afterResume != null) {
+      await OoeExecutionIntegration.onExecutionResumed(
+        companyScope: <String, dynamic>{
+          'companyId': normalizedCompanyId,
+          'plantKey': normalizedPlantKey,
+        },
+        executionPayload: afterResume,
+      );
+    }
   }
 
   Future<void> completeExecution({
@@ -681,6 +723,21 @@ class ProductionExecutionService {
         'updatedBy': normalizedUpdatedBy,
       });
     });
+
+    final afterComplete = await getById(
+      executionId: normalizedExecutionId,
+      companyId: normalizedCompanyId,
+      plantKey: normalizedPlantKey,
+    );
+    if (afterComplete != null) {
+      await OoeExecutionIntegration.onExecutionCompleted(
+        companyScope: <String, dynamic>{
+          'companyId': normalizedCompanyId,
+          'plantKey': normalizedPlantKey,
+        },
+        executionAfterPayload: afterComplete,
+      );
+    }
   }
 
   Future<Map<String, dynamic>?> getById({
@@ -750,6 +807,41 @@ class ProductionExecutionService {
     return snapshot.docs
         .map((doc) => <String, dynamic>{'id': doc.id, ...doc.data()})
         .toList();
+  }
+
+  /// Više naloga u jednom ili više upita ([whereIn] max 10 ID-eva). Ključ = `productionOrderId`.
+  Future<Map<String, List<Map<String, dynamic>>>> getExecutionsByOrderIds({
+    required String companyId,
+    required String plantKey,
+    required Set<String> productionOrderIds,
+  }) async {
+    final normalizedCompanyId = _s(companyId);
+    final normalizedPlantKey = _s(plantKey);
+    if (normalizedCompanyId.isEmpty || normalizedPlantKey.isEmpty) {
+      return {};
+    }
+    final flat = productionOrderIds.map(_s).where((e) => e.isNotEmpty).toList();
+    if (flat.isEmpty) {
+      return {};
+    }
+    final out = <String, List<Map<String, dynamic>>>{};
+    for (var i = 0; i < flat.length; i += 10) {
+      final chunk = flat.sublist(i, min(i + 10, flat.length));
+      final snap = await _execution
+          .where('companyId', isEqualTo: normalizedCompanyId)
+          .where('plantKey', isEqualTo: normalizedPlantKey)
+          .where('productionOrderId', whereIn: chunk)
+          .get();
+      for (final doc in snap.docs) {
+        final m = doc.data();
+        final oid = _s(m['productionOrderId']);
+        if (oid.isEmpty) {
+          continue;
+        }
+        out.putIfAbsent(oid, () => []).add(<String, dynamic>{'id': doc.id, ...m});
+      }
+    }
+    return out;
   }
 
   Future<List<Map<String, dynamic>>> getActiveExecutionsForOrder({
