@@ -4,6 +4,8 @@ import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/ui/company_plant_label_text.dart';
 import '../ooe_help_texts.dart';
 import '../models/machine_state_event.dart';
+import '../models/mes_tpm_six_losses.dart';
+import '../models/ooe_loss_reason.dart';
 import '../services/machine_state_service.dart';
 import '../services/ooe_loss_reason_service.dart';
 import '../widgets/ooe_info_icon.dart';
@@ -28,14 +30,32 @@ class _OoeLossAnalysisScreenState extends State<OoeLossAnalysisScreen> {
   String get _plantKey =>
       (widget.companyData['plantKey'] ?? '').toString().trim();
 
-  Stream<Map<String, String>> get _ooeReasonLabelStream => _reasonSvc
-      .watchAllReasonsForPlant(companyId: _companyId, plantKey: _plantKey)
-      .map((list) => {for (final r in list) r.code: r.name});
+  Stream<List<OoeLossReason>> get _ooeReasonsStream => _reasonSvc
+      .watchAllReasonsForPlant(companyId: _companyId, plantKey: _plantKey);
 
   @override
   void dispose() {
     _machineCtrl.dispose();
     super.dispose();
+  }
+
+  /// Kao [MachineStateService.openState]: denormalizirano polje, inače katalog po šifri.
+  static String _tpmKeyForEvent(
+    MachineStateEvent e,
+    Map<String, OoeLossReason> byCodeUpper,
+  ) {
+    final stored = e.tpmLossKey?.trim();
+    if (stored != null && stored.isNotEmpty) {
+      return stored;
+    }
+    final code = e.reasonCode?.trim();
+    if (code != null && code.isNotEmpty) {
+      final r = byCodeUpper[code.toUpperCase()];
+      if (r != null) {
+        return r.effectiveTpmLossKey;
+      }
+    }
+    return MesTpmLossKeys.unclassified;
   }
 
   @override
@@ -97,11 +117,19 @@ class _OoeLossAnalysisScreenState extends State<OoeLossAnalysisScreen> {
             )
           else
             SliverFillRemaining(
-              child: StreamBuilder<Map<String, String>>(
-                stream: _ooeReasonLabelStream,
+              child: StreamBuilder<List<OoeLossReason>>(
+                stream: _ooeReasonsStream,
                 builder: (context, reasonSnap) {
-                  final ooeReasonLabels =
-                      reasonSnap.hasData ? reasonSnap.data : null;
+                  final reasons = reasonSnap.data;
+                  final ooeReasonLabels = reasons == null
+                      ? null
+                      : {for (final r in reasons) r.code: r.name};
+                  final byCode = reasons == null
+                      ? <String, OoeLossReason>{}
+                      : {
+                          for (final r in reasons)
+                            r.code.trim().toUpperCase(): r,
+                        };
                   return StreamBuilder(
                     stream: svc.watchEventsForMachine(
                       companyId: _companyId,
@@ -125,16 +153,38 @@ class _OoeLossAnalysisScreenState extends State<OoeLossAnalysisScreen> {
                         return const Center(child: CircularProgressIndicator());
                       }
                       final agg = <String, int>{};
+                      final aggTpm = <String, int>{};
                       for (final e in snap.data!) {
-                        if ((e.durationSeconds ?? 0) <= 0) continue;
+                        if ((e.durationSeconds ?? 0) <= 0) {
+                          continue;
+                        }
                         if (e.state == MachineStateEvent.stateRunning) {
                           continue;
                         }
                         final k = (e.reasonCode ?? e.state).trim();
-                        if (k.isEmpty) continue;
-                        agg[k] = (agg[k] ?? 0) + (e.durationSeconds ?? 0);
+                        if (k.isEmpty) {
+                          continue;
+                        }
+                        final sec = e.durationSeconds ?? 0;
+                        agg[k] = (agg[k] ?? 0) + sec;
+
+                        final tpm = _tpmKeyForEvent(e, byCode);
+                        aggTpm[tpm] = (aggTpm[tpm] ?? 0) + sec;
                       }
                       final losses = agg.entries
+                          .map(
+                            (e) => {
+                              'reasonKey': e.key,
+                              'seconds': e.value,
+                            },
+                          )
+                          .toList()
+                        ..sort(
+                          (a, b) => (b['seconds'] as int).compareTo(
+                            a['seconds'] as int,
+                          ),
+                        );
+                      final tpmLosses = aggTpm.entries
                           .map(
                             (e) => {
                               'reasonKey': e.key,
@@ -163,10 +213,26 @@ class _OoeLossAnalysisScreenState extends State<OoeLossAnalysisScreen> {
                           OoeLossParetoCard(
                             losses: losses.take(12).toList(),
                             reasonLabels: ooeReasonLabels,
+                            title: OoeHelpTexts.paretoTitle,
                             titleTrailing: OoeInfoIcon(
                               tooltip: OoeHelpTexts.paretoTooltip,
                               dialogTitle: OoeHelpTexts.paretoTitle,
                               dialogBody: OoeHelpTexts.paretoBody,
+                              iconSize: 18,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          OoeLossParetoCard(
+                            losses: tpmLosses.take(8).toList(),
+                            reasonLabels: MesTpmLossKeys.reasonKeyLabelMapHr(),
+                            title: 'Gubici po TPM (šest velikih gubitaka)',
+                            titleTrailing: OoeInfoIcon(
+                              tooltip: 'TPM Pareto',
+                              dialogTitle: 'Gubici po TPM kategoriji',
+                              dialogBody:
+                                  'Sekunde zastoja grupirane po istoj taksonomiji '
+                                  'kao u katalogu razloga (tpmLossKey), uz '
+                                  'heuristiku ako na segmentu još nema denormaliziranog polja.',
                               iconSize: 18,
                             ),
                           ),

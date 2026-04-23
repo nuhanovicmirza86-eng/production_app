@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/errors/app_error_mapper.dart';
 import '../../production/products/services/product_service.dart';
 import '../models/qms_document_kind.dart';
 import '../models/qms_list_models.dart';
@@ -195,6 +196,8 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
   bool _loading = true;
   bool _loadingMore = false;
   String? _error;
+  /// Dokument u tijeku brisanja (sprječava dvostruki klik).
+  String? _deletingId;
 
   @override
   void initState() {
@@ -224,7 +227,7 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = AppErrorMapper.toMessage(e);
         _loading = false;
       });
     }
@@ -251,7 +254,52 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
       if (!mounted) return;
       setState(() => _loadingMore = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
+        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
+      );
+    }
+  }
+
+  Future<void> _confirmDelete(QmsDocumentRow r) async {
+    final label = r.title.trim().isEmpty ? 'ovaj dokument' : '„${r.title.trim()}“';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Obrisati dokument?'),
+        content: Text(
+          '$label će biti uklonjen iz liste. Ovo ne može poništiti.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Odustani'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Obriši'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _deletingId = r.id);
+    try {
+      await widget.svc.deleteQmsDocument(
+        companyId: widget.companyId,
+        qmsDocumentId: r.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _rows.removeWhere((e) => e.id == r.id);
+        _deletingId = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Dokument je obrisan.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deletingId = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
       );
     }
   }
@@ -345,6 +393,22 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
                       child: ListTile(
                         leading: const Icon(Icons.description_outlined),
                         title: Text(r.title.isEmpty ? 'Bez naslova' : r.title),
+                        trailing: _deletingId == r.id
+                            ? const SizedBox(
+                                width: 28,
+                                height: 28,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : IconButton(
+                                tooltip: 'Obriši dokument',
+                                icon: Icon(
+                                  Icons.delete_outline,
+                                  color: cs.error,
+                                ),
+                                onPressed: () => _confirmDelete(r),
+                              ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -594,7 +658,7 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
+        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
       );
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -614,6 +678,7 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
     if (lower.endsWith('.docx')) {
       return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     }
+    if (lower.endsWith('.doc')) return 'application/msword';
     return null;
   }
 

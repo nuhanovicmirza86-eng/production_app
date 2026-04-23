@@ -86,6 +86,16 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     return double.tryParse(_s(value).replaceAll(',', '.')) ?? 0;
   }
 
+  /// Sekunde po komadu za OOE performans; prazno ili ≤0 → „nije postavljeno”.
+  String _formatIdealCycleForDisplay(dynamic raw) {
+    final v = _d(raw);
+    if (v <= 0) return '—';
+    final fixed = v == v.roundToDouble()
+        ? v.toStringAsFixed(0)
+        : v.toStringAsFixed(2);
+    return '$fixed s/komad';
+  }
+
   String _formatDateTime(dynamic value) {
     if (value == null) return '-';
 
@@ -1184,6 +1194,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
             _infoRow('Naziv', _s(product['productName'])),
             _infoRow('Status', _statusLabel(_s(product['status']))),
             _infoRow('Jedinica', _s(product['unit'])),
+            _infoRow('Idealni ciklus (OOE)', _formatIdealCycleForDisplay(product['idealCycleTimeSeconds'])),
             _infoRow('Kupac', _s(product['customerName'])),
             _infoRow('Customer ID', _s(product['customerId'])),
             _infoRow('Default plantKey', _s(product['defaultPlantKey'])),

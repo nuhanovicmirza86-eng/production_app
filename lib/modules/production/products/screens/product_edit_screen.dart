@@ -44,6 +44,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
   late final TextEditingController _shelfLifeDaysController;
   late final TextEditingController _minStockQtyController;
   late final TextEditingController _maxStockQtyController;
+  late final TextEditingController _idealCycleSecondsController;
 
   bool _isLoading = false;
   late bool _isActive;
@@ -149,6 +150,9 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     );
     _maxStockQtyController = TextEditingController(
       text: _formatNumForField(widget.productData['maxStockQty']),
+    );
+    _idealCycleSecondsController = TextEditingController(
+      text: _formatNumForField(widget.productData['idealCycleTimeSeconds']),
     );
 
     _status = _s(widget.productData['status']).isEmpty
@@ -278,6 +282,12 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     );
     if (maxUp == null) return;
 
+    final idealUp = parseUpdateDouble(
+      _idealCycleSecondsController.text,
+      label: 'Idealni ciklus (s)',
+    );
+    if (idealUp == null) return;
+
     if (_companyId.isEmpty || _productId.isEmpty || _userId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Nedostaju obavezni podaci za update.')),
@@ -317,6 +327,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
         shelfLifeDays: shelfDaysUp,
         minStockQty: minUp,
         maxStockQty: maxUp,
+        idealCycleTimeSeconds: idealUp,
         scanAliases: _scanAliases,
       );
 
@@ -406,6 +417,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
 
   @override
   void dispose() {
+    _idealCycleSecondsController.dispose();
     _productCodeController.dispose();
     _productNameController.dispose();
     _unitController.dispose();
@@ -623,6 +635,17 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                 TextFormField(
                   controller: _routingVersionController,
                   decoration: _dec('Aktivna Routing verzija'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _idealCycleSecondsController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: _dec(
+                    'Idealni ciklus (s/komad) za OOE',
+                    hint: 'Prazno = ukloni (Performance)',
+                  ),
                 ),
                 const SizedBox(height: 24),
                 const Text(

@@ -35,3 +35,44 @@ TextStyle? planningOrderExcludedStyle(ThemeData t) {
     decorationColor: t.colorScheme.onSurfaceVariant,
   );
 }
+
+/// Ikone (rizik / stroj) — usklađeno s [planningOrderRiskStripeColor], za tablicu i kartice.
+Widget planningOrderSignalRow(ThemeData t, ProductionOrderModel o) {
+  final hasMachine = (o.machineId ?? '').trim().isNotEmpty;
+  final due = o.requestedDeliveryDate;
+  final lateRisk = due != null && due.difference(DateTime.now()).inDays < 3;
+  final children = <Widget>[];
+  if (!hasMachine) {
+    children.add(
+      Tooltip(
+        message: 'Nema dodijeljenog stroja na nalogu',
+        child: Icon(Icons.precision_manufacturing_outlined, size: 18, color: t.colorScheme.error),
+      ),
+    );
+  }
+  if (lateRisk) {
+    children.add(
+      Tooltip(
+        message: 'Rizik roka: isporuka u manje od 3 dana',
+        child: Icon(Icons.event_busy, size: 18, color: Colors.amber.shade800),
+      ),
+    );
+  }
+  if (children.isEmpty) {
+    children.add(
+      Tooltip(
+        message: 'Nema posebnog signala (stroj + rok u redu)',
+        child: Icon(Icons.check_circle_outline, size: 16, color: t.colorScheme.outline),
+      ),
+    );
+  }
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      for (var i = 0; i < children.length; i++) ...[
+        if (i > 0) const SizedBox(width: 4),
+        children[i],
+      ],
+    ],
+  );
+}

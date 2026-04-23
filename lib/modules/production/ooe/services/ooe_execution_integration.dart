@@ -105,6 +105,7 @@ class OoeExecutionIntegration {
         );
       }
 
+      final pauseCode = _s(executionPayload['ooePauseReasonCode']);
       await _machine.openState(
         companyId: companyId,
         plantKey: plantKey,
@@ -118,6 +119,7 @@ class OoeExecutionIntegration {
         productId: productId.isEmpty ? null : productId,
         shiftId: shiftId.isEmpty ? null : shiftId,
         shiftDate: DateTime(now.year, now.month, now.day),
+        reasonCode: pauseCode.isEmpty ? null : pauseCode,
         createdBy: operatorId.isEmpty ? null : operatorId,
       );
 

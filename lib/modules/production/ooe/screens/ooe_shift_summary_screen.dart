@@ -7,6 +7,7 @@ import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/ui/company_plant_label_text.dart';
 import '../ooe_help_texts.dart';
+import '../models/mes_tpm_six_losses.dart';
 import '../models/ooe_shift_summary.dart';
 import '../services/shift_context_service.dart';
 import '../services/shift_context_window.dart';
@@ -430,10 +431,25 @@ class _OoeShiftSummaryScreenState extends State<OoeShiftSummaryScreen> {
                           OoeLossParetoCard(
                             losses: s.topLosses,
                             reasonLabels: ooeReasonLabels,
+                            title: OoeHelpTexts.paretoTitle,
                             titleTrailing: OoeInfoIcon(
                               tooltip: OoeHelpTexts.paretoTooltip,
                               dialogTitle: OoeHelpTexts.paretoTitle,
                               dialogBody: OoeHelpTexts.paretoBody,
+                              iconSize: 18,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          OoeLossParetoCard(
+                            losses: s.topTpmLosses,
+                            reasonLabels: MesTpmLossKeys.reasonKeyLabelMapHr(),
+                            title: 'Gubici po TPM (sažetak smjene)',
+                            titleTrailing: OoeInfoIcon(
+                              tooltip: 'TPM agregat',
+                              dialogTitle: 'Gubici po TPM u smjeni',
+                              dialogBody:
+                                  'Isti prozor vremena kao gornji Pareto; sekunde su '
+                                  'zbrojene po ključu tpm_* (Callable recomputeOoeShiftSummary, v2).',
                               iconSize: 18,
                             ),
                           ),

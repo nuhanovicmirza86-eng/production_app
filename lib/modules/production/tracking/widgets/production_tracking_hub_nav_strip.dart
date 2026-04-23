@@ -53,10 +53,10 @@ class ProductionTrackingHubNavStrip extends StatelessWidget {
         onTap: () => onSelectPlaceholder('Smjene'),
       ),
       _HubItem(
-        label: 'AI izvještaji',
+        label: 'Brzi izvještaji',
         hasDropdown: false,
         selected: false,
-        onTap: () => onSelectPlaceholder('AI izvještaji'),
+        onTap: () => onSelectPlaceholder('Brzi izvještaji'),
       ),
     ];
 

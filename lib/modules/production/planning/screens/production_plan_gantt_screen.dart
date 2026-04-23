@@ -52,7 +52,7 @@ class _ProductionPlanGanttScreenState extends State<ProductionPlanGanttScreen> {
     super.initState();
     if (widget.planningSession != null) {
       widget.planningSession!.addListener(_syncFromSession);
-      _data = widget.planningSession!.ganttDto;
+      _data = widget.planningSession!.ganttForDisplay;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _resolveMachineLabels();
@@ -75,7 +75,7 @@ class _ProductionPlanGanttScreenState extends State<ProductionPlanGanttScreen> {
       return;
     }
     setState(() {
-      _data = widget.planningSession?.ganttDto;
+      _data = widget.planningSession?.ganttForDisplay;
     });
     unawaited(_resolveMachineLabels());
   }
@@ -259,6 +259,16 @@ class _GanttLegendBar extends StatelessWidget {
             c.error,
             'Crveni rub: preklapanje s drugom operacijom na istom stroju',
           ),
+        leg(
+          c.tertiaryContainer,
+          c.onTertiaryContainer,
+          'Stvarno (MES) — interval startedAt/endedAt; ne pomiče se (usporedbe s planom)',
+        ),
+        leg(
+          c.surfaceContainerHigh,
+          c.onSurfaceVariant,
+          'Stop / održavanje — uskoro iz kalendara zauzetosti (ne bloka FCS)',
+        ),
       ],
     );
   }
@@ -603,6 +613,9 @@ class _GanttRow extends StatelessWidget {
   }
 
   static bool _opOverlap(PlanningGanttOp o, Set<String> ids) {
+    if (o.blockKind != PlanningGanttBlockKind.plannedFcs) {
+      return false;
+    }
     final id = o.scheduledOperationId;
     if (id == null || id.isEmpty) {
       return false;
@@ -674,11 +687,13 @@ class _GanttDraggableOpState extends State<_GanttDraggableOp> {
           operationLabel: o.operationLabel,
           isSetup: s.isSetup,
           overlapHighlight: widget.overlapHighlight,
+          blockKind: o.blockKind,
         ),
       );
     }
-    final canDrag =
-        widget.onNudge != null && (o.scheduledOperationId ?? '').isNotEmpty;
+    final canDrag = widget.onNudge != null &&
+        (o.scheduledOperationId ?? '').isNotEmpty &&
+        o.blockKind == PlanningGanttBlockKind.plannedFcs;
     final content = Transform.translate(
       offset: Offset(_dragPx, 0),
       child: Stack(clipBehavior: Clip.hardEdge, children: segWidgets),
@@ -727,6 +742,16 @@ class _GanttLayout {
     PlanningGanttOp o,
     double pxPerMinute,
   ) {
+    if (o.blockKind == PlanningGanttBlockKind.mesActual ||
+        o.blockKind == PlanningGanttBlockKind.maintenanceStop) {
+      final l =
+          o.plannedStart.difference(data.windowStart).inMinutes * pxPerMinute;
+      final w =
+          o.plannedEnd.difference(o.plannedStart).inMinutes * pxPerMinute;
+      return [
+        (left: l, width: w.clamp(4, 1e6), isSetup: false),
+      ];
+    }
     final rs = o.runStart;
     final re = o.runEnd;
     if (rs != null && re != null) {
@@ -782,13 +807,28 @@ class _GanttLayout {
     required String? operationLabel,
     required bool isSetup,
     bool overlapHighlight = false,
+    PlanningGanttBlockKind blockKind = PlanningGanttBlockKind.plannedFcs,
   }) {
-    final bg = isSetup
-        ? theme.colorScheme.secondaryContainer
-        : theme.colorScheme.primaryContainer;
-    final fg = isSetup
-        ? theme.colorScheme.onSecondaryContainer
-        : theme.colorScheme.onPrimaryContainer;
+    final Color bg;
+    final Color fg;
+    switch (blockKind) {
+      case PlanningGanttBlockKind.mesActual:
+        bg = theme.colorScheme.tertiaryContainer;
+        fg = theme.colorScheme.onTertiaryContainer;
+        break;
+      case PlanningGanttBlockKind.maintenanceStop:
+        bg = theme.colorScheme.surfaceContainerHigh;
+        fg = theme.colorScheme.onSurfaceVariant;
+        break;
+      case PlanningGanttBlockKind.plannedFcs:
+        bg = isSetup
+            ? theme.colorScheme.secondaryContainer
+            : theme.colorScheme.primaryContainer;
+        fg = isSetup
+            ? theme.colorScheme.onSecondaryContainer
+            : theme.colorScheme.onPrimaryContainer;
+        break;
+    }
     return Positioned(
       left: left,
       top: 4,
@@ -798,9 +838,11 @@ class _GanttLayout {
         color: bg,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(4),
-          side: overlapHighlight
+          side: overlapHighlight && blockKind == PlanningGanttBlockKind.plannedFcs
               ? BorderSide(color: theme.colorScheme.error, width: 2)
-              : BorderSide.none,
+              : blockKind == PlanningGanttBlockKind.maintenanceStop
+                  ? BorderSide(color: theme.colorScheme.outline, width: 1)
+                  : BorderSide.none,
         ),
         clipBehavior: Clip.antiAlias,
         child: Padding(

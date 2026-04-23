@@ -20,6 +20,10 @@ class OoeLossReason {
   final bool active;
   final int sortOrder;
 
+  /// TPM OEE veliki gubitak — vidi [MesTpmLossKeys] (`mes_tpm_six_losses.dart`).
+  /// Ako je null, UI/servis može koristiti heuristiku iz [category].
+  final String? tpmLossKey;
+
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -37,6 +41,7 @@ class OoeLossReason {
     required this.affectsQuality,
     required this.active,
     required this.sortOrder,
+    this.tpmLossKey,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -77,6 +82,7 @@ class OoeLossReason {
         affectsQuality: false,
         active: true,
         sortOrder: 0,
+        tpmLossKey: null,
         createdAt: DateTime.fromMillisecondsSinceEpoch(0),
         updatedAt: DateTime.fromMillisecondsSinceEpoch(0),
       );
@@ -101,6 +107,7 @@ class OoeLossReason {
       sortOrder: (map['sortOrder'] is num)
           ? (map['sortOrder'] as num).toInt()
           : int.tryParse((map['sortOrder'] ?? '0').toString()) ?? 0,
+      tpmLossKey: _trimOrNull(map['tpmLossKey']),
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ??
           DateTime.fromMillisecondsSinceEpoch(0),
       updatedAt: (map['updatedAt'] as Timestamp?)?.toDate() ??
@@ -123,6 +130,8 @@ class OoeLossReason {
       'affectsQuality': affectsQuality,
       'active': active,
       'sortOrder': sortOrder,
+      if (tpmLossKey != null && tpmLossKey!.trim().isNotEmpty)
+        'tpmLossKey': tpmLossKey!.trim(),
       'createdAt': createdAt,
       'updatedAt': updatedAt,
     };

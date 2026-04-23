@@ -13,7 +13,7 @@ import '../services/production_tracking_assistant_client_service.dart';
 class ProductionTrackingAssistantScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
 
-  /// Unaprijed ispunjen upit (npr. iz „AI izvještaji“).
+  /// Unaprijed ispunjen upit (npr. zalijepljen iz „Brzi izvještaji“ / drugih ekrana).
   final String? initialPrompt;
 
   const ProductionTrackingAssistantScreen({

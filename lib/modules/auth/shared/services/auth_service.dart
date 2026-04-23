@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:production_app/services/fcm_token_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -18,6 +19,7 @@ class AuthService {
   }
 
   Future<void> signOut() async {
+    FcmTokenService.instance.reset();
     await _auth.signOut();
   }
 

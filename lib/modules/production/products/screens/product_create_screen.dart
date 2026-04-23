@@ -29,6 +29,8 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
   final TextEditingController _unitController = TextEditingController(
     text: 'pcs',
   );
+  final TextEditingController _idealCycleSecondsController =
+      TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _customerIdController = TextEditingController();
   final TextEditingController _customerNameController = TextEditingController();
@@ -185,6 +187,8 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
             : _currencyController.text.trim(),
         isActive: _isActive,
         scanAliases: scanAliases,
+        idealCycleTimeSeconds:
+            _optionalPositiveDouble(_idealCycleSecondsController.text),
       );
 
       if (!mounted) return;
@@ -223,6 +227,7 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
     _standardUnitPriceController.dispose();
     _currencyController.dispose();
     _externalScanController.dispose();
+    _idealCycleSecondsController.dispose();
     super.dispose();
   }
 
@@ -331,6 +336,17 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
                 TextFormField(
                   controller: _unitController,
                   decoration: _dec('Jedinica'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _idealCycleSecondsController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: _dec(
+                    'Idealni ciklus (OOE)',
+                    hint: 'Sekunde po komadu za performans; ostavi prazno ako ne koristiš',
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(

@@ -127,6 +127,7 @@ class ProductService {
     int? shelfLifeDays,
     double? minStockQty,
     double? maxStockQty,
+    double? idealCycleTimeSeconds,
     List<String> scanAliases = const [],
   }) {
     final now = DateTime.now();
@@ -246,6 +247,10 @@ class ProductService {
       payload['maxStockQty'] = maxStockQty;
     }
 
+    if (idealCycleTimeSeconds != null && idealCycleTimeSeconds > 0) {
+      payload['idealCycleTimeSeconds'] = idealCycleTimeSeconds;
+    }
+
     return payload;
   }
 
@@ -274,6 +279,7 @@ class ProductService {
     int? shelfLifeDays,
     double? minStockQty,
     double? maxStockQty,
+    double? idealCycleTimeSeconds,
     List<String>? scanAliases,
   }) async {
     final normalizedCompanyId = companyId.trim();
@@ -343,6 +349,7 @@ class ProductService {
       shelfLifeDays: shelfLifeDays,
       minStockQty: minStockQty,
       maxStockQty: maxStockQty,
+      idealCycleTimeSeconds: idealCycleTimeSeconds,
       scanAliases: normalizedAliases,
     );
 
@@ -377,6 +384,7 @@ class ProductService {
     int? shelfLifeDays,
     double? minStockQty,
     double? maxStockQty,
+    double? idealCycleTimeSeconds,
     List<String>? scanAliases,
   }) async {
     final normalizedProductId = productId.trim();
@@ -639,6 +647,14 @@ class ProductService {
       }
     }
 
+    if (idealCycleTimeSeconds != null) {
+      if (idealCycleTimeSeconds <= 0) {
+        updates['idealCycleTimeSeconds'] = FieldValue.delete();
+      } else {
+        updates['idealCycleTimeSeconds'] = idealCycleTimeSeconds;
+      }
+    }
+
     final currentUnit = _s(current['unit']);
     final currentDescription = _s(current['description']);
     final currentCustomerId = _s(current['customerId']);
@@ -665,6 +681,7 @@ class ProductService {
     }
     final currentMinStock = _readDouble(current['minStockQty']);
     final currentMaxStock = _readDouble(current['maxStockQty']);
+    final currentIdealCycle = _readDouble(current['idealCycleTimeSeconds']);
 
     final nothingChanged =
         nextProductCode == currentProductCode &&
@@ -706,7 +723,9 @@ class ProductService {
         (minStockQty == null ||
             _almostEqualDouble(currentMinStock, minStockQty)) &&
         (maxStockQty == null ||
-            _almostEqualDouble(currentMaxStock, maxStockQty));
+            _almostEqualDouble(currentMaxStock, maxStockQty)) &&
+        (idealCycleTimeSeconds == null ||
+            _almostEqualDouble(currentIdealCycle, idealCycleTimeSeconds));
 
     if (nothingChanged) {
       return;

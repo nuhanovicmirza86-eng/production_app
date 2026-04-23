@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../tracking/services/production_asset_display_lookup.dart';
+import '../models/planning_delivery_risk.dart';
 import '../models/planning_engine_result.dart';
 import '../planning_ui_formatters.dart';
 
@@ -11,12 +12,14 @@ class PlanningKpiStrip extends StatefulWidget {
     required this.r,
     required this.companyId,
     required this.plantKey,
+    this.deliveryRisk,
     this.compact = true,
   });
 
   final PlanningEngineResult r;
   final String companyId;
   final String plantKey;
+  final PlanningDeliveryRisk? deliveryRisk;
   final bool compact;
 
   @override
@@ -96,17 +99,62 @@ class _PlanningKpiStripState extends State<PlanningKpiStrip> {
 
     return Material(
       color: t.colorScheme.surfaceContainerHighest,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          children: [
-            for (var i = 0; i < items.length; i++) ...[
-              if (i > 0) const Text('  ·  ', style: TextStyle(color: Colors.black38)),
-              Text(items[i], style: s),
-            ],
-          ],
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (widget.deliveryRisk != null) _deliveryRiskBar(context, widget.deliveryRisk!),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                for (var i = 0; i < items.length; i++) ...[
+                  if (i > 0) const Text('  ·  ', style: TextStyle(color: Colors.black38)),
+                  Text(items[i], style: s),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _deliveryRiskBar(BuildContext context, PlanningDeliveryRisk d) {
+    final t = Theme.of(context);
+    final c = d.risk01;
+    final fg = c < 0.25
+        ? t.colorScheme.onPrimaryContainer
+        : c < 0.55
+            ? t.colorScheme.onTertiaryContainer
+            : t.colorScheme.onErrorContainer;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+      child: Row(
+        children: [
+          Text('Rizik isporuke (F4):', style: t.textTheme.labelSmall?.copyWith(color: fg)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: c.clamp(0, 1),
+                minHeight: 6,
+                color: t.colorScheme.error,
+                backgroundColor: t.colorScheme.surfaceContainerHigh,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${(c * 100).toStringAsFixed(0)}% · ${d.labelHr}',
+            style: t.textTheme.labelMedium?.copyWith(
+              color: fg,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -123,6 +171,10 @@ class _PlanningKpiStripState extends State<PlanningKpiStrip> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (widget.deliveryRisk != null) ...[
+              _deliveryRiskBar(context, widget.deliveryRisk!),
+              const SizedBox(height: 8),
+            ],
             Text(
               'Rezultat: ${p.planCode}',
               style: Theme.of(context).textTheme.titleSmall,

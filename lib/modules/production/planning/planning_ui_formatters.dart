@@ -6,7 +6,11 @@ class PlanningUiFormatters {
 
   /// Oznaka motora nakon generiranja (nije interni API ključ u UI prema korisniku).
   static String engineStrategy(String code) {
-    switch (code.trim()) {
+    final c = code.trim();
+    if (c.isEmpty) {
+      return '—';
+    }
+    switch (c) {
       case 'edd_finite_routing_multi_v1':
         return 'Rok (EDD) · ograničen kapacitet · višekorakni routings';
       case 'edd_finite_synthetic_v1':
@@ -16,9 +20,27 @@ class PlanningUiFormatters {
       case 'mvp_fifo_due_edd_edd': // u slučaju starih nacrta
         return 'MVP: redoslijed po roku';
       default:
-        if (code.isEmpty) return '—';
-        return code;
+        break;
     }
+    if (c.startsWith('spt_')) {
+      if (c.contains('routing')) {
+        return 'SPT · ograničen kapacitet · višekorakni routings';
+      }
+      if (c.contains('synthetic')) {
+        return 'SPT · ograničen kapacitet · jedna sintetička operacija';
+      }
+      return 'SPT · ograničen kapacitet';
+    }
+    if (c.startsWith('edd_')) {
+      if (c.contains('routing')) {
+        return 'Rok (EDD) · ograničen kapacitet · višekorakni routings';
+      }
+      if (c.contains('synthetic')) {
+        return 'Rok (EDD) · ograničen kapacitet · jedna sintetička operacija';
+      }
+      return 'Rok (EDD) · ograničen kapacitet';
+    }
+    return c;
   }
 
   /// Sljedeći korak u radnom toku plana (`null` = nema sljedećeg).

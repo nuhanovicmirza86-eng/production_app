@@ -40,6 +40,8 @@ class OoeShiftSummary {
   final double ooe;
 
   final List<Map<String, dynamic>> topLosses;
+  /// Ključ = `tpm_*` (MesTpmLossKeys), isti format redaka kao [topLosses] (`reasonKey`, `seconds`).
+  final List<Map<String, dynamic>> topTpmLosses;
   final DateTime lastCalculatedAt;
   final String calculationVersion;
 
@@ -75,11 +77,12 @@ class OoeShiftSummary {
     required this.quality,
     required this.ooe,
     required this.topLosses,
+    this.topTpmLosses = const [],
     required this.lastCalculatedAt,
     required this.calculationVersion,
   });
 
-  static const String currentVersion = '2026-04-21-ooe-v1';
+  static const String currentVersion = '2026-04-25-ooe-v2';
 
   factory OoeShiftSummary.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final map = doc.data();
@@ -111,6 +114,7 @@ class OoeShiftSummary {
         quality: 0,
         ooe: 0,
         topLosses: const [],
+        topTpmLosses: const [],
         lastCalculatedAt: now,
         calculationVersion: currentVersion,
       );
@@ -123,6 +127,16 @@ class OoeShiftSummary {
     final raw = map['topLosses'];
     if (raw is List) {
       topLosses = raw.map((e) {
+        if (e is Map<String, dynamic>) return Map<String, dynamic>.from(e);
+        if (e is Map) return Map<String, dynamic>.from(e);
+        return <String, dynamic>{};
+      }).toList();
+    }
+
+    List<Map<String, dynamic>> topTpmLosses = const [];
+    final rawTpm = map['topTpmLosses'];
+    if (rawTpm is List) {
+      topTpmLosses = rawTpm.map((e) {
         if (e is Map<String, dynamic>) return Map<String, dynamic>.from(e);
         if (e is Map) return Map<String, dynamic>.from(e);
         return <String, dynamic>{};
@@ -163,6 +177,7 @@ class OoeShiftSummary {
       quality: (map['quality'] as num?)?.toDouble() ?? 0,
       ooe: (map['ooe'] as num?)?.toDouble() ?? 0,
       topLosses: topLosses,
+      topTpmLosses: topTpmLosses,
       lastCalculatedAt:
           (map['lastCalculatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       calculationVersion:
@@ -205,6 +220,7 @@ class OoeShiftSummary {
       'quality': quality,
       'ooe': ooe,
       'topLosses': topLosses,
+      'topTpmLosses': topTpmLosses,
       'lastCalculatedAt': lastCalculatedAt,
       'calculationVersion': calculationVersion,
     };

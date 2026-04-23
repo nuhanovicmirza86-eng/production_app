@@ -12,6 +12,8 @@ import 'production_plan_gantt_screen.dart';
 import 'production_plan_execution_screen.dart';
 import 'production_planning_screen.dart';
 import 'production_plans_list_screen.dart';
+import 'planning_scenarios_tab.dart';
+import '../widgets/planning_fcs_reoptimize.dart';
 
 /// Zajednički **planning workflow**: zaglavlje (pogon, horizont, scenarij, vremenski odsjek, akcije, KPI) i tabovi
 /// Nalozi · Raspored · Provedba · Kapacitet.
@@ -37,7 +39,7 @@ class _ProductionPlanningHomeScreenState extends State<ProductionPlanningHomeScr
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 4, vsync: this);
+    _tab = TabController(length: 5, vsync: this);
     _session = PlanningSessionController(_cid, _pk)..loadPool();
   }
 
@@ -79,6 +81,8 @@ class _ProductionPlanningHomeScreenState extends State<ProductionPlanningHomeScr
       ),
     );
   }
+
+  Future<void> _onReoptimizeFcs() => reoptimizeFcsWithOptionalDialog(context, _session);
 
   Future<void> _onSave() async {
     await _session.saveDraft();
@@ -148,6 +152,7 @@ class _ProductionPlanningHomeScreenState extends State<ProductionPlanningHomeScr
                             session: _session,
                             onOpenGanttFullscreen: _openGanttFullscreen,
                             onSaveDraft: _onSave,
+                            onReoptimizeFcs: _onReoptimizeFcs,
                           ),
                         ),
                       ),
@@ -190,6 +195,7 @@ class _ProductionPlanningHomeScreenState extends State<ProductionPlanningHomeScr
                         r: _session.result!,
                         companyId: _cid,
                         plantKey: _pk,
+                        deliveryRisk: _session.planningDeliveryRisk,
                         compact: true,
                       ),
                     Expanded(
@@ -210,6 +216,7 @@ class _ProductionPlanningHomeScreenState extends State<ProductionPlanningHomeScr
                                       Tab(text: 'Raspored', icon: Icon(Icons.view_timeline_outlined)),
                                       Tab(text: 'Provedba', icon: Icon(Icons.fact_check_outlined)),
                                       Tab(text: 'Kapacitet', icon: Icon(Icons.speed_outlined)),
+                                      Tab(text: 'Scenariji', icon: Icon(Icons.hub_outlined)),
                                     ],
                                   ),
                                 ),
@@ -224,6 +231,10 @@ class _ProductionPlanningHomeScreenState extends State<ProductionPlanningHomeScr
                                       ),
                                       ProductionPlanExecutionScreen(companyData: widget.companyData),
                                       ProductionCapacityOverviewScreen(companyData: widget.companyData),
+                                      PlanningScenariosTab(
+                                        companyData: widget.companyData,
+                                        session: _session,
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -235,6 +246,7 @@ class _ProductionPlanningHomeScreenState extends State<ProductionPlanningHomeScr
                               session: _session,
                               onOpenGanttFullscreen: _openGanttFullscreen,
                               onSaveDraft: _onSave,
+                              onReoptimizeFcs: _onReoptimizeFcs,
                             ),
                         ],
                       ),

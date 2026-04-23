@@ -117,4 +117,59 @@ abstract final class OoeHelpTexts {
       'Period može biti dan, ISO tjedan ili pun mjesec; opseg cijeli pogon, linija '
       '(filtar na lineId u sažetku smjene) ili jedan stroj. Za tjedan/mjesec treba '
       'capacity_calendars za svaki dan u tom periodu (ili jednokratni zbir sekundi u Callable).';
+
+  static const teepKpiOeeTooltip = 'OEE u ovoj kartici';
+  static const teepKpiOeeTitle = 'OEE (planirana proizvodnja)';
+  static const teepKpiOeeBody =
+      'OEE ovdje koristi planirano vrijeme proizvodnje kao referencu: '
+      'Availability = rad / planirana proizvodnja, zatim OEE = A×P×Q. '
+      'Isti P i Q kao u OOE; mijenja se samo baza vremena za A.';
+
+  static const teepKpiOoeTooltip = 'OOE u ovoj kartici';
+  static const teepKpiOoeTitle = 'OOE (operativno / smjene)';
+  static const teepKpiOoeBody =
+      'OOE agregat koristi operativno (smensko) vrijeme: rad u odnosu na to što '
+      'je zakazano za pogon. Zato je OOE tipično niži od OEE kad plan ispod '
+      'operativnog povećava gubitke u kalendaru.';
+
+  static const teepKpiTeepTooltip = 'TEEP u ovoj kartici';
+  static const teepKpiTeepTitle = 'TEEP (kalendar)';
+  static const teepKpiTeepBody =
+      'TEEP = OEE × Utilization, gdje je Utilization = planirana proizvodnja / '
+      'kalendarsko vrijeme. Vidi cijeli dan/tjedan — uključuje nerad, vikend, '
+      'praznike ako su u kalendaru. Ne uspoređuj TEEP s OEE kao „istu stvar“.';
+
+  static const teepUtilizationTooltip = 'Iskorištenje kalendara';
+  static const teepUtilizationTitle = 'Utilization';
+  static const teepUtilizationBody =
+      'Koliki dio punog kalendara (sekunde) pretvaraš u planiranu proizvodnju. '
+      'To je množitelj koji spaja OEE s „koliko dana uopće radiš plan“.';
+
+  static const teepRecomputePanelTooltip = 'Kako preračun i sidro rade';
+  static const teepRecomputePanelTitle = 'Preračun TEEP (Callable)';
+  static const teepRecomputePanelBody =
+      'Biraš period (dan / tjedan / mjesec) i opseg: cijeli pogon, linija '
+      '(ID kao u ooe_shift_summaries.lineId) ili stroj (machineId). Sidro u kalendaru '
+      'je jedan dan; za tjedan se uzima cijeli ISO tjedan od ponedjeljka, za mjesec cijeli mjesec. '
+      'Pritisak na osvježi u traci otvara kalendar i šalje preračun s odabranim postavkama.';
+
+  static const teepHistorySectionTooltip = 'Što znači lista ispod';
+  static const teepHistorySectionTitle = 'Povijest perioda';
+  static const teepHistorySectionBody =
+      'Svaki red je jedan sačuvani proračun iz teep_summaries (s obzirom na opseg, '
+      'tipu perioda i datumu). Noviji su na vrhu ako ih je više. Možeš uspoređivati '
+      'OEE, OOE, TEEP i iskorištenje u istom retku.';
+
+  static const capacitySectionCalendarHeaderTooltip = 'Ova sekcija';
+  static const capacitySectionCalendarHeaderTitle = 'capacity_calendars';
+  static const capacitySectionCalendarHeaderBody =
+      'Dnevni zapisi: koliko u danu ima kalendarskog vremena, operativnog i '
+      'planirane proizvodnje. Isti opseg (pogon, linija, stroj) mora imati kalendar '
+      'za svaki dan kada preračunavaš tjedan ili mjesec.';
+
+  static const capacitySectionUtilizationHeaderTooltip = 'Ova sekcija';
+  static const capacitySectionUtilizationHeaderTitle = 'utilization_summaries';
+  static const capacitySectionUtilizationHeaderBody =
+      'Sažetak: koliko su plan, operativno i kalendar povezani (iskorištenje) za '
+      'već izračunat period. Dolazi s istim proračunom kao TEEP.';
 }

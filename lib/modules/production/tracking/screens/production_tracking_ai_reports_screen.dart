@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/format/ba_formatted_date.dart';
 import '../../../../core/saas/production_module_keys.dart';
-import '../../ai/screens/production_tracking_assistant_screen.dart';
-import '../../ai_analysis/screens/ai_analysis_screen.dart' show aiStructuredAnalysisVisibleForRole;
 import '../../reports/screens/production_ai_report_screen.dart'
     show ProductionAiReportScreen, productionAiReportVisibleForRole;
 import '../models/production_operator_tracking_entry.dart';
@@ -12,7 +12,8 @@ import '../models/production_tracking_ai_report_models.dart';
 import '../services/production_tracking_ai_reports_service.dart';
 import '../services/tracking_effective_plant_key.dart';
 
-/// Brzi dnevni izvještaji (škart, uređaji) + ulaz u asistenta s kontekstom — tab „AI izvještaji“.
+/// Brzi dnevni izvještaji (škart, uređaji) iz hub trake Praćenja — bez duplog chata;
+/// kontekst za OperonixAI na Pregledu može se kopirati u međuspremnik.
 class ProductionTrackingAiReportsScreen extends StatefulWidget {
   const ProductionTrackingAiReportsScreen({super.key, required this.companyData});
 
@@ -41,11 +42,6 @@ class _ProductionTrackingAiReportsScreenState
       (widget.companyData['companyId'] ?? '').toString().trim();
 
   String get _role => (widget.companyData['role'] ?? '').toString();
-
-  bool get _canAiAssistant {
-    return ProductionModuleKeys.hasAiProductionAnalyticsModule(widget.companyData) &&
-        aiStructuredAnalysisVisibleForRole(_role);
-  }
 
   bool get _canMarkdownReport {
     return ProductionModuleKeys.hasAiProductionMarkdownReportModule(widget.companyData) &&
@@ -116,9 +112,7 @@ class _ProductionTrackingAiReportsScreenState
     }
   }
 
-  String _fmtDay(BuildContext context) {
-    return MaterialLocalizations.of(context).formatFullDate(_day);
-  }
+  String _fmtDay() => BaFormattedDate.formatFullDate(_day);
 
   String _fmtPct(double v) =>
       '${v.toStringAsFixed(1).replaceAll('.', ',')}%';
@@ -141,18 +135,24 @@ class _ProductionTrackingAiReportsScreenState
     }
   }
 
-  void _openAssistantWithPrompt(BuildContext context) {
-    final prompt = _svc.buildAssistantPrompt(
-      workDateLabel: _fmtDay(context),
+  String _buildPromptForClipboard() {
+    return _svc.buildAssistantPrompt(
+      workDateLabel: _fmtDay(),
       plantLabel: _plantLabel ?? _plantKey ?? '',
       topProducts: _topProducts,
       topDevices: _topDevices,
+      allProductsRanked: _allProducts,
     );
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => ProductionTrackingAssistantScreen(
-          companyData: widget.companyData,
-          initialPrompt: prompt,
+  }
+
+  Future<void> _copyPromptForOverviewAssistant() async {
+    final text = _buildPromptForClipboard();
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Tekst kopiran. Na kartici Pregled zalijepi u OperonixAI asistenta ako želiš analizu.',
         ),
       ),
     );
@@ -180,7 +180,7 @@ class _ProductionTrackingAiReportsScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI izvještaji'),
+        title: const Text('Brzi izvještaji — dan'),
         actions: [
           IconButton(
             tooltip: 'Odaberi dan',
@@ -230,18 +230,23 @@ class _ProductionTrackingAiReportsScreenState
                     padding: const EdgeInsets.all(16),
                     children: [
                       Text(
-                        'Radni dan: ${_fmtDay(context)} · ${_plantLabel ?? _plantKey ?? ''}',
+                        'Radni dan: ${_fmtDay()} · ${_plantLabel ?? _plantKey ?? ''}',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Brzi pregled za dnevne odluke. Asistent koristi ove brojke kao kontekst.',
+                        'Dnevni pregled iz Praćenja: top problematični proizvodi po % škarta, cijeli popis po proizvodu, '
+                        'te top uređaji po zastojima, alarmima i kvarovima. '
+                        'Chat asistent ostaje na kartici Pregled — ovdje samo izvještaji; po želji kopiraj kontekst dolje.',
                         style: theme.textTheme.bodySmall?.copyWith(color: _muted),
                       ),
                       const SizedBox(height: 20),
-                      _sectionTitle(theme, 'Top 5 — najveći udio škarta'),
+                      _sectionTitle(
+                        theme,
+                        'Top 5 problematičnih proizvoda — najveći % škarta (dnevno)',
+                      ),
                       const SizedBox(height: 8),
                       _buildCard(
                         child: _topProducts.isEmpty
@@ -265,7 +270,10 @@ class _ProductionTrackingAiReportsScreenState
                               ),
                       ),
                       const SizedBox(height: 20),
-                      _sectionTitle(theme, 'Izvještaj po proizvodu (svi s podacima)'),
+                      _sectionTitle(
+                        theme,
+                        'Izvještaj po proizvodu (svi s agregatom za dan)',
+                      ),
                       const SizedBox(height: 8),
                       _buildCard(
                         child: _allProducts.isEmpty
@@ -329,7 +337,7 @@ class _ProductionTrackingAiReportsScreenState
                       const SizedBox(height: 20),
                       _sectionTitle(
                         theme,
-                        'Top 5 uređaja — zastoji, alarmi, kvarovi',
+                        'Top 5 uređaja — najviše zastoja, alarmi, kvarovi',
                       ),
                       const SizedBox(height: 8),
                       _buildCard(
@@ -369,38 +377,28 @@ class _ProductionTrackingAiReportsScreenState
                               ),
                       ),
                       const SizedBox(height: 20),
-                      _sectionTitle(theme, 'AI asistent — sugestije'),
+                      _sectionTitle(theme, 'Kontekst za OperonixAI (Pregled)'),
                       const SizedBox(height: 8),
                       _buildCard(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Text(
-                              'Asistent može povezati škart s ponavljajućim zastojima i alarmima '
-                              '(isti pogon, isti dan). Predloženi upit ispunjava se automatski; '
-                              'pošalji ga ili prilagodi.',
+                              'Dupli chat ovdje nije potreban. Gumb ispod kopira u međuspremnik isti strukturirani '
+                              'tekst (top škart, proizvodi, uređaji, zadatak za analizu) koji možeš zalijepiti u '
+                              'OperonixAI asistenta na kartici Pregled.',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: _muted,
                               ),
                             ),
                             const SizedBox(height: 12),
-                            if (_canAiAssistant)
-                              FilledButton.icon(
-                                onPressed: () =>
-                                    _openAssistantWithPrompt(context),
-                                icon: const Icon(Icons.psychology_outlined),
-                                label: const Text(
-                                  'Otvori asistenta s analizom dana',
-                                ),
-                              )
-                            else
-                              Text(
-                                'Potreban je modul AI Assistant Production (ili legacy ai_assistant) '
-                                'i uloga s pristupom operativnom asistentu.',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: cs.outline,
-                                ),
+                            OutlinedButton.icon(
+                              onPressed: _copyPromptForOverviewAssistant,
+                              icon: const Icon(Icons.copy_outlined),
+                              label: const Text(
+                                'Kopiraj predloženi upit za asistenta',
                               ),
+                            ),
                           ],
                         ),
                       ),

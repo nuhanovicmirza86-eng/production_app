@@ -5,6 +5,7 @@ import '../../production_orders/services/production_order_service.dart';
 import '../models/planning_conflict.dart';
 import '../models/planning_engine_result.dart';
 import '../models/planning_resource_snapshot.dart';
+import '../models/planning_schedule_strategy.dart';
 import '../models/production_plan.dart';
 import '../models/production_plan_item.dart';
 import '../models/production_plan_status.dart';
@@ -13,8 +14,9 @@ import 'planning_routing_service.dart';
 
 /// **Finite capacity scheduling** — lokalni izvor istine; plan se po želji sprema u Firestore.
 ///
-/// - Nalozi **EDD**; ako postoji [routing_steps] za `routingId` naloga, planira se
-///   **više operacija** s redom; inače jedna sintetička.
+/// - Redoslijed naloga: [PlanningScheduleStrategy] (EDD prema roku, ili SPT prema procijenjenom poslu);
+///   ako postoji [routing_steps] za `routingId` naloga, planira se **više operacija** s redom; inače
+///   jedna sintetička.
 /// - Stroj: [PlanningRoutingStep] može imati `machineId`; inače stroj s naloga.
 /// - Vrijeme: setup + (količina × min/jed iz standarda) / [performanceFactor], ili globalni ciklus (s/kom).
 class PlanningEngineService {
@@ -41,6 +43,7 @@ class PlanningEngineService {
     double performanceFactor = 0.65,
     double setupMinutes = defaultSetupMinutes,
     double cycleSecPerUnit = defaultCycleSecPerUnit,
+    PlanningScheduleStrategy scheduleStrategy = PlanningScheduleStrategy.eddDueDate,
   }) async {
     if (!horizonEnd.isAfter(horizonStart)) {
       throw ArgumentError('horizonEnd mora biti poslije horizonStart.');
@@ -60,7 +63,14 @@ class PlanningEngineService {
     }
 
     pool = pool.take(maxOrdersPerRun).toList();
-    _sortForScheduling(pool);
+    await _orderPoolForStrategy(
+      pool,
+      companyId: companyId,
+      scheduleStrategy: scheduleStrategy,
+      setupMinutes: setupMinutes,
+      cycleMinPerUnit: cycleMinPerUnit,
+      perf: perf,
+    );
 
     final planId = 'local_${DateTime.now().microsecondsSinceEpoch}';
     final now = DateTime.now();
@@ -421,9 +431,12 @@ class PlanningEngineService {
         : machineAssignedMin.values.fold<int>(0, (a, b) => a + b) /
             (math.max(1, machineAssignedMin.length * horizonMin));
 
-    final strategy = usedRouting
-        ? 'edd_finite_routing_multi_v1'
-        : 'edd_finite_synthetic_v1';
+    final baseName =
+        usedRouting ? 'finite_routing_multi_v1' : 'finite_synthetic_v1';
+    final strategyStr = (scheduleStrategy == PlanningScheduleStrategy.sptTotalWork
+            ? 'spt_'
+            : 'edd_') +
+        baseName;
 
     final plan = ProductionPlan(
       id: planId,
@@ -434,7 +447,7 @@ class PlanningEngineService {
       createdAt: now,
       planningStart: horizonStart,
       planningEnd: horizonEnd,
-      strategy: strategy,
+      strategy: strategyStr,
       items: items,
       totalOrders: totalPlanned,
       totalConflicts: conflicts.length,
@@ -491,6 +504,85 @@ class PlanningEngineService {
       }
       return b.createdAt.compareTo(a.createdAt);
     });
+  }
+
+  Future<void> _orderPoolForStrategy(
+    List<ProductionOrderModel> pool, {
+    required String companyId,
+    required PlanningScheduleStrategy scheduleStrategy,
+    required double setupMinutes,
+    required double cycleMinPerUnit,
+    required double perf,
+  }) async {
+    switch (scheduleStrategy) {
+      case PlanningScheduleStrategy.eddDueDate:
+        _sortForScheduling(pool);
+        return;
+      case PlanningScheduleStrategy.sptTotalWork:
+        await _sortSptByEstimatedWork(
+          pool,
+          companyId: companyId,
+          setupMinutes: setupMinutes,
+          cycleMinPerUnit: cycleMinPerUnit,
+          perf: perf,
+        );
+        return;
+    }
+  }
+
+  Future<void> _sortSptByEstimatedWork(
+    List<ProductionOrderModel> pool, {
+    required String companyId,
+    required double setupMinutes,
+    required double cycleMinPerUnit,
+    required double perf,
+  }) async {
+    final est = <String, double>{};
+    for (final o in pool) {
+      final m = await _estimateOrderTotalWorkMinutes(
+        o,
+        companyId: companyId,
+        setupMinutes: setupMinutes,
+        cycleMinPerUnit: cycleMinPerUnit,
+        perf: perf,
+      );
+      est[o.id] = m;
+    }
+    pool.sort((a, b) {
+      final ca = est[a.id] ?? 0;
+      final cb = est[b.id] ?? 0;
+      final c = ca.compareTo(cb);
+      if (c != 0) return c;
+      return a.createdAt.compareTo(b.createdAt);
+    });
+  }
+
+  Future<double> _estimateOrderTotalWorkMinutes(
+    ProductionOrderModel o, {
+    required String companyId,
+    required double setupMinutes,
+    required double cycleMinPerUnit,
+    required double perf,
+  }) async {
+    final rem = _remainingQty(o);
+    if (rem <= 0) return 0;
+    final steps = await _routing.loadStepsForOrder(
+      companyId: companyId,
+      routingId: o.routingId,
+    );
+    if (steps.isEmpty) {
+      return setupMinutes + rem * cycleMinPerUnit / perf;
+    }
+    var sum = 0.0;
+    for (final step in steps) {
+      final su = step.setupTimeMinutes ?? setupMinutes;
+      final runMin = (step.standardTimeMinutesPerUnit != null &&
+              step.standardTimeMinutesPerUnit! > 0)
+          ? (rem * step.standardTimeMinutesPerUnit! / perf)
+          : (rem * cycleMinPerUnit / perf);
+      sum += su + runMin;
+    }
+    return sum;
   }
 
   double _remainingQty(ProductionOrderModel o) {

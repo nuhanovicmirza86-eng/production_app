@@ -256,20 +256,25 @@ class _PlanningExecutionShiftBoardState extends State<PlanningExecutionShiftBoar
               ),
               const DataColumn(label: Text('Status (plan)')),
             ],
-            rows: machineKeys.map((mk) {
-              final op = byMachine[mk]!.first;
-              return DataRow(
-                cells: [
-                  DataCell(Text(labelFor(mk))),
-                  DataCell(Text(orderCodes[op.productionOrderId] ?? '—')),
-                  DataCell(Text(_fmtDt(op.plannedStart))),
-                  DataCell(Text(_fmtDt(op.plannedEnd))),
-                  DataCell(Text(_actualText(orders, op.productionOrderId))),
-                  DataCell(Text(_mesTodayText(orders, mesByOrder, op.productionOrderId, mk))),
-                  DataCell(Text(_statusHr(op.status))),
-                ],
-              );
-            }).toList(),
+            rows: [
+              for (final mk in machineKeys)
+                for (final op in byMachine[mk]!)
+                  DataRow(
+                    cells: [
+                      DataCell(Text(labelFor(mk))),
+                      DataCell(Text(orderCodes[op.productionOrderId] ?? '—')),
+                      DataCell(Text(_fmtDt(op.plannedStart))),
+                      DataCell(Text(_fmtDt(op.plannedEnd))),
+                      DataCell(Text(_actualText(orders, op.productionOrderId))),
+                      DataCell(
+                        Text(
+                          _mesTodayText(orders, mesByOrder, op.productionOrderId, mk),
+                        ),
+                      ),
+                      DataCell(Text(_statusHr(op.status))),
+                    ],
+                  ),
+            ],
           ),
         );
       },

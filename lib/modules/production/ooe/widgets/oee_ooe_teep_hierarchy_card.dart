@@ -58,6 +58,9 @@ class OeeOoeTeepHierarchyCard extends StatelessWidget {
               subtitle: 'u planiranom vremenu proizvodnje',
               value: s == null ? null : _pct(s.oee),
               color: cs.primary,
+              infoTooltip: OoeHelpTexts.teepKpiOeeTooltip,
+              infoTitle: OoeHelpTexts.teepKpiOeeTitle,
+              infoBody: OoeHelpTexts.teepKpiOeeBody,
             ),
             const SizedBox(height: 8),
             _kpiRow(
@@ -66,6 +69,9 @@ class OeeOoeTeepHierarchyCard extends StatelessWidget {
               subtitle: 'u operativnom vremenu',
               value: s == null ? null : _pct(s.ooe),
               color: cs.secondary,
+              infoTooltip: OoeHelpTexts.teepKpiOoeTooltip,
+              infoTitle: OoeHelpTexts.teepKpiOoeTitle,
+              infoBody: OoeHelpTexts.teepKpiOoeBody,
             ),
             const SizedBox(height: 8),
             _kpiRow(
@@ -74,12 +80,28 @@ class OeeOoeTeepHierarchyCard extends StatelessWidget {
               subtitle: 'u punom kalendarskom vremenu · TEEP = OEE × Utilization',
               value: s == null ? null : _pct(s.teep),
               color: cs.tertiary,
+              infoTooltip: OoeHelpTexts.teepKpiTeepTooltip,
+              infoTitle: OoeHelpTexts.teepKpiTeepTitle,
+              infoBody: OoeHelpTexts.teepKpiTeepBody,
             ),
             if (s != null) ...[
               const Divider(height: 20),
-              Text(
-                'Iskorištenje kalendara (Utilization): ${_pct(s.utilization)}',
-                style: Theme.of(context).textTheme.bodySmall,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Iskorištenje kalendara (Utilization): ${_pct(s.utilization)}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                  OoeInfoIcon(
+                    tooltip: OoeHelpTexts.teepUtilizationTooltip,
+                    dialogTitle: OoeHelpTexts.teepUtilizationTitle,
+                    dialogBody: OoeHelpTexts.teepUtilizationBody,
+                    iconSize: 18,
+                  ),
+                ],
               ),
             ],
           ],
@@ -94,6 +116,9 @@ class OeeOoeTeepHierarchyCard extends StatelessWidget {
     required String subtitle,
     required String? value,
     required Color color,
+    required String infoTooltip,
+    required String infoTitle,
+    required String infoBody,
   }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,6 +160,12 @@ class OeeOoeTeepHierarchyCard extends StatelessWidget {
                 ),
             ],
           ),
+        ),
+        OoeInfoIcon(
+          tooltip: infoTooltip,
+          dialogTitle: infoTitle,
+          dialogBody: infoBody,
+          iconSize: 18,
         ),
       ],
     );

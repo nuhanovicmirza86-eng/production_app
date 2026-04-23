@@ -41,10 +41,14 @@ class PlanningFiltersBar extends StatelessWidget {
         s.poolFilterDueWithinDays != null ||
         s.poolFilterNoMachine ||
         s.poolFilterMachineId != null ||
-        s.poolFilterOperationName != null;
+        s.poolFilterOperationName != null ||
+        s.poolFilterLineId != null ||
+        s.poolFilterCustomerName != null;
 
     final machineOpts = s.machineFilterOptions;
     final opNames = s.poolDistinctOperationNames;
+    final lineOpts = s.lineFilterOptions;
+    final customers = s.poolDistinctCustomerNames;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -170,8 +174,67 @@ class PlanningFiltersBar extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
+        Text('Linija (nalog, lineId)', style: t.textTheme.labelLarge),
+        const SizedBox(height: 4),
+        InputDecorator(
+          decoration: const InputDecoration(
+            isDense: true,
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String?>(
+              isExpanded: true,
+              value: s.poolFilterLineId != null && lineOpts.any((e) => e.id == s.poolFilterLineId)
+                  ? s.poolFilterLineId
+                  : null,
+              hint: Text(lineOpts.isEmpty ? 'Nema lineId u poolu' : 'Sve linije'),
+              items: [
+                const DropdownMenuItem<String?>(value: null, child: Text('Sve linije')),
+                ...lineOpts.map(
+                  (e) => DropdownMenuItem<String?>(
+                    value: e.id,
+                    child: Text(e.label, overflow: TextOverflow.ellipsis),
+                  ),
+                ),
+              ],
+              onChanged: s.isLocked || lineOpts.isEmpty ? null : s.setPoolFilterLineId,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text('Kupac (nalog)', style: t.textTheme.labelLarge),
+        const SizedBox(height: 4),
+        InputDecorator(
+          decoration: const InputDecoration(
+            isDense: true,
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String?>(
+              isExpanded: true,
+              value: s.poolFilterCustomerName != null &&
+                      customers.contains(s.poolFilterCustomerName)
+                  ? s.poolFilterCustomerName
+                  : null,
+              hint: Text(customers.isEmpty ? 'Nema kupca u poolu' : 'Svi kupci'),
+              items: [
+                const DropdownMenuItem<String?>(value: null, child: Text('Svi kupci')),
+                ...customers.map(
+                  (name) => DropdownMenuItem<String?>(
+                    value: name,
+                    child: Text(name, overflow: TextOverflow.ellipsis),
+                  ),
+                ),
+              ],
+              onChanged: s.isLocked || customers.isEmpty ? null : s.setPoolFilterCustomerName,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
         Text(
-          'Work centar, alat, kupac, ERP šifrarnik — mogu u sljedećoj fazi; stroj/segment/rok ovise o poljima proizvodnog naloga u poolu.',
+          'Alat / work-centar: kad budu u modelu naloga (ili routingu), ovdje se mogu proširiti; segment i stroj već slijede nalog u poolu.',
           style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
         ),
       ],

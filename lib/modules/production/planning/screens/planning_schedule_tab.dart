@@ -14,7 +14,7 @@ class PlanningScheduleTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final session = PlanningWorkflowScope.of(context);
-    final d = session.ganttDto;
+    final d = session.ganttForDisplay;
     if (session.result == null || d == null || d.operations.isEmpty) {
       return Center(
         child: Padding(
@@ -42,7 +42,23 @@ class PlanningScheduleTab extends StatelessWidget {
           child: Wrap(
             spacing: 8,
             runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
+              FilterChip(
+                label: const Text('Stvarno (MES)'),
+                selected: session.showMesGanttOverlay,
+                onSelected: session.isLocked
+                    ? null
+                    : (v) => session.setShowMesGanttOverlay(v),
+              ),
+              if (session.mesGanttLoading) ...[
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                Text('Učitavam MES…', style: Theme.of(context).textTheme.labelSmall),
+              ],
               FilledButton.tonalIcon(
                 onPressed: session.isLocked ? null : onOpenFullscreen,
                 icon: const Icon(Icons.open_in_new),

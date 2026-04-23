@@ -309,6 +309,18 @@ class QualityCallableService {
     return id;
   }
 
+  /// Brisanje reda u `qms_documents` (+ Storage datoteka ako postoji putanja).
+  Future<void> deleteQmsDocument({
+    required String companyId,
+    required String qmsDocumentId,
+  }) async {
+    final callable = _functions.httpsCallable('deleteQmsDocument');
+    await callable.call({
+      'companyId': companyId,
+      'qmsDocumentId': qmsDocumentId,
+    });
+  }
+
   /// Zadnji rezultati kontrola (OK/NOK, lot, plan, datum).
   Future<List<QmsInspectionResultRow>> listInspectionResults({
     required String companyId,

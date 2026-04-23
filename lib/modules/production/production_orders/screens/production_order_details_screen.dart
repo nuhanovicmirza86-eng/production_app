@@ -7,6 +7,10 @@ import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/user_display_label.dart';
 import '../../execution/screens/production_execution_screen.dart';
 import '../../execution/services/production_execution_service.dart';
+import '../../ooe/ooe_help_texts.dart';
+import '../../ooe/services/machine_state_service.dart';
+import '../../ooe/widgets/ooe_info_icon.dart';
+import '../../ooe/widgets/ooe_timeline_widget.dart';
 import '../../products/services/product_service.dart';
 import '../models/production_order_model.dart';
 import '../printing/bom_classification_catalog.dart';
@@ -36,6 +40,7 @@ class _ProductionOrderDetailsScreenState
   final ProductionOrderService _service = ProductionOrderService();
   final ProductionExecutionService _executionService =
       ProductionExecutionService();
+  final MachineStateService _ooeMachineStateService = MachineStateService();
   final ProductService _productService = ProductService();
 
   bool _isLoading = true;
@@ -1041,6 +1046,75 @@ class _ProductionOrderDetailsScreenState
             ),
           ),
         ),
+        if ((order.machineId ?? '').trim().isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'OOE — segmenti stanja',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      OoeInfoIcon(
+                        tooltip: OoeHelpTexts.orderDetailsOoeTooltip,
+                        dialogTitle: OoeHelpTexts.orderDetailsOoeTitle,
+                        dialogBody: OoeHelpTexts.orderDetailsOoeBody,
+                        iconSize: 20,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  StreamBuilder(
+                    stream: _ooeMachineStateService.watchEventsForOrder(
+                      companyId: _companyId,
+                      plantKey: _plantKey,
+                      orderId: order.id,
+                      limit: 20,
+                    ),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return Text(
+                          'OOE podaci trenutno nisu dostupni (${snapshot.error}).',
+                        );
+                      }
+                      if (!snapshot.hasData) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Center(
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        );
+                      }
+                      final events = snapshot.data!;
+                      if (events.isEmpty) {
+                        return Text(
+                          'Nema segmenata',
+                          style: TextStyle(color: Colors.grey.shade700),
+                        );
+                      }
+                      return OoeTimelineWidget(events: events);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         Card(
           clipBehavior: Clip.antiAlias,

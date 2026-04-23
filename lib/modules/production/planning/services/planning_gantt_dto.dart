@@ -2,6 +2,9 @@ import 'package:flutter/foundation.dart';
 
 import '../models/planning_engine_result.dart';
 
+/// Vrsta bloka: plan (FCS) / stvarno iz MES / budući stop (održavanje) — [mesActual] se ne pomiče.
+enum PlanningGanttBlockKind { plannedFcs, mesActual, maintenanceStop }
+
 /// Jedan blok u Gantt prikazu (nakon učitavanja ili iz motora u memoriji).
 @immutable
 class PlanningGanttOp {
@@ -11,21 +14,25 @@ class PlanningGanttOp {
     required this.plannedStart,
     required this.plannedEnd,
     this.scheduledOperationId,
+    this.productionOrderId,
     this.runStart,
     this.runEnd,
     this.operationLabel,
+    this.blockKind = PlanningGanttBlockKind.plannedFcs,
   });
 
   final String orderCode;
   final String machineId;
   final DateTime plannedStart;
   final DateTime plannedEnd;
+  final String? productionOrderId;
   /// Identitet operacije (motor / Firestore doc); potreban za DnD.
   final String? scheduledOperationId;
   final DateTime? runStart;
   final DateTime? runEnd;
   /// Prikaz koraka (routings) ili sintetički; iz [ScheduledOperation.sourceFactors] / Firestorea.
   final String? operationLabel;
+  final PlanningGanttBlockKind blockKind;
 }
 
 /// Ulaz za Gantt ekran (iz memorije ili nakon učitavanja iz baze).
@@ -64,10 +71,12 @@ class PlanningGanttDto {
             machineId: op.machineId,
             plannedStart: op.plannedStart,
             plannedEnd: op.plannedEnd,
+            productionOrderId: op.productionOrderId,
             scheduledOperationId: op.id,
             runStart: op.runStart,
             runEnd: op.runEnd,
             operationLabel: _operationLabelFromSource(op.sourceFactors),
+            blockKind: PlanningGanttBlockKind.plannedFcs,
           ),
         )
         .toList();

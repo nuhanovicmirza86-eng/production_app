@@ -11,11 +11,15 @@ class OoeLiveStatusCard extends StatelessWidget {
   final String? machineDisplayName;
   final VoidCallback? onOpenDetails;
 
+  /// Ciljni OOE [0,1] iz `ooe_machine_targets`, ako postoji.
+  final double? targetOoe;
+
   const OoeLiveStatusCard({
     super.key,
     required this.status,
     this.machineDisplayName,
     this.onOpenDetails,
+    this.targetOoe,
   });
 
   String _pct(double x) => '${(x * 100).toStringAsFixed(1)} %';
@@ -68,6 +72,18 @@ class OoeLiveStatusCard extends StatelessWidget {
                                 color: Theme.of(context)
                                     .colorScheme
                                     .onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        if (targetOoe != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              'Cilj OOE: ${_pct(targetOoe!)} · trenutno ${_pct(status.currentShiftOoe)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context).colorScheme.tertiary,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),

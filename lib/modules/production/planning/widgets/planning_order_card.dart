@@ -63,6 +63,7 @@ class PlanningOrderCard extends StatelessWidget {
                               ),
                             ),
                           ),
+                          planningOrderSignalRow(t, order),
                           PopupMenuButton<String>(
                             enabled: !session.isLocked,
                             onSelected: (v) {

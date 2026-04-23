@@ -1,14 +1,21 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:flutter/material.dart';
 
 import '../production_orders/models/production_order_model.dart';
 import '../production_orders/services/production_order_service.dart';
+import '../execution/services/production_execution_service.dart';
 import '../tracking/services/production_asset_display_lookup.dart';
+import 'models/planning_conflict.dart';
+import 'models/planning_delivery_risk.dart';
 import 'models/planning_engine_result.dart';
+import 'models/planning_schedule_strategy.dart';
 import 'models/scheduled_operation.dart';
 import 'services/planning_engine_service.dart';
 import 'services/planning_gantt_dto.dart';
+import 'services/planning_mes_gantt_merge.dart';
+import 'services/planning_execution_variance_service.dart';
 import 'services/production_plan_persistence_service.dart';
 
 /// Zajedničko stanje planiranja za [ProductionPlanningHomeScreen] i tabove.
@@ -16,7 +23,9 @@ class PlanningSessionController extends ChangeNotifier {
   PlanningSessionController(this.companyId, this.plantKey)
       : _engine = PlanningEngineService(),
         _orderService = ProductionOrderService(),
-        _persistence = ProductionPlanPersistenceService() {
+        _persistence = ProductionPlanPersistenceService(),
+        _executionService = ProductionExecutionService(),
+        _varianceService = PlanningExecutionVarianceService() {
     perfController = TextEditingController(text: '0.65');
     setupController = TextEditingController(text: '30');
     cycleController = TextEditingController(text: '60');
@@ -28,6 +37,8 @@ class PlanningSessionController extends ChangeNotifier {
   final PlanningEngineService _engine;
   final ProductionOrderService _orderService;
   final ProductionPlanPersistenceService _persistence;
+  final ProductionExecutionService _executionService;
+  final PlanningExecutionVarianceService _varianceService;
 
   late final TextEditingController perfController;
   late final TextEditingController setupController;
@@ -39,6 +50,8 @@ class PlanningSessionController extends ChangeNotifier {
   String? errorMessage;
   bool saving = false;
   int horizonDays = 14;
+  /// F4.3 — redoslijed naloga u FCS: EDD (rok) ili SPT (kraći procijenjeni posao prvi).
+  PlanningScheduleStrategy scheduleStrategy = PlanningScheduleStrategy.eddDueDate;
   int scenarioIndex = 0;
   /// 0=smjena, 1=dan, 2=tjedan (povezat će se s MES/šiftom kasnije).
   int timeScopeIndex = 1;
@@ -66,11 +79,33 @@ class PlanningSessionController extends ChangeNotifier {
   String? poolFilterMachineId;
   /// `null` = sve. Inače točno podudaranje [ProductionOrderModel.operationName].
   String? poolFilterOperationName;
+  /// `null` = sve linije. [ProductionOrderModel.lineId].
+  String? poolFilterLineId;
+  /// `null` = svi. Točan kupac s naloga (prikaz imena u poolu).
+  String? poolFilterCustomerName;
+  /// FCS (plave) + MES (narandžaste) u Ganttu.
+  bool showMesGanttOverlay = true;
+  bool _mesGanttLoading = false;
+  PlanningGanttDto? _ganttWithMes;
+  final Set<String> _dismissedEngineConflictKeys = {};
+  /// Faza 3: uzrok po `ScheduledOperation.id` (draft do spremanja; Firestore nakon [saveDraft] + Spremi uzroke).
+  final Map<String, String> _varianceRootByClientOpId = {};
+  final Map<String, String> _varianceNotesByClientOpId = {};
+  String? _executionVariancesLoadedForPlanId;
+  bool persistingExecutionVariances = false;
   ProductionOrderModel? selectedOrder;
   Map<String, String> ganttMachineLabels = const {};
   String? ganttLabelForResultId;
   /// Ime stroja s poola (šifarnik) kada Gantt još nema taj resurs.
   Map<String, String> _poolMachineIdLabels = const {};
+
+  void setScheduleStrategy(PlanningScheduleStrategy s) {
+    if (scheduleStrategy == s) {
+      return;
+    }
+    scheduleStrategy = s;
+    notifyListeners();
+  }
 
   bool get isLocked => busy || saving;
 
@@ -104,6 +139,25 @@ class PlanningSessionController extends ChangeNotifier {
       final on = poolFilterOperationName!.trim();
       if (on.isNotEmpty) {
         list = list.where((o) => (o.operationName ?? '').trim() == on).toList();
+      }
+    }
+    if (poolFilterLineId != null) {
+      final l = poolFilterLineId!.trim();
+      if (l.isNotEmpty) {
+        list = list.where((o) => (o.lineId ?? '').trim() == l).toList();
+      }
+    }
+    if (poolFilterCustomerName != null) {
+      final c = poolFilterCustomerName!.trim();
+      if (c.isNotEmpty) {
+        list = list
+            .where(
+              (o) =>
+                  ((o.customerName ?? o.sourceCustomerName) ?? '')
+                      .trim() ==
+                  c,
+            )
+            .toList();
       }
     }
     return list;
@@ -186,12 +240,210 @@ class PlanningSessionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setPoolFilterLineId(String? value) {
+    final v = value?.trim();
+    poolFilterLineId = (v == null || v.isEmpty) ? null : v;
+    notifyListeners();
+  }
+
+  void setPoolFilterCustomerName(String? value) {
+    final v = value?.trim();
+    poolFilterCustomerName = (v == null || v.isEmpty) ? null : v;
+    notifyListeners();
+  }
+
+  void setShowMesGanttOverlay(bool v) {
+    showMesGanttOverlay = v;
+    final b = ganttDto;
+    if (b != null) {
+      unawaited(_afterGanttBaseReady(b));
+    } else {
+      notifyListeners();
+    }
+  }
+
+  /// Ponovno učitava MES intervale npr. nakon „Osvježi MES” u Provedbi.
+  Future<void> refreshMesGanttOverlay() async {
+    final b = ganttDto;
+    if (b == null) {
+      return;
+    }
+    await _afterGanttBaseReady(b);
+  }
+
+  String _conflictKey(PlanningConflict c) => '${c.type.name}::${c.message}';
+
+  void dismissEngineConflict(PlanningConflict c) {
+    _dismissedEngineConflictKeys.add(_conflictKey(c));
+    notifyListeners();
+  }
+
+  void clearDismissedEngineConflicts() {
+    _dismissedEngineConflictKeys.clear();
+    notifyListeners();
+  }
+
+  String? getExecutionVarianceRootDraft(String clientOperationId) =>
+      _varianceRootByClientOpId[clientOperationId];
+
+  String? getExecutionVarianceNotesDraft(String clientOperationId) =>
+      _varianceNotesByClientOpId[clientOperationId];
+
+  void setExecutionVarianceDraft(
+    String clientOperationId, {
+    required String? rootCauseCode,
+    String? notes,
+  }) {
+    final r = rootCauseCode?.trim();
+    if (r == null || r.isEmpty) {
+      _varianceRootByClientOpId.remove(clientOperationId);
+    } else {
+      _varianceRootByClientOpId[clientOperationId] = r;
+    }
+    final n = notes?.trim();
+    if (n == null || n.isEmpty) {
+      _varianceNotesByClientOpId.remove(clientOperationId);
+    } else {
+      _varianceNotesByClientOpId[clientOperationId] = n;
+    }
+    notifyListeners();
+  }
+
+  Future<void> loadExecutionVariancesForSavedPlan() async {
+    final pid = lastSavedPlanId;
+    if (pid == null || pid.isEmpty) {
+      return;
+    }
+    if (_executionVariancesLoadedForPlanId == pid) {
+      return;
+    }
+    if (companyId.isEmpty || plantKey.isEmpty) {
+      return;
+    }
+    try {
+      final list = await _varianceService.listForPlan(
+        planId: pid,
+        companyId: companyId,
+        plantKey: plantKey,
+      );
+      for (final e in list) {
+        _varianceRootByClientOpId[e.clientOperationId] = e.rootCauseCode;
+        if (e.notes != null && e.notes!.trim().isNotEmpty) {
+          _varianceNotesByClientOpId[e.clientOperationId] = e.notes!.trim();
+        } else {
+          _varianceNotesByClientOpId.remove(e.clientOperationId);
+        }
+      }
+      _executionVariancesLoadedForPlanId = pid;
+    } catch (_) {
+      // ostaje draft
+    }
+    notifyListeners();
+  }
+
+  /// Upis u `execution_variances` za svaku operaciju u zadnjem rezultatu (uz MES trenutke).
+  Future<void> persistAllExecutionVariancesToFirestore() async {
+    final r = result;
+    if (r == null || r.scheduledOperations.isEmpty) {
+      return;
+    }
+    final pid = lastSavedPlanId;
+    if (pid == null || pid.isEmpty) {
+      return;
+    }
+    persistingExecutionVariances = true;
+    errorMessage = null;
+    notifyListeners();
+    try {
+      final ids = r.scheduledOperations.map((e) => e.productionOrderId).toSet();
+      final mes = await _executionService.getExecutionsByOrderIds(
+        companyId: companyId,
+        plantKey: plantKey,
+        productionOrderIds: ids,
+      );
+      for (final op in r.scheduledOperations) {
+        final list = mes[op.productionOrderId] ?? const <Map<String, dynamic>>[];
+        final actual = _bestMesStartEndOnMachine(
+          list,
+          op.machineId,
+        );
+        final code = getExecutionVarianceRootDraft(op.id) ?? 'unknown';
+        final notes = getExecutionVarianceNotesDraft(op.id);
+        await _varianceService.upsertForOperation(
+          planId: pid,
+          companyId: companyId,
+          plantKey: plantKey,
+          clientOperationId: op.id,
+          productionOrderId: op.productionOrderId,
+          orderCode: _productionOrderCodeFor(r, op.productionOrderId),
+          machineId: op.machineId,
+          plannedStart: op.plannedStart,
+          plannedEnd: op.plannedEnd,
+          actualStart: actual?.$1,
+          actualEnd: actual?.$2,
+          rootCauseCode: code,
+          notes: notes,
+        );
+      }
+      _executionVariancesLoadedForPlanId = pid;
+    } catch (e) {
+      errorMessage = 'Varijance nisu spremljene. Provjera mreže i uloga.';
+    } finally {
+      persistingExecutionVariances = false;
+      notifyListeners();
+    }
+  }
+
+  (DateTime, DateTime?)? _bestMesStartEndOnMachine(
+    List<Map<String, dynamic>> execs,
+    String machineId,
+  ) {
+    final mid = machineId.trim();
+    if (mid.isEmpty) {
+      return null;
+    }
+    DateTime? bestS;
+    DateTime? bestE;
+    for (final m in execs) {
+      if ((m['machineId'] ?? '').toString().trim() != mid) {
+        continue;
+      }
+      final s = m['startedAt'];
+      if (s is! Timestamp) {
+        continue;
+      }
+      final start = s.toDate();
+      if (bestS == null || start.isAfter(bestS)) {
+        bestS = start;
+        final e = m['endedAt'];
+        bestE = e is Timestamp ? e.toDate() : null;
+      }
+    }
+    final bs = bestS;
+    if (bs == null) {
+      return null;
+    }
+    return (bs, bestE);
+  }
+
+  List<PlanningConflict> get visibleEngineConflicts {
+    final r = result;
+    if (r == null) {
+      return const [];
+    }
+    return r.conflicts
+        .where((c) => !_dismissedEngineConflictKeys.contains(_conflictKey(c)))
+        .toList();
+  }
+
   void clearPoolFilters() {
     poolFilterHasMachine = false;
     poolFilterDueWithinDays = null;
     poolFilterNoMachine = false;
     poolFilterMachineId = null;
     poolFilterOperationName = null;
+    poolFilterLineId = null;
+    poolFilterCustomerName = null;
     notifyListeners();
   }
 
@@ -199,6 +451,48 @@ class PlanningSessionController extends ChangeNotifier {
     final r = result;
     if (r == null) return null;
     return PlanningGanttDto.fromEngineResult(r);
+  }
+
+  /// Prikaz: plan (FCS) + opc. MES preko [showMesGanttOverlay] nakon učitavanja.
+  PlanningGanttDto? get ganttForDisplay {
+    final b = ganttDto;
+    if (b == null) {
+      return null;
+    }
+    if (showMesGanttOverlay && _ganttWithMes != null) {
+      return _ganttWithMes;
+    }
+    return b;
+  }
+
+  bool get mesGanttLoading => _mesGanttLoading;
+
+  List<({String id, String label})> get lineFilterOptions {
+    final ids = <String>{};
+    for (final o in pool) {
+      final l = o.lineId?.trim();
+      if (l != null && l.isNotEmpty) {
+        ids.add(l);
+      }
+    }
+    final out = <({String id, String label})>[];
+    for (final id in ids) {
+      out.add((id: id, label: id));
+    }
+    out.sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
+    return out;
+  }
+
+  List<String> get poolDistinctCustomerNames {
+    final s = <String>{};
+    for (final o in pool) {
+      final c = (o.customerName ?? o.sourceCustomerName)?.trim();
+      if (c != null && c.isNotEmpty) {
+        s.add(c);
+      }
+    }
+    final l = s.toList()..sort();
+    return l;
   }
 
   /// Parovi operacija na istom stroju s vremenskim preklapanjem (nakon ručnog pomicanja).
@@ -277,6 +571,10 @@ class PlanningSessionController extends ChangeNotifier {
     return orderId;
   }
 
+  /// UI: šifra naloga u kontekstu zadnjeg [PlanningEngineResult].
+  String engineOrderCode(PlanningEngineResult r, String productionOrderId) =>
+      _productionOrderCodeFor(r, productionOrderId);
+
   void setSearchQuery(String v) {
     searchQuery = v;
     notifyListeners();
@@ -285,6 +583,10 @@ class PlanningSessionController extends ChangeNotifier {
   void bumpMesBoardRefresh() {
     mesBoardRefreshToken++;
     notifyListeners();
+    final b = ganttDto;
+    if (b != null) {
+      unawaited(_afterGanttBaseReady(b));
+    }
   }
 
   /// Pomiče operaciju u nacrtu (vremenska os); **ne** pokreće ponovno FCS — KPI/konflikti mogu biti zastarjeli.
@@ -434,6 +736,23 @@ class PlanningSessionController extends ChangeNotifier {
         poolFilterOperationName = null;
       }
     }
+    if (poolFilterLineId != null) {
+      final l = poolFilterLineId!.trim();
+      if (l.isEmpty || !pool.any((o) => (o.lineId ?? '').trim() == l)) {
+        poolFilterLineId = null;
+      }
+    }
+    if (poolFilterCustomerName != null) {
+      final c = poolFilterCustomerName!.trim();
+      if (c.isEmpty) {
+        poolFilterCustomerName = null;
+      } else if (!pool.any(
+            (o) =>
+                ((o.customerName ?? o.sourceCustomerName) ?? '').trim() == c,
+          )) {
+        poolFilterCustomerName = null;
+      }
+    }
   }
 
   Future<void> _rebuildPoolMachineLabels() async {
@@ -532,9 +851,55 @@ class PlanningSessionController extends ChangeNotifier {
     if (d == null) {
       ganttMachineLabels = const {};
       ganttLabelForResultId = null;
+      _ganttWithMes = null;
       notifyListeners();
     } else {
-      _resolveGanttLabels(d);
+      unawaited(_afterGanttBaseReady(d));
+    }
+  }
+
+  Future<void> _afterGanttBaseReady(PlanningGanttDto base) async {
+    await _rebuildGanttWithMes(base);
+    final display = ganttForDisplay;
+    if (display == null || display.operations.isEmpty) {
+      ganttMachineLabels = const {};
+      ganttLabelForResultId = result?.plan.id;
+      notifyListeners();
+      return;
+    }
+    await _resolveGanttLabels(display);
+  }
+
+  Future<void> _rebuildGanttWithMes(PlanningGanttDto base) async {
+    if (!showMesGanttOverlay || result == null) {
+      _ganttWithMes = null;
+      return;
+    }
+    final r = result!;
+    final ids = r.scheduledOperations.map((e) => e.productionOrderId).toSet();
+    if (ids.isEmpty) {
+      _ganttWithMes = null;
+      return;
+    }
+    _mesGanttLoading = true;
+    notifyListeners();
+    try {
+      final mes = await _executionService.getExecutionsByOrderIds(
+        companyId: companyId,
+        plantKey: plantKey,
+        productionOrderIds: ids,
+      );
+      final mesOps = planningMesGanttOpsFromExecutions(
+        mesByOrderId: mes,
+        productionOrderIdsInPlan: ids,
+        orderCodeFor: (oid) => _productionOrderCodeFor(r, oid),
+      );
+      _ganttWithMes = appendGanttOperations(base, mesOps);
+    } catch (_) {
+      _ganttWithMes = null;
+    } finally {
+      _mesGanttLoading = false;
+      notifyListeners();
     }
   }
 
@@ -597,8 +962,14 @@ class PlanningSessionController extends ChangeNotifier {
         performanceFactor: perf,
         setupMinutes: setup,
         cycleSecPerUnit: cyc,
+        scheduleStrategy: scheduleStrategy,
       );
+      _dismissedEngineConflictKeys.clear();
       _localGanttNudged = false;
+      lastSavedPlanId = null;
+      _executionVariancesLoadedForPlanId = null;
+      _varianceRootByClientOpId.clear();
+      _varianceNotesByClientOpId.clear();
       _onResultChanged();
     } catch (e) {
       errorMessage = e.toString();
@@ -619,7 +990,9 @@ class PlanningSessionController extends ChangeNotifier {
         result: r,
         companyId: companyId,
         plantKey: plantKey,
+        localGanttAdjusted: _localGanttNudged,
       );
+      unawaited(loadExecutionVariancesForSavedPlan());
     } catch (e) {
       errorMessage = 'Spremanje nije uspjelo. Provjerite uloge i mrežu.';
     } finally {
@@ -637,6 +1010,19 @@ class PlanningSessionController extends ChangeNotifier {
               (o.machineId ?? '').trim().isNotEmpty,
         )
         .length;
+  }
+
+  /// F4.5 — heuristika rizika isporuke nakon zadnjeg FCS (null ako nema rezultata).
+  PlanningDeliveryRisk? get planningDeliveryRisk {
+    final r = result;
+    if (r == null) {
+      return null;
+    }
+    return PlanningDeliveryRisk.fromEngineResult(
+      r,
+      poolUrgentCount: countRiskOrders(),
+      poolSize: pool.isEmpty ? 1 : pool.length,
+    );
   }
 
   int countNoMachine() {

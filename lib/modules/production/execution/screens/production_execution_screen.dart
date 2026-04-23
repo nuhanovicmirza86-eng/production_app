@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../ooe/models/ooe_loss_reason.dart';
+import '../../ooe/services/ooe_loss_reason_service.dart';
 import '../services/production_execution_service.dart';
 
 class ProductionExecutionScreen extends StatefulWidget {
@@ -34,6 +36,10 @@ class ProductionExecutionScreen extends StatefulWidget {
 
 class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
   final _service = ProductionExecutionService();
+  final _ooeLossReasonService = OoeLossReasonService();
+
+  /// Šifra iz `ooe_loss_reasons`; prazno = pauza bez MES/OOE razloga.
+  String _pauseOoeReasonCode = '';
 
   bool _isLoading = false;
   bool _initializingResume = false;
@@ -180,6 +186,9 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
         companyId: _companyId,
         plantKey: _plantKey,
         updatedBy: _userId,
+        ooePauseReasonCode: _pauseOoeReasonCode.trim().isEmpty
+            ? null
+            : _pauseOoeReasonCode.trim(),
         goodQty: _parse(_goodController.text),
         scrapQty: _parse(_scrapController.text),
         reworkQty: _parse(_reworkController.text),
@@ -345,6 +354,76 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
               ),
 
             if (started) ...[
+              StreamBuilder<List<OoeLossReason>>(
+                stream: _ooeLossReasonService.watchActiveReasons(
+                  companyId: _companyId,
+                  plantKey: _plantKey,
+                ),
+                builder: (context, snap) {
+                  if (snap.hasError) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        AppErrorMapper.toMessage(snap.error!),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    );
+                  }
+                  final reasons = snap.data ?? const <OoeLossReason>[];
+                  if (reasons.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        'Nema aktivnih OOE razloga u katalogu — dodaj ih u OOE katalogu.',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    );
+                  }
+                  final validValue = _pauseOoeReasonCode.isEmpty
+                      ? ''
+                      : (reasons.any((r) => r.code == _pauseOoeReasonCode)
+                          ? _pauseOoeReasonCode
+                          : '');
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Razlog pauze (OOE, opcionalno)',
+                        helperText:
+                            'Isti kod kao u katalogu razloga; za TPM/Pareto i segment stanja.',
+                        border: OutlineInputBorder(),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          value: validValue,
+                          items: <DropdownMenuItem<String>>[
+                            const DropdownMenuItem<String>(
+                              value: '',
+                              child: Text('— bez OOE kategorije'),
+                            ),
+                            ...reasons.map(
+                              (r) => DropdownMenuItem<String>(
+                                value: r.code,
+                                child: Text('${r.code} — ${r.name}'),
+                              ),
+                            ),
+                          ],
+                          onChanged: _isLoading
+                              ? null
+                              : (v) {
+                                  setState(
+                                    () => _pauseOoeReasonCode = v ?? '',
+                                  );
+                                },
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
               ElevatedButton(
                 onPressed: _isLoading ? null : _pause,
                 child: const Text('Pauza'),

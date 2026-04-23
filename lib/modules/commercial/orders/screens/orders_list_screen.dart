@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/date/date_range_utils.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/ui/date_range_filter_controls.dart';
+import '../../../../core/ui/export_list_popup_menu.dart';
 import '../../../../core/ui/standard_list_components.dart';
 import '../../../logistics/inventory/services/product_warehouse_stock_service.dart';
 import '../export/orders_list_pdf_export.dart';
@@ -382,6 +383,88 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
     }
   }
 
+  Future<void> _exportCsv() async {
+    final list = _filteredOrders;
+    if (list.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Nema narudžbi za izvoz (filtrirani pregled je prazan).',
+          ),
+        ),
+      );
+      return;
+    }
+    try {
+      await _refreshStockForFiltered();
+      if (!mounted) return;
+      final fn = 'narudzbe_${DateTime.now().millisecondsSinceEpoch}.csv';
+      await OrdersListPdfExport.shareCsv(
+        orders: list,
+        stockByProductId: _stockByProductId.isEmpty
+            ? null
+            : Map<String, double>.from(_stockByProductId),
+        fileName: fn,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
+    }
+  }
+
+  Future<void> _exportPdfShare() async {
+    final list = _filteredOrders;
+    if (list.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Nema narudžbi za izvoz (filtrirani pregled je prazan).',
+          ),
+        ),
+      );
+      return;
+    }
+    try {
+      await _refreshStockForFiltered();
+      if (!mounted) return;
+      await OrdersListPdfExport.sharePdfFile(
+        orders: list,
+        reportTitle: 'Pregled narudžbi (detaljno)',
+        companyLine: _companyDisplayName(),
+        filterDescription: _filterDescriptionForPdf(),
+        stockByProductId: _stockByProductId.isEmpty
+            ? null
+            : Map<String, double>.from(_stockByProductId),
+        companyId: _companyId,
+        companyData: widget.companyData,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
+    }
+  }
+
+  Widget _exportMenuButton() {
+    return ExportListPopupMenu(
+      enabled: !_isLoading,
+      onCsv: () {
+        _exportCsv();
+      },
+      onPdfPreview: () {
+        _exportPdf();
+      },
+      onPdfShare: () {
+        _exportPdfShare();
+      },
+    );
+  }
+
   Widget _buildHeader() {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -409,12 +492,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                       ),
                     ),
                   ),
-                  IconButton(
-                    tooltip:
-                        'Export PDF — detaljno po stavkama (zalihe ako su učitane)',
-                    icon: const Icon(Icons.picture_as_pdf_outlined),
-                    onPressed: _isLoading ? null : _exportPdf,
-                  ),
+                  _exportMenuButton(),
                   IconButton(
                     icon: const Icon(Icons.info_outline_rounded),
                     onPressed: () {
@@ -429,7 +507,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                             '• Filtriranje po statusu, tipu i datumu (od–do)\n'
                             '• Tabularni pregled po partneru (stavke, zalihe, zeleno = spremno)\n'
                             '• Široki ekran: tablica; uski ekran: kartice. ⋮ ili tap na karticu — detalji / procjena\n'
-                            '• Export u PDF (isti raspored; zalihe ako su učitane)\n'
+                            '• Izvoz: CSV, PDF (pregled/ispis), dijeljenje PDF-a (isti raspored; zalihe ako su učitane)\n'
                             '• Povezivanje sa proizvodnim nalozima\n\n'
                             'Ovdje pratiš komercijalni tok prije realizacije i proizvodnje.',
                           ),
@@ -488,12 +566,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
               ),
             ),
-            IconButton(
-              tooltip:
-                  'Export PDF — detaljno po stavkama (zalihe ako su učitane)',
-              icon: const Icon(Icons.picture_as_pdf_outlined),
-              onPressed: _isLoading ? null : _exportPdf,
-            ),
+            _exportMenuButton(),
             IconButton(
               icon: const Icon(Icons.info_outline_rounded),
               onPressed: () {
@@ -507,7 +580,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                       '• Praćenje statusa\n'
                       '• Filtriranje po statusu, tipu i datumu (od–do)\n'
                       '• Tabularni pregled po partneru (stavke, zalihe, zeleno = spremno)\n'
-                      '• Export u PDF (isti raspored; zalihe ako su učitane)\n'
+                      '• Izvoz: CSV, PDF (pregled/ispis), dijeljenje PDF-a (isti raspored; zalihe ako su učitane)\n'
                       '• Povezivanje sa proizvodnim nalozima\n\n'
                       'Ovdje pratiš komercijalni tok prije realizacije i proizvodnje.',
                     ),

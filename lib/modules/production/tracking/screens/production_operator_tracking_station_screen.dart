@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../../../core/format/ba_formatted_date.dart';
 import '../../../../core/access/production_access_helper.dart'
     show ProductionAccessHelper, ProductionDashboardCard;
 import '../../station/screens/station_tracking_setup_screen.dart';
@@ -116,10 +117,7 @@ class _ProductionOperatorTrackingStationScreenState
     return 'Pogon: $pk';
   }
 
-  String _todayLine(BuildContext context) {
-    final d = DateTime.now();
-    return MaterialLocalizations.of(context).formatFullDate(d);
-  }
+  String _todayLine() => BaFormattedDate.formatFullDate(DateTime.now());
 
   Future<void> _loadStationTheme() async {
     final a = await StationScreenThemeStore.load();
@@ -349,7 +347,7 @@ class _ProductionOperatorTrackingStationScreenState
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
-                      _todayLine(context),
+                      _todayLine(),
                       style: theme.textTheme.labelLarge?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),

@@ -1,9 +1,13 @@
+import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/date/date_range_utils.dart' show formatCalendarDay;
 import '../../../../core/pdf/operonix_pdf_footer.dart';
@@ -381,6 +385,129 @@ class OrdersListPdfExport {
         printIdentity: identity,
         companyData: companyData,
       ),
+    );
+  }
+
+  static String _csvEsc(String v) {
+    if (v.contains(';') || v.contains('"') || v.contains('\n') || v.contains('\r')) {
+      return '"${v.replaceAll('"', '""')}"';
+    }
+    return v;
+  }
+
+  static String buildCsv({
+    required List<OrderModel> orders,
+    Map<String, double>? stockByProductId,
+  }) {
+    final grouped = _groupByPartner(orders);
+    final partnerKeys = grouped.keys.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    final sb = StringBuffer();
+    sb.writeln('sep=;');
+    const h = <String>[
+      'Partner',
+      'Broj nar.',
+      'Datum nar.',
+      'Ref.',
+      'Rok isp.',
+      'Tip',
+      'Izvoz/fiskal',
+      'Status',
+      'Šifra',
+      'Naziv',
+      'MJ',
+      'Naruč.',
+      'Isp./Prim.',
+      'Ostalo',
+      'Stanje',
+    ];
+    sb.writeln(h.map(_csvEsc).join(';'));
+    for (final partner in partnerKeys) {
+      final lines = _sortedLines(grouped[partner]!);
+      for (final line in lines) {
+        final o = line.o;
+        final it = line.it;
+        final ref = _partnerRef(o);
+        final rok = _formatDay(
+          it?.dueDate ?? o.requestedDeliveryDate ?? o.confirmedDeliveryDate,
+        );
+        final pid = (it?.productId ?? '').trim();
+        final stockText = (stockByProductId == null || pid.isEmpty)
+            ? '—'
+            : _fmtQty(stockByProductId[pid] ?? 0);
+        final nar = it == null ? '—' : _fmtQty(it.qty);
+        final isp = it == null ? '—' : _fmtQty(_fulfilledQty(o, it));
+        final ost = it == null ? '—' : _fmtQty(_remainingQty(o, it));
+        final row = <String>[
+          partner,
+          o.orderNumber,
+          _formatDay(o.orderDate ?? o.createdAt),
+          ref ?? '—',
+          rok,
+          o.orderType == OrderType.customer ? 'Kupac' : 'Dobavljač',
+          _fiscalSummaryCell(o),
+          orderStatusLabel(o.status),
+          it?.productCode ?? '—',
+          it?.productName ?? 'Nema učitanih stavki',
+          () {
+            final u = (it?.unit ?? '').trim();
+            return u.isEmpty ? '—' : u;
+          }(),
+          nar,
+          isp,
+          ost,
+          stockText,
+        ];
+        sb.writeln(row.map(_csvEsc).join(';'));
+      }
+    }
+    return sb.toString();
+  }
+
+  static Future<void> shareCsv({
+    required List<OrderModel> orders,
+    Map<String, double>? stockByProductId,
+    required String fileName,
+  }) async {
+    final body = '\uFEFF${buildCsv(orders: orders, stockByProductId: stockByProductId)}';
+    final dir = await getTemporaryDirectory();
+    final safe = fileName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    final f = File('${dir.path}/$safe');
+    await f.writeAsString(body, encoding: utf8);
+    await Share.shareXFiles(
+      [XFile(f.path)],
+      text: 'Pregled narudžbi (CSV)',
+    );
+  }
+
+  static Future<void> sharePdfFile({
+    required List<OrderModel> orders,
+    required String reportTitle,
+    String? companyLine,
+    String? filterDescription,
+    Map<String, double>? stockByProductId,
+    required String companyId,
+    required Map<String, dynamic> companyData,
+  }) async {
+    final identity = await CompanyPrintIdentityService().load(
+      companyId: companyId,
+      companyData: companyData,
+    );
+    final bytes = await buildPdf(
+      orders: orders,
+      reportTitle: reportTitle,
+      companyLine: companyLine,
+      filterDescription: filterDescription,
+      stockByProductId: stockByProductId,
+      printIdentity: identity,
+      companyData: companyData,
+    );
+    final dir = await getTemporaryDirectory();
+    final path = '${dir.path}/narudzbe_pregled.pdf';
+    await File(path).writeAsBytes(bytes);
+    await Share.shareXFiles(
+      [XFile(path)],
+      text: 'Pregled narudžbi (PDF)',
     );
   }
 }

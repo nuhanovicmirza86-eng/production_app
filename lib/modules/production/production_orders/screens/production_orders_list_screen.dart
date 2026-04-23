@@ -8,6 +8,7 @@ import '../../../../core/theme/operonix_production_brand.dart';
 import '../../../../core/date/date_range_utils.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/ui/date_range_filter_controls.dart';
+import '../../../../core/ui/export_list_popup_menu.dart';
 import '../../../../core/ui/standard_list_components.dart';
 import '../../../logistics/inventory/services/product_warehouse_stock_service.dart';
 import '../export/production_orders_list_pdf_export.dart';
@@ -661,11 +662,83 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     }
   }
 
-  Widget _pdfExportButton() {
-    return IconButton(
-      tooltip: 'Export PDF — detaljno (zalihe ako su učitane)',
-      icon: const Icon(Icons.picture_as_pdf_outlined),
-      onPressed: _isLoading ? null : _exportPdf,
+  Future<void> _exportCsv() async {
+    final list = _filteredOrders;
+    if (list.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nema naloga za izvoz (filtrirani pregled je prazan).'),
+        ),
+      );
+      return;
+    }
+    try {
+      await _refreshStockForFiltered();
+      if (!mounted) return;
+      final fn =
+          'proizvodni_nalozi_${DateTime.now().millisecondsSinceEpoch}.csv';
+      await ProductionOrdersListPdfExport.shareCsv(
+        orders: list,
+        stockByProductId: _stockByProductId.isEmpty
+            ? null
+            : Map<String, double>.from(_stockByProductId),
+        fileName: fn,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
+    }
+  }
+
+  Future<void> _exportPdfShare() async {
+    final list = _filteredOrders;
+    if (list.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nema naloga za izvoz (filtrirani pregled je prazan).'),
+        ),
+      );
+      return;
+    }
+    try {
+      await _refreshStockForFiltered();
+      if (!mounted) return;
+      await ProductionOrdersListPdfExport.sharePdfFile(
+        orders: list,
+        reportTitle: 'Pregled proizvodnih naloga (detaljno)',
+        companyLine:
+            '${_companyDisplayName()}  ·  Pogon: ${_plantLineForDisplay()}',
+        filterDescription: _filterDescriptionForPdf(),
+        stockByProductId: _stockByProductId.isEmpty
+            ? null
+            : Map<String, double>.from(_stockByProductId),
+        companyId: _companyId,
+        companyData: widget.companyData,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
+    }
+  }
+
+  Widget _exportMenuButton() {
+    return ExportListPopupMenu(
+      enabled: !_isLoading,
+      onCsv: () {
+        _exportCsv();
+      },
+      onPdfPreview: () {
+        _exportPdf();
+      },
+      onPdfShare: () {
+        _exportPdfShare();
+      },
     );
   }
 
@@ -717,7 +790,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
                 '• Tab „Zalihe i status“: plan / ostalo / stanje zalihe (zeleno = spremno)\n'
                 '• Tab „Izvještaj“: detaljnija tabela po kupcu (opcijske kolone samo ako postoje podaci)\n'
                 '• Filteri: kupac, proces (operationName), status, datum kreiranja\n'
-                '• Export u PDF; detalji naloga\n\n'
+                '• Izvoz: CSV, PDF (pregled/ispis), dijeljenje PDF-a; detalji naloga\n\n'
                 'Ovdje pratiš operativni tok proizvodnje od planiranog do završenog naloga.',
               ),
               actions: [
@@ -737,7 +810,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
               StandardScreenHeader(
                 title: 'Proizvodni nalozi',
                 onBack: () => Navigator.of(context).pop(),
-                beforeInfoAction: _pdfExportButton(),
+                beforeInfoAction: _exportMenuButton(),
                 onInfo: infoAction,
               ),
               if (_canCreateOrder) ...[
@@ -758,7 +831,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
         return StandardScreenHeader(
           title: 'Proizvodni nalozi',
           onBack: () => Navigator.of(context).pop(),
-          beforeInfoAction: _pdfExportButton(),
+          beforeInfoAction: _exportMenuButton(),
           onInfo: infoAction,
           action: _canCreateOrder
               ? ElevatedButton.icon(

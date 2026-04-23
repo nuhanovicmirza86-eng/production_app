@@ -63,10 +63,7 @@ class ProductionPlanningScreen extends StatelessWidget {
   Widget _precheck(PlanningSessionController session) {
     return Card(
       margin: const EdgeInsets.all(4),
-      child: PlanningPrecheckPanel(
-        pool: session.pool,
-        result: session.result,
-      ),
+      child: PlanningPrecheckPanel(session: session),
     );
   }
 }

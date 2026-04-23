@@ -1,9 +1,13 @@
+import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/date/date_range_utils.dart' show formatCalendarDay;
 import '../../../../core/pdf/operonix_pdf_footer.dart';
@@ -341,6 +345,121 @@ class ProductionOrdersListPdfExport {
         printIdentity: identity,
         companyData: companyData,
       ),
+    );
+  }
+
+  static String _csvEsc(String v) {
+    if (v.contains(';') || v.contains('"') || v.contains('\n') || v.contains('\r')) {
+      return '"${v.replaceAll('"', '""')}"';
+    }
+    return v;
+  }
+
+  /// Isti sadržaj kao tabela u PDF-u (grupa Kupac, sort po roku).
+  static String buildCsv({
+    required List<ProductionOrderModel> orders,
+    Map<String, double>? stockByProductId,
+  }) {
+    final grouped = _groupByCustomer(orders);
+    final keys = grouped.keys.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    final sb = StringBuffer();
+    sb.writeln('sep=;');
+    const h = <String>[
+      'Kupac',
+      'Broj PN',
+      'Kreirano',
+      'Narudžba',
+      'Rok (plan)',
+      'Status',
+      'Šifra',
+      'Naziv',
+      'MJ',
+      'Plan',
+      'Dobro',
+      'Ostalo',
+      'Pogon',
+      'Stanje',
+    ];
+    sb.writeln(h.map(_csvEsc).join(';'));
+    for (final customer in keys) {
+      for (final o in _sortedOrders(grouped[customer]!)) {
+        final pid = o.productId.trim();
+        final stockText = (stockByProductId == null || pid.isEmpty)
+            ? '—'
+            : _fmtQty(stockByProductId[pid] ?? 0);
+        final rok = o.scheduledEndAt ?? o.scheduledStartAt;
+        final rokStr = rok == null ? '—' : formatCalendarDay(rok);
+        final src = (o.sourceOrderNumber ?? '').trim().isEmpty
+            ? '—'
+            : o.sourceOrderNumber!;
+        final unit = o.unit.trim().isEmpty ? '—' : o.unit;
+        final row = <String>[
+          customer,
+          o.productionOrderCode,
+          formatCalendarDay(o.createdAt),
+          src,
+          rokStr,
+          _statusBs(o.status),
+          o.productCode,
+          o.productName,
+          unit,
+          _fmtQty(o.plannedQty),
+          _fmtQty(o.producedGoodQty),
+          _fmtQty(_pnRemaining(o)),
+          o.plantKey,
+          stockText,
+        ];
+        sb.writeln(row.map(_csvEsc).join(';'));
+      }
+    }
+    return sb.toString();
+  }
+
+  static Future<void> shareCsv({
+    required List<ProductionOrderModel> orders,
+    Map<String, double>? stockByProductId,
+    required String fileName,
+  }) async {
+    final body = '\uFEFF${buildCsv(orders: orders, stockByProductId: stockByProductId)}';
+    final dir = await getTemporaryDirectory();
+    final safe = fileName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    final f = File('${dir.path}/$safe');
+    await f.writeAsString(body, encoding: utf8);
+    await Share.shareXFiles(
+      [XFile(f.path)],
+      text: 'Pregled proizvodnih naloga (CSV)',
+    );
+  }
+
+  static Future<void> sharePdfFile({
+    required List<ProductionOrderModel> orders,
+    required String reportTitle,
+    String? companyLine,
+    String? filterDescription,
+    Map<String, double>? stockByProductId,
+    required String companyId,
+    required Map<String, dynamic> companyData,
+  }) async {
+    final identity = await CompanyPrintIdentityService().load(
+      companyId: companyId,
+      companyData: companyData,
+    );
+    final bytes = await buildPdf(
+      orders: orders,
+      reportTitle: reportTitle,
+      companyLine: companyLine,
+      filterDescription: filterDescription,
+      stockByProductId: stockByProductId,
+      printIdentity: identity,
+      companyData: companyData,
+    );
+    final dir = await getTemporaryDirectory();
+    final path = '${dir.path}/proizvodni_nalozi_pregled.pdf';
+    await File(path).writeAsBytes(bytes);
+    await Share.shareXFiles(
+      [XFile(path)],
+      text: 'Pregled proizvodnih naloga (PDF)',
     );
   }
 }

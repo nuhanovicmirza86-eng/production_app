@@ -6,17 +6,22 @@ import '../../tracking/services/production_tracking_assets_service.dart';
 import '../models/ooe_live_status.dart';
 import '../ooe_help_texts.dart';
 import '../services/ooe_live_service.dart';
+import '../services/ooe_machine_target_service.dart';
 import '../widgets/ooe_info_icon.dart';
 import '../widgets/ooe_line_group_header.dart';
 import '../widgets/ooe_live_status_card.dart';
+import 'ooe_alerts_screen.dart';
+import 'ooe_alert_rules_screen.dart';
 import 'ooe_loss_analysis_screen.dart';
 import 'ooe_loss_reasons_screen.dart';
 import 'ooe_machine_details_screen.dart';
+import 'ooe_machine_targets_screen.dart';
 import 'ooe_shift_context_screen.dart';
 import 'ooe_daily_overview_screen.dart';
 import 'capacity_overview_screen.dart';
 import 'teep_analysis_screen.dart';
 import 'ooe_shift_summary_screen.dart';
+import 'scada_live_hub_screen.dart';
 
 enum _LiveCardSort { ooeDesc, nameAsc }
 
@@ -33,7 +38,8 @@ class OoeDashboardScreen extends StatefulWidget {
 }
 
 class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
-  late final Future<ProductionPlantAssetsSnapshot> _assetsFuture;
+  late final Future<({ProductionPlantAssetsSnapshot assets, Map<String, double?> targets})>
+      _assetsAndTargets;
   _LiveCardSort _liveSort = _LiveCardSort.ooeDesc;
   _LineLayout _lineLayout = _LineLayout.flat;
 
@@ -60,14 +66,32 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
         card: ProductionDashboardCard.ooe,
       );
 
+  bool get _canViewOoe =>
+      ProductionAccessHelper.canView(role: _role, card: ProductionDashboardCard.ooe);
+
   @override
   void initState() {
     super.initState();
-    _assetsFuture = ProductionTrackingAssetsService().loadForPlant(
+    _assetsAndTargets = _loadAssetsAndTargets();
+  }
+
+  Future<({ProductionPlantAssetsSnapshot assets, Map<String, double?> targets})>
+  _loadAssetsAndTargets() async {
+    final assets = await ProductionTrackingAssetsService().loadForPlant(
       companyId: _companyId,
       plantKey: _plantKey,
       limit: 128,
     );
+    final t = <String, double?>{};
+    final svc = OoeMachineTargetService();
+    for (final m in assets.machines) {
+      t[m.id] = await svc.getTargetOoe(
+        companyId: _companyId,
+        plantKey: _plantKey,
+        machineId: m.id,
+      );
+    }
+    return (assets: assets, targets: t);
   }
 
   void _push(Widget screen) {
@@ -131,12 +155,17 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
     return list;
   }
 
-  Widget _liveCard(OoeLiveStatus st, Map<String, String> labelMap) {
+  Widget _liveCard(
+    OoeLiveStatus st,
+    Map<String, String> labelMap, {
+    Map<String, double?>? ooeTargetById,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: OoeLiveStatusCard(
         status: st,
         machineDisplayName: labelMap[st.machineId],
+        targetOoe: ooeTargetById?[st.machineId],
         onOpenDetails: () {
           Navigator.push<void>(
             context,
@@ -156,6 +185,7 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
     required List<OoeLiveStatus> sorted,
     required Map<String, String> labelMap,
     required ProductionPlantAssetsSnapshot assets,
+    required Map<String, double?> ooeTargetById,
   }) {
     final grouped = <String?, List<OoeLiveStatus>>{};
     for (final st in sorted) {
@@ -180,7 +210,9 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
       final group = grouped[lineKey];
       if (group == null) continue;
       for (final st in group) {
-        children.add(_liveCard(st, labelMap));
+        children.add(
+          _liveCard(st, labelMap, ooeTargetById: ooeTargetById),
+        );
       }
     }
     return children;
@@ -199,12 +231,24 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
             dialogTitle: OoeHelpTexts.liveDashboardTitle,
             dialogBody: OoeHelpTexts.liveDashboardBody,
           ),
+          if (_canViewOoe)
+            IconButton(
+              icon: const Icon(Icons.view_quilt_outlined),
+              tooltip: 'SCADA — pregled pogon i performanse',
+              onPressed: () => _push(ScadaLiveHubScreen(companyData: widget.companyData)),
+            ),
           if (_canAnalytics || _canManageOoe)
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert),
               tooltip: 'Još opcija',
               onSelected: (id) {
                 switch (id) {
+                  case 'alerts':
+                    _push(OoeAlertsScreen(companyData: widget.companyData));
+                  case 'alert_rules':
+                    _push(OoeAlertRulesScreen(companyData: widget.companyData));
+                  case 'machine_targets':
+                    _push(OoeMachineTargetsScreen(companyData: widget.companyData));
                   case 'loss_analysis':
                     _push(OoeLossAnalysisScreen(companyData: widget.companyData));
                   case 'shift_summary':
@@ -222,6 +266,33 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
                 }
               },
               itemBuilder: (ctx) => [
+                if (_canAnalytics || _canManageOoe)
+                  const PopupMenuItem(
+                    value: 'alerts',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.notifications_active_outlined),
+                      title: Text('OOE alarmi'),
+                    ),
+                  ),
+                if (_canManageOoe) ...[
+                  const PopupMenuItem(
+                    value: 'alert_rules',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.tune),
+                      title: Text('Pragovi alarma'),
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'machine_targets',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.flag_outlined),
+                      title: Text('Ciljevi OOE'),
+                    ),
+                  ),
+                ],
                 if (_canAnalytics)
                   const PopupMenuItem(
                     value: 'loss_analysis',
@@ -289,8 +360,12 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
             ),
         ],
       ),
-      body: FutureBuilder<ProductionPlantAssetsSnapshot>(
-        future: _assetsFuture,
+      body: FutureBuilder<
+          ({
+            ProductionPlantAssetsSnapshot assets,
+            Map<String, double?> targets
+          })>(
+        future: _assetsAndTargets,
         builder: (context, assetSnap) {
           if (assetSnap.hasError) {
             return Center(
@@ -306,12 +381,14 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
           if (!assetSnap.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
+          final data = assetSnap.data!;
           final labelMap = <String, String>{};
-          for (final m in assetSnap.data!.machines) {
+          for (final m in data.assets.machines) {
             labelMap[m.id] = m.title;
           }
 
-          final assets = assetSnap.data!;
+          final assets = data.assets;
+          final ooeTargetById = data.targets;
 
           return StreamBuilder(
             stream: live.watchLiveForPlant(
@@ -432,7 +509,11 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
                             padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
                             itemCount: list.length,
                             itemBuilder: (context, i) {
-                              return _liveCard(list[i], labelMap);
+                              return _liveCard(
+                                list[i],
+                                labelMap,
+                                ooeTargetById: ooeTargetById,
+                              );
                             },
                           )
                         : ListView(
@@ -441,6 +522,7 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
                               sorted: list,
                               labelMap: labelMap,
                               assets: assets,
+                              ooeTargetById: ooeTargetById,
                             ),
                           ),
                   ),

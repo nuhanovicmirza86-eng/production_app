@@ -6,7 +6,7 @@ import '../models/production_tracking_ai_report_models.dart';
 import 'production_asset_display_lookup.dart';
 import 'production_operator_tracking_service.dart';
 
-/// Dnevni brzi izvještaji za tab „AI izvještaji”: škart po proizvodu, uređaji.
+/// Dnevni brzi izvještaji (hub „Brzi izvještaji” u Praćenju): škart po proizvodu, uređaji.
 class ProductionTrackingAiReportsService {
   ProductionTrackingAiReportsService({
     ProductionOperatorTrackingService? tracking,
@@ -304,47 +304,147 @@ class ProductionTrackingAiReportsService {
     return list.take(limit).toList();
   }
 
-  /// Tekst za predloženi upit asistentu (HR).
+  /// Tekst za predloženi upit asistentu (HR) — isti sadržaj kao ekran „Brzi izvještaji“ u Praćenju.
+  ///
+  /// [allProductsRanked] opcionalno: svi proizvodi sortirani po % škarta (za sažetak u promptu).
   String buildAssistantPrompt({
     required String workDateLabel,
     required String plantLabel,
     required List<ProductScrapDayRollup> topProducts,
     required List<DeviceIssueDayRollup> topDevices,
+    List<ProductScrapDayRollup>? allProductsRanked,
+    int allProductsPromptMaxLines = 25,
   }) {
     final buf = StringBuffer();
     buf.writeln(
-      'Analiziraj operativne podatke za radni dan $workDateLabel, pogon $plantLabel.',
+      'DNEVNI OPERATIVNI IZVJEŠTAJ (brzi) — radni dan $workDateLabel, pogon $plantLabel.',
+    );
+    buf.writeln(
+      'Kontekst: brzi dnevni izvještaj iz Praćenja proizvodnje (škart iz unosa + događaji uređaja + kvarovi).',
     );
     buf.writeln();
-    buf.writeln('Top proizvodi po udjelu škarta (prijavljena masa):');
-    if (topProducts.isEmpty) {
-      buf.writeln('- (nema dovoljno podataka za agregat)');
-    } else {
-      for (final p in topProducts) {
-        buf.writeln(
-          '- ${p.itemCode.isNotEmpty ? p.itemCode : p.itemName}: '
-          '${_fmtPct(p.scrapPct)} škarta (${_fmtNum(p.scrapQty)} / ${_fmtNum(p.totalMass)})',
-        );
-      }
-    }
-    buf.writeln();
-    buf.writeln('Uređaji s najviše događaja (zastoji, alarmi, kvarovi):');
-    if (topDevices.isEmpty) {
-      buf.writeln('- (nema događaja ili kvarova za ovaj dan)');
-    } else {
-      for (final d in topDevices) {
-        buf.writeln(
-          '- ${d.displayName}: zastoji ${d.downtimeCount}, alarmi ${d.alarmCount}, '
-          'kvarovi ${d.faultCount} (bodovi: ${d.score})',
-        );
-      }
-    }
-    buf.writeln();
+
     buf.writeln(
-      'Predloži: postoji li povezanost između škarta i ponavljajućih zastoja/alarmi '
-      'na istim uređajima? Što bi provjerio sljedeći radni dan? Odgovor kratko, s konkretnim koracima.',
+      '=== TOP 5 PROBLEMATIČNIH PROIZVODA (najveći % škarta, dnevni agregat) ===',
+    );
+    if (topProducts.isEmpty) {
+      buf.writeln('(Nema dovoljno prijavljene mase za agregat ili su svi ispod praga.)');
+    } else {
+      for (var i = 0; i < topProducts.length; i++) {
+        final p = topProducts[i];
+        buf.writeln(
+          'Rang ${i + 1}. ${_productLine(p)} — ${_fmtPct(p.scrapPct)} škarta '
+          '(škart ${_fmtNum(p.scrapQty)} / ukupno ${_fmtNum(p.totalMass)})',
+        );
+        _appendProductPhaseScrapDetail(buf, p);
+      }
+    }
+    buf.writeln();
+
+    final full = allProductsRanked;
+    if (full != null && full.isNotEmpty) {
+      final skip = topProducts.length;
+      final rest = full.skip(skip).toList(growable: false);
+      buf.writeln(
+        '=== IZVJEŠTAJ PO PROIZVODU (ostali proizvodi s podacima, isti rang po % škarta) ===',
+      );
+      if (rest.isEmpty) {
+        buf.writeln(
+          '(Nema dodatnih redova osim top $skip — ili je cijeli dan pokriven gornjim listom.)',
+        );
+      } else {
+        final cap = allProductsPromptMaxLines.clamp(5, 80);
+        var n = 0;
+        for (final p in rest) {
+          if (n >= cap) break;
+          buf.writeln(
+            '${skip + n + 1}. ${_productLine(p)} — ${_fmtPct(p.scrapPct)} škarta '
+            '(dobro ${_fmtNum(p.goodQty)}, škart ${_fmtNum(p.scrapQty)})',
+          );
+          n++;
+        }
+        if (rest.length > cap) {
+          buf.writeln(
+            '… i još ${rest.length - cap} proizvod(a) — punu tabelu vidi u aplikaciji.',
+          );
+        }
+      }
+      buf.writeln();
+    }
+
+    buf.writeln(
+      '=== TOP 5 UREĐAJA / LINIJA (najviše zastoja, alarmi, kvarovi; bodovi: zastoj×3 + alarm×2 + kvar) ===',
+    );
+    if (topDevices.isEmpty) {
+      buf.writeln(
+        '(Nema događaja u „Stanje uređaja“ niti prijavljenih kvarova za ovaj dan i pogon.)',
+      );
+    } else {
+      for (var i = 0; i < topDevices.length; i++) {
+        final d = topDevices[i];
+        buf.writeln(
+          'Rang ${i + 1}. ${d.displayName}: zastoji ${d.downtimeCount}, '
+          'alarmi ${d.alarmCount}, kvarovi ${d.faultCount} (bodovi: ${d.score})',
+        );
+      }
+    }
+    buf.writeln();
+
+    buf.writeln('=== ZADATAK ZA AI ASISTENTA ===');
+    buf.writeln(
+      '1) Sažmi dnevni operativni rizik u 5 kratkih tačaka (za menadžment / brzi sastanak).',
+    );
+    buf.writeln(
+      '2) Za top proizvode s visokim % škarta: koje faze i koje vrste škarta (labele) ističu?',
+    );
+    buf.writeln(
+      '3) Za top 5 uređaja: prepoznaj signale ponavljajućih zastoja ili alarm '
+      '(isti uređaj, više događaja u jednom danu). Predloži 3 konkretne provjere ili preventivne korake.',
+    );
+    buf.writeln(
+      '4) Gdje ima smisla, poveži hipotetski visok škart na proizvodu s mogućim zastojem na liniji '
+      '(bez kategoričnih tvrdnji — navedi šta bi se provjerilo u proizvodnji).',
+    );
+    buf.writeln(
+      'Odgovor na bosanskom/hrvatskom, numerisano, sažeto, s konkretnim sljedećim koracima.',
     );
     return buf.toString();
+  }
+
+  static String _productLine(ProductScrapDayRollup p) {
+    final code = p.itemCode.trim();
+    final name = p.itemName.trim();
+    if (code.isNotEmpty && name.isNotEmpty) return '$code — $name';
+    if (code.isNotEmpty) return code;
+    if (name.isNotEmpty) return name;
+    return p.itemKey;
+  }
+
+  static void _appendProductPhaseScrapDetail(StringBuffer buf, ProductScrapDayRollup p) {
+    if (p.entries.isEmpty) return;
+    for (final e in p.entries) {
+      final sc = e.scrapBreakdown.fold<double>(0, (a, b) => a + b.qty);
+      buf.writeln(
+        '   • ${_phaseLabelHr(e.phase)}: dobro ${_fmtNum(e.quantity)}, škart ${_fmtNum(sc)}',
+      );
+      for (final b in e.scrapBreakdown) {
+        final lbl = b.label.trim().isNotEmpty ? b.label : b.code;
+        buf.writeln('     – $lbl: ${_fmtNum(b.qty)}');
+      }
+    }
+  }
+
+  static String _phaseLabelHr(String phase) {
+    switch (phase) {
+      case ProductionOperatorTrackingEntry.phasePreparation:
+        return 'Pripremna';
+      case ProductionOperatorTrackingEntry.phaseFirstControl:
+        return 'Prva kontrola';
+      case ProductionOperatorTrackingEntry.phaseFinalControl:
+        return 'Završna kontrola';
+      default:
+        return phase;
+    }
   }
 
   static String _fmtPct(double v) =>

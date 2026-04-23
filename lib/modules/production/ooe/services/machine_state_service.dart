@@ -1,13 +1,21 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/machine_state_event.dart';
+import 'ooe_loss_reason_service.dart';
 
 /// Upis i čitanje `machine_state_events` — promjene stanja mašine / linije.
 class MachineStateService {
   final FirebaseFirestore _firestore;
+  final OoeLossReasonService _ooeLossReasons;
 
-  MachineStateService({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+  MachineStateService({
+    FirebaseFirestore? firestore,
+    OoeLossReasonService? ooeLossReasonService,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _ooeLossReasons = ooeLossReasonService ??
+            OoeLossReasonService(
+              firestore: firestore ?? FirebaseFirestore.instance,
+            );
 
   CollectionReference<Map<String, dynamic>> get _col =>
       _firestore.collection('machine_state_events');
@@ -128,6 +136,7 @@ class MachineStateService {
     DateTime? shiftDate,
     String? reasonCode,
     String? reasonCategory,
+    String? tpmLossKey,
     String? createdBy,
     String? notes,
   }) async {
@@ -135,6 +144,22 @@ class MachineStateService {
     final st = _s(state);
     _validateState(st);
     if (_s(machineId).isEmpty) throw Exception('machineId je obavezan.');
+
+    var resolvedTpm = _nullable(tpmLossKey);
+    if (resolvedTpm == null) {
+      final rc = _nullable(reasonCode);
+      if (rc != null) {
+        try {
+          resolvedTpm = await _ooeLossReasons.resolveEffectiveTpmKeyForReasonCode(
+            companyId: _s(companyId),
+            plantKey: _s(plantKey),
+            reasonCode: rc,
+          );
+        } catch (_) {
+          resolvedTpm = null;
+        }
+      }
+    }
 
     final now = DateTime.now();
     final docRef = _col.doc();
@@ -152,6 +177,7 @@ class MachineStateService {
       state: st,
       reasonCode: _nullable(reasonCode),
       reasonCategory: _nullable(reasonCategory),
+      tpmLossKey: _nullable(resolvedTpm),
       startedAt: startedAt,
       endedAt: null,
       durationSeconds: null,

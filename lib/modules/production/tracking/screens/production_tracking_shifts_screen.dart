@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
+import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/format/ba_formatted_date.dart';
 import '../models/production_shift_day_summary.dart';
 import '../services/production_tracking_hub_callable_service.dart';
 import '../services/production_tracking_hub_firestore_service.dart';
@@ -26,6 +28,8 @@ class _ProductionTrackingShiftsScreenState
 
   late DateTime _day;
   String? _plantKey;
+  /// Ljudski naziv pogona iz šifrarnika `company_plants`, ne sirovi `plantKey`.
+  String? _plantLabel;
   bool _plantLoading = true;
 
   String get _companyId =>
@@ -54,8 +58,18 @@ class _ProductionTrackingShiftsScreenState
     final pk = await resolveEffectiveTrackingPlantKey(widget.companyData);
     if (!mounted) return;
     final t = pk?.trim() ?? '';
+    String? label;
+    final cid = _companyId;
+    if (t.isNotEmpty && cid.isNotEmpty) {
+      label = await CompanyPlantDisplayName.resolve(
+        companyId: cid,
+        plantKey: t,
+      );
+    }
+    if (!mounted) return;
     setState(() {
       _plantKey = t.isEmpty ? null : t;
+      _plantLabel = label;
       _plantLoading = false;
     });
   }
@@ -203,16 +217,9 @@ class _ProductionTrackingShiftsScreenState
     }
   }
 
-  String _formatDay(BuildContext context) {
-    return MaterialLocalizations.of(context).formatFullDate(_day);
-  }
+  String _formatDay() => BaFormattedDate.formatFullDate(_day);
 
-  String _formatDateTime(BuildContext context, DateTime d) {
-    final date = MaterialLocalizations.of(context).formatFullDate(d);
-    final t = TimeOfDay.fromDateTime(d);
-    final time = t.format(context);
-    return '$date $time';
-  }
+  String _formatDateTime(DateTime d) => BaFormattedDate.formatDateTime(d);
 
   @override
   Widget build(BuildContext context) {
@@ -258,14 +265,14 @@ class _ProductionTrackingShiftsScreenState
                   padding: const EdgeInsets.all(16),
                   children: [
                     Text(
-                      _formatDay(context),
+                      _formatDay(),
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Pogon: $_plantKey',
+                      'Pogon: ${_plantLabel ?? _plantKey ?? '—'}',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: cs.onSurfaceVariant,
                       ),
@@ -378,7 +385,7 @@ class _ProductionTrackingShiftsScreenState
                                     if (s?.updatedAt != null) ...[
                                       const SizedBox(height: 8),
                                       Text(
-                                        'Zadnja izmjena: ${_formatDateTime(context, s!.updatedAt!)}',
+                                        'Zadnja izmjena: ${_formatDateTime(s!.updatedAt!)}',
                                         style: theme.textTheme.labelSmall
                                             ?.copyWith(
                                           color: cs.outline,

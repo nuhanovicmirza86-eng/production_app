@@ -2,15 +2,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/shift_context.dart';
 import 'ooe_path_ids.dart';
+import 'ooe_mes_callable_service.dart';
 
-/// Konfiguracija smjene po danu (`shift_contexts`) — osnova za stabilan availability u OOE.
-///
-/// Kolekcija: root `shift_contexts`, dokument ID = [OoePathIds.shiftContextDocId].
+/// Konfiguracija smjene po danu; upis preko Callables.
 class ShiftContextService {
   ShiftContextService({FirebaseFirestore? firestore})
     : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
+  final OoeMesCallableService _cf = OoeMesCallableService();
 
   CollectionReference<Map<String, dynamic>> get _col =>
       _firestore.collection('shift_contexts');
@@ -66,7 +66,7 @@ class ShiftContextService {
         .map((snap) => snap.docs.map(ShiftContext.fromDoc).toList());
   }
 
-  /// Spremi kontekst smjene (merge: ažurira polja, čuva `createdAt` ako već postoji).
+  /// Spremi kontekst smjene (kao prije, ali preko `upsertShiftContext`).
   Future<void> upsertContext({
     required String companyId,
     required String plantKey,
@@ -97,73 +97,24 @@ class ShiftContextService {
         !plannedEndAt.isAfter(plannedStartAt)) {
       throw Exception('plannedEndAt mora biti nakon plannedStartAt.');
     }
-
     final dk = ShiftContext.shiftDateKeyFromLocal(shiftDateLocal);
-    final id = OoePathIds.shiftContextDocId(
+    await _cf.upsertShiftContext(
       companyId: companyId,
       plantKey: plantKey,
       shiftDateKey: dk,
       shiftCode: code,
+      operatingTimeSeconds: operatingTimeSeconds,
+      plannedBreakSeconds: plannedBreakSeconds,
+      plannedStartAtMs: plannedStartAt?.millisecondsSinceEpoch,
+      plannedEndAtMs: plannedEndAt?.millisecondsSinceEpoch,
+      isWorkingShift: isWorkingShift,
+      active: active,
+      notes: notes,
+      createdBy: createdBy,
     );
-    final ref = _col.doc(id);
-    final existing = await ref.get();
-    final cid = _s(companyId);
-    final pk = _s(plantKey);
-
-    final payload = <String, dynamic>{
-      'companyId': cid,
-      'plantKey': pk,
-      'shiftCode': code,
-      'shiftDateKey': dk,
-      'shiftId': id,
-      'operatingTimeSeconds': operatingTimeSeconds,
-      'plannedBreakSeconds': plannedBreakSeconds,
-      'isWorkingShift': isWorkingShift,
-      'active': active,
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
-
-    if (plannedStartAt != null) {
-      payload['plannedStartAt'] = Timestamp.fromDate(plannedStartAt);
-    } else {
-      payload['plannedStartAt'] = FieldValue.delete();
-    }
-    if (plannedEndAt != null) {
-      payload['plannedEndAt'] = Timestamp.fromDate(plannedEndAt);
-    } else {
-      payload['plannedEndAt'] = FieldValue.delete();
-    }
-
-    if (notes != null && _s(notes).isNotEmpty) {
-      payload['notes'] = _s(notes);
-    } else {
-      payload['notes'] = FieldValue.delete();
-    }
-
-    if (!existing.exists) {
-      payload['createdAt'] = FieldValue.serverTimestamp();
-      if (createdBy != null && _s(createdBy).isNotEmpty) {
-        payload['createdBy'] = _s(createdBy);
-      }
-    } else {
-      final prev = existing.data();
-      if (prev != null && prev['createdAt'] != null) {
-        payload['createdAt'] = prev['createdAt'];
-      } else {
-        payload['createdAt'] = FieldValue.serverTimestamp();
-      }
-      final prevBy = prev?['createdBy'];
-      if (prevBy != null && _s(prevBy).isNotEmpty) {
-        payload['createdBy'] = prevBy;
-      } else if (createdBy != null && _s(createdBy).isNotEmpty) {
-        payload['createdBy'] = _s(createdBy);
-      }
-    }
-
-    await ref.set(payload, SetOptions(merge: true));
   }
 
-  /// Trajno ukloni kontekst smjene (istu putanju kao [upsertContext]).
+  /// Trajno ukloni kontekst smjene.
   Future<void> deleteContext({
     required String companyId,
     required String plantKey,
@@ -176,20 +127,11 @@ class ShiftContextService {
       throw Exception('shiftCode je obavezan.');
     }
     final dk = ShiftContext.shiftDateKeyFromLocal(shiftDateLocal);
-    final id = OoePathIds.shiftContextDocId(
+    await _cf.deleteShiftContext(
       companyId: companyId,
       plantKey: plantKey,
       shiftDateKey: dk,
       shiftCode: code,
     );
-    final snap = await _col.doc(id).get();
-    if (!snap.exists) return;
-    final ctx = ShiftContext.fromDoc(snap);
-    final cid = _s(companyId);
-    final pk = _s(plantKey);
-    if (ctx.companyId != cid || ctx.plantKey != pk) {
-      throw Exception('Zapis ne pripada ovom pogonskom kontekstu.');
-    }
-    await _col.doc(id).delete();
   }
 }

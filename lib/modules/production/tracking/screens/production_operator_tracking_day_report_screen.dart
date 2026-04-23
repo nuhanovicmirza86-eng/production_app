@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/company_plant_display_name.dart';
+import '../../../../core/format/ba_formatted_date.dart';
 import '../config/operator_tracking_column_labels.dart';
 import '../config/platform_defect_codes.dart';
 import '../export/production_operator_tracking_day_pdf_export.dart';
@@ -89,6 +91,10 @@ class _ProductionOperatorTrackingDayReportScreenState
         ).showSnackBar(SnackBar(content: Text('Nema unosa za $workKey.')));
         return;
       }
+      final plantLabel = await CompanyPlantDisplayName.resolve(
+        companyId: _companyId,
+        plantKey: _plantKey,
+      );
       final u = entries.isEmpty
           ? 'kom'
           : entries.first.unit.trim().isEmpty
@@ -99,7 +105,7 @@ class _ProductionOperatorTrackingDayReportScreenState
         workDate: workKey,
         phase: _phase,
         companyLine: _companyDisplayName,
-        plantLine: 'Pogon: $_plantKey',
+        plantLine: 'Pogon: $plantLabel',
         defectDisplayNames: parseDefectDisplayNamesMap(widget.companyData),
         columnLabels: parseOperatorTrackingColumnLabels(widget.companyData),
         unitForHeaders: u,
@@ -135,7 +141,7 @@ class _ProductionOperatorTrackingDayReportScreenState
             contentPadding: EdgeInsets.zero,
             title: const Text('Radni datum'),
             subtitle: Text(
-              workKey,
+              '${BaFormattedDate.formatFullDate(_workDay)} · $workKey',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w600,
               ),

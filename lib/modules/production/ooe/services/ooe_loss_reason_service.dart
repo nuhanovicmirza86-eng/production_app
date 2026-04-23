@@ -1,13 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../models/mes_tpm_six_losses.dart';
 import '../models/ooe_loss_reason.dart';
+import 'ooe_mes_callable_service.dart';
 
-/// Katalog razloga gubitaka — master podaci za mapiranje **planned** i **A/P/Q** zastoja.
-///
-/// Kolekcija: `ooe_loss_reasons` (root), dokument s `companyId` + `plantKey` kao kod
-/// ostalih production kolekcija u ovom app-u.
+/// Katalog razloga gubitaka — master podaci; upis preko Callables (`upsertOoeLossReason`).
 class OoeLossReasonService {
   final FirebaseFirestore _firestore;
+  final OoeMesCallableService _cf = OoeMesCallableService();
 
   OoeLossReasonService({FirebaseFirestore? firestore})
     : _firestore = firestore ?? FirebaseFirestore.instance;
@@ -23,22 +23,6 @@ class OoeLossReasonService {
   }) {
     if (_s(companyId).isEmpty || _s(plantKey).isEmpty) {
       throw Exception('companyId i plantKey su obavezni za OOE katalog.');
-    }
-  }
-
-  Future<void> _assertDocTenant({
-    required DocumentReference<Map<String, dynamic>> ref,
-    required String companyId,
-    required String plantKey,
-  }) async {
-    final snap = await ref.get();
-    if (!snap.exists) {
-      throw Exception('Razlog gubitka ne postoji.');
-    }
-    final data = snap.data();
-    if (data == null) throw Exception('Razlog gubitka nema podataka.');
-    if (_s(data['companyId']) != companyId || _s(data['plantKey']) != plantKey) {
-      throw Exception('Nemaš pristup ovom razlogu gubitka.');
     }
   }
 
@@ -142,6 +126,29 @@ class OoeLossReasonService {
     return q.docs.first.id;
   }
 
+  /// Efektivni TPM klaster za šifru razloga (denormalizacija u `machine_state_events`).
+  Future<String?> resolveEffectiveTpmKeyForReasonCode({
+    required String companyId,
+    required String plantKey,
+    required String reasonCode,
+  }) async {
+    final c = _s(reasonCode);
+    if (c.isEmpty) return null;
+    _assertTenant(companyId: companyId, plantKey: plantKey);
+    final id = await findIdByCode(
+      companyId: companyId,
+      plantKey: plantKey,
+      code: c,
+    );
+    if (id == null) return null;
+    final r = await getReason(
+      reasonId: id,
+      companyId: companyId,
+      plantKey: plantKey,
+    );
+    return r?.effectiveTpmLossKey;
+  }
+
   /// Kreira novi red u katalogu. [code] mora biti jedinstven u okviru company+plant.
   Future<String> createReason({
     required String companyId,
@@ -150,12 +157,12 @@ class OoeLossReasonService {
     required String name,
     String? description,
     required String category,
+    String? tpmLossKey,
     required bool isPlanned,
     required bool affectsAvailability,
     required bool affectsPerformance,
     required bool affectsQuality,
     int? sortOrder,
-    required String createdBy,
   }) async {
     _assertTenant(companyId: companyId, plantKey: plantKey);
     final codeNorm = _s(code);
@@ -163,94 +170,61 @@ class OoeLossReasonService {
     if (codeNorm.isEmpty) throw Exception('Šifra razloga (code) je obavezna.');
     if (nameNorm.isEmpty) throw Exception('Naziv razloga je obavezan.');
 
-    final dup = await findIdByCode(
+    return _cf.upsertOoeLossReasonCreate(
       companyId: companyId,
       plantKey: plantKey,
-      code: codeNorm,
-    );
-    if (dup != null) {
-      throw Exception('Razlog s tom šifrom već postoji u katalogu.');
-    }
-
-    final now = DateTime.now();
-    final docRef = _col.doc();
-    final reason = OoeLossReason(
-      id: docRef.id,
-      companyId: _s(companyId),
-      plantKey: _s(plantKey),
-      code: codeNorm,
+      code: codeNorm.toUpperCase(),
       name: nameNorm,
-      description: description?.trim().isEmpty ?? true ? null : description!.trim(),
+      description: description,
       category: _s(category).isEmpty ? OoeLossReason.categoryOther : _s(category),
+      tpmLossKey: _nullableTpm(tpmLossKey),
       isPlanned: isPlanned,
       affectsAvailability: affectsAvailability,
       affectsPerformance: affectsPerformance,
       affectsQuality: affectsQuality,
-      active: true,
       sortOrder: sortOrder ?? 0,
-      createdAt: now,
-      updatedAt: now,
     );
-
-    await docRef.set({
-      ...reason.toMap(),
-      'createdBy': _s(createdBy),
-      'updatedBy': _s(createdBy),
-    });
-
-    return docRef.id;
   }
 
   Future<void> updateReason({
     required String reasonId,
     required String companyId,
     required String plantKey,
-    String? name,
-    String? description,
-    String? category,
-    bool? isPlanned,
-    bool? affectsAvailability,
-    bool? affectsPerformance,
-    bool? affectsQuality,
-    bool? active,
-    int? sortOrder,
-    required String updatedBy,
+    required String name,
+    required String description,
+    required String category,
+    required String tpmLossKey,
+    required bool isPlanned,
+    required bool affectsAvailability,
+    required bool affectsPerformance,
+    required bool affectsQuality,
+    required bool active,
+    required int sortOrder,
   }) async {
     _assertTenant(companyId: companyId, plantKey: plantKey);
-    final ref = _col.doc(reasonId);
-    await _assertDocTenant(ref: ref, companyId: companyId, plantKey: plantKey);
+    final n = _s(name);
+    if (n.isEmpty) {
+      throw Exception('Naziv ne može biti prazan.');
+    }
+    await _cf.upsertOoeLossReasonUpdate(
+      reasonId: reasonId,
+      companyId: companyId,
+      plantKey: plantKey,
+      name: n,
+      description: description,
+      category: _s(category).isEmpty ? OoeLossReason.categoryOther : _s(category),
+      tpmLossKey: tpmLossKey,
+      isPlanned: isPlanned,
+      affectsAvailability: affectsAvailability,
+      affectsPerformance: affectsPerformance,
+      affectsQuality: affectsQuality,
+      active: active,
+      sortOrder: sortOrder,
+    );
+  }
 
-    final now = DateTime.now();
-    final patch = <String, dynamic>{
-      'updatedAt': now,
-      'updatedBy': _s(updatedBy),
-    };
-
-    if (name != null) {
-      final n = _s(name);
-      if (n.isEmpty) throw Exception('Naziv ne može biti prazan.');
-      patch['name'] = n;
-    }
-    if (description != null) {
-      patch['description'] =
-          description.trim().isEmpty ? FieldValue.delete() : description.trim();
-    }
-    if (category != null) {
-      patch['category'] = _s(category).isEmpty
-          ? OoeLossReason.categoryOther
-          : _s(category);
-    }
-    if (isPlanned != null) patch['isPlanned'] = isPlanned;
-    if (affectsAvailability != null) {
-      patch['affectsAvailability'] = affectsAvailability;
-    }
-    if (affectsPerformance != null) {
-      patch['affectsPerformance'] = affectsPerformance;
-    }
-    if (affectsQuality != null) patch['affectsQuality'] = affectsQuality;
-    if (active != null) patch['active'] = active;
-    if (sortOrder != null) patch['sortOrder'] = sortOrder;
-
-    await ref.update(patch);
+  String? _nullableTpm(String? v) {
+    final t = _s(v);
+    return t.isEmpty ? null : t;
   }
 }

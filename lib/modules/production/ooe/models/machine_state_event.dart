@@ -18,6 +18,9 @@ class MachineStateEvent {
   final String? reasonCode;
   final String? reasonCategory;
 
+  /// Denormalizirano s [OoeLossReason.tpmLossKey] kad je [reasonCode] riješen, ili ručno/PLC.
+  final String? tpmLossKey;
+
   final DateTime startedAt;
   final DateTime? endedAt;
   final int? durationSeconds;
@@ -41,6 +44,7 @@ class MachineStateEvent {
     required this.state,
     this.reasonCode,
     this.reasonCategory,
+    this.tpmLossKey,
     required this.startedAt,
     this.endedAt,
     this.durationSeconds,
@@ -83,6 +87,7 @@ class MachineStateEvent {
         plantKey: '',
         machineId: '',
         state: stateIdle,
+        tpmLossKey: null,
         startedAt: now,
         createdAt: now,
         source: 'manual',
@@ -106,6 +111,7 @@ class MachineStateEvent {
       state: (map['state'] ?? stateIdle).toString(),
       reasonCode: _trimOrNull(map['reasonCode']),
       reasonCategory: _trimOrNull(map['reasonCategory']),
+      tpmLossKey: _trimOrNull(map['tpmLossKey']),
       startedAt:
           (map['startedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       endedAt: (map['endedAt'] as Timestamp?)?.toDate(),
@@ -137,6 +143,8 @@ class MachineStateEvent {
         'reasonCode': reasonCode,
       if (reasonCategory != null && reasonCategory!.trim().isNotEmpty)
         'reasonCategory': reasonCategory,
+      if (tpmLossKey != null && tpmLossKey!.trim().isNotEmpty)
+        'tpmLossKey': tpmLossKey,
       'startedAt': startedAt,
       if (endedAt != null) 'endedAt': endedAt,
       if (durationSeconds != null) 'durationSeconds': durationSeconds,

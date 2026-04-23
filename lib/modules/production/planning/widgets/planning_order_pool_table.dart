@@ -150,6 +150,10 @@ class _OrderDataTable extends StatelessWidget {
           columns: const [
             DataColumn(label: Text('')),
             DataColumn(label: Text('Nalog')),
+            DataColumn(
+              label: Text('Signali'),
+              tooltip: 'Stroj, rok — isto kao lijevi rub (zeleno/žuto/crveno).',
+            ),
             DataColumn(label: Text('Proizvod')),
             DataColumn(label: Text('Kol.')),
             DataColumn(label: Text('Rok')),
@@ -216,6 +220,7 @@ DataRow _dataRow(BuildContext context, PlanningSessionController session, Produc
           decorationColor: exStyle?.decorationColor,
         ),
       )),
+      DataCell(planningOrderSignalRow(t, o)),
       DataCell(
         SizedBox(
           width: 120,

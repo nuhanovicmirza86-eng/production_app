@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/format/ba_formatted_date.dart';
 import '../../../../core/access/production_access_helper.dart'
     show ProductionAccessHelper, ProductionDashboardCard;
 import '../../../../core/saas/production_module_keys.dart';
@@ -98,10 +99,8 @@ class _ProductionOperatorTrackingScreenState
     super.dispose();
   }
 
-  String _todayLine(BuildContext context) {
-    final d = DateTime.now();
-    return MaterialLocalizations.of(context).formatFullDate(d);
-  }
+  String _todayLine() =>
+      BaFormattedDate.formatFullDate(DateTime.now());
 
   bool get _showStationPagesButton {
     final r = (widget.companyData['role'] ?? '').toString();
@@ -162,7 +161,7 @@ class _ProductionOperatorTrackingScreenState
       case 'Smjene':
         push(ProductionTrackingShiftsScreen(companyData: cd));
         return;
-      case 'AI izvještaji':
+      case 'Brzi izvještaji':
         push(ProductionTrackingAiReportsScreen(companyData: cd));
         return;
       default:
@@ -285,7 +284,7 @@ class _ProductionOperatorTrackingScreenState
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'Radni dan: ${_todayLine(context)}',
+                              'Radni dan: ${_todayLine()}',
                               style: theme.textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w600,
                               ),

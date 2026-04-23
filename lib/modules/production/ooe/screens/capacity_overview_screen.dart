@@ -129,9 +129,22 @@ class _CapacityOverviewScreenState extends State<CapacityOverviewScreen> {
               children: [
                 const OeeOoeTeepHierarchyCard(),
                 const SizedBox(height: 12),
-                Text(
-                  'Kalendarski dani (capacity_calendars)',
-                  style: Theme.of(context).textTheme.titleSmall,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Kalendarski dani (capacity_calendars)',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    OoeInfoIcon(
+                      tooltip: OoeHelpTexts.capacitySectionCalendarHeaderTooltip,
+                      dialogTitle: OoeHelpTexts.capacitySectionCalendarHeaderTitle,
+                      dialogBody: OoeHelpTexts.capacitySectionCalendarHeaderBody,
+                      iconSize: 20,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 StreamBuilder(
@@ -207,9 +220,22 @@ class _CapacityOverviewScreenState extends State<CapacityOverviewScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                Text(
-                  'Iskorištenje (utilization_summaries)',
-                  style: Theme.of(context).textTheme.titleSmall,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Iskorištenje (utilization_summaries)',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    OoeInfoIcon(
+                      tooltip: OoeHelpTexts.capacitySectionUtilizationHeaderTooltip,
+                      dialogTitle: OoeHelpTexts.capacitySectionUtilizationHeaderTitle,
+                      dialogBody: OoeHelpTexts.capacitySectionUtilizationHeaderBody,
+                      iconSize: 20,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 StreamBuilder(

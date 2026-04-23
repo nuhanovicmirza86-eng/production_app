@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/ui/company_plant_label_text.dart';
+import '../models/mes_tpm_six_losses.dart';
 import '../models/ooe_loss_reason.dart';
 import '../services/ooe_loss_reason_service.dart';
 
@@ -103,7 +104,7 @@ class OoeLossReasonsScreen extends StatelessWidget {
                 child: ListTile(
                   title: Text(r.name),
                   subtitle: Text(
-                    '${r.code} · ${_categoryLabel(r.category)}',
+                    '${r.code} · ${_categoryLabel(r.category)} · TPM: ${MesTpmLossKeys.labelHr(r.effectiveTpmLossKey)}',
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -188,12 +189,20 @@ class _LossReasonEditorSheetState extends State<_LossReasonEditorSheet> {
   late TextEditingController _descCtrl;
   late TextEditingController _sortCtrl;
   late String _category;
+  /// Prazan string = nema overridea, koristi heuristiku iz kategorije.
+  late String _tpmKey;
   late bool _isPlanned;
   late bool _affectsA;
   late bool _affectsP;
   late bool _affectsQ;
   late bool _active;
   bool _saving = false;
+
+  /// Nepoznat ključ u starim zapisima — prikaži kao stavku da ne gubimo mapiranje.
+  bool get _tpmKeyIsCustom =>
+      _tpmKey.isNotEmpty &&
+      !MesTpmLossKeys.ordered.contains(_tpmKey) &&
+      _tpmKey != MesTpmLossKeys.unclassified;
 
   static const _categories = <String, String>{
     OoeLossReason.categoryPlannedStop: 'Planirani zastoj',
@@ -219,6 +228,7 @@ class _LossReasonEditorSheetState extends State<_LossReasonEditorSheet> {
       text: e != null ? e.sortOrder.toString() : '0',
     );
     _category = e?.category ?? OoeLossReason.categoryUnplannedStop;
+    _tpmKey = e?.tpmLossKey?.trim() ?? '';
     _isPlanned = e?.isPlanned ?? false;
     _affectsA = e?.affectsAvailability ?? true;
     _affectsP = e?.affectsPerformance ?? false;
@@ -266,12 +276,12 @@ class _LossReasonEditorSheetState extends State<_LossReasonEditorSheet> {
           name: name,
           description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
           category: _category,
+          tpmLossKey: _tpmKey.isEmpty ? null : _tpmKey,
           isPlanned: _isPlanned,
           affectsAvailability: _affectsA,
           affectsPerformance: _affectsP,
           affectsQuality: _affectsQ,
           sortOrder: sort,
-          createdBy: uid,
         );
       } else {
         await _svc.updateReason(
@@ -281,13 +291,13 @@ class _LossReasonEditorSheetState extends State<_LossReasonEditorSheet> {
           name: name,
           description: _descCtrl.text.trim().isEmpty ? '' : _descCtrl.text.trim(),
           category: _category,
+          tpmLossKey: _tpmKey.isEmpty ? '' : _tpmKey,
           isPlanned: _isPlanned,
           affectsAvailability: _affectsA,
           affectsPerformance: _affectsP,
           affectsQuality: _affectsQ,
           active: _active,
           sortOrder: sort,
-          updatedBy: uid,
         );
       }
       if (mounted) {
@@ -370,6 +380,46 @@ class _LossReasonEditorSheetState extends State<_LossReasonEditorSheet> {
                   onChanged: widget.canManage && !_saving
                       ? (v) {
                           if (v != null) setState(() => _category = v);
+                        }
+                      : null,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'TPM — šest velikih gubitaka',
+                helperText: 'Prazno = heuristika iz kategorije gore (za starije unose).',
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  isExpanded: true,
+                  value: _tpmKey,
+                  items: <DropdownMenuItem<String>>[
+                    const DropdownMenuItem<String>(
+                      value: '',
+                      child: Text('Auto (heuristika iz kategorije)'),
+                    ),
+                    const DropdownMenuItem<String>(
+                      value: MesTpmLossKeys.unclassified,
+                      child: Text('Eksplicitno: nekvalificirano'),
+                    ),
+                    ...MesTpmLossKeys.ordered.map(
+                      (k) => DropdownMenuItem<String>(
+                        value: k,
+                        child: Text(MesTpmLossKeys.labelHr(k)),
+                      ),
+                    ),
+                    if (_tpmKeyIsCustom)
+                      DropdownMenuItem<String>(
+                        value: _tpmKey,
+                        child: Text('Spremljeno: $_tpmKey'),
+                      ),
+                  ],
+                  onChanged: widget.canManage && !_saving
+                      ? (v) {
+                          if (v == null) return;
+                          setState(() => _tpmKey = v);
                         }
                       : null,
                 ),

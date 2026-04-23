@@ -419,6 +419,9 @@ class ProductionExecutionService {
     required String plantKey,
     required String updatedBy,
     String? notes,
+    /// Šifra iz `ooe_loss_reasons` (OOE) — u `openState` postaje [reasonCode] + `tpmLossKey`.
+    /// `null` ili prazno: briše polje (nema MES razloga za ovu pauzu).
+    String? ooePauseReasonCode,
     double? goodQty,
     double? scrapQty,
     double? reworkQty,
@@ -462,6 +465,13 @@ class ProductionExecutionService {
       'updatedAt': DateTime.now(),
       'updatedBy': normalizedUpdatedBy,
     };
+
+    final pr = ooePauseReasonCode;
+    if (pr == null || _s(pr).isEmpty) {
+      updates['ooePauseReasonCode'] = FieldValue.delete();
+    } else {
+      updates['ooePauseReasonCode'] = _s(pr).toUpperCase();
+    }
 
     if (goodQty != null) {
       updates['goodQty'] = goodQty;
@@ -561,6 +571,7 @@ class ProductionExecutionService {
       'status': 'started',
       'updatedAt': DateTime.now(),
       'updatedBy': normalizedUpdatedBy,
+      'ooePauseReasonCode': FieldValue.delete(),
     };
 
     if (notes != null) {

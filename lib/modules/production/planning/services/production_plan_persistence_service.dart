@@ -21,10 +21,13 @@ class ProductionPlanPersistenceService {
   static const int _maxConflictDocs = 80;
 
   /// Vraća ID dokumenta u [production_plans] nakon uspješnog batcha.
+  ///
+  /// [localGanttAdjusted]: ručno pomicanje u Gantt-u (audit / kasnija analitika).
   Future<String> saveDraftFromEngineResult({
     required PlanningEngineResult result,
     required String companyId,
     required String plantKey,
+    bool localGanttAdjusted = false,
   }) async {
     final u = _auth.currentUser;
     if (u == null) {
@@ -69,6 +72,7 @@ class ProductionPlanPersistenceService {
       'planningHorizonEnd':
           plan.planningEnd != null ? Timestamp.fromDate(plan.planningEnd!) : null,
       'source': 'fcs_mvp_1',
+      'localGanttAdjusted': localGanttAdjusted,
       'createdAt': FieldValue.serverTimestamp(),
       'createdByUid': u.uid,
       'updatedAt': FieldValue.serverTimestamp(),
@@ -103,6 +107,7 @@ class ProductionPlanPersistenceService {
         'operatorIds': op.operatorIds,
         'plannedStart': Timestamp.fromDate(op.plannedStart),
         'plannedEnd': Timestamp.fromDate(op.plannedEnd),
+        'setupStart': op.setupStart != null ? Timestamp.fromDate(op.setupStart!) : null,
         'runStart': op.runStart != null ? Timestamp.fromDate(op.runStart!) : null,
         'runEnd': op.runEnd != null ? Timestamp.fromDate(op.runEnd!) : null,
         'status': op.status,
@@ -168,10 +173,12 @@ class ProductionPlanPersistenceService {
           machineId: (m['machineId'] as String?) ?? '',
           plannedStart: ps.toDate(),
           plannedEnd: pe.toDate(),
+          productionOrderId: (m['productionOrderId'] as String?)?.trim(),
           scheduledOperationId: d.id,
           runStart: runS,
           runEnd: runE,
           operationLabel: opLabel,
+          blockKind: PlanningGanttBlockKind.plannedFcs,
         ),
       );
     }

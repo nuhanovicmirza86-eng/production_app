@@ -186,9 +186,22 @@ class _TeepAnalysisScreenState extends State<TeepAnalysisScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Preračun',
-                    style: Theme.of(context).textTheme.titleSmall,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Preračun',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                      ),
+                      OoeInfoIcon(
+                        tooltip: OoeHelpTexts.teepRecomputePanelTooltip,
+                        dialogTitle: OoeHelpTexts.teepRecomputePanelTitle,
+                        dialogBody: OoeHelpTexts.teepRecomputePanelBody,
+                        iconSize: 20,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   SegmentedButton<String>(
@@ -310,9 +323,22 @@ class _TeepAnalysisScreenState extends State<TeepAnalysisScreen> {
                   children: [
                     OeeOoeTeepHierarchyCard(summary: first),
                     const SizedBox(height: 12),
-                    Text(
-                      'Povijest perioda',
-                      style: Theme.of(context).textTheme.titleSmall,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Povijest perioda',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                        ),
+                        OoeInfoIcon(
+                          tooltip: OoeHelpTexts.teepHistorySectionTooltip,
+                          dialogTitle: OoeHelpTexts.teepHistorySectionTitle,
+                          dialogBody: OoeHelpTexts.teepHistorySectionBody,
+                          iconSize: 20,
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     ...list.map(
