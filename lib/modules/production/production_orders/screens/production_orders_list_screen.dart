@@ -14,6 +14,8 @@ import '../../../logistics/inventory/services/product_warehouse_stock_service.da
 import '../export/production_orders_list_pdf_export.dart';
 import '../models/production_order_model.dart';
 import '../services/production_order_service.dart';
+import '../../work_centers/models/work_center_model.dart';
+import '../../work_centers/services/work_center_service.dart';
 import 'production_order_create_screen.dart';
 import 'production_order_details_screen.dart';
 
@@ -50,6 +52,7 @@ class ProductionOrdersListScreen extends StatefulWidget {
 class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     with SingleTickerProviderStateMixin {
   final ProductionOrderService _service = ProductionOrderService();
+  final WorkCenterService _workCenterService = WorkCenterService();
   final ProductWarehouseStockService _stockService =
       ProductWarehouseStockService();
   final TextEditingController _searchController = TextEditingController();
@@ -57,7 +60,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
   bool _isLoading = true;
   String? _error;
 
-  /// Sklopivi blok: pretraga + kupac/proces + status/datum.
+  /// Sklopivi blok: pretraga + kupac/proces/radni centar + status/datum.
   bool _searchStripExpanded = false;
   ProductionOrderStatusFilter _selectedStatus = ProductionOrderStatusFilter.all;
   List<ProductionOrderModel> _orders = const [];
@@ -72,6 +75,11 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
 
   String? _filterCustomerName;
   String? _filterOperationName;
+
+  /// `null` = svi, `__none__` = bez RC, inače `workCenterId`.
+  String? _filterWorkCenterKey;
+
+  List<WorkCenter> _workCenters = const [];
 
   /// Ljudski naziv pogona (iz šifrarnika); `null` = još učitavanje.
   String? _plantResolvedLabel;
@@ -100,7 +108,30 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
       if (mounted) setState(() {});
       _scheduleStockRefresh();
     });
+    _loadWorkCenters();
     _loadOrders();
+  }
+
+  /// Povlačenje + nalozi (npr. nakon pull-to-refresh) da se šifrarnik RC uskladi s filterom.
+  Future<void> _refreshListData() async {
+    await Future.wait<void>([
+      _loadWorkCenters(),
+      _loadOrders(),
+    ]);
+  }
+
+  Future<void> _loadWorkCenters() async {
+    if (_companyId.isEmpty || _plantKey.isEmpty) return;
+    try {
+      final list = await _workCenterService.listWorkCentersForPlant(
+        companyId: _companyId,
+        plantKey: _plantKey,
+      );
+      if (!mounted) return;
+      setState(() => _workCenters = list);
+    } catch (_) {
+      /* šifrarnik može biti prazan */
+    }
   }
 
   @override
@@ -214,6 +245,17 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
             !_distinctOperationNames().contains(_filterOperationName!)) {
           _filterOperationName = null;
         }
+        if (_filterWorkCenterKey != null &&
+            _filterWorkCenterKey != '__none__') {
+          final k = _filterWorkCenterKey!;
+          final inCatalog = _workCenters.any((w) => w.id == k);
+          final inOrders = orders.any(
+            (o) => (o.workCenterId ?? '').trim() == k,
+          );
+          if (!inCatalog && !inOrders) {
+            _filterWorkCenterKey = null;
+          }
+        }
       });
       _scheduleStockRefresh();
     } catch (e) {
@@ -256,6 +298,8 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     return _orders.where((o) {
       final cust = _customerGroupKey(o);
       final op = (o.operationName ?? '').trim();
+      final wcCode = (o.workCenterCode ?? '').trim().toLowerCase();
+      final wcName = (o.workCenterName ?? '').trim().toLowerCase();
       final matchesSearch =
           q.isEmpty ||
           o.productionOrderCode.toLowerCase().contains(q) ||
@@ -263,7 +307,9 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
           o.productName.toLowerCase().contains(q) ||
           (o.customerName ?? '').toLowerCase().contains(q) ||
           (o.sourceCustomerName ?? '').toLowerCase().contains(q) ||
-          op.toLowerCase().contains(q);
+          op.toLowerCase().contains(q) ||
+          wcCode.contains(q) ||
+          wcName.contains(q);
       final matchesStatus = _selectedStatus.matches(o.status);
       final matchesDate = dateInInclusiveRange(o.createdAt, _dateFrom, _dateTo);
       final matchesCustomer =
@@ -272,11 +318,18 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
           _filterOperationName == null ||
           (_filterOperationName == '__bez_procesa__' && op.isEmpty) ||
           op == _filterOperationName;
+      final wid = (o.workCenterId ?? '').trim();
+      final matchesWc = _filterWorkCenterKey == null
+          ? true
+          : _filterWorkCenterKey == '__none__'
+          ? wid.isEmpty
+          : wid == _filterWorkCenterKey;
       return matchesSearch &&
           matchesStatus &&
           matchesDate &&
           matchesCustomer &&
-          matchesOp;
+          matchesOp &&
+          matchesWc;
     }).toList();
   }
 
@@ -286,6 +339,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     if (_dateFrom != null || _dateTo != null) n++;
     if (_filterCustomerName != null) n++;
     if (_filterOperationName != null) n++;
+    if (_filterWorkCenterKey != null) n++;
     return n;
   }
 
@@ -389,6 +443,64 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     );
   }
 
+  List<DropdownMenuItem<String?>> _workCenterFilterItems() {
+    final items = <DropdownMenuItem<String?>>[
+      const DropdownMenuItem<String?>(
+        value: null,
+        child: Text('Svi radni centri'),
+      ),
+      const DropdownMenuItem<String?>(
+        value: '__none__',
+        child: Text('(bez radnog centra)'),
+      ),
+    ];
+    final seen = <String>{};
+    for (final w in _workCenters) {
+      final id = w.id.trim();
+      if (id.isEmpty || seen.contains(id)) continue;
+      seen.add(id);
+      items.add(
+        DropdownMenuItem<String?>(
+          value: id,
+          child: Text(
+            '${w.workCenterCode} — ${w.name}',
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      );
+    }
+    for (final o in _orders) {
+      final id = (o.workCenterId ?? '').trim();
+      if (id.isEmpty || seen.contains(id)) continue;
+      seen.add(id);
+      final label = [
+        (o.workCenterCode ?? '').trim(),
+        (o.workCenterName ?? '').trim(),
+      ].where((s) => s.isNotEmpty).join(' — ');
+      items.add(
+        DropdownMenuItem<String?>(
+          value: id,
+          child: Text(
+            label.isEmpty ? id : label,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      );
+    }
+    final k = _filterWorkCenterKey;
+    if (k != null &&
+        k != '__none__' &&
+        !items.any((e) => e.value == k)) {
+      items.add(
+        DropdownMenuItem<String?>(
+          value: k,
+          child: Text(k, overflow: TextOverflow.ellipsis),
+        ),
+      );
+    }
+    return items;
+  }
+
   Widget _buildPnAxisFilters() {
     final customers = _distinctCustomerFilterKeys();
     final ops = _distinctOperationNames();
@@ -402,11 +514,9 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
       final cs = Theme.of(context).colorScheme;
       return DropdownButtonFormField<T?>(
         isExpanded: true,
-        isDense: true,
         borderRadius: BorderRadius.circular(12),
         decoration: InputDecoration(
           labelText: label,
-          isDense: true,
           filled: true,
           fillColor: cs.surface,
           border: OutlineInputBorder(
@@ -430,10 +540,10 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
           ),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 12,
-            vertical: 10,
+            vertical: 14,
           ),
         ),
-        value: value,
+        initialValue: value,
         items: items,
         onChanged: onChanged,
       );
@@ -470,6 +580,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
             ),
           ),
         ];
+        final wcItems = _workCenterFilterItems();
 
         final plantLabel = _plantLineForDisplay();
 
@@ -497,6 +608,18 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
                   items: opItems,
                   onChanged: (v) {
                     setState(() => _filterOperationName = v);
+                    _scheduleStockRefresh();
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: axisDropdown<String?>(
+                  label: 'Radni centar',
+                  value: _filterWorkCenterKey,
+                  items: wcItems,
+                  onChanged: (v) {
+                    setState(() => _filterWorkCenterKey = v);
                     _scheduleStockRefresh();
                   },
                 ),
@@ -546,6 +669,18 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
                 ),
               ],
             ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: axisDropdown<String?>(
+                label: 'Radni centar',
+                value: _filterWorkCenterKey,
+                items: wcItems,
+                onChanged: (v) {
+                  setState(() => _filterWorkCenterKey = v);
+                  _scheduleStockRefresh();
+                },
+              ),
+            ),
             Text(
               'Pogon: $plantLabel',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -556,6 +691,31 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
         );
       },
     );
+  }
+
+  String _workCenterFilterLabelForExport() {
+    final k = _filterWorkCenterKey;
+    if (k == null) return '';
+    if (k == '__none__') return '(bez radnog centra)';
+    WorkCenter? fromCat;
+    for (final w in _workCenters) {
+      if (w.id == k) {
+        fromCat = w;
+        break;
+      }
+    }
+    if (fromCat != null) {
+      return '${fromCat.workCenterCode} — ${fromCat.name}';
+    }
+    for (final o in _orders) {
+      if ((o.workCenterId ?? '').trim() != k) continue;
+      final t = [
+        (o.workCenterCode ?? '').trim(),
+        (o.workCenterName ?? '').trim(),
+      ].where((s) => s.isNotEmpty).join(' — ');
+      return t.isEmpty ? k : t;
+    }
+    return k;
   }
 
   String _companyDisplayName() {
@@ -575,6 +735,17 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     }
     if (_selectedStatus != ProductionOrderStatusFilter.all) {
       parts.add('Status: ${_selectedStatus.label}');
+    }
+    if (_filterCustomerName != null) {
+      parts.add('Kupac: ${_filterCustomerName!}');
+    }
+    if (_filterOperationName != null) {
+      parts.add(
+        'Proces: ${_filterOperationName == '__bez_procesa__' ? '(bez oznake)' : _filterOperationName!}',
+      );
+    }
+    if (_filterWorkCenterKey != null) {
+      parts.add('Radni centar: ${_workCenterFilterLabelForExport()}');
     }
     if (parts.isEmpty) return null;
     return parts.join('  |  ');
@@ -789,7 +960,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
                 '• Filtriranje po statusu i datumu kreiranja (od–do)\n'
                 '• Tab „Zalihe i status“: plan / ostalo / stanje zalihe (zeleno = spremno)\n'
                 '• Tab „Izvještaj“: detaljnija tabela po kupcu (opcijske kolone samo ako postoje podaci)\n'
-                '• Filteri: kupac, proces (operationName), status, datum kreiranja\n'
+                '• Filteri: kupac, proces (operationName), radni centar, status, datum kreiranja\n'
                 '• Izvoz: CSV, PDF (pregled/ispis), dijeljenje PDF-a; detalji naloga\n\n'
                 'Ovdje pratiš operativni tok proizvodnje od planiranog do završenog naloga.',
               ),
@@ -1662,7 +1833,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
                     ),
                     Expanded(
                       child: RefreshIndicator(
-                        onRefresh: _loadOrders,
+                        onRefresh: _refreshListData,
                         child: TabBarView(
                           controller: _tabController,
                           physics: const AlwaysScrollableScrollPhysics(),

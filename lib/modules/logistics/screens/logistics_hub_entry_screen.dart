@@ -21,12 +21,21 @@ import '../internal_supply/screens/internal_supply_module_screen.dart';
 class LogisticsHubEntryScreen extends StatelessWidget {
   final Map<String, dynamic> companyData;
 
-  const LogisticsHubEntryScreen({super.key, required this.companyData});
+  /// Npr. nakon skena `rcpt:v1` — tab „Evidencija” (lista GR) je indeks 7.
+  final int? initialTabIndex;
+
+  const LogisticsHubEntryScreen({
+    super.key,
+    required this.companyData,
+    this.initialTabIndex,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final initial = (initialTabIndex ?? 0).clamp(0, 11);
     return DefaultTabController(
       length: 12,
+      initialIndex: initial,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Centralni magacin / Hub'),

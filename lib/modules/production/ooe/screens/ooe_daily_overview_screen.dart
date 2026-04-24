@@ -16,7 +16,14 @@ enum _DailyScope { oneMachine, wholePlant }
 class OoeDailyOverviewScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
 
-  const OoeDailyOverviewScreen({super.key, required this.companyData});
+  /// Početni dan (npr. iz analitike zastoja — isti vremenski rez).
+  final DateTime? initialDay;
+
+  const OoeDailyOverviewScreen({
+    super.key,
+    required this.companyData,
+    this.initialDay,
+  });
 
   @override
   State<OoeDailyOverviewScreen> createState() => _OoeDailyOverviewScreenState();
@@ -46,7 +53,12 @@ class _OoeDailyOverviewScreenState extends State<OoeDailyOverviewScreen> {
   void initState() {
     super.initState();
     final n = DateTime.now();
-    _day = DateTime(n.year, n.month, n.day);
+    final init = widget.initialDay;
+    if (init != null) {
+      _day = DateTime(init.year, init.month, init.day);
+    } else {
+      _day = DateTime(n.year, n.month, n.day);
+    }
     _assetsFuture = ProductionTrackingAssetsService().loadForPlant(
       companyId: _companyId,
       plantKey: _plantKey,
@@ -353,8 +365,6 @@ class _OoeDailyOverviewScreenState extends State<OoeDailyOverviewScreen> {
                             labelText: 'Šifra stroja',
                             helperText:
                                 'Isti stroj kao u izvršenju i u imovini pogona (assets).',
-                            border: OutlineInputBorder(),
-                            isDense: true,
                           ),
                           onChanged: (_) => setState(() {}),
                         ),
@@ -374,8 +384,6 @@ class _OoeDailyOverviewScreenState extends State<OoeDailyOverviewScreen> {
                           child: InputDecorator(
                             decoration: const InputDecoration(
                               labelText: 'Dan',
-                              border: OutlineInputBorder(),
-                              isDense: true,
                               suffixIcon: Icon(
                                 Icons.calendar_today_outlined,
                                 size: 18,

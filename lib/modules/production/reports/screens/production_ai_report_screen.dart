@@ -2,6 +2,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
+import '../../../../core/ai/production_ai_context_scope.dart';
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/saas/production_module_keys.dart';
 import '../services/production_ai_report_service.dart';
@@ -42,6 +43,9 @@ class _ProductionAiReportScreenState extends State<ProductionAiReportScreen> {
 
   bool get _periodExceedsLimit =>
       _periodOrderOk && _inclusiveCalendarDays() > _maxInclusivePeriodDays;
+
+  bool get _reportAllowedByRbac =>
+      ProductionAiContextScope.allowsProductionAiReport(widget.companyData);
 
   static const String _periodTooLongMessage =
       'Period ne smije biti dulji od 31 dan (uključivo). Skrati raspon datuma.';
@@ -224,11 +228,21 @@ class _ProductionAiReportScreenState extends State<ProductionAiReportScreen> {
                     ),
                   ),
                 ],
+                if (!_reportAllowedByRbac) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Nemaš u aplikaciji pristup praćenju ni nalozima u dometu uloge — izvještaj nije dostupan.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 FilledButton.icon(
                   onPressed: (_loading ||
                           !_periodOrderOk ||
-                          _periodExceedsLimit)
+                          _periodExceedsLimit ||
+                          !_reportAllowedByRbac)
                       ? null
                       : _generate,
                   icon: _loading

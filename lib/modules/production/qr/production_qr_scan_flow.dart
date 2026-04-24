@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../logistics/receipt/screens/logistics_receipt_qr_result_screen.dart';
 import '../../logistics/receipt/screens/packing_box_receipt_screen.dart';
 import '../../logistics/receipt/screens/production_label_receipt_screen.dart';
+import '../../logistics/wms/screens/wms_lot_scan_result_screen.dart';
+import '../../workforce/employee_profiles/workforce_employee_qr_navigation.dart';
 import '../production_orders/screens/production_order_details_screen.dart';
 import 'production_qr_resolver.dart';
 import 'screens/production_qr_scan_screen.dart';
@@ -22,15 +25,19 @@ Future<void> runProductionQrScanFlow({
   if (!context.mounted || resolution == null) return;
 
   switch (resolution.intent) {
+    case ProductionQrIntent.workforceEmployeeV1:
+      await openWorkforceEmployeeFromBadgeQr(
+        context: context,
+        companyData: companyData,
+        rawPayload: resolution.rawPayload,
+      );
+      break;
+
     case ProductionQrIntent.productionOrderReferenceV1:
       final id = resolution.productionOrderId?.trim();
       if (id == null || id.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'QR ne sadrži ID naloga. Koristite noviji ispis (po:v1 sa poljem id).',
-            ),
-          ),
+          const SnackBar(content: Text('QR naloga nije uredan.')),
         );
         return;
       }
@@ -60,9 +67,9 @@ Future<void> runProductionQrScanFlow({
     case ProductionQrIntent.packedStation1BoxV1:
       final boxId = resolution.packingBoxId?.trim();
       if (boxId == null || boxId.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('QR kutije nije valjan.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('QR kutije nije valjan.')));
         return;
       }
       await Navigator.push<void>(
@@ -78,28 +85,41 @@ Future<void> runProductionQrScanFlow({
       final lotId = resolution.wmsLotDocId?.trim();
       if (lotId == null || lotId.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'WMS QR nema id lota. Koristi format wmslot:v1;<id>.',
-            ),
-          ),
+          const SnackBar(content: Text('QR lota nije uredan.')),
         );
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'WMS lot: $lotId — otvori WMS (Putaway / Otpremna zona).',
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              WmsLotScanResultScreen(companyData: companyData, lotDocId: lotId),
+        ),
+      );
+      break;
+
+    case ProductionQrIntent.logisticsReceiptDocV1:
+      final receiptId = resolution.logisticsReceiptDocId?.trim();
+      if (receiptId == null || receiptId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('QR prijema nije uredan.')),
+        );
+        return;
+      }
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => LogisticsReceiptQrResultScreen(
+            companyData: companyData,
+            receiptDocId: receiptId,
           ),
         ),
       );
       break;
 
     case ProductionQrIntent.nepoznat:
-      final raw = resolution.rawPayload;
-      final preview = raw.length > 120 ? '${raw.substring(0, 120)}…' : raw;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Nepoznat QR. Sadržaj: $preview')),
+        const SnackBar(content: Text('Nepoznat QR.')),
       );
       break;
   }

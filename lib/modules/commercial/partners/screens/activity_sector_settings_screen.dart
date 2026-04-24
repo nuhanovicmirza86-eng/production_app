@@ -161,8 +161,6 @@ class _ActivitySectorSettingsScreenState
               decoration: const InputDecoration(
                 labelText: 'Pretraga u šifarniku',
                 prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-                isDense: true,
               ),
             ),
           ),

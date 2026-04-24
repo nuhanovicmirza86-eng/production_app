@@ -4,10 +4,14 @@ enum ProductionDashboardCard {
   productionTracking,
   stationPages,
   workCenters,
+  /// MES šifrarnik standardnih procesa (odvojeno od routingu).
+  productionProcesses,
   shifts,
   downtime,
   /// OOE / OEE — live stanje, gubici, agregati smjene (dogasci + summary).
   ooe,
+  /// Operonix Analytics (MES BI) — rukovodstvena analitika; odvojeno od [ooe] da operater ne vidi isti ekran.
+  operonixAnalytics,
   problemReporting,
   processExecution,
   reports,
@@ -23,6 +27,14 @@ enum ProductionDashboardCard {
 
 enum ProductionAccessLevel { hidden, view, manage }
 
+/// Pristup ekranima u Production appu.
+///
+/// **Uloga** = vrijednost `users.role` (string) u Firestoreu. Ispod su **kanonske** uloge koje ovaj helper
+/// eksplicitno poznaje (konstante) — **nisu** izmišljene ovdje: moraju se poklapati s onim što
+/// tenant (Super admin) dodjeljuje korisniku. Ne uvoditi nove stringove uloga u kodu (vidi
+/// `.cursor/rules/production-auth-roles.mdc`); niti u UI **izmišljati** nove nazive uloga — u
+/// [displayRoleLabel] dozvoljeni su samo fiksni prikazi + sirovi kôd (npr. `supervisor`) gdje
+/// nema odvojenog proizvodnog naziva.
 class ProductionAccessHelper {
   const ProductionAccessHelper._();
 
@@ -33,7 +45,7 @@ class ProductionAccessHelper {
   static const String roleMaintenanceManager = 'maintenance_manager';
   static const String roleAdmin = 'admin';
 
-  /// Operater / kontrolor kvaliteta (QMS ekrani).
+  /// [quality_operator] — QMS ekrani; ne miješati s ulogom [roleSupervisor].
   static const String roleQualityOperator = 'quality_operator';
 
   /// Vlasnik projekta (SaaS) — izvan scopea pojedine kompanije u smislu `admin`.
@@ -55,6 +67,8 @@ class ProductionAccessHelper {
 
   /// Tekst za prikaz u UI (npr. „Uloga: …”). Za tenant admin uvijek tačno **„Admin”**
   /// (nikad „Administrator” ili sirovi kod iz baze).
+  /// Za [roleSupervisor] nema zasebnog „poslovnog” naziva u proizvodu — prikaz je isti kôd kao u bazi
+  /// (`supervisor`). [roleQualityOperator] = **Operater kvaliteta** (druga uloga, fiksno).
   static String displayRoleLabel(dynamic role) {
     final s = (role ?? '').toString().trim().toLowerCase();
     if (s == 'admin' ||
@@ -78,7 +92,7 @@ class ProductionAccessHelper {
       case roleLogisticsManager:
         return 'Menadžer logistike';
       case roleSupervisor:
-        return 'Supervizor';
+        return 'supervisor';
       case roleProductionOperator:
         return 'Operater proizvodnje';
       case roleQualityOperator:
@@ -149,15 +163,17 @@ class ProductionAccessHelper {
       ProductionDashboardCard.productionTracking: ProductionAccessLevel.manage,
       ProductionDashboardCard.stationPages: ProductionAccessLevel.hidden,
       ProductionDashboardCard.workCenters: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionProcesses: ProductionAccessLevel.hidden,
       ProductionDashboardCard.shifts: ProductionAccessLevel.hidden,
-      /// MVP: zasebni dashboard ekran za zastoje još nije isporučen — operater koristi praćenje / nalog.
-      ProductionDashboardCard.downtime: ProductionAccessLevel.hidden,
+      /// Zastoji: prijava na podu; IATF verifikacija zatvaranja: admin / menadžer proizvodnje / super admin, ne uloga `supervisor`.
+      ProductionDashboardCard.downtime: ProductionAccessLevel.manage,
       /// Live OOE pregled (bez uređivanja kataloga razloga).
       ProductionDashboardCard.ooe: ProductionAccessLevel.view,
+      ProductionDashboardCard.operonixAnalytics: ProductionAccessLevel.hidden,
       ProductionDashboardCard.problemReporting: ProductionAccessLevel.manage,
-      /// MVP: „Evidencija procesa“ kao zaseban tab još nije isporučen — operater koristi detalj naloga → execution.
+      /// Hub „Evidencija procesa“ je za menadžment; operater i dalje ulazi u izvršenje iz detalja naloga.
       ProductionDashboardCard.processExecution: ProductionAccessLevel.hidden,
-      /// Operater na podu: praćenje i nalozi; analitički hub (Izvještaji) ostaje menadžeru / supervizoru.
+      /// Operater na podu: praćenje i nalozi; analitički hub (Izvještaji) ostaje menadžeru / uloga `supervisor` gdje pristup postoji.
       ProductionDashboardCard.reports: ProductionAccessLevel.hidden,
       ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
@@ -170,9 +186,11 @@ class ProductionAccessHelper {
       ProductionDashboardCard.productionTracking: ProductionAccessLevel.manage,
       ProductionDashboardCard.stationPages: ProductionAccessLevel.hidden,
       ProductionDashboardCard.workCenters: ProductionAccessLevel.view,
+      ProductionDashboardCard.productionProcesses: ProductionAccessLevel.view,
       ProductionDashboardCard.shifts: ProductionAccessLevel.manage,
       ProductionDashboardCard.downtime: ProductionAccessLevel.manage,
       ProductionDashboardCard.ooe: ProductionAccessLevel.manage,
+      ProductionDashboardCard.operonixAnalytics: ProductionAccessLevel.hidden,
       ProductionDashboardCard.problemReporting: ProductionAccessLevel.manage,
       ProductionDashboardCard.processExecution: ProductionAccessLevel.manage,
       ProductionDashboardCard.reports: ProductionAccessLevel.view,
@@ -187,9 +205,11 @@ class ProductionAccessHelper {
       ProductionDashboardCard.productionTracking: ProductionAccessLevel.manage,
       ProductionDashboardCard.stationPages: ProductionAccessLevel.manage,
       ProductionDashboardCard.workCenters: ProductionAccessLevel.manage,
+      ProductionDashboardCard.productionProcesses: ProductionAccessLevel.manage,
       ProductionDashboardCard.shifts: ProductionAccessLevel.manage,
       ProductionDashboardCard.downtime: ProductionAccessLevel.manage,
       ProductionDashboardCard.ooe: ProductionAccessLevel.manage,
+      ProductionDashboardCard.operonixAnalytics: ProductionAccessLevel.manage,
       ProductionDashboardCard.problemReporting: ProductionAccessLevel.manage,
       ProductionDashboardCard.processExecution: ProductionAccessLevel.manage,
       ProductionDashboardCard.reports: ProductionAccessLevel.manage,
@@ -204,9 +224,11 @@ class ProductionAccessHelper {
       ProductionDashboardCard.productionTracking: ProductionAccessLevel.hidden,
       ProductionDashboardCard.stationPages: ProductionAccessLevel.hidden,
       ProductionDashboardCard.workCenters: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionProcesses: ProductionAccessLevel.hidden,
       ProductionDashboardCard.shifts: ProductionAccessLevel.hidden,
       ProductionDashboardCard.downtime: ProductionAccessLevel.hidden,
       ProductionDashboardCard.ooe: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.operonixAnalytics: ProductionAccessLevel.view,
       ProductionDashboardCard.problemReporting: ProductionAccessLevel.hidden,
       ProductionDashboardCard.processExecution: ProductionAccessLevel.hidden,
       ProductionDashboardCard.reports: ProductionAccessLevel.hidden,
@@ -222,9 +244,11 @@ class ProductionAccessHelper {
       ProductionDashboardCard.productionTracking: ProductionAccessLevel.manage,
       ProductionDashboardCard.stationPages: ProductionAccessLevel.manage,
       ProductionDashboardCard.workCenters: ProductionAccessLevel.manage,
+      ProductionDashboardCard.productionProcesses: ProductionAccessLevel.manage,
       ProductionDashboardCard.shifts: ProductionAccessLevel.manage,
       ProductionDashboardCard.downtime: ProductionAccessLevel.manage,
       ProductionDashboardCard.ooe: ProductionAccessLevel.manage,
+      ProductionDashboardCard.operonixAnalytics: ProductionAccessLevel.manage,
       ProductionDashboardCard.problemReporting: ProductionAccessLevel.manage,
       ProductionDashboardCard.processExecution: ProductionAccessLevel.manage,
       ProductionDashboardCard.reports: ProductionAccessLevel.manage,
@@ -239,9 +263,11 @@ class ProductionAccessHelper {
       ProductionDashboardCard.productionTracking: ProductionAccessLevel.manage,
       ProductionDashboardCard.stationPages: ProductionAccessLevel.manage,
       ProductionDashboardCard.workCenters: ProductionAccessLevel.manage,
+      ProductionDashboardCard.productionProcesses: ProductionAccessLevel.manage,
       ProductionDashboardCard.shifts: ProductionAccessLevel.manage,
       ProductionDashboardCard.downtime: ProductionAccessLevel.manage,
       ProductionDashboardCard.ooe: ProductionAccessLevel.manage,
+      ProductionDashboardCard.operonixAnalytics: ProductionAccessLevel.manage,
       ProductionDashboardCard.problemReporting: ProductionAccessLevel.manage,
       ProductionDashboardCard.processExecution: ProductionAccessLevel.manage,
       ProductionDashboardCard.reports: ProductionAccessLevel.manage,
@@ -256,9 +282,11 @@ class ProductionAccessHelper {
       ProductionDashboardCard.productionTracking: ProductionAccessLevel.hidden,
       ProductionDashboardCard.stationPages: ProductionAccessLevel.hidden,
       ProductionDashboardCard.workCenters: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionProcesses: ProductionAccessLevel.hidden,
       ProductionDashboardCard.shifts: ProductionAccessLevel.hidden,
       ProductionDashboardCard.downtime: ProductionAccessLevel.hidden,
       ProductionDashboardCard.ooe: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.operonixAnalytics: ProductionAccessLevel.view,
       ProductionDashboardCard.problemReporting: ProductionAccessLevel.hidden,
       ProductionDashboardCard.processExecution: ProductionAccessLevel.hidden,
       ProductionDashboardCard.reports: ProductionAccessLevel.hidden,
@@ -274,9 +302,11 @@ class ProductionAccessHelper {
       ProductionDashboardCard.productionTracking: ProductionAccessLevel.hidden,
       ProductionDashboardCard.stationPages: ProductionAccessLevel.hidden,
       ProductionDashboardCard.workCenters: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionProcesses: ProductionAccessLevel.view,
       ProductionDashboardCard.shifts: ProductionAccessLevel.hidden,
       ProductionDashboardCard.downtime: ProductionAccessLevel.hidden,
       ProductionDashboardCard.ooe: ProductionAccessLevel.view,
+      ProductionDashboardCard.operonixAnalytics: ProductionAccessLevel.hidden,
       ProductionDashboardCard.problemReporting: ProductionAccessLevel.hidden,
       ProductionDashboardCard.processExecution: ProductionAccessLevel.hidden,
       ProductionDashboardCard.reports: ProductionAccessLevel.view,
@@ -297,6 +327,15 @@ class ProductionAccessHelper {
 
   static bool isMaintenanceManagerRole(String role) {
     return normalizeRole(role) == roleMaintenanceManager;
+  }
+
+  /// IATF: potvrda zatvaranja zastoja — ne samo „klik“ od strane operatera.
+  /// Ovdje nije uključena uloga [roleSupervisor] (ne miješati s [roleQualityOperator] / Operater kvaliteta).
+  static bool canVerifyDowntime(String role) {
+    final r = normalizeRole(role);
+    return r == roleProductionManager ||
+        r == roleAdmin ||
+        r == roleSuperAdmin;
   }
 
   /// Ručne boje ekrana stanica (praćenje) — samo [roleAdmin] ili [roleSuperAdmin].

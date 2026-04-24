@@ -754,7 +754,7 @@ class _UnifiedAssessmentRunScreenState
     return DropdownButtonFormField<int>(
       // ignore: deprecated_member_use
       value: value,
-      decoration: InputDecoration(labelText: label, isDense: true),
+      decoration: InputDecoration(labelText: label),
       items: List.generate(
         10,
         (i) => DropdownMenuItem(value: i + 1, child: Text('${i + 1}')),

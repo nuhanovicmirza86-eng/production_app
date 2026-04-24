@@ -891,7 +891,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
             vertical: 8,
           ),
         ),
-        value: value,
+        initialValue: value,
         items: items,
         onChanged: onChanged,
       );

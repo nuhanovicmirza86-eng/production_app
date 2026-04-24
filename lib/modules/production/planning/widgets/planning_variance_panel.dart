@@ -10,10 +10,7 @@ import 'planning_fcs_reoptimize.dart';
 
 /// Faza 3: plan vs stvarno (MES) + uzrok; trajni zapis u `execution_variances` (Callable).
 class PlanningVariancePanel extends StatefulWidget {
-  const PlanningVariancePanel({
-    super.key,
-    required this.session,
-  });
+  const PlanningVariancePanel({super.key, required this.session});
 
   final PlanningSessionController session;
 
@@ -91,11 +88,14 @@ class _PlanningVariancePanelState extends State<PlanningVariancePanel> {
     if (r == null || r.scheduledOperations.isEmpty) {
       return Text(
         'Nema zadnjeg plana s operacijama — generirajte (tab Nalozi).',
-        style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
+        style: t.textTheme.bodySmall?.copyWith(
+          color: t.colorScheme.onSurfaceVariant,
+        ),
       );
     }
     final ids = r.scheduledOperations.map((e) => e.productionOrderId).toSet();
-    final canPersist = s.lastSavedPlanId != null && s.lastSavedPlanId!.isNotEmpty;
+    final canPersist =
+        s.lastSavedPlanId != null && s.lastSavedPlanId!.isNotEmpty;
     return FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
       future: _exec.getExecutionsByOrderIds(
         companyId: s.companyId,
@@ -110,7 +110,10 @@ class _PlanningVariancePanelState extends State<PlanningVariancePanel> {
           );
         }
         if (snap.hasError) {
-          return Text('MES: ${snap.error}', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.error));
+          return Text(
+            'MES: ${snap.error}',
+            style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.error),
+          );
         }
         final mes = snap.data ?? {};
         return Column(
@@ -121,7 +124,9 @@ class _PlanningVariancePanelState extends State<PlanningVariancePanel> {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
                   'Nacrt nije u bazi. Spremite nacrt plana, zatim možete uskladiti uzroke (pohranjuju se na poslužitelju).',
-                  style: t.textTheme.labelSmall?.copyWith(color: t.colorScheme.tertiary),
+                  style: t.textTheme.labelSmall?.copyWith(
+                    color: t.colorScheme.tertiary,
+                  ),
                 ),
               ),
             SingleChildScrollView(
@@ -139,11 +144,13 @@ class _PlanningVariancePanelState extends State<PlanningVariancePanel> {
                   DataColumn(label: Text('Bilješka')),
                 ],
                 rows: r.scheduledOperations.map((op) {
-                  final list = mes[op.productionOrderId] ?? const <Map<String, dynamic>>[];
+                  final list =
+                      mes[op.productionOrderId] ??
+                      const <Map<String, dynamic>>[];
                   final actualStart = _mesLatestStart(list, op.machineId);
-                  final dMin = actualStart != null
-                      ? actualStart.difference(op.plannedStart).inMinutes
-                      : null;
+                  final dMin = actualStart
+                      ?.difference(op.plannedStart)
+                      .inMinutes;
                   final dStr = dMin == null ? '—' : '$dMin min';
                   final key = op.id;
                   var root = s.getExecutionVarianceRootDraft(key) ?? 'unknown';
@@ -153,25 +160,20 @@ class _PlanningVariancePanelState extends State<PlanningVariancePanel> {
                   return DataRow(
                     cells: [
                       DataCell(
-                        Text(
-                          s.engineOrderCode(r, op.productionOrderId),
-                        ),
+                        Text(s.engineOrderCode(r, op.productionOrderId)),
                       ),
                       DataCell(Text(s.poolMachineLabel(op.machineId))),
                       DataCell(Text(_fmt(op.plannedStart))),
                       DataCell(
-                        Text(
-                          actualStart == null ? '—' : _fmt(actualStart),
-                        ),
+                        Text(actualStart == null ? '—' : _fmt(actualStart)),
                       ),
                       DataCell(Text(dStr)),
                       DataCell(
                         ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 200),
                           child: DropdownButtonFormField<String>(
-                            isDense: true,
                             isExpanded: true,
-                            value: root,
+                            initialValue: root,
                             items: [
                               for (final k in planningRootCauseCodeKeys)
                                 DropdownMenuItem(
@@ -191,7 +193,9 @@ class _PlanningVariancePanelState extends State<PlanningVariancePanel> {
                                     s.setExecutionVarianceDraft(
                                       key,
                                       rootCauseCode: v,
-                                      notes: s.getExecutionVarianceNotesDraft(key),
+                                      notes: s.getExecutionVarianceNotesDraft(
+                                        key,
+                                      ),
                                     );
                                     setState(() {});
                                   },
@@ -203,13 +207,11 @@ class _PlanningVariancePanelState extends State<PlanningVariancePanel> {
                           width: 140,
                           child: TextFormField(
                             key: ValueKey('vn-$key'),
-                            initialValue: s.getExecutionVarianceNotesDraft(key) ?? '',
+                            initialValue:
+                                s.getExecutionVarianceNotesDraft(key) ?? '',
                             enabled: !s.isLocked,
                             maxLines: 1,
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              border: OutlineInputBorder(),
-                            ),
+                            decoration: const InputDecoration(),
                             onChanged: (v) {
                               s.setExecutionVarianceDraft(
                                 key,
@@ -231,7 +233,10 @@ class _PlanningVariancePanelState extends State<PlanningVariancePanel> {
               runSpacing: 6,
               children: [
                 FilledButton.tonal(
-                  onPressed: s.isLocked || s.persistingExecutionVariances || !canPersist
+                  onPressed:
+                      s.isLocked ||
+                          s.persistingExecutionVariances ||
+                          !canPersist
                       ? null
                       : () async {
                           await s.persistAllExecutionVariancesToFirestore();
@@ -239,9 +244,9 @@ class _PlanningVariancePanelState extends State<PlanningVariancePanel> {
                             return;
                           }
                           if (s.errorMessage != null) {
-                            ScaffoldMessenger.of(
-                              context,
-                            ).showSnackBar(SnackBar(content: Text(s.errorMessage!)));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(s.errorMessage!)),
+                            );
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(

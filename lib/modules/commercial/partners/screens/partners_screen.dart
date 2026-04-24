@@ -554,7 +554,6 @@ class _PartnersScreenState extends State<PartnersScreen>
             initialValue: _customerActivityFilter,
             decoration: const InputDecoration(
               labelText: 'Djelatnost',
-              isDense: true,
             ),
             items: [
               const DropdownMenuItem<String?>(
@@ -635,7 +634,6 @@ class _PartnersScreenState extends State<PartnersScreen>
             initialValue: _supplierActivityFilter,
             decoration: const InputDecoration(
               labelText: 'Djelatnost',
-              isDense: true,
             ),
             items: [
               const DropdownMenuItem<String?>(

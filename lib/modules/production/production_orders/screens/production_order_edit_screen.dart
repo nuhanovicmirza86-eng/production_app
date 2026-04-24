@@ -67,12 +67,16 @@ class _ProductionOrderEditScreenState extends State<ProductionOrderEditScreen> {
 
     if (date == null) return;
 
+    if (!mounted) return;
+
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(_scheduledEndAt ?? now),
     );
 
     if (time == null) return;
+
+    if (!mounted) return;
 
     setState(() {
       _scheduledEndAt = DateTime(
@@ -135,8 +139,7 @@ class _ProductionOrderEditScreenState extends State<ProductionOrderEditScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     } finally {
-      if (!mounted) return;
-      setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 

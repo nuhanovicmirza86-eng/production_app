@@ -85,7 +85,9 @@ class _PlanningScenariosTabState extends State<PlanningScenariosTab> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Nema spremljenog plana u ovoj sesiji. Spremite nacrt ili unesite ID ručno.'),
+          content: Text(
+            'Nema spremljenog plana u ovoj sesiji. Spremite nacrt ili unesite ID ručno.',
+          ),
         ),
       );
     }
@@ -138,15 +140,15 @@ class _PlanningScenariosTabState extends State<PlanningScenariosTab> {
         if (!mounted) {
           return;
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Scenarij spremljen.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Scenarij spremljen.')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Greška: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Greška: $e')));
       }
     } finally {
       if (mounted) {
@@ -160,10 +162,18 @@ class _PlanningScenariosTabState extends State<PlanningScenariosTab> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Obrisati scenarij?'),
-        content: Text('„${r.title}” — ovo ne briše nacrt proizvodnog plana, samo zapis scenarija.'),
+        content: Text(
+          '„${r.title}” — ovo ne briše nacrt proizvodnog plana, samo zapis scenarija.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Odustani')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Obriši')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Odustani'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Obriši'),
+          ),
         ],
       ),
     );
@@ -171,7 +181,11 @@ class _PlanningScenariosTabState extends State<PlanningScenariosTab> {
       return;
     }
     try {
-      await _svc.deleteScenario(companyId: _cid, plantKey: _pk, scenarioId: r.id);
+      await _svc.deleteScenario(
+        companyId: _cid,
+        plantKey: _pk,
+        scenarioId: r.id,
+      );
       if (mounted) {
         if (_editingId == r.id) {
           _clearForm();
@@ -180,15 +194,15 @@ class _PlanningScenariosTabState extends State<PlanningScenariosTab> {
         if (!mounted) {
           return;
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Obrisano.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Obrisano.')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Brisanje: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Brisanje: $e')));
       }
     }
   }
@@ -197,7 +211,9 @@ class _PlanningScenariosTabState extends State<PlanningScenariosTab> {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     if (_cid.isEmpty || _pk.isEmpty) {
-      return const Center(child: Text('Kontekst kompanija/pogon nije učitavan.'));
+      return const Center(
+        child: Text('Kontekst kompanija/pogon nije učitavan.'),
+      );
     }
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
@@ -220,7 +236,9 @@ class _PlanningScenariosTabState extends State<PlanningScenariosTab> {
             children: [
               ListTile(
                 title: const Text('Scenariji planiranja (F4)'),
-                subtitle: const Text('Baseline / what-if, opcionalno vezan nacrt plana. Pisanje: Callable u pozadini.'),
+                subtitle: const Text(
+                  'Baseline / what-if, opcionalno vezan nacrt plana. Pisanje: Callable u pozadini.',
+                ),
                 trailing: IconButton(
                   icon: const Icon(Icons.refresh),
                   onPressed: widget.session.isLocked ? null : _load,
@@ -272,28 +290,30 @@ class _PlanningScenariosTabState extends State<PlanningScenariosTab> {
                 TextField(
                   controller: _title,
                   enabled: !widget.session.isLocked,
-                  decoration: const InputDecoration(
-                    labelText: 'Naslov',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
+                  decoration: const InputDecoration(labelText: 'Naslov'),
                 ),
                 const SizedBox(height: 8),
                 InputDecorator(
                   decoration: const InputDecoration(
                     labelText: 'Vrsta',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: _type,
                       isExpanded: true,
-                      isDense: true,
                       items: const [
-                        DropdownMenuItem(value: 'baseline', child: Text('Baseline')),
-                        DropdownMenuItem(value: 'whatif', child: Text('What-if')),
+                        DropdownMenuItem(
+                          value: 'baseline',
+                          child: Text('Baseline'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'whatif',
+                          child: Text('What-if'),
+                        ),
                       ],
                       onChanged: widget.session.isLocked
                           ? null
@@ -311,8 +331,6 @@ class _PlanningScenariosTabState extends State<PlanningScenariosTab> {
                   enabled: !widget.session.isLocked,
                   decoration: const InputDecoration(
                     labelText: 'ID baze (nacrt u production_plans, opcij.)',
-                    border: OutlineInputBorder(),
-                    isDense: true,
                   ),
                 ),
                 Align(
@@ -326,17 +344,15 @@ class _PlanningScenariosTabState extends State<PlanningScenariosTab> {
                   controller: _notes,
                   enabled: !widget.session.isLocked,
                   maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Napomena',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
+                  decoration: const InputDecoration(labelText: 'Napomena'),
                 ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
                     FilledButton(
-                      onPressed: widget.session.isLocked || _saving ? null : _save,
+                      onPressed: widget.session.isLocked || _saving
+                          ? null
+                          : _save,
                       child: _saving
                           ? const SizedBox(
                               width: 18,

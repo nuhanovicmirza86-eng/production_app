@@ -144,6 +144,11 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
     setState(() => _isLoading = true);
 
     try {
+      String? orderField(String key) {
+        final v = (_order[key] ?? '').toString().trim();
+        return v.isEmpty ? null : v;
+      }
+
       final id = await _service.startExecution(
         companyId: _companyId,
         plantKey: _plantKey,
@@ -160,6 +165,10 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
         operatorId: _userId,
         operatorName: _userName.isEmpty ? null : _userName,
         createdBy: _userId,
+        workCenterId: orderField('workCenterId'),
+        workCenterCode: orderField('workCenterCode'),
+        workCenterName: orderField('workCenterName'),
+        machineId: orderField('machineId'),
       );
 
       setState(() {

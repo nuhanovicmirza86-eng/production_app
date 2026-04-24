@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 
 import 'package:production_app/services/fcm_token_service.dart';
 
+import '../../../../core/access/production_access_helper.dart';
+import '../../../../core/production_admin_session_plant.dart';
 import '../../../../core/station_launch_config.dart';
 import '../../../../core/station_launch_preference.dart';
 import '../../../production/dashboard/screens/production_dashboard_screen.dart';
@@ -152,12 +154,20 @@ class _AuthWrapperState extends State<AuthWrapper> {
       }
 
       if (plantKey.isEmpty) {
-        _error =
-            'U profilu nije postavljen pogon (tvornica / lokacija).\n'
-            'Administrator mora dodijeliti pogon prije korištenja aplikacije.';
-        if (!mounted) return;
-        setState(() => _loading = false);
-        return;
+        final normRole = ProductionAccessHelper.normalizeRole(role);
+        final globalTenantAdmin =
+            ProductionAccessHelper.isAdminRole(normRole) ||
+                ProductionAccessHelper.isSuperAdminRole(normRole);
+        if (!globalTenantAdmin) {
+          _error =
+              'U profilu nije postavljen pogon (tvornica / lokacija).\n'
+              'Administrator mora dodijeliti pogon prije korištenja aplikacije.';
+          if (!mounted) return;
+          setState(() => _loading = false);
+          return;
+        }
+        // Admin / super_admin u kompaniji: pogon nije obavezan na korisniku —
+        // moduli biraju kontekst (Workforce, stanica, spremljeni odabir).
       }
 
       final companyDoc = await FirebaseFirestore.instance
@@ -250,6 +260,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
             _companyData!['stationLabelLayout'] = kStationLabelLayoutStandard;
           }
         }
+      }
+
+      if (_companyData != null) {
+        await ProductionAdminSessionPlant.applyPreferenceIfAdmin(
+          _companyData!,
+        );
       }
 
       _error = null;
@@ -369,6 +385,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
       );
     }
 
-    return ProductionDashboardScreen(companyData: _companyData!);
+    return ProductionDashboardScreen(
+      companyData: _companyData!,
+    );
   }
 }

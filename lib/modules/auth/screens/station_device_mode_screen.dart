@@ -89,8 +89,10 @@ class _StationDeviceModeScreenState extends State<StationDeviceModeScreen> {
             InputDecorator(
               decoration: const InputDecoration(
                 labelText: 'Način rada nakon prijave',
-                border: OutlineInputBorder(),
-                isDense: true,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(

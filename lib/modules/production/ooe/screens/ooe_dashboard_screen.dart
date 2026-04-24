@@ -31,7 +31,14 @@ enum _LineLayout { flat, byLine }
 class OoeDashboardScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
 
-  const OoeDashboardScreen({super.key, required this.companyData});
+  /// Kontekst iz druge analitike (npr. period zastoja) — prikaz ispod naslova.
+  final String? analyticsContextHint;
+
+  const OoeDashboardScreen({
+    super.key,
+    required this.companyData,
+    this.analyticsContextHint,
+  });
 
   @override
   State<OoeDashboardScreen> createState() => _OoeDashboardScreenState();
@@ -82,15 +89,11 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
       plantKey: _plantKey,
       limit: 128,
     );
-    final t = <String, double?>{};
     final svc = OoeMachineTargetService();
-    for (final m in assets.machines) {
-      t[m.id] = await svc.getTargetOoe(
-        companyId: _companyId,
-        plantKey: _plantKey,
-        machineId: m.id,
-      );
-    }
+    final t = await svc.loadTargetOoeByMachineForPlant(
+      companyId: _companyId,
+      plantKey: _plantKey,
+    );
     return (assets: assets, targets: t);
   }
 
@@ -222,9 +225,27 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
   Widget build(BuildContext context) {
     final live = OoeLiveService();
 
+    final hint = widget.analyticsContextHint?.trim();
     return Scaffold(
       appBar: AppBar(
-        title: const Text('OOE — live'),
+        title: hint == null || hint.isEmpty
+            ? const Text('OOE — live')
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('OOE — live'),
+                  Text(
+                    hint,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: (Theme.of(context).appBarTheme.foregroundColor ??
+                              Theme.of(context).colorScheme.onSurface)
+                          .withValues(alpha: 0.82),
+                    ),
+                  ),
+                ],
+              ),
         actions: [
           OoeInfoIcon(
             tooltip: OoeHelpTexts.liveDashboardTooltip,

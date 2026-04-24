@@ -2,6 +2,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
+import '../../../../core/ai/production_ai_context_scope.dart';
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/saas/production_module_keys.dart';
 import '../ai_analysis_payloads.dart';
@@ -44,6 +45,12 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
       (widget.companyData['plantKey'] ?? '').toString().trim();
 
   bool get _busy => _loading || _snapshotLoading;
+
+  bool get _domainAllowedForRole =>
+      ProductionAiContextScope.allowsStructuredAnalysisApiDomain(
+        _domain.apiValue,
+        widget.companyData,
+      );
 
   /// Broj kalendarskih dana od [Od] do [Do], uključivo oba kraja.
   int _inclusiveCalendarDays() {
@@ -299,6 +306,10 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
       setState(() => _error = 'Nedostaje podatak o kompaniji ili pogonu. Obrati se administratoru.');
       return;
     }
+    if (!_domainAllowedForRole) {
+      setState(() => _error = 'Ova domena analize nije u dometu tvoje uloge (pretplata + prava pristupa).');
+      return;
+    }
     if (_payload == null) {
       setState(() => _error = 'Učitaj demo podatke ili pripremi payload iz aplikacije.');
       return;
@@ -457,6 +468,15 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
                       ),
                     ),
                   ),
+                  if (!_domainAllowedForRole) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Ova domena nije u dometu tvoje uloge. Odaberi drugu domenu ili se obrati administratoru.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.error,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   TextField(
                     controller: _focusCtrl,
@@ -549,7 +569,7 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
                   ),
                   const SizedBox(height: 12),
                   FilledButton.icon(
-                    onPressed: _busy ? null : _run,
+                    onPressed: (_busy || !_domainAllowedForRole) ? null : _run,
                     icon: _loading
                         ? const SizedBox(
                             width: 20,

@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../logistics/wms/wms_scan_helpers.dart';
+import '../services/product_lookup_service.dart';
 import '../services/product_service.dart';
 
 class ProductCreateScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
 
-  /// Jedan ili više vanjskih kodova (EAN, QR sadržaj) vezanih uz ovaj proizvod.
+  /// Početni vanjski kodovi (EAN, barkod) — npr. nakon skena prije otvaranja forme.
   final List<String>? initialScanAliases;
 
   const ProductCreateScreen({
@@ -51,8 +52,10 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
   final TextEditingController _currencyController = TextEditingController(
     text: 'KM',
   );
-  final TextEditingController _externalScanController =
+  final TextEditingController _manualAliasController =
       TextEditingController();
+
+  var _scanAliases = <String>[];
 
   bool _isLoading = false;
   bool _isActive = true;
@@ -71,18 +74,68 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
   void initState() {
     super.initState();
     final initial = widget.initialScanAliases;
-    if (initial != null && initial.isNotEmpty) {
-      _externalScanController.text = initial.first.trim();
+    if (initial == null || initial.isEmpty) return;
+    final acc = <String>[];
+    for (final s in initial) {
+      final n = ProductLookupService.normalizeScanAlias(s);
+      if (n.isEmpty || acc.contains(n)) continue;
+      acc.add(n);
     }
+    _scanAliases = acc;
   }
 
-  Future<void> _scanExternalCode() async {
+  Future<void> _tryAddAlias(String norm) async {
+    if (norm.isEmpty) return;
+    final existing = await ProductLookupService().getByScanAlias(
+      companyId: _companyId,
+      raw: norm,
+    );
+    if (!mounted) return;
+    if (existing != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Kod je već na proizvodu: ${existing.productCode}',
+          ),
+        ),
+      );
+      return;
+    }
+    if (_scanAliases.contains(norm)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Taj kod je već na listi.')),
+      );
+      return;
+    }
+    if (_scanAliases.length >= ProductService.maxScanAliasesForProduct) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Najviše ${ProductService.maxScanAliasesForProduct} kodova.',
+          ),
+        ),
+      );
+      return;
+    }
+    setState(() => _scanAliases = [..._scanAliases, norm]);
+  }
+
+  Future<void> _addScanAlias() async {
     final raw = await wmsScanBarcodeRaw(
       context,
       companyData: widget.companyData,
     );
     if (!mounted || raw == null || raw.isEmpty) return;
-    setState(() => _externalScanController.text = raw);
+    await _tryAddAlias(ProductLookupService.normalizeScanAlias(raw));
+  }
+
+  Future<void> _addManualAlias() async {
+    final norm = ProductLookupService.normalizeScanAlias(
+      _manualAliasController.text,
+    );
+    if (norm.isEmpty) return;
+    await _tryAddAlias(norm);
+    if (mounted) _manualAliasController.clear();
   }
 
   InputDecoration _dec(String label, {String? hint}) {
@@ -133,10 +186,6 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
     });
 
     try {
-      final scanAliases = _externalScanController.text.trim().isEmpty
-          ? null
-          : [_externalScanController.text.trim()];
-
       await _productService.createProduct(
         companyId: _companyId,
         productCode: _productCodeController.text.trim(),
@@ -186,7 +235,7 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
             ? null
             : _currencyController.text.trim(),
         isActive: _isActive,
-        scanAliases: scanAliases,
+        scanAliases: _scanAliases.isEmpty ? null : _scanAliases,
         idealCycleTimeSeconds:
             _optionalPositiveDouble(_idealCycleSecondsController.text),
       );
@@ -200,11 +249,11 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     } finally {
-      if (!mounted) return;
-
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -226,7 +275,7 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
     _packagingQtyController.dispose();
     _standardUnitPriceController.dispose();
     _currencyController.dispose();
-    _externalScanController.dispose();
+    _manualAliasController.dispose();
     _idealCycleSecondsController.dispose();
     super.dispose();
   }
@@ -253,39 +302,67 @@ class _ProductCreateScreenState extends State<ProductCreateScreen> {
             child: ListView(
               children: [
                 Text(
-                  'Vanjski barkod / QR (postojeći)',
+                  'Barkodovi na ambalaži',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Operonix interna šifra može ostati GK/PP…; ovdje vežeš stvarnu '
-                  'etiketu s linije da skeniranje u prijemu pronalazi proizvod.',
+                  'Do ${ProductService.maxScanAliasesForProduct} kodova (npr. EAN). '
+                  'Koriste se pri skeniranju artikla u prijemu.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                 ),
                 const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _scanAliases
+                      .map(
+                        (a) => InputChip(
+                          label: Text(
+                            a.length > 40 ? '${a.substring(0, 40)}…' : a,
+                          ),
+                          onDeleted: _isLoading
+                              ? null
+                              : () => setState(
+                                    () => _scanAliases =
+                                        _scanAliases.where((x) => x != a).toList(),
+                                  ),
+                        ),
+                      )
+                      .toList(),
+                ),
+                const SizedBox(height: 8),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: TextFormField(
-                        controller: _externalScanController,
+                      child: TextField(
+                        controller: _manualAliasController,
+                        enabled: !_isLoading,
                         decoration: _dec(
-                          'Sadržaj etikete',
-                          hint: 'EAN, QR ili interni kod',
+                          'Ručni unos koda',
+                          hint: 'EAN / barkod',
                         ),
-                        maxLines: 2,
                       ),
                     ),
                     IconButton(
-                      tooltip: 'Skeniraj',
-                      onPressed: _isLoading ? null : _scanExternalCode,
-                      icon: const Icon(Icons.qr_code_scanner_outlined),
+                      tooltip: 'Dodaj',
+                      onPressed: _isLoading ? null : _addManualAlias,
+                      icon: const Icon(Icons.add_circle_outline),
                     ),
                   ],
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: _isLoading ? null : _addScanAlias,
+                    icon: const Icon(Icons.qr_code_scanner_outlined),
+                    label: const Text('Dodaj kod skeniranjem'),
+                  ),
                 ),
                 const SizedBox(height: 20),
                 TextFormField(

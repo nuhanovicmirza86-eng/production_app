@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../bom/services/bom_service.dart';
 import '../../products/services/product_lookup_service.dart';
+import '../../work_centers/models/work_center_model.dart';
+import '../../work_centers/services/work_center_service.dart';
 import '../services/production_order_service.dart';
 import '../services/production_order_technical_refs_resolver.dart';
 
@@ -27,6 +29,7 @@ class _ProductionOrderCreateScreenState
   final ProductionOrderTechnicalRefsResolver _refsResolver =
       ProductionOrderTechnicalRefsResolver();
   final BomService _bomService = BomService();
+  final WorkCenterService _workCenterService = WorkCenterService();
 
   final TextEditingController _productSearchController =
       TextEditingController();
@@ -60,6 +63,10 @@ class _ProductionOrderCreateScreenState
 
   Timer? _productSearchDebounce;
 
+  List<WorkCenter> _workCenters = const [];
+  bool _workCentersReady = false;
+  String? _selectedWorkCenterId;
+
   String get _companyId => (widget.companyData['companyId'] ?? '').toString();
   String get _plantKey => (widget.companyData['plantKey'] ?? '').toString();
   String get _plantCode =>
@@ -86,6 +93,23 @@ class _ProductionOrderCreateScreenState
         });
       }
     });
+    _loadWorkCenters();
+  }
+
+  Future<void> _loadWorkCenters() async {
+    try {
+      final list = await _workCenterService.listWorkCentersForPlant(
+        companyId: _companyId,
+        plantKey: _plantKey,
+      );
+      if (!mounted) return;
+      setState(() {
+        _workCenters = list;
+        _workCentersReady = true;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _workCentersReady = true);
+    }
   }
 
   Future<void> _pickDate() async {
@@ -338,6 +362,17 @@ class _ProductionOrderCreateScreenState
         return;
       }
 
+      WorkCenter? selWc;
+      final sw = _selectedWorkCenterId?.trim();
+      if (sw != null && sw.isNotEmpty) {
+        for (final w in _workCenters) {
+          if (w.id == sw) {
+            selWc = w;
+            break;
+          }
+        }
+      }
+
       await _service.createProductionOrder(
         companyId: _companyId,
         plantKey: _plantKey,
@@ -360,6 +395,9 @@ class _ProductionOrderCreateScreenState
         inputMaterialLot: _resolvedBomClassification == 'SECONDARY'
             ? _inputMaterialLotController.text.trim()
             : null,
+        workCenterId: selWc?.id,
+        workCenterCode: selWc?.workCenterCode,
+        workCenterName: selWc?.name,
       );
 
       if (!mounted) return;
@@ -372,11 +410,11 @@ class _ProductionOrderCreateScreenState
         context,
       ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     } finally {
-      if (!mounted) return;
-
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -524,9 +562,11 @@ class _ProductionOrderCreateScreenState
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.08),
+                      color: Colors.green.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.green.withOpacity(0.3)),
+                      border: Border.all(
+                        color: Colors.green.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: const Row(
                       children: [
@@ -608,6 +648,36 @@ class _ProductionOrderCreateScreenState
                   decoration: _dec('Kupac'),
                   readOnly: true,
                 ),
+                if (_workCentersReady && _workCenters.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String?>(
+                    initialValue: _selectedWorkCenterId,
+                    decoration: _dec(
+                      'Radni centar (opcionalno)',
+                    ).copyWith(
+                      helperText:
+                          'Predloženo za MES: izvršenje i izvještaji vezani uz centar.',
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('— kasnije / nije određeno —'),
+                      ),
+                      ..._workCenters.map(
+                        (w) => DropdownMenuItem<String?>(
+                          value: w.id,
+                          child: Text(
+                            '${w.workCenterCode} — ${w.name}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: _isLoading
+                        ? null
+                        : (v) => setState(() => _selectedWorkCenterId = v),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _qtyController,

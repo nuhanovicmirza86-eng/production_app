@@ -89,6 +89,11 @@ class ProductionOrderService {
     DateTime? sourceOrderDate,
     DateTime? requestedDeliveryDate,
     String? inputMaterialLot,
+    String? workCenterId,
+    String? workCenterCode,
+    String? workCenterName,
+    String? machineId,
+    String? lineId,
   }) async {
     final docRef = _orders.doc();
     final now = DateTime.now();
@@ -128,8 +133,11 @@ class ProductionOrderService {
       bomVersion: bomVersion.trim(),
       routingId: routingId.trim(),
       routingVersion: routingVersion.trim(),
-      machineId: null,
-      lineId: null,
+      machineId: _trimOrNull(machineId),
+      lineId: _trimOrNull(lineId),
+      workCenterId: _trimOrNull(workCenterId),
+      workCenterCode: _trimOrNull(workCenterCode),
+      workCenterName: _trimOrNull(workCenterName),
       scheduledStartAt: null,
       scheduledEndAt: scheduledEndAt,
       releasedAt: null,
@@ -248,6 +256,100 @@ class ProductionOrderService {
     });
   }
 
+  /// Postavlja radni centar i opcionalno stroj/liniju na nalogu (samo admin / menadžer proizvodnje).
+  Future<void> updateProductionOrderMesAssignment({
+    required String productionOrderId,
+    required String companyId,
+    required String plantKey,
+    required String actorUserId,
+    required String actorRole,
+    String? workCenterId,
+    String? workCenterCode,
+    String? workCenterName,
+    String? machineId,
+    String? lineId,
+  }) async {
+    final role = actorRole.trim().toLowerCase();
+    if (role != 'admin' && role != 'production_manager') {
+      throw Exception(
+        'Samo Admin ili Menadžer proizvodnje mogu mijenjati MES dodjelu naloga.',
+      );
+    }
+
+    final docRef = _orders.doc(productionOrderId.trim());
+    final uid = actorUserId.trim();
+    if (uid.isEmpty) {
+      throw Exception('Nedostaje korisnik za audit.');
+    }
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(docRef);
+      if (!snap.exists) throw Exception('Proizvodni nalog ne postoji');
+      final data = snap.data();
+      if (data == null) throw Exception('Podaci naloga nedostaju');
+      if (data['companyId'] != companyId || data['plantKey'] != plantKey) {
+        throw Exception('Nemaš pristup ovom nalogu');
+      }
+
+      final st = (data['status'] ?? '').toString().toLowerCase();
+      if (st == 'closed' || st == 'cancelled') {
+        throw Exception('Nalog u ovom statusu se ne može mijenjati.');
+      }
+
+      final now = DateTime.now();
+      final updates = <String, dynamic>{
+        'updatedAt': now,
+        'updatedBy': uid,
+      };
+
+      void putOrDelete(String key, String? v) {
+        final t = (v ?? '').trim();
+        if (t.isEmpty) {
+          updates[key] = FieldValue.delete();
+        } else {
+          updates[key] = t;
+        }
+      }
+
+      putOrDelete('workCenterId', workCenterId);
+      putOrDelete('workCenterCode', workCenterCode);
+      putOrDelete('workCenterName', workCenterName);
+      putOrDelete('machineId', machineId);
+      putOrDelete('lineId', lineId);
+
+      tx.update(docRef, updates);
+    });
+  }
+
+  /// Zadnji nalozi vezani uz radni centar (stream za detalje centra).
+  Stream<List<ProductionOrderModel>> watchOrdersForWorkCenter({
+    required String companyId,
+    required String plantKey,
+    required String workCenterId,
+    int limit = 40,
+  }) {
+    final cid = companyId.trim();
+    final pk = plantKey.trim();
+    final wcid = workCenterId.trim();
+    if (cid.isEmpty || pk.isEmpty || wcid.isEmpty) {
+      return Stream.value(const []);
+    }
+
+    return _orders
+        .where('companyId', isEqualTo: cid)
+        .where('plantKey', isEqualTo: pk)
+        .where('workCenterId', isEqualTo: wcid)
+        .limit(limit)
+        .snapshots()
+        .map((snap) {
+          final list = snap.docs
+              .map((d) => ProductionOrderModel.fromMap(d.id, d.data()))
+              .toList();
+          list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+          return list;
+        });
+  }
+
   // ================= RELEASE =================
 
   Future<void> releaseProductionOrder({
@@ -320,6 +422,28 @@ class ProductionOrderService {
     }
 
     final snapshot = await query.get();
+
+    return snapshot.docs
+        .map((doc) => ProductionOrderModel.fromMap(doc.id, doc.data()))
+        .toList();
+  }
+
+  /// Zadnjih [limit] naloga (npr. odabir pri prijavi zastoja) — manji upit od punog [getOrders].
+  Future<List<ProductionOrderModel>> getRecentOrders({
+    required String companyId,
+    required String plantKey,
+    int limit = 100,
+  }) async {
+    final cid = companyId.trim();
+    final pk = plantKey.trim();
+    if (cid.isEmpty || pk.isEmpty) return const [];
+
+    final snapshot = await _orders
+        .where('companyId', isEqualTo: cid)
+        .where('plantKey', isEqualTo: pk)
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .get();
 
     return snapshot.docs
         .map((doc) => ProductionOrderModel.fromMap(doc.id, doc.data()))

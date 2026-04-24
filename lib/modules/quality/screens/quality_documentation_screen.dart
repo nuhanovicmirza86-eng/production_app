@@ -70,9 +70,9 @@ class _QualityDocumentationScreenState extends State<QualityDocumentationScreen>
     );
     if (ok == true && mounted) {
       setState(() => _reloadSeq++);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Dokument je spremljen.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Dokument je spremljen.')));
     }
   }
 
@@ -162,9 +162,9 @@ class _QualityDocumentationScreenState extends State<QualityDocumentationScreen>
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 }
@@ -184,7 +184,7 @@ class _DocumentKindTab extends StatefulWidget {
   final QualityCallableService svc;
   final Future<void> Function(String? url) onOpenUrl;
   final Future<void> Function(String companyId, QmsDocumentRow row)
-      onDownloadFile;
+  onDownloadFile;
 
   @override
   State<_DocumentKindTab> createState() => _DocumentKindTabState();
@@ -196,6 +196,7 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
   bool _loading = true;
   bool _loadingMore = false;
   String? _error;
+
   /// Dokument u tijeku brisanja (sprječava dvostruki klik).
   String? _deletingId;
 
@@ -253,14 +254,16 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingMore = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     }
   }
 
   Future<void> _confirmDelete(QmsDocumentRow r) async {
-    final label = r.title.trim().isEmpty ? 'ovaj dokument' : '„${r.title.trim()}“';
+    final label = r.title.trim().isEmpty
+        ? 'ovaj dokument'
+        : '„${r.title.trim()}“';
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -292,15 +295,15 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
         _rows.removeWhere((e) => e.id == r.id);
         _deletingId = null;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Dokument je obrisan.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Dokument je obrisan.')));
     } catch (e) {
       if (!mounted) return;
       setState(() => _deletingId = null);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     }
   }
 
@@ -342,16 +345,16 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
                 Text(
                   widget.kind.label,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Dokumenti vezani uz proizvod. Lista je straničena (50 po stranici). '
                   'Datoteka: upload na storage preko potpisanog URL-a.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                 ),
                 const SizedBox(height: 16),
               ]),
@@ -374,9 +377,9 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
                   Text(
                     'Dodaj dokument i odaberi proizvod — opcionalno priloži datoteku.',
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -385,79 +388,69 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, i) {
-                    final r = _rows[i];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: const Icon(Icons.description_outlined),
-                        title: Text(r.title.isEmpty ? 'Bez naslova' : r.title),
-                        trailing: _deletingId == r.id
-                            ? const SizedBox(
-                                width: 28,
-                                height: 28,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : IconButton(
-                                tooltip: 'Obriši dokument',
-                                icon: Icon(
-                                  Icons.delete_outline,
-                                  color: cs.error,
-                                ),
-                                onPressed: () => _confirmDelete(r),
-                              ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Proizvod: ${_QualityDocumentationScreenState._productLine(r)}',
+                delegate: SliverChildBuilderDelegate((context, i) {
+                  final r = _rows[i];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      leading: const Icon(Icons.description_outlined),
+                      title: Text(r.title.isEmpty ? 'Bez naslova' : r.title),
+                      trailing: _deletingId == r.id
+                          ? const SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : IconButton(
+                              tooltip: 'Obriši dokument',
+                              icon: Icon(Icons.delete_outline, color: cs.error),
+                              onPressed: () => _confirmDelete(r),
                             ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Proizvod: ${_QualityDocumentationScreenState._productLine(r)}',
+                          ),
+                          Text(
+                            'Status: ${QmsDisplayFormatters.qmsDocStatus(r.status)} · '
+                            'Ažurirano: ${_QualityDocumentationScreenState._formatUpdated(r.updatedAtIso)}',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                          if (r.notes != null && r.notes!.trim().isNotEmpty)
                             Text(
-                              'Status: ${QmsDisplayFormatters.qmsDocStatus(r.status)} · '
-                              'Ažurirano: ${_QualityDocumentationScreenState._formatUpdated(r.updatedAtIso)}',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(color: cs.onSurfaceVariant),
+                              r.notes!.trim(),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            if (r.notes != null && r.notes!.trim().isNotEmpty)
-                              Text(
-                                r.notes!.trim(),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
+                          if (r.fileStoragePath != null &&
+                              r.fileStoragePath!.trim().isNotEmpty)
+                            TextButton.icon(
+                              onPressed: () =>
+                                  widget.onDownloadFile(widget.companyId, r),
+                              icon: const Icon(
+                                Icons.download_outlined,
+                                size: 18,
                               ),
-                            if (r.fileStoragePath != null &&
-                                r.fileStoragePath!.trim().isNotEmpty)
-                              TextButton.icon(
-                                onPressed: () => widget.onDownloadFile(
-                                  widget.companyId,
-                                  r,
-                                ),
-                                icon: const Icon(Icons.download_outlined, size: 18),
-                                label: Text(
-                                  r.fileName?.trim().isNotEmpty == true
-                                      ? 'Preuzmi: ${r.fileName}'
-                                      : 'Preuzmi datoteku',
-                                ),
+                              label: Text(
+                                r.fileName?.trim().isNotEmpty == true
+                                    ? 'Preuzmi: ${r.fileName}'
+                                    : 'Preuzmi datoteku',
                               ),
-                            if (r.externalUrl != null &&
-                                r.externalUrl!.trim().isNotEmpty)
-                              TextButton.icon(
-                                onPressed: () =>
-                                    widget.onOpenUrl(r.externalUrl),
-                                icon: const Icon(Icons.link, size: 18),
-                                label: const Text('Vanjski link'),
-                              ),
-                          ],
-                        ),
+                            ),
+                          if (r.externalUrl != null &&
+                              r.externalUrl!.trim().isNotEmpty)
+                            TextButton.icon(
+                              onPressed: () => widget.onOpenUrl(r.externalUrl),
+                              icon: const Icon(Icons.link, size: 18),
+                              label: const Text('Vanjski link'),
+                            ),
+                        ],
                       ),
-                    );
-                  },
-                  childCount: _rows.length,
-                ),
+                    ),
+                  );
+                }, childCount: _rows.length),
               ),
             ),
           if (_rows.isNotEmpty && _nextToken != null)
@@ -570,7 +563,9 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Datoteka nije učitana u memoriju (probaj manju datoteku).'),
+            content: Text(
+              'Datoteka nije učitana u memoriju (probaj manju datoteku).',
+            ),
           ),
         );
       }
@@ -588,15 +583,15 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
     final title = _title.text.trim();
     final pid = _productId?.trim();
     if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unesi naslov dokumenta.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Unesi naslov dokumenta.')));
       return;
     }
     if (pid == null || pid.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Odaberi proizvod.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Odaberi proizvod.')));
       return;
     }
 
@@ -620,7 +615,8 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
       if (_fileBytes != null &&
           _pickedName != null &&
           _pickedName!.isNotEmpty) {
-        final ct = _mime ??
+        final ct =
+            _mime ??
             _guessMimeFromName(_pickedName!) ??
             'application/octet-stream';
         final up = await widget.svc.getQmsDocumentSignedUploadUrl(
@@ -657,9 +653,9 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -695,10 +691,7 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
             children: [
               TextField(
                 controller: _title,
-                decoration: const InputDecoration(
-                  labelText: 'Naslov',
-                  border: OutlineInputBorder(),
-                ),
+                decoration: const InputDecoration(labelText: 'Naslov'),
                 textCapitalization: TextCapitalization.sentences,
               ),
               const SizedBox(height: 12),
@@ -711,13 +704,15 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
               InputDecorator(
                 decoration: const InputDecoration(
                   labelText: 'Status',
-                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
                     value: _status,
                     isExpanded: true,
-                    isDense: true,
                     items: const [
                       DropdownMenuItem(value: 'draft', child: Text('Nacrt')),
                       DropdownMenuItem(
@@ -742,7 +737,9 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
                 onPressed: _submitting ? null : _pickFile,
                 icon: const Icon(Icons.attach_file),
                 label: Text(
-                  _pickedName != null ? 'Datoteka: $_pickedName' : 'Priloži datoteku (opcionalno)',
+                  _pickedName != null
+                      ? 'Datoteka: $_pickedName'
+                      : 'Priloži datoteku (opcionalno)',
                 ),
               ),
               const SizedBox(height: 12),
@@ -750,7 +747,6 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
                 controller: _notes,
                 decoration: const InputDecoration(
                   labelText: 'Napomena (opcionalno)',
-                  border: OutlineInputBorder(),
                 ),
                 maxLines: 3,
               ),
@@ -770,7 +766,9 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: _submitting ? null : () => Navigator.of(context).pop(false),
+          onPressed: _submitting
+              ? null
+              : () => Navigator.of(context).pop(false),
           child: const Text('Odustani'),
         ),
         FilledButton(

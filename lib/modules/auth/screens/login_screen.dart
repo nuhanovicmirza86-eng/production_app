@@ -397,8 +397,7 @@ class _StationPickDialogState extends State<_StationPickDialog> {
           InputDecorator(
             decoration: const InputDecoration(
               labelText: 'Stanicu',
-              border: OutlineInputBorder(),
-              isDense: true,
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(

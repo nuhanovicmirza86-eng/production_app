@@ -1,3 +1,4 @@
+import 'dart:convert' show jsonDecode, jsonEncode;
 import 'dart:io' show Platform;
 
 import 'package:firebase_core/firebase_core.dart';
@@ -14,6 +15,7 @@ import 'firebase_options.dart';
 import 'package:production_app/core/theme/operonix_production_brand.dart';
 import 'package:production_app/modules/auth/session/screens/auth_wrapper.dart';
 import 'package:production_app/services/fcm_token_service.dart';
+import 'package:production_app/services/mes_push_navigation.dart';
 
 bool get _isDesktopNative =>
     !kIsWeb &&
@@ -21,11 +23,14 @@ bool get _isDesktopNative =>
         defaultTargetPlatform == TargetPlatform.linux ||
         defaultTargetPlatform == TargetPlatform.macOS);
 
-bool get _pushSupported =>
-    !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+bool get _pushSupported => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
 final FlutterLocalNotificationsPlugin _prodLocalNotifs =
     FlutterLocalNotificationsPlugin();
+
+/// Koristi se za MES push navigaciju iz korijena [MaterialApp].
+final GlobalKey<NavigatorState> operonixProductionNavigatorKey =
+    GlobalKey<NavigatorState>();
 
 const String _kProdChannelId = 'production_high';
 const String _kProdChannelName = 'Operonix Production';
@@ -47,7 +52,14 @@ Future<void> _openFundingCallUrl(String url) async {
 
 void _handleProductionPushNavigation(RemoteMessage msg) {
   final data = msg.data;
-  if (_ps(data['type']) != 'FUNDING_CALL') return;
+  final t = _ps(data['type']);
+  if (t == 'MES_NOTIFICATION') {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      MesPushNavigation.handleData(data, operonixProductionNavigatorKey);
+    });
+    return;
+  }
+  if (t != 'FUNDING_CALL') return;
   final url = _ps(data['url']);
   if (url.isEmpty) return;
   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -66,6 +78,21 @@ Future<void> _initProductionLocalNotifications() async {
     ),
     onDidReceiveNotificationResponse: (resp) {
       final payload = _ps(resp.payload);
+      if (payload.startsWith('mes:')) {
+        try {
+          final raw = Uri.decodeComponent(payload.substring(4));
+          final decoded = jsonDecode(raw) as Map<String, dynamic>;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            MesPushNavigation.handleData(
+              decoded,
+              operonixProductionNavigatorKey,
+            );
+          });
+        } catch (e) {
+          debugPrint('MES local notification tap: $e');
+        }
+        return;
+      }
       if (payload.startsWith('external:')) {
         final raw = payload.substring('external:'.length);
         final url = Uri.decodeComponent(raw);
@@ -79,7 +106,8 @@ Future<void> _initProductionLocalNotifications() async {
   if (Platform.isIOS) {
     await _prodLocalNotifs
         .resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin>()
+          IOSFlutterLocalNotificationsPlugin
+        >()
         ?.requestPermissions(alert: true, badge: true, sound: true);
   }
 
@@ -92,7 +120,8 @@ Future<void> _initProductionLocalNotifications() async {
 
   await _prodLocalNotifs
       .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
+        AndroidFlutterLocalNotificationsPlugin
+      >()
       ?.createNotificationChannel(androidChannel);
 }
 
@@ -109,6 +138,12 @@ Future<void> _showProductionForegroundNotification(RemoteMessage msg) async {
     final url = _ps(data['url']);
     if (url.isNotEmpty) {
       payload = 'external:${Uri.encodeComponent(url)}';
+    }
+  } else if (_ps(data['type']) == 'MES_NOTIFICATION') {
+    try {
+      payload = 'mes:${Uri.encodeComponent(jsonEncode(data))}';
+    } catch (e) {
+      debugPrint('MES foreground payload encode: $e');
     }
   }
 
@@ -160,8 +195,7 @@ Future<void> _initProductionPushStack() async {
     );
   }
 
-  await FirebaseMessaging.instance
-      .setForegroundNotificationPresentationOptions(
+  await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
     alert: true,
     badge: true,
     sound: true,
@@ -216,14 +250,16 @@ class MyApp extends StatelessWidget {
     final scheme = baseTheme.colorScheme;
 
     return MaterialApp(
+      navigatorKey: operonixProductionNavigatorKey,
       title: 'Operonix Production',
       debugShowCheckedModeBanner: false,
+
       /// HR kalendari u dijalozima (npr. datum); prikaz punog datuma u tekstu ide preko [BaFormattedDate].
+      /// Nema miješanog EN+BA: fiksna lokacija za tržište; puni engleski UI zahtijeva l10n (ARB) — trenutno nije uključeno.
       locale: const Locale('hr', 'BA'),
       supportedLocales: const [
         Locale('hr', 'BA'),
         Locale('bs', 'BA'),
-        Locale('en', 'US'),
       ],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -238,6 +274,11 @@ class MyApp extends StatelessWidget {
           shape: kOperonixProductionCardShape,
         ),
         inputDecorationTheme: InputDecorationTheme(
+          /// Na webu je [VisualDensity.compact]; malo veći padding sprječava
+          /// da plutajuća oznaka „presijeca” obrub kod outlined polja.
+          contentPadding: kIsWeb
+              ? const EdgeInsets.fromLTRB(14, 18, 14, 14)
+              : null,
           border: OutlineInputBorder(
             borderRadius: const BorderRadius.all(Radius.circular(12)),
             borderSide: BorderSide(

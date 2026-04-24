@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../production/products/services/product_lookup_service.dart';
 import '../../warehouse_hub/services/warehouse_hub_service.dart';
 import '../../widgets/wms_tab_scaffold.dart';
 import '../services/warehouse_wms_service.dart';
@@ -8,28 +11,31 @@ import '../wms_scan_helpers.dart';
 
 class _LineCtrls {
   _LineCtrls() {
-    itemId = TextEditingController();
+    artiklCaption = TextEditingController();
     qty = TextEditingController();
     unit = TextEditingController(text: 'pcs');
     lotId = TextEditingController();
     batch = TextEditingController();
-    supplierId = TextEditingController();
+    supplierRef = TextEditingController();
   }
 
-  late final TextEditingController itemId;
+  /// Interni ključ za Callable (ne prikazuje se operatoru).
+  String? productId;
+
+  late final TextEditingController artiklCaption;
   late final TextEditingController qty;
   late final TextEditingController unit;
   late final TextEditingController lotId;
   late final TextEditingController batch;
-  late final TextEditingController supplierId;
+  late final TextEditingController supplierRef;
 
   void dispose() {
-    itemId.dispose();
+    artiklCaption.dispose();
     qty.dispose();
     unit.dispose();
     lotId.dispose();
     batch.dispose();
-    supplierId.dispose();
+    supplierRef.dispose();
   }
 }
 
@@ -79,7 +85,14 @@ class _WmsReceivingScreenState extends State<WmsReceivingScreen> {
       final rows = await _hub.listWarehouses(companyId: _cid);
       setState(() {
         _warehouses = rows
-            .map((r) => (id: r.id, label: r.name))
+            .map((r) {
+              final name = r.name.trim();
+              final code = r.code.trim();
+              final label = name.isNotEmpty
+                  ? name
+                  : (code.isNotEmpty ? code : 'Magacin');
+              return (id: r.id, label: label);
+            })
             .toList();
         if (_warehouseId == null && _warehouses.isNotEmpty) {
           _warehouseId = _warehouses.first.id;
@@ -118,6 +131,25 @@ class _WmsReceivingScreenState extends State<WmsReceivingScreen> {
     });
   }
 
+  void _applyProduct(_LineCtrls l, ProductLookupItem item) {
+    l.productId = item.productId;
+    l.artiklCaption.text = '${item.productCode} — ${item.productName}';
+    final u = item.unit?.trim();
+    if (u != null && u.isNotEmpty) {
+      l.unit.text = u;
+    }
+  }
+
+  Future<void> _pickProductForLine(_LineCtrls l) async {
+    final picked = await showModalBottomSheet<ProductLookupItem>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => _WmsProductPickSheet(companyId: _cid),
+    );
+    if (!mounted || picked == null) return;
+    setState(() => _applyProduct(l, picked));
+  }
+
   Future<void> _submit() async {
     final wid = _warehouseId?.trim();
     if (wid == null || wid.isEmpty) {
@@ -128,10 +160,10 @@ class _WmsReceivingScreenState extends State<WmsReceivingScreen> {
     final out = <Map<String, dynamic>>[];
     for (var i = 0; i < _lines.length; i++) {
       final l = _lines[i];
-      final item = l.itemId.text.trim();
+      final item = l.productId?.trim();
       final q = double.tryParse(l.qty.text.trim().replaceAll(',', '.'));
-      if (item.isEmpty || q == null || q <= 0) {
-        _snack('Stavka ${i + 1}: artikl (ID) i pozitivna količina su obavezni.');
+      if (item == null || item.isEmpty || q == null || q <= 0) {
+        _snack('Stavka ${i + 1}: odaberi artikl i unesi količinu.');
         return;
       }
       out.add(<String, dynamic>{
@@ -140,8 +172,8 @@ class _WmsReceivingScreenState extends State<WmsReceivingScreen> {
         'unit': l.unit.text.trim().isEmpty ? 'pcs' : l.unit.text.trim(),
         if (l.lotId.text.trim().isNotEmpty) 'lotId': l.lotId.text.trim(),
         if (l.batch.text.trim().isNotEmpty) 'batchNumber': l.batch.text.trim(),
-        if (l.supplierId.text.trim().isNotEmpty)
-          'supplierId': l.supplierId.text.trim(),
+        if (l.supplierRef.text.trim().isNotEmpty)
+          'supplierId': l.supplierRef.text.trim(),
       });
     }
 
@@ -184,12 +216,6 @@ class _WmsReceivingScreenState extends State<WmsReceivingScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const Text(
-              'Više stavki u jednom dokumentu prijema. Sken artikla: etiketa ili ID; '
-              'šarža: bilo koji barkod/tekst.',
-              style: TextStyle(color: Colors.black54, fontSize: 13),
-            ),
-            const SizedBox(height: 12),
             if (_loadingWh)
               const LinearProgressIndicator()
             else if (_warehouses.isEmpty)
@@ -202,9 +228,7 @@ class _WmsReceivingScreenState extends State<WmsReceivingScreen> {
                     .map(
                       (w) => DropdownMenuItem<String>(
                         value: w.id,
-                        child: Text(
-                          w.label.isNotEmpty ? '${w.label} (${w.id})' : w.id,
-                        ),
+                        child: Text(w.label),
                       ),
                     )
                     .toList(),
@@ -269,27 +293,35 @@ class _WmsReceivingScreenState extends State<WmsReceivingScreen> {
                         children: [
                           Expanded(
                             child: TextField(
-                              controller: l.itemId,
+                              controller: l.artiklCaption,
+                              readOnly: true,
                               decoration: const InputDecoration(
-                                labelText: 'Artikl (šifarnik)',
+                                labelText: 'Artikl',
+                                hintText: 'Odaberi ili skeniraj',
                               ),
                             ),
                           ),
                           IconButton(
+                            tooltip: 'Odaberi',
+                            onPressed: _loading ? null : () => _pickProductForLine(l),
+                            icon: const Icon(Icons.search),
+                          ),
+                          IconButton(
                             tooltip: 'Skeniraj',
-                            onPressed: () async {
-                              final id = await wmsScanProductId(
-                                context,
-                                companyData: widget.companyData,
-                              );
-                              if (!mounted || id == null || id.isEmpty) {
-                                if (mounted && id == null) {
-                                  _snack('Skeniraj oznaku proizvoda ili JSON etiketu.');
-                                }
-                                return;
-                              }
-                              setState(() => l.itemId.text = id);
-                            },
+                            onPressed: _loading
+                                ? null
+                                : () async {
+                                    final item = await wmsScanResolvedProduct(
+                                      context,
+                                      companyData: widget.companyData,
+                                    );
+                                    if (!mounted) return;
+                                    if (item == null) {
+                                      _snack('Artikl nije prepoznat.');
+                                      return;
+                                    }
+                                    setState(() => _applyProduct(l, item));
+                                  },
                             icon: const Icon(Icons.qr_code_scanner_outlined),
                           ),
                         ],
@@ -332,7 +364,7 @@ class _WmsReceivingScreenState extends State<WmsReceivingScreen> {
                             ),
                           ),
                           IconButton(
-                            tooltip: 'Skeniraj šaržu / kod',
+                            tooltip: 'Skeniraj',
                             onPressed: () async {
                               final id = await wmsScanBarcodeRaw(
                                 context,
@@ -352,9 +384,9 @@ class _WmsReceivingScreenState extends State<WmsReceivingScreen> {
                         ),
                       ),
                       TextField(
-                        controller: l.supplierId,
+                        controller: l.supplierRef,
                         decoration: const InputDecoration(
-                          labelText: 'Supplier ID (opc.)',
+                          labelText: 'Oznaka dobavljača (opc.)',
                         ),
                       ),
                     ],
@@ -369,6 +401,150 @@ class _WmsReceivingScreenState extends State<WmsReceivingScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _WmsProductPickSheet extends StatefulWidget {
+  const _WmsProductPickSheet({required this.companyId});
+
+  final String companyId;
+
+  @override
+  State<_WmsProductPickSheet> createState() => _WmsProductPickSheetState();
+}
+
+class _WmsProductPickSheetState extends State<_WmsProductPickSheet> {
+  final _q = TextEditingController();
+  final _lookup = ProductLookupService();
+  Timer? _debounce;
+  bool _loading = false;
+  List<ProductLookupItem> _results = const [];
+  String? _error;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _q.dispose();
+    super.dispose();
+  }
+
+  Future<void> _runSearch(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      setState(() {
+        _results = const [];
+        _loading = false;
+        _error = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final list = await _lookup.searchProducts(
+        companyId: widget.companyId,
+        query: trimmed,
+        limit: 25,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _results = list;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = AppErrorMapper.toMessage(e);
+        _results = const [];
+        _loading = false;
+      });
+    }
+  }
+
+  void _onQueryChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), () {
+      _runSearch(value);
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _q.addListener(() => _onQueryChanged(_q.text));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pad = MediaQuery.paddingOf(context);
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 12,
+        bottom: pad.bottom + 12,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Odaberi artikl',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _q,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Šifra ili naziv',
+              prefixIcon: Icon(Icons.search),
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(_error!, style: const TextStyle(color: Colors.red)),
+            ),
+          SizedBox(
+            height: 360,
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _q.text.trim().isEmpty
+                ? const SizedBox.shrink()
+                : _results.isEmpty
+                ? const Center(child: Text('Nema rezultata.'))
+                : ListView.separated(
+                    itemCount: _results.length,
+                    separatorBuilder: (context, index) =>
+                        const Divider(height: 1),
+                    itemBuilder: (_, i) {
+                      final p = _results[i];
+                      return ListTile(
+                        title: Text('${p.productCode} — ${p.productName}'),
+                        subtitle: Text('Jed: ${p.unit ?? '—'}'),
+                        onTap: () => Navigator.pop(context, p),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }

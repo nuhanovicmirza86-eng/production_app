@@ -340,6 +340,8 @@ class QualityCallableService {
     bool openOnly = true,
     /// `customer` | `supplier` | `internal` | `operations` ili prazno = sve.
     String? sourceFilter,
+    /// Filtar NCR zapisa za jedan proizvod (`products` id).
+    String? productId,
   }) async {
     final callable = _functions.httpsCallable('listQmsNonConformances');
     final res = await callable.call({
@@ -348,6 +350,8 @@ class QualityCallableService {
       'openOnly': openOnly,
       if (sourceFilter != null && sourceFilter.trim().isNotEmpty)
         'sourceFilter': sourceFilter.trim(),
+      if (productId != null && productId.trim().isNotEmpty)
+        'productId': productId.trim(),
     });
     return _parseRows(res.data, QmsNcrRow.fromMap);
   }

@@ -43,8 +43,8 @@ Future<String?> wmsScanLotDocId(
   return raw;
 }
 
-/// Sken za polje **ID artikla** (products doc id) — nepoznat payload tretira kao id.
-Future<String?> wmsScanProductId(
+/// Sken artikla za prijem / WMS — vraća zapis iz šifarnika ili `null` ako kod nije prepoznat.
+Future<ProductLookupItem?> wmsScanResolvedProduct(
   BuildContext context, {
   required Map<String, dynamic> companyData,
 }) async {
@@ -59,24 +59,38 @@ Future<String?> wmsScanProductId(
   if (res.intent == ProductionQrIntent.wmsLotDocV1) {
     return null;
   }
+  if (res.intent == ProductionQrIntent.workforceEmployeeV1 ||
+      res.intent == ProductionQrIntent.productionOrderReferenceV1 ||
+      res.intent == ProductionQrIntent.packedStation1BoxV1 ||
+      res.intent == ProductionQrIntent.logisticsReceiptDocV1) {
+    return null;
+  }
+
+  final cid = (companyData['companyId'] ?? '').toString().trim();
+  if (cid.isEmpty) return null;
+
   if (res.intent == ProductionQrIntent.printedClassificationLabelV1) {
     final m = res.labelFields;
     final pid = (m?['productId'] ?? m?['product_id'] ?? '').toString().trim();
-    if (pid.isNotEmpty) return pid;
-  }
-  final raw = res.rawPayload.trim();
-  if (raw.isEmpty) return null;
-
-  final cid = (companyData['companyId'] ?? '').toString().trim();
-  if (cid.isNotEmpty) {
-    final found = await ProductLookupService().findProductByScanContent(
-      companyId: cid,
-      raw: raw,
-    );
-    if (found != null) {
-      return found.productId;
+    if (pid.isNotEmpty) {
+      return ProductLookupService().getByProductId(
+        companyId: cid,
+        productId: pid,
+        onlyActive: true,
+      );
     }
+    final pcode = (m?['pcode'] ?? '').toString().trim();
+    if (pcode.isNotEmpty) {
+      return ProductLookupService().getByExactCode(
+        companyId: cid,
+        productCode: pcode,
+      );
+    }
+    return null;
   }
 
-  return raw;
+  return ProductLookupService().findProductByScanContent(
+    companyId: cid,
+    raw: res.rawPayload.trim(),
+  );
 }

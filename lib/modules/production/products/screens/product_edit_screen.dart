@@ -535,7 +535,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Skeniranje u prijemu i WMS-u pronalazi proizvod po ovim kodovima.',
+                  'Sken prijema robe prepoznaje artikl po ovim kodovima.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),

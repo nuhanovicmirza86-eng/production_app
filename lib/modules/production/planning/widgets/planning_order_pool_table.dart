@@ -32,7 +32,10 @@ class _PlanningOrderPoolTableState extends State<PlanningOrderPoolTable> {
   }
 
   Future<void> _loadSavedView() async {
-    final m = await PlanningPoolViewPrefs.read(session.companyId, session.plantKey);
+    final m = await PlanningPoolViewPrefs.read(
+      session.companyId,
+      session.plantKey,
+    );
     if (!mounted || m == null) return;
     setState(() => _view = m);
   }
@@ -52,7 +55,10 @@ class _PlanningOrderPoolTableState extends State<PlanningOrderPoolTable> {
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
             child: Row(
               children: [
-                Text('Order pool', style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                  'Order pool',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
                 const Spacer(),
                 SegmentedButton<PlanningOrderPoolViewMode>(
                   showSelectedIcon: false,
@@ -84,8 +90,6 @@ class _PlanningOrderPoolTableState extends State<PlanningOrderPoolTable> {
             child: TextField(
               decoration: const InputDecoration(
                 labelText: 'Pretraga (šifra, proizvod…)',
-                border: OutlineInputBorder(),
-                isDense: true,
               ),
               onChanged: session.setSearchQuery,
             ),
@@ -93,15 +97,20 @@ class _PlanningOrderPoolTableState extends State<PlanningOrderPoolTable> {
           Wrap(
             spacing: 4,
             children: [
-              TextButton(onPressed: session.isLocked ? null : session.selectAllInPool, child: const Text('Sve')),
               TextButton(
-                onPressed: session.isLocked || session.searchQuery.trim().isEmpty
+                onPressed: session.isLocked ? null : session.selectAllInPool,
+                child: const Text('Sve'),
+              ),
+              TextButton(
+                onPressed:
+                    session.isLocked || session.searchQuery.trim().isEmpty
                     ? null
                     : session.selectFiltered,
                 child: const Text('+ filtrirane'),
               ),
               TextButton(
-                onPressed: session.isLocked || session.searchQuery.trim().isEmpty
+                onPressed:
+                    session.isLocked || session.searchQuery.trim().isEmpty
                     ? null
                     : session.clearFilteredFromSelection,
                 child: const Text('− filtrirane'),
@@ -120,12 +129,12 @@ class _PlanningOrderPoolTableState extends State<PlanningOrderPoolTable> {
             child: session.loadingPool
                 ? const Center(child: CircularProgressIndicator())
                 : session.poolError != null
-                    ? Center(child: Text(session.poolError!))
-                    : session.pool.isEmpty
-                        ? const Center(child: Text('Nema naloga (pušten / u toku).'))
-                        : _view == PlanningOrderPoolViewMode.table
-                            ? _OrderDataTable(session: session)
-                            : _OrderCardList(session: session),
+                ? Center(child: Text(session.poolError!))
+                : session.pool.isEmpty
+                ? const Center(child: Text('Nema naloga (pušten / u toku).'))
+                : _view == PlanningOrderPoolViewMode.table
+                ? _OrderDataTable(session: session)
+                : _OrderCardList(session: session),
           ),
         ],
       ),
@@ -181,16 +190,17 @@ class _OrderCardList extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
       itemCount: list.length,
       itemBuilder: (context, i) {
-        return PlanningOrderCard(
-          order: list[i],
-          session: session,
-        );
+        return PlanningOrderCard(order: list[i], session: session);
       },
     );
   }
 }
 
-DataRow _dataRow(BuildContext context, PlanningSessionController session, ProductionOrderModel o) {
+DataRow _dataRow(
+  BuildContext context,
+  PlanningSessionController session,
+  ProductionOrderModel o,
+) {
   final t = Theme.of(context);
   final hasMachine = (o.machineId ?? '').trim().isNotEmpty;
   final rem = (o.plannedQty - o.producedGoodQty).clamp(0, double.infinity);
@@ -208,18 +218,22 @@ DataRow _dataRow(BuildContext context, PlanningSessionController session, Produc
       DataCell(
         Checkbox(
           value: ex ? false : session.selectedOrderIds.contains(o.id),
-          onChanged: ex || session.isLocked ? null : (v) => session.toggleOrderSelected(o.id, v),
+          onChanged: ex || session.isLocked
+              ? null
+              : (v) => session.toggleOrderSelected(o.id, v),
         ),
       ),
-      DataCell(Text(
-        o.productionOrderCode,
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          color: exStyle?.color,
-          decoration: exStyle?.decoration,
-          decorationColor: exStyle?.decorationColor,
+      DataCell(
+        Text(
+          o.productionOrderCode,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: exStyle?.color,
+            decoration: exStyle?.decoration,
+            decorationColor: exStyle?.decorationColor,
+          ),
         ),
-      )),
+      ),
       DataCell(planningOrderSignalRow(t, o)),
       DataCell(
         SizedBox(
@@ -232,14 +246,14 @@ DataRow _dataRow(BuildContext context, PlanningSessionController session, Produc
           ),
         ),
       ),
-      DataCell(Text('${rem.toStringAsFixed(rem == rem.roundToDouble() ? 0 : 1)} ${o.unit}', style: exStyle)),
-      DataCell(Text(formatPlanningDueDate(due), style: exStyle)),
       DataCell(
         Text(
-          formatPlanningCustomerLine(o),
+          '${rem.toStringAsFixed(rem == rem.roundToDouble() ? 0 : 1)} ${o.unit}',
           style: exStyle,
         ),
       ),
+      DataCell(Text(formatPlanningDueDate(due), style: exStyle)),
+      DataCell(Text(formatPlanningCustomerLine(o), style: exStyle)),
       DataCell(
         Text(
           o.routingId.isEmpty ? '—' : o.routingId,
@@ -270,8 +284,13 @@ DataRow _dataRow(BuildContext context, PlanningSessionController session, Produc
             }
           },
           itemBuilder: (c) => [
-            if (!ex) const PopupMenuItem(value: 'ex', child: Text('Isključi iz plana')),
-            if (ex) const PopupMenuItem(value: 'in', child: Text('Uključi u plan')),
+            if (!ex)
+              const PopupMenuItem(
+                value: 'ex',
+                child: Text('Isključi iz plana'),
+              ),
+            if (ex)
+              const PopupMenuItem(value: 'in', child: Text('Uključi u plan')),
           ],
           child: const Icon(Icons.more_vert, size: 20),
         ),

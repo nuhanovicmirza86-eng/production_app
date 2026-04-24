@@ -119,6 +119,25 @@ class OoeSummaryService {
   }
 
   /// Isti kalendarski dan — svi sažeci u pogoni (sve mašine, sve smjene).
+  /// Jedan dokument sažetka (npr. deep link iz MES obavijesti) — provjera tenanta.
+  Future<OoeShiftSummary?> getSummaryForTenant({
+    required String companyId,
+    required String plantKey,
+    required String docId,
+  }) async {
+    final id = _s(docId);
+    final cid = _s(companyId);
+    final pk = _s(plantKey);
+    if (id.isEmpty || cid.isEmpty || pk.isEmpty) return null;
+
+    final doc = await _col.doc(id).get();
+    if (!doc.exists) return null;
+    final m = doc.data();
+    if (m == null) return null;
+    if (_s(m['companyId']) != cid || _s(m['plantKey']) != pk) return null;
+    return OoeShiftSummary.fromDoc(doc);
+  }
+
   Stream<List<OoeShiftSummary>> watchSummariesForPlantOnCalendarDay({
     required String companyId,
     required String plantKey,

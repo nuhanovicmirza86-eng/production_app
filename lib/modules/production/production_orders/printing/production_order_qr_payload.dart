@@ -15,7 +15,23 @@ String buildProductionOrderQrPayload({
   return 'po:v1;c=$c;p=$p;id=$id;code=$code';
 }
 
-/// Parsiranje za budući skener (povrat `productionOrderId` ako je poznat format).
+/// Kratka referenca na isti nalog (npr. sitna etiketa); skener koristi isti intent kao [buildProductionOrderQrPayload].
+///
+/// Format: `pol:v1;c=<companyId>;p=<plantKey>;poId=<productionOrderId>;code=<productionOrderCode>`
+String buildProductionOrderLabelReferenceQrPayload({
+  required String companyId,
+  required String plantKey,
+  required String productionOrderId,
+  required String productionOrderCode,
+}) {
+  final c = Uri.encodeComponent(companyId.trim());
+  final p = Uri.encodeComponent(plantKey.trim());
+  final poId = Uri.encodeComponent(productionOrderId.trim());
+  final code = Uri.encodeComponent(productionOrderCode.trim());
+  return 'pol:v1;c=$c;p=$p;poId=$poId;code=$code';
+}
+
+/// Parsiranje za skener (povrat `productionOrderId` ako je poznat format).
 String? tryParseProductionOrderIdFromQr(String raw) {
   final s = raw.trim();
   if (s.isEmpty) return null;

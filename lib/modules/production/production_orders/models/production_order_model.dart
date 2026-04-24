@@ -48,6 +48,11 @@ class ProductionOrderModel {
   final String? machineId;
   final String? lineId;
 
+  /// MES radni centar (šifrarnik `work_centers`) — primarna dodjela izvršenja.
+  final String? workCenterId;
+  final String? workCenterCode;
+  final String? workCenterName;
+
   final DateTime? scheduledStartAt;
   final DateTime? scheduledEndAt;
 
@@ -117,6 +122,9 @@ class ProductionOrderModel {
     required this.routingVersion,
     this.machineId,
     this.lineId,
+    this.workCenterId,
+    this.workCenterCode,
+    this.workCenterName,
     this.scheduledStartAt,
     this.scheduledEndAt,
     this.releasedAt,
@@ -198,6 +206,9 @@ class ProductionOrderModel {
       routingVersion: map['routingVersion'] ?? '',
       machineId: map['machineId'],
       lineId: map['lineId'],
+      workCenterId: _nullableTrimString(map['workCenterId']),
+      workCenterCode: _nullableTrimString(map['workCenterCode']),
+      workCenterName: _nullableTrimString(map['workCenterName']),
       scheduledStartAt: (map['scheduledStartAt'] as Timestamp?)?.toDate(),
       scheduledEndAt: (map['scheduledEndAt'] as Timestamp?)?.toDate(),
       releasedAt: (map['releasedAt'] as Timestamp?)?.toDate(),
@@ -269,6 +280,9 @@ class ProductionOrderModel {
       'routingVersion': routingVersion,
       'machineId': machineId,
       'lineId': lineId,
+      'workCenterId': workCenterId,
+      'workCenterCode': workCenterCode,
+      'workCenterName': workCenterName,
       'scheduledStartAt': scheduledStartAt,
       'scheduledEndAt': scheduledEndAt,
       'releasedAt': releasedAt,

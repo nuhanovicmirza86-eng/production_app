@@ -26,6 +26,7 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
   String _myRole = '';
   String _myCompanyId = '';
   String _usersStatusFilter = 'all';
+
   /// 'all' ili kanonski kod uloge (npr. [admin], [production_operator]).
   String _roleFilter = 'all';
 
@@ -121,31 +122,8 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
   }
 
   String _roleLabel(String role) {
-    final r = ProductionAccessHelper.normalizeRole(role);
-    switch (r) {
-      case 'admin':
-        return 'Admin';
-      case 'super_admin':
-        return 'Super admin';
-      case 'supervisor':
-        return 'Supervizor';
-      case 'production_operator':
-        return 'Operater proizvodnje';
-      case 'quality_operator':
-        return 'Operater kvaliteta';
-      case 'logistics_operator':
-        return 'Operater logistike';
-      case 'logistics_manager':
-        return 'Menadžer logistike';
-      case 'shift_lead':
-        return 'Vođa smjene';
-      case 'production_manager':
-        return 'Menadžer proizvodnje';
-      case 'maintenance_manager':
-        return 'Menadžer održavanja';
-      default:
-        return role.isEmpty ? '—' : role;
-    }
+    if ((role).toString().trim().isEmpty) return '—';
+    return ProductionAccessHelper.displayRoleLabel(role);
   }
 
   String _roleFilterDropdownLabel(String value) {
@@ -550,7 +528,9 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
               initialValue: selectedRole,
-              decoration: const InputDecoration(labelText: 'Uloga u proizvodnji'),
+              decoration: const InputDecoration(
+                labelText: 'Uloga u proizvodnji',
+              ),
               items: _productionRoles
                   .map(
                     (role) => DropdownMenuItem<String>(
@@ -805,10 +785,7 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
                     email.isEmpty ? '—' : email,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade800,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
                   ),
                 ],
                 if (expanded) ...[
@@ -824,10 +801,7 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
                   CompanyPlantLabelText(
                     companyId: _myCompanyId,
                     plantKey: plantKey,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade800,
-                    ),
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
                   ),
                   const SizedBox(height: 4),
                   Text('Status: ${_statusLabel(status)}'),
@@ -880,17 +854,11 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
           if (_roleFilter == 'all') return true;
           final data = doc.data();
           final nr = ProductionAccessHelper.normalizeRole(data['role']);
-          return nr ==
-              ProductionAccessHelper.normalizeRole(_roleFilter);
+          return nr == ProductionAccessHelper.normalizeRole(_roleFilter);
         });
 
         final List<Map<String, dynamic>> productionUsers = filtered
-            .map(
-              (doc) => <String, dynamic>{
-                ...doc.data(),
-                'uid': doc.id,
-              },
-            )
+            .map((doc) => <String, dynamic>{...doc.data(), 'uid': doc.id})
             .toList();
 
         final Map<String, List<Map<String, dynamic>>> grouped =
@@ -916,10 +884,7 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
                 children: [
                   const Text(
                     'Korisnici u kompaniji',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
@@ -927,7 +892,6 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
                     initialValue: _usersStatusFilter,
                     decoration: const InputDecoration(
                       labelText: 'Status naloga',
-                      isDense: true,
                     ),
                     items: _userStatusFilters
                         .map(
@@ -947,10 +911,7 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
                   DropdownButtonFormField<String>(
                     key: ValueKey<String>('role_$_roleFilter'),
                     initialValue: _roleFilter,
-                    decoration: const InputDecoration(
-                      labelText: 'Uloga',
-                      isDense: true,
-                    ),
+                    decoration: const InputDecoration(labelText: 'Uloga'),
                     items: <DropdownMenuItem<String>>[
                       DropdownMenuItem<String>(
                         value: 'all',

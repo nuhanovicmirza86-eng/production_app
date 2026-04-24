@@ -17,11 +17,11 @@ class AiAnalysisPayloads {
     return <String, dynamic>{
       'kind': 'scada_snapshot',
       'source': source,
-      if (windowLabel != null) 'window': windowLabel,
+      'window': ?windowLabel,
       if (capturedAt != null) 'capturedAt': capturedAt.toUtc().toIso8601String(),
-      if (deviceStates != null) 'deviceStates': deviceStates,
-      if (telemetryPoints != null) 'telemetryPoints': telemetryPoints,
-      if (alarms != null) 'alarms': alarms,
+      'deviceStates': ?deviceStates,
+      'telemetryPoints': ?telemetryPoints,
+      'alarms': ?alarms,
     };
   }
 
@@ -37,13 +37,13 @@ class AiAnalysisPayloads {
   }) {
     return <String, dynamic>{
       'kind': 'oee_block',
-      if (periodLabel != null) 'period': periodLabel,
-      if (availabilityPct != null) 'availabilityPct': availabilityPct,
-      if (performancePct != null) 'performancePct': performancePct,
-      if (qualityPct != null) 'qualityPct': qualityPct,
-      if (oeePct != null) 'oeePct': oeePct,
-      if (losses != null) 'losses': losses,
-      if (downtimeSummary != null) 'downtimeSummary': downtimeSummary,
+      'period': ?periodLabel,
+      'availabilityPct': ?availabilityPct,
+      'performancePct': ?performancePct,
+      'qualityPct': ?qualityPct,
+      'oeePct': ?oeePct,
+      'losses': ?losses,
+      'downtimeSummary': ?downtimeSummary,
     };
   }
 
@@ -57,9 +57,9 @@ class AiAnalysisPayloads {
     return <String, dynamic>{
       'kind': 'production_flow',
       'label': label,
-      if (orders != null) 'orders': orders,
-      if (phases != null) 'phases': phases,
-      if (totals != null) 'totals': totals,
+      'orders': ?orders,
+      'phases': ?phases,
+      'totals': ?totals,
     };
   }
 

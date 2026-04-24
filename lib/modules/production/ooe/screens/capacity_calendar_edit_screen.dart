@@ -255,7 +255,7 @@ class _CapacityCalendarEditScreenState extends State<CapacityCalendarEditScreen>
             ),
           ] else ...[
             DropdownButtonFormField<String>(
-              value: _scopeType,
+              initialValue: _scopeType,
               decoration: const InputDecoration(
                 labelText: 'Opseg',
                 border: OutlineInputBorder(),

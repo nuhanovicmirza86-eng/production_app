@@ -1,8 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../widgets/wms_tab_scaffold.dart';
 import '../services/warehouse_wms_service.dart';
+import '../wms_lot_label_helper.dart';
 import '../wms_scan_helpers.dart';
 
 class WmsShippingScreen extends StatefulWidget {
@@ -10,10 +12,13 @@ class WmsShippingScreen extends StatefulWidget {
 
   final bool embedInHubShell;
 
+  final String? initialLotDocId;
+
   const WmsShippingScreen({
     super.key,
     required this.companyData,
     this.embedInHubShell = false,
+    this.initialLotDocId,
   });
 
   @override
@@ -22,23 +27,67 @@ class WmsShippingScreen extends StatefulWidget {
 
 class _WmsShippingScreenState extends State<WmsShippingScreen> {
   final _svc = WarehouseWmsService();
-  final _lotDocId = TextEditingController();
+  final _lotCaption = TextEditingController();
   bool _busy = false;
 
-  String get _cid =>
-      (widget.companyData['companyId'] ?? '').toString().trim();
+  String _lotDocInternal = '';
+
+  String get _cid => (widget.companyData['companyId'] ?? '').toString().trim();
+
+  @override
+  void initState() {
+    super.initState();
+    final init = widget.initialLotDocId?.trim();
+    if (init != null && init.isNotEmpty) {
+      _bindLotDoc(init);
+    }
+  }
 
   @override
   void dispose() {
-    _lotDocId.dispose();
+    _lotCaption.dispose();
     super.dispose();
   }
 
+  Future<void> _bindLotDoc(String docId) async {
+    final id = docId.trim();
+    if (id.isEmpty) return;
+    _lotDocInternal = id;
+    if (!mounted) return;
+    setState(() => _lotCaption.text = '…');
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('inventory_lots')
+          .doc(id)
+          .get();
+      if (!mounted) return;
+      if (!snap.exists) {
+        setState(() => _lotCaption.text = 'Lot');
+        return;
+      }
+      final d = snap.data() ?? {};
+      final docCid = (d['companyId'] ?? '').toString().trim();
+      if (docCid.isNotEmpty && docCid != _cid) {
+        setState(() {
+          _lotDocInternal = '';
+          _lotCaption.text = '';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Lot nije u ovoj kompaniji.')),
+        );
+        return;
+      }
+      setState(() => _lotCaption.text = wmsLotCaptionFromDocData(d));
+    } catch (_) {
+      if (mounted) setState(() => _lotCaption.text = 'Lot');
+    }
+  }
+
   Future<void> _submit() async {
-    final id = _lotDocId.text.trim();
+    final id = _lotDocInternal.trim();
     if (id.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unesi lotDocId.')),
+        const SnackBar(content: Text('Skeniraj lot.')),
       );
       return;
     }
@@ -47,13 +96,13 @@ class _WmsShippingScreenState extends State<WmsShippingScreen> {
       await _svc.moveLotToShippingZone(companyId: _cid, lotDocId: id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lot je u otpremnoj zoni (SHIPPING).')),
+        const SnackBar(content: Text('Lot je u otpremnoj zoni.')),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -71,26 +120,21 @@ class _WmsShippingScreenState extends State<WmsShippingScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'Označava fizički prijelaz lota u zonu otpreme prije knjiženja izlaza '
-                '(sljedeći korak u praksi: outbound / otpremnica prema postojećim Callable tokovima).',
-                style: TextStyle(color: Colors.black54),
-              ),
-              const SizedBox(height: 16),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: TextField(
-                      controller: _lotDocId,
+                      controller: _lotCaption,
+                      readOnly: true,
                       decoration: const InputDecoration(
-                        labelText: 'lotDocId',
-                        hintText: 'wmslot:v1;…',
+                        labelText: 'Lot',
+                        hintText: 'Skeniraj',
                       ),
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Skeniraj',
+                    tooltip: 'Skeniraj lot',
                     onPressed: _busy
                         ? null
                         : () async {
@@ -99,16 +143,16 @@ class _WmsShippingScreenState extends State<WmsShippingScreen> {
                               companyData: widget.companyData,
                             );
                             if (!mounted || id == null || id.isEmpty) return;
-                            setState(() => _lotDocId.text = id);
+                            await _bindLotDoc(id);
                           },
                     icon: const Icon(Icons.qr_code_scanner_outlined),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               FilledButton(
                 onPressed: _busy ? null : _submit,
-                child: const Text('Premjesti u SHIPPING'),
+                child: const Text('Potvrdi prijelaz u otpremu'),
               ),
             ],
           ),

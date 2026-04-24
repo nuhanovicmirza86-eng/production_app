@@ -357,9 +357,7 @@ class _ProductionTrackingAssistantScreenState
                   decoration: const InputDecoration(
                     labelText: 'Pitanje',
                     hintText: 'Npr. Koji je omjer škarta ovaj tjedan?',
-                    border: OutlineInputBorder(),
                     alignLabelWithHint: true,
-                    isDense: true,
                   ),
                   onSubmitted: (_) => _ask(),
                 ),

@@ -121,16 +121,12 @@ class _QmsProductPickerBodyState extends State<_QmsProductPickerBody> {
               decoration: const InputDecoration(
                 hintText: 'Pretraži šifru ili naziv',
                 prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-                isDense: true,
               ),
             ),
           ),
           const SizedBox(height: 8),
           if (_loading)
-            const Expanded(
-              child: Center(child: CircularProgressIndicator()),
-            )
+            const Expanded(child: Center(child: CircularProgressIndicator()))
           else if (_error != null)
             Expanded(
               child: Center(
@@ -302,16 +298,12 @@ class _QmsControlPlanPickerBodyState extends State<_QmsControlPlanPickerBody> {
               decoration: const InputDecoration(
                 hintText: 'Pretraži naslov, šifru, proizvod…',
                 prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-                isDense: true,
               ),
             ),
           ),
           const SizedBox(height: 8),
           if (_loading)
-            const Expanded(
-              child: Center(child: CircularProgressIndicator()),
-            )
+            const Expanded(child: Center(child: CircularProgressIndicator()))
           else if (_error != null)
             Expanded(
               child: Center(
@@ -471,8 +463,6 @@ class _QmsCustomerPickerBodyState extends State<_QmsCustomerPickerBody> {
               decoration: const InputDecoration(
                 hintText: 'Pretraži šifru ili naziv…',
                 prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-                isDense: true,
               ),
             ),
           ),
@@ -615,8 +605,6 @@ class _QmsSupplierPickerBodyState extends State<_QmsSupplierPickerBody> {
               decoration: const InputDecoration(
                 hintText: 'Pretraži šifru ili naziv…',
                 prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-                isDense: true,
               ),
             ),
           ),

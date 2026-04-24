@@ -143,7 +143,8 @@ class _OoeAlertsScreenState extends State<OoeAlertsScreen> {
                 return ListView.separated(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
                   itemCount: list.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 6),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 6),
                   itemBuilder: (context, i) {
                     final a = list[i];
                     final isOpen = a.status == OoeAlert.statusOpen;

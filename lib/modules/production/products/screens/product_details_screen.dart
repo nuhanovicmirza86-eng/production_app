@@ -2,10 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
-import '../../../logistics/inventory/widgets/product_warehouse_stock_section.dart';
 import '../../bom/services/bom_service.dart';
 import '../services/product_lookup_service.dart';
 import '../services/product_service.dart';
+import '../widgets/product_details_auxiliary_tabs.dart';
 import 'product_edit_screen.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
@@ -45,6 +45,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
   String _selectedBomClassification = 'PRIMARY';
   List<Map<String, dynamic>> _bomItems = [];
   List<Map<String, dynamic>> _bomHistory = [];
+
+  /// Osvježava polja zalihe (min/max) nakon spremanja u tabu „Zaliha“.
+  int _stockTabReloadSeq = 0;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -225,7 +228,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
     _loadProduct();
   }
 
@@ -415,10 +418,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
         context,
       ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _isCreatingBomVersion = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isCreatingBomVersion = false;
+        });
+      }
     }
   }
 
@@ -608,7 +612,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.blueGrey.withOpacity(0.06),
+                            color: Colors.blueGrey.withValues(alpha: 0.06),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Row(
@@ -651,7 +655,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                             child: ListView.separated(
                               shrinkWrap: true,
                               itemCount: searchResults.length,
-                              separatorBuilder: (_, __) =>
+                              separatorBuilder: (context, index) =>
                                   const Divider(height: 1),
                               itemBuilder: (_, index) {
                                 final item = searchResults[index];
@@ -725,10 +729,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                             width: double.infinity,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.08),
+                              color: Colors.green.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: Colors.green.withOpacity(0.25),
+                                color: Colors.green.withValues(alpha: 0.25),
                               ),
                             ),
                             child: Row(
@@ -908,7 +912,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.blueGrey.withOpacity(0.06),
+                            color: Colors.blueGrey.withValues(alpha: 0.06),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
@@ -1155,10 +1159,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: _statusColor(status).withOpacity(0.12),
+                    color: _statusColor(status).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(999),
                     border: Border.all(
-                      color: _statusColor(status).withOpacity(0.35),
+                      color: _statusColor(status).withValues(alpha: 0.35),
                     ),
                   ),
                   child: Text(
@@ -1196,7 +1200,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
             _infoRow('Jedinica', _s(product['unit'])),
             _infoRow('Idealni ciklus (OOE)', _formatIdealCycleForDisplay(product['idealCycleTimeSeconds'])),
             _infoRow('Kupac', _s(product['customerName'])),
-            _infoRow('Customer ID', _s(product['customerId'])),
+            _infoRow('Kupac (šifra)', _s(product['customerId'])),
             _infoRow('Default plantKey', _s(product['defaultPlantKey'])),
             _infoRow('Opis', _s(product['description'])),
             _infoRow('Vanjski barkod / QR', _formatScanAliases(product['scanAliases'])),
@@ -1213,14 +1217,42 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
             _infoRow('Valuta', _s(product['currency'])),
           ],
         ),
-        const SizedBox(height: 12),
-        ProductWarehouseStockSection(
-          companyId: _companyId,
-          productId: _productId,
-          plantKey: _plantKeyHint.isNotEmpty ? _plantKeyHint : null,
-          fallbackUnit: _s(product['unit']),
-        ),
       ],
+    );
+  }
+
+  Future<void> _onStockTabSaved() async {
+    await _loadProduct();
+    if (mounted) {
+      setState(() => _stockTabReloadSeq++);
+    }
+  }
+
+  Widget _buildStockTab(Map<String, dynamic> product) {
+    return ProductDetailsStockTab(
+      key: ValueKey('stock_${_productId}_$_stockTabReloadSeq'),
+      companyId: _companyId,
+      productId: _productId,
+      plantKey: _plantKeyHint.isNotEmpty ? _plantKeyHint : null,
+      fallbackUnit: _s(product['unit']),
+      product: product,
+      updatedByUid: _userId,
+      canEdit: _canEdit,
+      onStockSettingsSaved: _onStockTabSaved,
+    );
+  }
+
+  Widget _buildDocumentationTab() {
+    return ProductDetailsDocumentationTab(
+      companyId: _companyId,
+      productId: _productId,
+    );
+  }
+
+  Widget _buildComplaintsTab() {
+    return ProductDetailsComplaintsTab(
+      companyId: _companyId,
+      productId: _productId,
     );
   }
 
@@ -1385,7 +1417,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
 
   Widget _buildBomTab(Map<String, dynamic> product) {
     final packagingQty = _s(product['packagingQty']);
-    final activeBomId = _s(_activeBom?['id']);
     final activeBomVersion = _s(_activeBom?['version']);
     final isActiveBom = (_activeBom?['isActive'] ?? false) == true;
     final effectiveFrom = _formatDateTime(_activeBom?['effectiveFrom']);
@@ -1397,27 +1428,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
       children: [
         _sectionCard(
           title: 'Sastavnica',
-          subtitle:
-              'Primarna (PRIMARY) sastavnica je glavna za ovaj proizvod: nakon učitavanja ili izmjene, '
-              'njen ID i verzija automatski se upisuju na proizvod (za naloge i pretragu), bez posebnog koraka.\n\n'
-              '🛈 Sastavnica prikazuje šta je potrebno za proizvodnju 1 komada gotovog proizvoda. Svaka klasifikacija ima svoju sastavnicu.',
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Icon(Icons.info_outline, size: 18),
-                SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Primjer upisa: Čep 1 KOM, Etiketa 1 KOM, Vrećica 0.05 KOM',
-                    style: TextStyle(color: Colors.black54),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _selectedBomClassification,
+              initialValue: _selectedBomClassification,
               items: const [
                 DropdownMenuItem(value: 'PRIMARY', child: Text('Primarna')),
                 DropdownMenuItem(value: 'SECONDARY', child: Text('Sekundarna')),
@@ -1429,7 +1442,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
               onChanged: _onClassificationChanged,
               decoration: const InputDecoration(
                 labelText: 'Klasifikacija sastavnice',
-                helperText: '🛈 Svaka klasifikacija ima svoju sastavnicu.',
               ),
             ),
             const SizedBox(height: 16),
@@ -1459,30 +1471,25 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
               },
             ),
             const SizedBox(height: 16),
-            if (activeBomId.isNotEmpty || activeBomVersion.isNotEmpty)
+            if (_activeBom != null)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blueGrey.withOpacity(0.06),
+                  color: Colors.blueGrey.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blueGrey.withOpacity(0.18)),
+                  border: Border.all(
+                    color: Colors.blueGrey.withValues(alpha: 0.18),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (activeBomId.isNotEmpty)
-                      Text(
-                        'Aktivna sastavnica: $activeBomId',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    if (activeBomVersion.isNotEmpty) ...[
-                      if (activeBomId.isNotEmpty) const SizedBox(height: 4),
+                    if (activeBomVersion.isNotEmpty)
                       Text(
                         'Verzija: $activeBomVersion',
-                        style: const TextStyle(color: Colors.black54),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
-                    ],
                     const SizedBox(height: 4),
                     Text(
                       'Status: ${isActiveBom ? 'Aktivna' : 'Neaktivna'}',
@@ -1564,10 +1571,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
       children: [
         _sectionCard(
           title: 'Routing',
-          subtitle:
-              'Aktivni Routing se trenutno vodi direktno na product dokumentu dok ne završimo puni versioned flow.',
           children: [
-            _infoRow('Aktivni Routing ID', routingId),
+            _infoRow('Aktivni routing', routingId),
             _infoRow('Aktivna verzija', routingVersion),
             const SizedBox(height: 8),
             OutlinedButton.icon(
@@ -1587,10 +1592,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
       children: [
         _sectionCard(
           title: 'Proizvodni nalozi',
-          subtitle:
-              'Ovdje će ići pregled ili shortcut na filtrirane naloge za ovaj proizvod.',
           children: [
-            _infoRow('Product ID', _s(product['productId'])),
             _infoRow('Šifra proizvoda', _s(product['productCode'])),
             _infoRow('Naziv proizvoda', _s(product['productName'])),
             const SizedBox(height: 8),
@@ -1650,6 +1652,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
             Tab(text: 'BOM'),
             Tab(text: 'Routing'),
             Tab(text: 'Nalozi'),
+            Tab(text: 'Zaliha'),
+            Tab(text: 'Dokumentacija'),
+            Tab(text: 'Reklamacije'),
           ],
         ),
         Expanded(
@@ -1660,6 +1665,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
               _buildBomTab(product),
               _buildRoutingTab(product),
               _buildOrdersTab(product),
+              _buildStockTab(product),
+              _buildDocumentationTab(),
+              _buildComplaintsTab(),
             ],
           ),
         ),

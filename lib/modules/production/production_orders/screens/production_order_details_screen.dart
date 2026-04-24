@@ -18,7 +18,9 @@ import '../../../commercial/orders/services/company_print_identity_service.dart'
 import '../printing/production_order_pdf.dart';
 import '../printing/production_order_qr_payload.dart';
 import '../services/production_order_service.dart';
+import '../../work_centers/screens/work_center_details_screen.dart';
 import 'production_order_edit_screen.dart';
+import 'production_order_mes_assignment_screen.dart';
 
 class ProductionOrderDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
@@ -231,11 +233,11 @@ class _ProductionOrderDetailsScreenState
         context,
       ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     } finally {
-      if (!mounted) return;
-
-      setState(() {
-        _isReleasing = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isReleasing = false;
+        });
+      }
     }
   }
 
@@ -298,6 +300,10 @@ class _ProductionOrderDetailsScreenState
             'customerName': order.customerName ?? '',
             'routingId': order.routingId,
             'routingVersion': order.routingVersion,
+            'workCenterId': order.workCenterId ?? '',
+            'workCenterCode': order.workCenterCode ?? '',
+            'workCenterName': order.workCenterName ?? '',
+            'machineId': order.machineId ?? '',
           },
           stepId: _defaultStepId,
           stepName: _defaultStepName,
@@ -702,7 +708,7 @@ class _ProductionOrderDetailsScreenState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -787,7 +793,7 @@ class _ProductionOrderDetailsScreenState
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.12),
+                  color: Colors.orange.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text(
@@ -960,7 +966,7 @@ class _ProductionOrderDetailsScreenState
                         vertical: 7,
                       ),
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.12),
+                        color: statusColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
@@ -978,7 +984,7 @@ class _ProductionOrderDetailsScreenState
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.orange.withOpacity(0.15),
+                          color: Colors.orange.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: const Text(
@@ -1042,11 +1048,70 @@ class _ProductionOrderDetailsScreenState
                   '${_formatQty(order.producedReworkQty)} ${order.unit}',
                 ),
                 _buildInfoRow('Pogon', order.plantKey),
+                if ((order.workCenterCode ?? '').trim().isNotEmpty ||
+                    (order.workCenterName ?? '').trim().isNotEmpty)
+                  _buildInfoRow(
+                    'Radni centar',
+                    [
+                      (order.workCenterCode ?? '').trim(),
+                      (order.workCenterName ?? '').trim(),
+                    ].where((s) => s.isNotEmpty).join(' — '),
+                  )
+                else
+                  _buildInfoRow('Radni centar', '—'),
               ],
             ),
           ),
         ),
-        if ((order.machineId ?? '').trim().isNotEmpty) ...[
+        if (_canManageLifecycle &&
+            order.status != 'closed' &&
+            order.status != 'cancelled') ...[
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                final ok = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute<bool>(
+                    builder: (_) => ProductionOrderMesAssignmentScreen(
+                      companyData: widget.companyData,
+                      order: order,
+                    ),
+                  ),
+                );
+                if (ok == true && mounted) await _loadOrder();
+              },
+              icon: const Icon(Icons.precision_manufacturing_outlined),
+              label: const Text('Postavi radni centar / resurse'),
+            ),
+          ),
+        ],
+        if ((order.workCenterId ?? '').trim().isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () {
+                Navigator.push<void>(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => WorkCenterDetailsScreen(
+                      companyData: widget.companyData,
+                      workCenterId: order.workCenterId!.trim(),
+                      plantKey: _plantKey,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.open_in_new, size: 18),
+              label: const Text('Otvori karticu radnog centra'),
+            ),
+          ),
+        ],
+        if (order.status == 'released' ||
+            order.status == 'in_progress' ||
+            order.status == 'completed') ...[
           const SizedBox(height: 16),
           Card(
             child: Padding(
@@ -1137,6 +1202,9 @@ class _ProductionOrderDetailsScreenState
                 _buildInfoRow('Routing ID', order.routingId),
                 _buildInfoRow('Routing verzija', order.routingVersion),
                 _buildInfoRow('Linija', order.lineId ?? '-'),
+                _buildInfoRow('Radni centar ID', order.workCenterId ?? '-'),
+                _buildInfoRow('Radni centar šifra', order.workCenterCode ?? '-'),
+                _buildInfoRow('Radni centar naziv', order.workCenterName ?? '-'),
                 _buildInfoRow('Mašina', order.machineId ?? '-'),
               ],
             ),

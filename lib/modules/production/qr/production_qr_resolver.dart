@@ -1,3 +1,5 @@
+import '../../logistics/receipt/logistics_receipt_qr_payload.dart';
+import '../../workforce/employee_profiles/workforce_qr_payload.dart';
 import '../packing/packing_box_qr.dart';
 import '../production_orders/printing/classification_label_print_qr.dart';
 import '../production_orders/printing/production_order_qr_payload.dart';
@@ -6,25 +8,23 @@ import '../production_orders/printing/production_order_qr_payload.dart';
 ///
 /// Arhitektura (izvor istine): `maintenance_app/docs/architecture/PRODUCTION_QR_AND_SCANNING_ARCHITECTURE.md`
 ///
-/// Svaki generator QR-a u toku (nalog, etiketa, lot, prenos…) treba imati
-/// vlastiti format payloada; [resolveProductionQrScan] ga mapira na jedan [ProductionQrIntent].
+/// Registrirani formati → [resolveProductionQrScan]:
+/// - `workforceEmployee:v1;…` → [ProductionQrIntent.workforceEmployeeV1]
+/// - `po:v1;` / `pol:v1;` → [ProductionQrIntent.productionOrderReferenceV1]
+/// - `wmslot:v1;` / `lot:v1;` → [ProductionQrIntent.wmsLotDocV1] (isti payload)
+/// - `rcpt:v1;` → [ProductionQrIntent.logisticsReceiptDocV1] (`logistics_receipts`)
+/// - JSON `type: production_classification_label` → [ProductionQrIntent.printedClassificationLabelV1]
+/// - JSON `type: packing_box_station1` → [ProductionQrIntent.packedStation1BoxV1]
 ///
-/// Plan navigacije (implementacija kasnije):
-/// | Intent | Tipičan izvor | Ciljni ekran / tok |
-/// |--------|----------------|---------------------|
-/// | [ProductionQrIntent.productionOrderReferenceV1] | `po:v1;…` na nalogu / A4 | Detalji PN → evidencija / [ProductionExecutionScreen] |
-/// | [ProductionQrIntent.printedClassificationLabelV1] | JSON etiketa | Prijem sa liste, zaliha po magacinu, prenos (logistika) |
-/// | [ProductionQrIntent.unknown] | nepoznat string | Ručni unos ili poruka |
-///
-/// Buduće (dodati ovdje i u [resolveProductionQrScan]):
-/// - `wmslot:v1;<lotDocId>` → Firestore id dokumenta u `inventory_lots` (WMS sken).
-/// - `lot:v1` → detalj lota, FIFO, prenos između magacina
-/// - `mv:v1` / `rcpt:v1` → potvrda prijema / otpreme
+/// Planirano (nije u resolveru): npr. `ship:v1` (otprema) kad bude definiran.
 ///
 /// Sigurnost: sken sam po sebi ne smije zaobići Firestore pravila; ekrani
 /// i dalje provjeravaju ulogu i `companyId` / `plantKey`.
 enum ProductionQrIntent {
-  /// Referenca na proizvodni nalog (`po:v1;…`).
+  /// Bedž radnika ([tryParseWorkforceEmployeeQr]).
+  workforceEmployeeV1,
+
+  /// Referenca na proizvodni nalog (`po:v1;…` ili `pol:v1;…`).
   productionOrderReferenceV1,
 
   /// Otisnuta etiketa klasifikacije (`type`: production_classification_label).
@@ -33,8 +33,11 @@ enum ProductionQrIntent {
   /// Zatvorena kutija Stanica 1 (`type`: packing_box_station1).
   packedStation1BoxV1,
 
-  /// WMS lot: `wmslot:v1;<inventory_lots doc id>`.
+  /// Inventurni lot u WMS-u: `wmslot:v1;…` ili alias `lot:v1;…` (id dokumenta `inventory_lots`).
   wmsLotDocV1,
+
+  /// Prijem robe (GR): `rcpt:v1;…` — id dokumenta u `logistics_receipts`.
+  logisticsReceiptDocV1,
 
   nepoznat,
 }
@@ -49,15 +52,20 @@ class ProductionQrScanResolution {
     this.labelFields,
     this.packingBoxId,
     this.wmsLotDocId,
+    this.logisticsReceiptDocId,
+    this.workforceEmployee,
   });
 
   final ProductionQrIntent intent;
   final String rawPayload;
 
-  /// Iz `po:v1` (Firestore id dokumenta naloga).
+  /// Kad je [intent] [ProductionQrIntent.workforceEmployeeV1].
+  final ParsedWorkforceEmployeeQr? workforceEmployee;
+
+  /// Iz `po:v1` / `pol:v1` (Firestore id dokumenta naloga).
   final String? productionOrderId;
 
-  /// Iz `po:v1` ili etikete (`pn`).
+  /// Iz `po:v1` / `pol:v1` ili etikete (`pn`).
   final String? productionOrderCode;
 
   /// Kad je [intent] [ProductionQrIntent.printedClassificationLabelV1].
@@ -68,6 +76,9 @@ class ProductionQrScanResolution {
 
   /// Kad je [intent] [ProductionQrIntent.wmsLotDocV1] — `inventory_lots` id.
   final String? wmsLotDocId;
+
+  /// Kad je [intent] [ProductionQrIntent.logisticsReceiptDocV1] — `logistics_receipts` id.
+  final String? logisticsReceiptDocId;
 
   bool get isKnown => intent != ProductionQrIntent.nepoznat;
 }
@@ -82,7 +93,16 @@ ProductionQrScanResolution resolveProductionQrScan(String raw) {
     );
   }
 
-  if (trimmed.startsWith('po:v1;')) {
+  final wf = tryParseWorkforceEmployeeQr(trimmed);
+  if (wf != null) {
+    return ProductionQrScanResolution(
+      intent: ProductionQrIntent.workforceEmployeeV1,
+      rawPayload: trimmed,
+      workforceEmployee: wf,
+    );
+  }
+
+  if (trimmed.startsWith('po:v1;') || trimmed.startsWith('pol:v1;')) {
     return ProductionQrScanResolution(
       intent: ProductionQrIntent.productionOrderReferenceV1,
       rawPayload: trimmed,
@@ -91,8 +111,9 @@ ProductionQrScanResolution resolveProductionQrScan(String raw) {
     );
   }
 
-  if (trimmed.startsWith('wmslot:v1;')) {
-    var rest = trimmed.substring('wmslot:v1;'.length).trim();
+  if (trimmed.startsWith('wmslot:v1;') || trimmed.startsWith('lot:v1;')) {
+    final prefix = trimmed.startsWith('wmslot:v1;') ? 'wmslot:v1;' : 'lot:v1;';
+    var rest = trimmed.substring(prefix.length).trim();
     if (rest.startsWith('docId=')) {
       rest = rest.substring('docId='.length).trim();
     }
@@ -100,6 +121,15 @@ ProductionQrScanResolution resolveProductionQrScan(String raw) {
       intent: ProductionQrIntent.wmsLotDocV1,
       rawPayload: trimmed,
       wmsLotDocId: rest.isEmpty ? null : rest,
+    );
+  }
+
+  if (trimmed.startsWith('rcpt:v1;')) {
+    final rid = tryParseLogisticsReceiptDocIdFromQr(trimmed);
+    return ProductionQrScanResolution(
+      intent: ProductionQrIntent.logisticsReceiptDocV1,
+      rawPayload: trimmed,
+      logisticsReceiptDocId: rid,
     );
   }
 

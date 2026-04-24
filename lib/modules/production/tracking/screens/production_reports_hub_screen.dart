@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/branding/operonix_ai_branding.dart';
 import '../../../../core/saas/production_module_keys.dart';
 import '../../../quality/screens/capa_tracking_screen.dart';
@@ -7,6 +8,7 @@ import '../../../quality/screens/execute_inspection_screen.dart';
 import '../../../quality/screens/ncr_list_screen.dart';
 import '../../../quality/screens/quality_dashboard_screen.dart';
 import '../../ai_analysis/screens/ai_analysis_screen.dart';
+import '../../analytics/screens/operonix_analytics_dashboard_screen.dart';
 import '../../reports/screens/production_ai_report_screen.dart';
 import 'production_operator_tracking_day_report_screen.dart';
 
@@ -58,6 +60,28 @@ class ProductionReportsHubScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
+          if (ProductionAccessHelper.canView(
+                role: (companyData['role'] ?? '').toString(),
+                card: ProductionDashboardCard.operonixAnalytics,
+              )) ...[
+            _SectionHeader(theme, 'Operonix Analytics'),
+            _ReportTile(
+              icon: Icons.analytics_outlined,
+              title: 'Operonix Analytics Dashboard',
+              subtitle:
+                  'Centralni KPI (OEE/OOE/TEEP), Pareto zastoja, trend, smjene, automatski OperonixAI sažetak.',
+              onTap: () {
+                Navigator.push<void>(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        OperonixAnalyticsDashboardScreen(companyData: companyData),
+                  ),
+                );
+              },
+            ),
+            const Divider(height: 24),
+          ],
           if (ProductionModuleKeys.hasAnyProductionAiHubAccess(companyData) &&
               ((ProductionModuleKeys.hasAiProductionMarkdownReportModule(
                         companyData,

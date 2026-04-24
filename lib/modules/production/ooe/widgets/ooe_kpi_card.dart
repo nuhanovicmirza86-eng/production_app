@@ -36,7 +36,7 @@ class OoeKpiCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (titleTrailing != null) titleTrailing!,
+                ?titleTrailing,
               ],
             ),
             const SizedBox(height: 8),

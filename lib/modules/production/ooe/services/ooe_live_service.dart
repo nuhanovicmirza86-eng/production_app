@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../products/services/product_service.dart';
@@ -11,15 +14,12 @@ import 'machine_state_service.dart';
 import 'production_count_service.dart';
 import 'shift_context_service.dart';
 import 'shift_context_window.dart';
-/// Čitanje / osvježavanje `ooe_live_status` po mašini.
-class OoeLiveService {
-  final FirebaseFirestore _firestore;
-  final OoeLossReasonService _reasons;
-  final MachineStateService _machineStates;
-  final ProductionCountService _counts;
-  final ProductService _products;
-  final ShiftContextService _shiftContexts;
 
+/// Čitanje / osvježavanje `ooe_live_status` po mašini.
+///
+/// **Čitanje** s klijenta ide Callable-om (`listOoeLiveForPlant` / `getOoeLiveForMachine`):
+/// Firestore rules za ovu kolekciju ne dozvoljavaju list/get — upisi ostaju kroz Firestore.
+class OoeLiveService {
   OoeLiveService({
     FirebaseFirestore? firestore,
     OoeLossReasonService? reasons,
@@ -27,17 +27,133 @@ class OoeLiveService {
     ProductionCountService? counts,
     ProductService? products,
     ShiftContextService? shiftContexts,
+    FirebaseFunctions? functions,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _reasons = reasons ?? OoeLossReasonService(),
        _machineStates = machineStates ?? MachineStateService(),
        _counts = counts ?? ProductionCountService(),
        _products = products ?? ProductService(),
-       _shiftContexts = shiftContexts ?? ShiftContextService();
+       _shiftContexts = shiftContexts ?? ShiftContextService(),
+       _fn = functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
+
+  final FirebaseFirestore _firestore;
+  final OoeLossReasonService _reasons;
+  final MachineStateService _machineStates;
+  final ProductionCountService _counts;
+  final ProductService _products;
+  final ShiftContextService _shiftContexts;
+  final FirebaseFunctions _fn;
+
+  static const _poll = Duration(seconds: 2);
 
   CollectionReference<Map<String, dynamic>> get _col =>
       _firestore.collection('ooe_live_status');
 
   String _s(dynamic v) => (v ?? '').toString().trim();
+
+  Future<List<OoeLiveStatus>> _listViaCallable({
+    required String companyId,
+    required String plantKey,
+  }) async {
+    final callable = _fn.httpsCallable('listOoeLiveForPlant');
+    final raw = await callable.call<Map<String, dynamic>>({
+      'companyId': companyId,
+      'plantKey': plantKey,
+    });
+    final data = raw.data;
+    if (data['success'] != true) {
+      throw StateError('listOoeLiveForPlant nije uspio.');
+    }
+    final items = data['items'];
+    if (items is! List) {
+      return const <OoeLiveStatus>[];
+    }
+    final out = <OoeLiveStatus>[];
+    for (final e in items) {
+      if (e is! Map) continue;
+      final id = (e['id'] ?? '').toString();
+      final m = e['data'];
+      if (m is! Map) continue;
+      out.add(
+        OoeLiveStatus.fromMap(
+          id,
+          Map<String, dynamic>.from(m),
+        ),
+      );
+    }
+    out.sort((a, b) => a.machineId.compareTo(b.machineId));
+    return out;
+  }
+
+  Future<OoeLiveStatus?> _getOneViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String machineId,
+  }) async {
+    final callable = _fn.httpsCallable('getOoeLiveForMachine');
+    final raw = await callable.call<Map<String, dynamic>>({
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'machineId': machineId,
+    });
+    final data = raw.data;
+    if (data['success'] != true) {
+      throw StateError('getOoeLiveForMachine nije uspio.');
+    }
+    final item = data['item'];
+    if (item == null) {
+      return null;
+    }
+    if (item is! Map) {
+      return null;
+    }
+    final id = (item['id'] ?? '').toString();
+    final m = item['data'];
+    if (m is! Map) {
+      return null;
+    }
+    return OoeLiveStatus.fromMap(id, Map<String, dynamic>.from(m));
+  }
+
+  /// Periodično osvježavanje (Callable umjesto Firestore stream).
+  Stream<T> _pollStream<T>(Future<T> Function() fetch) {
+    var active = true;
+    late final StreamController<T> controller;
+    void start() {
+      Future<void> loop() async {
+        while (active) {
+          try {
+            final v = await fetch();
+            if (!active) {
+              return;
+            }
+            if (!controller.isClosed) {
+              controller.add(v);
+            }
+          } catch (e, st) {
+            if (active && !controller.isClosed) {
+              controller.addError(e, st);
+            }
+            return;
+          }
+          if (!active) {
+            return;
+          }
+          await Future<void>.delayed(_poll);
+        }
+      }
+
+      unawaited(loop());
+    }
+
+    controller = StreamController<T>(
+      onListen: start,
+      onCancel: () {
+        active = false;
+      },
+    );
+    return controller.stream;
+  }
 
   /// Jedan dokument [ooe_live_status] za mašinu (isti KPI kao na dashboardu).
   Stream<OoeLiveStatus?> watchLiveStatusForMachine({
@@ -51,34 +167,24 @@ class OoeLiveService {
     if (cid.isEmpty || pk.isEmpty || mid.isEmpty) {
       return Stream<OoeLiveStatus?>.value(null);
     }
-    final docId = OoePathIds.liveStatusDocId(
-      companyId: cid,
-      plantKey: pk,
-      machineId: mid,
+    return _pollStream<OoeLiveStatus?>(
+      () => _getOneViaCallable(companyId: cid, plantKey: pk, machineId: mid),
     );
-    return _col.doc(docId).snapshots().map((snap) {
-      if (!snap.exists) return null;
-      final data = snap.data();
-      if (data == null) return null;
-      return OoeLiveStatus.fromMap(mid, data);
-    });
   }
 
-  /// Svi live zapisi za pogon (MVP: jedan stream za dashboard).
+  /// Svi live zapisi za pogon (Callable + poll, umjesto Firestore [snapshots]).
   Stream<List<OoeLiveStatus>> watchLiveForPlant({
     required String companyId,
     required String plantKey,
   }) {
-    return _col
-        .where('companyId', isEqualTo: _s(companyId))
-        .where('plantKey', isEqualTo: _s(plantKey))
-        .snapshots()
-        .map((s) {
-          final list = s.docs
-              .map((d) => OoeLiveStatus.fromMap(d.id, d.data()))
-              .toList();
-          return list..sort((a, b) => a.machineId.compareTo(b.machineId));
-        });
+    final cid = _s(companyId);
+    final pk = _s(plantKey);
+    if (cid.isEmpty || pk.isEmpty) {
+      return Stream<List<OoeLiveStatus>>.value(const <OoeLiveStatus>[]);
+    }
+    return _pollStream<List<OoeLiveStatus>>(
+      () => _listViaCallable(companyId: cid, plantKey: pk),
+    );
   }
 
   /// Osvježi KPI za mašinu: događaji u **prozoru trenutne smjene** ([ShiftContextWindowHelper],

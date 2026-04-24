@@ -102,7 +102,8 @@ class _OoeAlertRulesScreenState extends State<OoeAlertRulesScreen> {
                 return ListView.separated(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
                   itemCount: list.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 6),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 6),
                   itemBuilder: (context, i) {
                     final r = list[i];
                     return Card(
@@ -258,7 +259,7 @@ class _RuleEditorState extends State<_RuleEditor> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _mid.isEmpty || !machines.any((m) => m.id == _mid)
+                initialValue: _mid.isEmpty || !machines.any((m) => m.id == _mid)
                     ? (machines.isEmpty ? null : machines.first.id)
                     : _mid,
                 items: machines
@@ -279,7 +280,7 @@ class _RuleEditorState extends State<_RuleEditor> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _type,
+                initialValue: _type,
                 items: const [
                   DropdownMenuItem(
                     value: OoeAlertRule.typeOoeBelow,

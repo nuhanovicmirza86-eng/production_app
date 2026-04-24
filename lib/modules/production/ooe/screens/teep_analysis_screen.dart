@@ -217,7 +217,7 @@ class _TeepAnalysisScreenState extends State<TeepAnalysisScreen> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: _scopeType,
+                    initialValue: _scopeType,
                     decoration: const InputDecoration(
                       labelText: 'Opseg',
                       border: OutlineInputBorder(),

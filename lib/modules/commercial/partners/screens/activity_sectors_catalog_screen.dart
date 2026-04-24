@@ -38,9 +38,7 @@ class _ActivitySectorsCatalogScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Šifarnik djelatnosti'),
-      ),
+      appBar: AppBar(title: const Text('Šifarnik djelatnosti')),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -52,8 +50,6 @@ class _ActivitySectorsCatalogScreenState
                 labelText: 'Pretraga',
                 hintText: 'Naziv ili kod (npr. nace_c25)',
                 prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-                isDense: true,
               ),
               onChanged: (_) => setState(() {}),
             ),

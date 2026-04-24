@@ -39,7 +39,7 @@ class OoeShiftSummaryCallableService {
       'shiftDate': shiftDate,
       'windowStart': windowStart.toUtc().toIso8601String(),
       'windowEnd': windowEnd.toUtc().toIso8601String(),
-      if (operatingTimeSeconds != null) 'operatingTimeSeconds': operatingTimeSeconds,
+      'operatingTimeSeconds': ?operatingTimeSeconds,
       if (productId != null && productId.trim().isNotEmpty)
         'productId': productId.trim(),
       if (orderId != null && orderId.trim().isNotEmpty) 'orderId': orderId.trim(),

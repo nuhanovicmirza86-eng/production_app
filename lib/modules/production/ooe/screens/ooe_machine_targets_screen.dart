@@ -49,14 +49,10 @@ class _OoeMachineTargetsScreenState extends State<OoeMachineTargetsScreen> {
       plantKey: _plantKey,
       limit: 128,
     );
-    final o = <String, double?>{};
-    for (final m in assets.machines) {
-      o[m.id] = await _svc.getTargetOoe(
-        companyId: _companyId,
-        plantKey: _plantKey,
-        machineId: m.id,
-      );
-    }
+    final o = await _svc.loadTargetOoeByMachineForPlant(
+      companyId: _companyId,
+      plantKey: _plantKey,
+    );
     return _TargetPageData(assets: assets, ooeTargetById: o);
   }
 
@@ -176,7 +172,6 @@ class _OoeMachineTargetsScreenState extends State<OoeMachineTargetsScreen> {
                                         ],
                                         decoration: const InputDecoration(
                                           labelText: 'Cilj %',
-                                          isDense: true,
                                         ),
                                       ),
                                     ),

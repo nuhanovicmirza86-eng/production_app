@@ -8,6 +8,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/access/production_access_helper.dart';
+import '../../../workforce/employee_profiles/workforce_employee_qr_navigation.dart';
 import '../../../../core/theme/operonix_production_brand.dart';
 import '../../../../core/ui/station_input.dart';
 import '../../production_orders/models/production_order_model.dart';
@@ -188,9 +189,11 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
     if (route != null && !route.isCurrent) return false;
     if (event.logicalKey != LogicalKeyboardKey.keyP) return false;
     final pressed = HardwareKeyboard.instance.logicalKeysPressed;
-    final alt = pressed.contains(LogicalKeyboardKey.altLeft) ||
+    final alt =
+        pressed.contains(LogicalKeyboardKey.altLeft) ||
         pressed.contains(LogicalKeyboardKey.altRight);
-    final shift = pressed.contains(LogicalKeyboardKey.shiftLeft) ||
+    final shift =
+        pressed.contains(LogicalKeyboardKey.shiftLeft) ||
         pressed.contains(LogicalKeyboardKey.shiftRight);
     if (!alt || !shift) return false;
     _focusQtyTilesFromShortcut();
@@ -230,10 +233,12 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
     if (oldWidget.phase != widget.phase) {
       unawaited(_loadColumnVisibility());
     }
-    final oldSb =
-        (oldWidget.companyData['stationBoundPlantKey'] ?? '').toString().trim();
-    final newSb =
-        (widget.companyData['stationBoundPlantKey'] ?? '').toString().trim();
+    final oldSb = (oldWidget.companyData['stationBoundPlantKey'] ?? '')
+        .toString()
+        .trim();
+    final newSb = (widget.companyData['stationBoundPlantKey'] ?? '')
+        .toString()
+        .trim();
     if (oldSb != newSb) {
       unawaited(_loadPlants());
     }
@@ -310,7 +315,8 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
 
   String get _stationLabelLayoutKey {
     final raw =
-        (widget.companyData['stationLabelLayout'] ?? kStationLabelLayoutStandard)
+        (widget.companyData['stationLabelLayout'] ??
+                kStationLabelLayoutStandard)
             .toString()
             .trim();
     return kStationLabelLayoutKeys.contains(raw)
@@ -386,8 +392,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
         _plantsLoading = false;
         _plantKeys = [];
         _plantLabelByKey = {};
-        _selectedStationPlantKey =
-            _sessionPlantKey.isNotEmpty ? _sessionPlantKey : null;
+        _selectedStationPlantKey = _sessionPlantKey.isNotEmpty
+            ? _sessionPlantKey
+            : null;
       });
       _setDefaultStatusLine();
       return;
@@ -450,10 +457,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
         final ao = (a.data()['order'] as num?)?.toInt() ?? 0;
         final bo = (b.data()['order'] as num?)?.toInt() ?? 0;
         if (ao != bo) return ao.compareTo(bo);
-        return _plantLabelFromDoc(
-          a.data(),
-          a.id,
-        ).toLowerCase().compareTo(_plantLabelFromDoc(b.data(), b.id).toLowerCase());
+        return _plantLabelFromDoc(a.data(), a.id).toLowerCase().compareTo(
+          _plantLabelFromDoc(b.data(), b.id).toLowerCase(),
+        );
       });
       final keys = <String>[];
       final labels = <String, String>{};
@@ -503,8 +509,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
         _plantsLoading = false;
         _plantKeys = [];
         _plantLabelByKey = {};
-        _selectedStationPlantKey =
-            _sessionPlantKey.isNotEmpty ? _sessionPlantKey : null;
+        _selectedStationPlantKey = _sessionPlantKey.isNotEmpty
+            ? _sessionPlantKey
+            : null;
       });
       _setDefaultStatusLine();
     }
@@ -574,9 +581,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
     }
     await _refreshOfflineCount();
     if (!silent && mounted && ok > 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Poslano iz reda čekanja: $ok.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Poslano iz reda čekanja: $ok.')));
     }
     if (mounted) _setDefaultStatusLine();
   }
@@ -643,10 +650,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
   /// Klasifikacija u JSON etiketi (usklađeno s BOM katalogom).
   String _classificationForLabels() {
     if (_stationBoundPlantKey.isNotEmpty) {
-      final sc =
-          (widget.companyData['stationTrackingClassification'] ?? '')
-              .toString()
-              .trim();
+      final sc = (widget.companyData['stationTrackingClassification'] ?? '')
+          .toString()
+          .trim();
       if (sc.isNotEmpty) return sc.toUpperCase();
     }
     switch (widget.phase) {
@@ -786,8 +792,7 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
     final rawPn = _pnCtrl.text.trim();
     final pn = rawPn.isEmpty ? null : rawPn;
     final linked = _linkedProductId?.trim();
-    final productId =
-        (linked != null && linked.isNotEmpty) ? linked : null;
+    final productId = (linked != null && linked.isNotEmpty) ? linked : null;
 
     await Navigator.push<void>(
       context,
@@ -825,7 +830,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
     final productId = await _resolveProductIdForLabelPrint();
     if (productId != null && productId.isNotEmpty) {
       try {
-        final custom = await ProductTrackingLabelService.loadForPrint(productId);
+        final custom = await ProductTrackingLabelService.loadForPrint(
+          productId,
+        );
         if (custom != null) {
           final ct = custom.contentType.toLowerCase();
           final asPdf = ct.contains('pdf') || _bytesLookLikePdf(custom.bytes);
@@ -844,9 +851,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
         }
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Prilagođena etiketa: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Prilagođena etiketa: $e')));
         return;
       }
     }
@@ -1528,6 +1535,15 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
     }
 
     switch (resolution.intent) {
+      case ProductionQrIntent.workforceEmployeeV1:
+        if (!mounted) return;
+        await openWorkforceEmployeeFromBadgeQr(
+          context: context,
+          companyData: widget.companyData,
+          rawPayload: resolution.rawPayload,
+        );
+        break;
+
       case ProductionQrIntent.printedClassificationLabelV1:
         final m = resolution.labelFields;
         if (m == null) break;
@@ -1588,7 +1604,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Ovaj QR nalog nije valjan. Pokušaj s etiketom komada.'),
+              content: Text(
+                'Ovaj QR nalog nije valjan. Pokušaj s etiketom komada.',
+              ),
             ),
           );
           return;
@@ -1612,6 +1630,15 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
             content: Text(
               'Ovo je WMS etiketa lota. Koristi modul WMS — centralni magacin (putaway / otprem).',
             ),
+          ),
+        );
+        break;
+
+      case ProductionQrIntent.logisticsReceiptDocV1:
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Koristi skener u logističkom hubu za prijem.'),
           ),
         );
         break;
@@ -1787,9 +1814,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
     }
     if (_quickEntryMode && _batchCtrl.text.trim().isEmpty) {
       setState(() => _statusLine = 'Upiši šaržu ili palicu.');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Upiši šaržu ili palicu.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Upiši šaržu ili palicu.')));
       return;
     }
     if (_goodQty + scrapSum <= 0) {
@@ -1822,8 +1849,8 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
         'lineOrBatchRef': _batchCtrl.text.trim().isEmpty
             ? null
             : _batchCtrl.text.trim(),
-        'releaseToolOrRodRef': _isPrepPhase &&
-                _releaseToolOrRodCtrl.text.trim().isNotEmpty
+        'releaseToolOrRodRef':
+            _isPrepPhase && _releaseToolOrRodCtrl.text.trim().isNotEmpty
             ? _releaseToolOrRodCtrl.text.trim()
             : null,
         'customerName': _customerCtrl.text.trim().isEmpty
@@ -1855,8 +1882,8 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
         lineOrBatchRef: _batchCtrl.text.trim().isEmpty
             ? null
             : _batchCtrl.text.trim(),
-        releaseToolOrRodRef: _isPrepPhase &&
-                _releaseToolOrRodCtrl.text.trim().isNotEmpty
+        releaseToolOrRodRef:
+            _isPrepPhase && _releaseToolOrRodCtrl.text.trim().isNotEmpty
             ? _releaseToolOrRodCtrl.text.trim()
             : null,
         customerName: _customerCtrl.text.trim().isEmpty
@@ -1986,7 +2013,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
         }
       } else {
         setState(() => _statusLine = 'Greška pri spremanju.');
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -2002,7 +2031,6 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
       ),
     );
     return InputDecoration(
-      isDense: true,
       filled: true,
       fillColor: cs.surface,
       border: soft,
@@ -2013,7 +2041,7 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
           width: 1.5,
         ),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
     );
   }
 
@@ -2049,10 +2077,7 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
     final scrapSum = _scrapSum();
     switch (k) {
       case OperatorTrackingColumnKeys.rowIndex:
-        return Text(
-          '—',
-          style: cellStyle.copyWith(color: cs.onSurfaceVariant),
-        );
+        return Text('—', style: cellStyle.copyWith(color: cs.onSurfaceVariant));
       case OperatorTrackingColumnKeys.prepDateTime:
         return Text(
           'nakon spremanja',
@@ -2246,9 +2271,7 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
         );
       case OperatorTrackingColumnKeys.releaseToolOrRodRef:
         return oneLine(
-          (e.releaseToolOrRodRef ?? '').isEmpty
-              ? '—'
-              : e.releaseToolOrRodRef!,
+          (e.releaseToolOrRodRef ?? '').isEmpty ? '—' : e.releaseToolOrRodRef!,
           maxLines: 2,
         );
       case OperatorTrackingColumnKeys.itemCode:
@@ -2290,9 +2313,7 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
         );
       case OperatorTrackingColumnKeys.rawWorkOperator:
         return oneLine(
-          (e.rawWorkOperatorName ?? '').isEmpty
-              ? '—'
-              : e.rawWorkOperatorName!,
+          (e.rawWorkOperatorName ?? '').isEmpty ? '—' : e.rawWorkOperatorName!,
           maxLines: 2,
         );
       case OperatorTrackingColumnKeys.preparedBy:
@@ -2319,8 +2340,7 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
     }
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final own = uid.isNotEmpty && uid == e.createdByUid;
-    final inBox =
-        e.packedBoxId != null && e.packedBoxId!.trim().isNotEmpty;
+    final inBox = e.packedBoxId != null && e.packedBoxId!.trim().isNotEmpty;
     if (!own) {
       return const SizedBox.shrink();
     }
@@ -2483,7 +2503,6 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
               child: DropdownButtonFormField<String>(
                 key: ValueKey<String>(_unit),
                 initialValue: _unit,
-                isDense: true,
                 decoration: _prepMjDropdownDecoration(context),
                 items: const [
                   DropdownMenuItem(value: 'kom', child: Text('kom')),
@@ -2843,7 +2862,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                         onSelected: (v) {
                           if (!v) return;
                           setState(() => _accentIndex = i);
-                          unawaited(PreparationStationUiPrefs.saveAccentIndex(i));
+                          unawaited(
+                            PreparationStationUiPrefs.saveAccentIndex(i),
+                          );
                         },
                       ),
                   ],
@@ -2881,8 +2902,6 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                       isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Pogon (obavezno za ovu stanicu)',
-                        border: OutlineInputBorder(),
-                        isDense: true,
                       ),
                       items: [
                         for (final pk in _plantKeys)
@@ -2957,9 +2976,7 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                         Expanded(
                           child: Text(
                             _statusLine.isEmpty
-                                ? (_plantsLoading
-                                      ? 'Učitavanje…'
-                                      : 'Spremno.')
+                                ? (_plantsLoading ? 'Učitavanje…' : 'Spremno.')
                                 : _statusLine,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w500,
@@ -3007,335 +3024,386 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                     ),
                   )
                 : StreamBuilder<List<ProductionOperatorTrackingEntry>>(
-              stream: _service.watchDayPhase(
-                companyId: _companyId,
-                plantKey: _plantKeyEffective,
-                phase: widget.phase,
-                workDate: workKey,
-              ),
-              builder: (context, snap) {
-                if (!snap.hasData && !snap.hasError) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: CircularProgressIndicator(),
+                    stream: _service.watchDayPhase(
+                      companyId: _companyId,
+                      plantKey: _plantKeyEffective,
+                      phase: widget.phase,
+                      workDate: workKey,
                     ),
-                  );
-                }
-                final rows = snap.hasData
-                    ? snap.data!
-                    : const <ProductionOperatorTrackingEntry>[];
+                    builder: (context, snap) {
+                      if (!snap.hasData && !snap.hasError) {
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24),
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                      }
+                      final rows = snap.hasData
+                          ? snap.data!
+                          : const <ProductionOperatorTrackingEntry>[];
 
-                return ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    SegmentedButton<bool>(
-                      segments: const [
-                        ButtonSegment<bool>(
-                          value: true,
-                          label: Text('Brzi unos'),
-                          icon: Icon(Icons.bolt_outlined),
-                        ),
-                        ButtonSegment<bool>(
-                          value: false,
-                          label: Text('Ručni unos'),
-                          icon: Icon(Icons.edit_note_outlined),
-                        ),
-                      ],
-                      selected: {_quickEntryMode},
-                      onSelectionChanged: (Set<bool> s) {
-                        final v = s.first;
-                        setState(() => _quickEntryMode = v);
-                        unawaited(PreparationStationUiPrefs.saveQuickMode(v));
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    if (snap.hasError)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Text(
-                          'Podaci se ne mogu učitati. Pokušaj ponovo.',
-                          style: TextStyle(color: theme.colorScheme.error),
-                        ),
-                      ),
-                    if (_quickEntryMode) ...[
-                      ScrollIntoViewOnFocus(
-                        focusNode: _wedgeFocus,
-                        child: TextField(
-                          controller: _wedgeCtrl,
-                          focusNode: _wedgeFocus,
-                          decoration: const InputDecoration(
-                            labelText: 'Vanjski QR skener',
-                            hintText: 'Fokus ovdje, zatim skeniraj',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                          onSubmitted: (s) =>
-                              unawaited(_onScannerWedgeSubmitted(s)),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
+                      return ListView(
+                        padding: const EdgeInsets.all(16),
                         children: [
-                          Expanded(
-                            child: FilledButton.icon(
-                              onPressed: _saving ? null : _scanRawPieceLabelQr,
-                              icon: const Icon(Icons.qr_code_scanner_outlined),
-                              label: const Text('Skeniraj QR'),
-                            ),
-                          ),
-                          if (_isPrepPhase) ...[
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: FilledButton.tonalIcon(
-                                onPressed: _saving ? null : _openStation1CloseBox,
-                                icon: const Icon(Icons.inventory_2_outlined),
-                                label: const Text('Zatvori kutiju'),
+                          SegmentedButton<bool>(
+                            segments: const [
+                              ButtonSegment<bool>(
+                                value: true,
+                                label: Text('Brzi unos'),
+                                icon: Icon(Icons.bolt_outlined),
                               ),
-                            ),
-                          ] else if (_stationLabelPrintingEnabled) ...[
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: FilledButton.tonalIcon(
-                                onPressed: _saving ? null : _printDraftLabel,
-                                icon: const Icon(Icons.label_outline),
-                                label: const Text('Ispiši etiketu'),
+                              ButtonSegment<bool>(
+                                value: false,
+                                label: Text('Ručni unos'),
+                                icon: Icon(Icons.edit_note_outlined),
                               ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Text(
-                            'Trenutni unos',
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
+                            ],
+                            selected: {_quickEntryMode},
+                            onSelectionChanged: (Set<bool> s) {
+                              final v = s.first;
+                              setState(() => _quickEntryMode = v);
+                              unawaited(
+                                PreparationStationUiPrefs.saveQuickMode(v),
+                              );
+                            },
                           ),
-                          const Spacer(),
-                          TextButton.icon(
-                            onPressed: _openTableColumnVisibility,
-                            icon: const Icon(Icons.view_column_outlined, size: 18),
-                            label: const Text('Kolone'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      _buildPreparationTrackingTable(
-                        context,
-                        rows,
-                        showDraftRow: true,
-                        showSavedRows: false,
-                        includeCatalogStrip: false,
-                        includeMjBar: true,
-                      ),
-                      const SizedBox(height: 8),
-                      ExpansionTile(
-                        initiallyExpanded: false,
-                        title: Text('Današnji unosi (${rows.length})'),
-                        children: [
-                          if (rows.isEmpty)
+                          const SizedBox(height: 16),
+                          if (snap.hasError)
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                              padding: const EdgeInsets.only(bottom: 12),
                               child: Text(
-                                _emptyDayHint(),
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
+                                'Podaci se ne mogu učitati. Pokušaj ponovo.',
+                                style: TextStyle(
+                                  color: theme.colorScheme.error,
                                 ),
                               ),
-                            )
-                          else
+                            ),
+                          if (_quickEntryMode) ...[
+                            ScrollIntoViewOnFocus(
+                              focusNode: _wedgeFocus,
+                              child: TextField(
+                                controller: _wedgeCtrl,
+                                focusNode: _wedgeFocus,
+                                decoration: const InputDecoration(
+                                  labelText: 'Vanjski QR skener',
+                                  hintText: 'Fokus ovdje, zatim skeniraj',
+                                ),
+                                onSubmitted: (s) =>
+                                    unawaited(_onScannerWedgeSubmitted(s)),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: FilledButton.icon(
+                                    onPressed: _saving
+                                        ? null
+                                        : _scanRawPieceLabelQr,
+                                    icon: const Icon(
+                                      Icons.qr_code_scanner_outlined,
+                                    ),
+                                    label: const Text('Skeniraj QR'),
+                                  ),
+                                ),
+                                if (_isPrepPhase) ...[
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: FilledButton.tonalIcon(
+                                      onPressed: _saving
+                                          ? null
+                                          : _openStation1CloseBox,
+                                      icon: const Icon(
+                                        Icons.inventory_2_outlined,
+                                      ),
+                                      label: const Text('Zatvori kutiju'),
+                                    ),
+                                  ),
+                                ] else if (_stationLabelPrintingEnabled) ...[
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: FilledButton.tonalIcon(
+                                      onPressed: _saving
+                                          ? null
+                                          : _printDraftLabel,
+                                      icon: const Icon(Icons.label_outline),
+                                      label: const Text('Ispiši etiketu'),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Text(
+                                  'Trenutni unos',
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const Spacer(),
+                                TextButton.icon(
+                                  onPressed: _openTableColumnVisibility,
+                                  icon: const Icon(
+                                    Icons.view_column_outlined,
+                                    size: 18,
+                                  ),
+                                  label: const Text('Kolone'),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
                             _buildPreparationTrackingTable(
                               context,
                               rows,
-                              showDraftRow: false,
-                              showSavedRows: true,
+                              showDraftRow: true,
+                              showSavedRows: false,
                               includeCatalogStrip: false,
-                              includeMjBar: false,
+                              includeMjBar: true,
                             ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      FilledButton.icon(
-                        onPressed: _saving ? null : () => _submit(scrapDefs),
-                        icon: _saving
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.save_outlined),
-                        label: Text(_saving ? 'Spremanje…' : 'Potvrdi unos'),
-                      ),
-                    ] else ...[
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Količine',
-                              style: theme.textTheme.titleMedium,
+                            const SizedBox(height: 8),
+                            ExpansionTile(
+                              initiallyExpanded: false,
+                              title: Text('Današnji unosi (${rows.length})'),
+                              children: [
+                                if (rows.isEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      0,
+                                      16,
+                                      12,
+                                    ),
+                                    child: Text(
+                                      _emptyDayHint(),
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: theme
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                    ),
+                                  )
+                                else
+                                  _buildPreparationTrackingTable(
+                                    context,
+                                    rows,
+                                    showDraftRow: false,
+                                    showSavedRows: true,
+                                    includeCatalogStrip: false,
+                                    includeMjBar: false,
+                                  ),
+                              ],
                             ),
-                          ),
-                          IconButton(
-                            tooltip: 'Šifrarnik i pločice',
-                            icon: const Icon(Icons.info_outline, size: 22),
-                            onPressed: _showCatalogHelpDialog,
-                          ),
-                          PopupMenuButton<String>(
-                            tooltip: 'Još opcija',
-                            itemBuilder: (ctx) => [
-                              PopupMenuItem(
-                                value: 'fill',
-                                enabled: !_saving,
-                                child: const Text('Popuni naziv iz šifrarnika'),
+                            const SizedBox(height: 16),
+                            FilledButton.icon(
+                              onPressed: _saving
+                                  ? null
+                                  : () => _submit(scrapDefs),
+                              icon: _saving
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.save_outlined),
+                              label: Text(
+                                _saving ? 'Spremanje…' : 'Potvrdi unos',
                               ),
-                              if (_canEditCompanyDefectNames()) ...[
-                                const PopupMenuItem(
-                                  value: 'defect',
-                                  child: Text('Nazivi tipova škarta'),
+                            ),
+                          ] else ...[
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Količine',
+                                    style: theme.textTheme.titleMedium,
+                                  ),
                                 ),
-                                const PopupMenuItem(
-                                  value: 'labels',
-                                  child: Text('Nazivi kolona u praćenju'),
+                                IconButton(
+                                  tooltip: 'Šifrarnik i pločice',
+                                  icon: const Icon(
+                                    Icons.info_outline,
+                                    size: 22,
+                                  ),
+                                  onPressed: _showCatalogHelpDialog,
+                                ),
+                                PopupMenuButton<String>(
+                                  tooltip: 'Još opcija',
+                                  itemBuilder: (ctx) => [
+                                    PopupMenuItem(
+                                      value: 'fill',
+                                      enabled: !_saving,
+                                      child: const Text(
+                                        'Popuni naziv iz šifrarnika',
+                                      ),
+                                    ),
+                                    if (_canEditCompanyDefectNames()) ...[
+                                      const PopupMenuItem(
+                                        value: 'defect',
+                                        child: Text('Nazivi tipova škarta'),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'labels',
+                                        child: Text('Nazivi kolona u praćenju'),
+                                      ),
+                                    ],
+                                  ],
+                                  onSelected: (v) {
+                                    switch (v) {
+                                      case 'fill':
+                                        unawaited(_fillFromCatalog());
+                                      case 'defect':
+                                        unawaited(_openDefectLabelsEditor());
+                                      case 'labels':
+                                        unawaited(_openColumnLabelsEditor());
+                                    }
+                                  },
                                 ),
                               ],
-                            ],
-                            onSelected: (v) {
-                              switch (v) {
-                                case 'fill':
-                                  unawaited(_fillFromCatalog());
-                                case 'defect':
-                                  unawaited(_openDefectLabelsEditor());
-                                case 'labels':
-                                  unawaited(_openColumnLabelsEditor());
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _qtyTiles(context, scrapDefs),
-                      const SizedBox(height: 20),
-                      Text(
-                        'Unos u tablicu',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: FilledButton.icon(
-                              onPressed: _saving ? null : _scanRawPieceLabelQr,
-                              icon: const Icon(Icons.qr_code_scanner_outlined),
-                              label: const Text('Skeniraj QR'),
                             ),
-                          ),
-                          if (_isPrepPhase) ...[
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: FilledButton.tonalIcon(
-                                onPressed: _saving ? null : _openStation1CloseBox,
-                                icon: const Icon(Icons.inventory_2_outlined),
-                                label: const Text('Zatvori kutiju'),
+                            const SizedBox(height: 12),
+                            _qtyTiles(context, scrapDefs),
+                            const SizedBox(height: 20),
+                            Text(
+                              'Unos u tablicu',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ] else if (_stationLabelPrintingEnabled) ...[
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: FilledButton.tonalIcon(
-                                onPressed: _saving ? null : _printDraftLabel,
-                                icon: const Icon(Icons.label_outline),
-                                label: const Text('Ispiši etiketu'),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: FilledButton.icon(
+                                    onPressed: _saving
+                                        ? null
+                                        : _scanRawPieceLabelQr,
+                                    icon: const Icon(
+                                      Icons.qr_code_scanner_outlined,
+                                    ),
+                                    label: const Text('Skeniraj QR'),
+                                  ),
+                                ),
+                                if (_isPrepPhase) ...[
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: FilledButton.tonalIcon(
+                                      onPressed: _saving
+                                          ? null
+                                          : _openStation1CloseBox,
+                                      icon: const Icon(
+                                        Icons.inventory_2_outlined,
+                                      ),
+                                      label: const Text('Zatvori kutiju'),
+                                    ),
+                                  ),
+                                ] else if (_stationLabelPrintingEnabled) ...[
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: FilledButton.tonalIcon(
+                                      onPressed: _saving
+                                          ? null
+                                          : _printDraftLabel,
+                                      icon: const Icon(Icons.label_outline),
+                                      label: const Text('Ispiši etiketu'),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            ScrollIntoViewOnFocus(
+                              focusNode: _wedgeFocus,
+                              child: TextField(
+                                controller: _wedgeCtrl,
+                                focusNode: _wedgeFocus,
+                                decoration: const InputDecoration(
+                                  labelText: 'Vanjski QR skener',
+                                  hintText: 'Fokus ovdje, zatim skeniraj',
+                                ),
+                                onSubmitted: (s) =>
+                                    unawaited(_onScannerWedgeSubmitted(s)),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Radni dan: $workKey',
+                                    style: theme.textTheme.labelLarge?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                                TextButton.icon(
+                                  onPressed: _openTableColumnVisibility,
+                                  icon: const Icon(
+                                    Icons.view_column_outlined,
+                                    size: 18,
+                                  ),
+                                  label: const Text('Kolone'),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            _buildPreparationTrackingTable(
+                              context,
+                              rows,
+                              showDraftRow: true,
+                              showSavedRows: true,
+                              includeCatalogStrip: true,
+                              includeMjBar: true,
+                            ),
+                            if (snap.hasData && rows.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  _emptyDayHint(),
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            const SizedBox(height: 16),
+                            FilledButton.icon(
+                              onPressed: _saving
+                                  ? null
+                                  : () => _submit(scrapDefs),
+                              icon: _saving
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.save_outlined),
+                              label: Text(
+                                _saving ? 'Spremanje…' : 'Potvrdi unos',
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            StationTextField(
+                              controller: _notesCtrl,
+                              focusNode: _notesFocus,
+                              maxLines: 2,
+                              decoration: StationInputDecoration.formField(
+                                context,
+                                labelText: 'Napomena (opcionalno)',
                               ),
                             ),
                           ],
                         ],
-                      ),
-                      const SizedBox(height: 8),
-                      ScrollIntoViewOnFocus(
-                        focusNode: _wedgeFocus,
-                        child: TextField(
-                          controller: _wedgeCtrl,
-                          focusNode: _wedgeFocus,
-                          decoration: const InputDecoration(
-                            labelText: 'Vanjski QR skener',
-                            hintText: 'Fokus ovdje, zatim skeniraj',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                          onSubmitted: (s) =>
-                              unawaited(_onScannerWedgeSubmitted(s)),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Radni dan: $workKey',
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                          TextButton.icon(
-                            onPressed: _openTableColumnVisibility,
-                            icon: const Icon(Icons.view_column_outlined, size: 18),
-                            label: const Text('Kolone'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      _buildPreparationTrackingTable(
-                        context,
-                        rows,
-                        showDraftRow: true,
-                        showSavedRows: true,
-                        includeCatalogStrip: true,
-                        includeMjBar: true,
-                      ),
-                      if (snap.hasData && rows.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            _emptyDayHint(),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 16),
-                      FilledButton.icon(
-                        onPressed: _saving ? null : () => _submit(scrapDefs),
-                        icon: _saving
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.save_outlined),
-                        label: Text(_saving ? 'Spremanje…' : 'Potvrdi unos'),
-                      ),
-                      const SizedBox(height: 12),
-                      StationTextField(
-                        controller: _notesCtrl,
-                        focusNode: _notesFocus,
-                        maxLines: 2,
-                        decoration: StationInputDecoration.formField(
-                          context,
-                          labelText: 'Napomena (opcionalno)',
-                        ),
-                      ),
-                    ],
-                  ],
-                );
-              },
-            ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -3442,7 +3510,7 @@ class _DefectDisplayNamesEditorDialogState
                 TextField(
                   controller: _c[code],
                   enabled: !_busy,
-                  decoration: const InputDecoration(isDense: true),
+                  decoration: const InputDecoration(),
                 ),
                 const SizedBox(height: 8),
               ],
@@ -3568,11 +3636,7 @@ class _OperatorTrackingColumnLabelsEditorDialogState
             ),
           ),
           Text(
-            'Ugrađeno: ${defaultOperatorTrackingColumnTitle(
-              k,
-              phase: widget.phase,
-              unit: widget.unit,
-            )}',
+            'Ugrađeno: ${defaultOperatorTrackingColumnTitle(k, phase: widget.phase, unit: widget.unit)}',
             style: theme.textTheme.labelSmall,
           ),
           const SizedBox(height: 4),
@@ -3580,7 +3644,6 @@ class _OperatorTrackingColumnLabelsEditorDialogState
             controller: _c[k],
             enabled: !_busy,
             decoration: const InputDecoration(
-              isDense: true,
               hintText: 'Prilagođeni naziv (opcionalno)',
             ),
           ),
@@ -3638,14 +3701,14 @@ class _OperatorTrackingColumnLabelsEditorDialogState
               const SizedBox(height: 12),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Prikaži sistemsku oznaku u zaglavlju tablice'),
+                title: const Text(
+                  'Prikaži sistemsku oznaku u zaglavlju tablice',
+                ),
                 subtitle: const Text(
                   'Drugi red: tehnički ključ polja. Isključi ako operaterima smeta.',
                 ),
                 value: _showSys,
-                onChanged: _busy
-                    ? null
-                    : (v) => setState(() => _showSys = v),
+                onChanged: _busy ? null : (v) => setState(() => _showSys = v),
               ),
               const Divider(height: 28),
               ExpansionTile(
@@ -3757,10 +3820,7 @@ class _QuantityTile extends StatelessWidget {
         onTap: onTap,
         child: Ink(
           decoration: BoxDecoration(
-            border: Border.all(
-              color: borderColor,
-              width: borderWidth,
-            ),
+            border: Border.all(color: borderColor, width: borderWidth),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Padding(

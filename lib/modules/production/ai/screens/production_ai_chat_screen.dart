@@ -1,6 +1,7 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/ai/production_ai_context_scope.dart';
 import '../../../../core/branding/operonix_ai_branding.dart';
 import '../services/production_ai_chat_service.dart';
 
@@ -106,12 +107,17 @@ class _ProductionAiChatScreenState extends State<ProductionAiChatScreen> {
           Expanded(
             child: _lines.isEmpty
                 ? Center(
-                    child: Text(
-                      'Postavi pitanje o proizvodnji, OEE-u ili procesu.',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        ProductionAiContextScope.hintForEmptyChat(
+                          widget.companyData,
+                        ),
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      textAlign: TextAlign.center,
                     ),
                   )
                 : ListView.builder(

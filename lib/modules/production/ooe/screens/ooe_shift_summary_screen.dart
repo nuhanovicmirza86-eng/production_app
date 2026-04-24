@@ -20,7 +20,14 @@ import '../widgets/ooe_loss_pareto_card.dart';
 class OoeShiftSummaryScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
 
-  const OoeShiftSummaryScreen({super.key, required this.companyData});
+  /// Otvaranje iz MES obavijesti ([SHIFT_SUMMARY_READY]) — učitava stroj / smjenu / dan.
+  final String? initialSummaryDocId;
+
+  const OoeShiftSummaryScreen({
+    super.key,
+    required this.companyData,
+    this.initialSummaryDocId,
+  });
 
   @override
   State<OoeShiftSummaryScreen> createState() => _OoeShiftSummaryScreenState();
@@ -68,7 +75,38 @@ class _OoeShiftSummaryScreenState extends State<OoeShiftSummaryScreen> {
       ),
     );
     _shiftCodeCtrl.addListener(_onShiftCodeChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshWindowLine());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final sid = (widget.initialSummaryDocId ?? '').trim();
+      if (sid.isNotEmpty) {
+        await _applyOpenedSummary(sid);
+      } else {
+        await _refreshWindowLine();
+      }
+    });
+  }
+
+  Future<void> _applyOpenedSummary(String docId) async {
+    final s = await _summary.getSummaryForTenant(
+      companyId: _companyId,
+      plantKey: _plantKey,
+      docId: docId,
+    );
+    if (!mounted) return;
+    if (s == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sažetak nije pronađen ili nije u tvom pogonu.')),
+      );
+      await _refreshWindowLine();
+      return;
+    }
+    final d = s.shiftDate.toLocal();
+    setState(() {
+      _machineCtrl.text = s.machineId;
+      final sid = (s.shiftId ?? '').trim();
+      _shiftCodeCtrl.text = sid.isEmpty ? 'DAY' : sid;
+      _shiftDay = DateTime(d.year, d.month, d.day);
+    });
+    await _refreshWindowLine();
   }
 
   @override
@@ -257,8 +295,6 @@ class _OoeShiftSummaryScreenState extends State<OoeShiftSummaryScreen> {
                             labelText: 'Šifra stroja',
                             helperText:
                                 'Ista kao u izvršenju i u imovini pogona (assets).',
-                            border: OutlineInputBorder(),
-                            isDense: true,
                           ),
                           onChanged: (_) => setState(() {}),
                         ),
@@ -287,8 +323,6 @@ class _OoeShiftSummaryScreenState extends State<OoeShiftSummaryScreen> {
                             child: InputDecorator(
                               decoration: const InputDecoration(
                                 labelText: 'Dan smjene',
-                                border: OutlineInputBorder(),
-                                isDense: true,
                                 suffixIcon: Icon(
                                   Icons.calendar_today_outlined,
                                   size: 18,
@@ -313,8 +347,6 @@ class _OoeShiftSummaryScreenState extends State<OoeShiftSummaryScreen> {
                           decoration: const InputDecoration(
                             labelText: 'Oznaka smjene',
                             hintText: 'DAY',
-                            border: OutlineInputBorder(),
-                            isDense: true,
                           ),
                         ),
                       ),
@@ -341,8 +373,6 @@ class _OoeShiftSummaryScreenState extends State<OoeShiftSummaryScreen> {
                           decoration: const InputDecoration(
                             labelText: 'Proizvodni nalog (opc.)',
                             hintText: 'Unutrašnja referenca',
-                            border: OutlineInputBorder(),
-                            isDense: true,
                           ),
                           onChanged: (_) => setState(() {}),
                         ),
@@ -354,8 +384,6 @@ class _OoeShiftSummaryScreenState extends State<OoeShiftSummaryScreen> {
                           decoration: const InputDecoration(
                             labelText: 'Proizvod (opc.)',
                             hintText: 'Unutrašnja referenca',
-                            border: OutlineInputBorder(),
-                            isDense: true,
                           ),
                           onChanged: (_) => setState(() {}),
                         ),

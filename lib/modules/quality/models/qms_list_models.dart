@@ -199,6 +199,8 @@ class QmsNcrRow {
   final String status;
   final String severity;
   final String description;
+  final String? productId;
+  final String? inspectionPlanId;
   final String? lotId;
   final String? productionOrderId;
   final String? partnerKind;
@@ -213,6 +215,8 @@ class QmsNcrRow {
     required this.status,
     required this.severity,
     required this.description,
+    this.productId,
+    this.inspectionPlanId,
     this.lotId,
     this.productionOrderId,
     this.partnerKind,
@@ -229,6 +233,8 @@ class QmsNcrRow {
       status: (m['status'] ?? '').toString(),
       severity: (m['severity'] ?? '').toString(),
       description: (m['description'] ?? '').toString(),
+      productId: m['productId']?.toString(),
+      inspectionPlanId: m['inspectionPlanId']?.toString(),
       lotId: m['lotId']?.toString(),
       productionOrderId: m['productionOrderId']?.toString(),
       partnerKind: m['partnerKind']?.toString(),

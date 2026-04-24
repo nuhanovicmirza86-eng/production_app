@@ -56,14 +56,12 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
   bool _saving = false;
   bool _holdingLot = false;
 
-  String get _cid =>
-      (widget.companyData['companyId'] ?? '').toString().trim();
+  String get _cid => (widget.companyData['companyId'] ?? '').toString().trim();
 
   bool _hasLogisticsModule() {
     final raw = widget.companyData['enabledModules'];
     if (raw is List) {
-      final list =
-          raw.map((e) => e.toString().trim().toLowerCase()).toList();
+      final list = raw.map((e) => e.toString().trim().toLowerCase()).toList();
       if (list.isEmpty) return false;
       return list.contains('logistics');
     }
@@ -183,7 +181,7 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
       if (!mounted) return;
       if (r.applied) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lot zadržan u WMS (${r.lotDocId}).')),
+          const SnackBar(content: Text('Lot zadržan u WMS.')),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -196,9 +194,9 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     } finally {
       if (mounted) setState(() => _holdingLot = false);
     }
@@ -241,9 +239,9 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
       att = _buildAttachmentsPayload();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
       return;
     }
@@ -312,16 +310,16 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
           ),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('NCR je spremljen.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('NCR je spremljen.')));
       }
       await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -350,8 +348,14 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
           autofocus: true,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Odustani')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Kreiraj')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Odustani'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Kreiraj'),
+          ),
         ],
       ),
     );
@@ -377,9 +381,9 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
       await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     }
   }
 
@@ -404,10 +408,7 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
               );
             },
           ),
-          QmsIatfInfoIcon(
-            title: 'NCR',
-            message: QmsIatfStrings.detailNcr,
-          ),
+          QmsIatfInfoIcon(title: 'NCR', message: QmsIatfStrings.detailNcr),
         ],
       ),
       floatingActionButton: _loading || _error != null
@@ -420,7 +421,12 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-          ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!)))
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(_error!),
+              ),
+            )
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
@@ -440,7 +446,9 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                (_ncr!['source'] ?? '').toString().toUpperCase() ==
+                                (_ncr!['source'] ?? '')
+                                            .toString()
+                                            .toUpperCase() ==
                                         'CUSTOMER'
                                     ? 'Kupac'
                                     : 'Dobavljač',
@@ -448,9 +456,12 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                (_ncr!['partnerDisplayName'] ?? '').toString().isEmpty
+                                (_ncr!['partnerDisplayName'] ?? '')
+                                        .toString()
+                                        .isEmpty
                                     ? (_ncr!['partnerId'] ?? '').toString()
-                                    : (_ncr!['partnerDisplayName'] ?? '').toString(),
+                                    : (_ncr!['partnerDisplayName'] ?? '')
+                                          .toString(),
                               ),
                               if ((_ncr!['externalClaimRef'] ?? '')
                                   .toString()
@@ -460,7 +471,9 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                                   padding: const EdgeInsets.only(top: 8),
                                   child: Text(
                                     'Vanjski broj: ${_ncr!['externalClaimRef']}',
-                                    style: Theme.of(context).textTheme.bodySmall,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
                                   ),
                                 ),
                             ],
@@ -468,15 +481,27 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                         ),
                       ),
                     ],
-                    if ((_ncr!['supplierId'] ?? '').toString().trim().isNotEmpty ||
-                        (_ncr!['customerId'] ?? '').toString().trim().isNotEmpty) ...[
+                    if ((_ncr!['supplierId'] ?? '')
+                            .toString()
+                            .trim()
+                            .isNotEmpty ||
+                        (_ncr!['customerId'] ?? '')
+                            .toString()
+                            .trim()
+                            .isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Text(
                         [
                           'Sljedljivost (kontrola)',
-                          if ((_ncr!['customerId'] ?? '').toString().trim().isNotEmpty)
+                          if ((_ncr!['customerId'] ?? '')
+                              .toString()
+                              .trim()
+                              .isNotEmpty)
                             'kupac: ${_ncr!['customerId']}',
-                          if ((_ncr!['supplierId'] ?? '').toString().trim().isNotEmpty)
+                          if ((_ncr!['supplierId'] ?? '')
+                              .toString()
+                              .trim()
+                              .isNotEmpty)
                             'dobavljač: ${_ncr!['supplierId']}',
                         ].join(' · '),
                         style: Theme.of(context).textTheme.bodySmall,
@@ -491,7 +516,9 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                         border: OutlineInputBorder(),
                       ),
                       items: _statuses
-                          .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                          .map(
+                            (s) => DropdownMenuItem(value: s, child: Text(s)),
+                          )
                           .toList(),
                       onChanged: (v) {
                         if (v != null) setState(() => _status = v);
@@ -511,7 +538,9 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                         ),
                       ),
                       items: _severities
-                          .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                          .map(
+                            (s) => DropdownMenuItem(value: s, child: Text(s)),
+                          )
                           .toList(),
                       onChanged: (v) {
                         if (v != null) setState(() => _severity = v);
@@ -523,7 +552,8 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                         controller: _capaWaiverReason,
                         maxLines: 3,
                         decoration: InputDecoration(
-                          labelText: 'Odstupanje od CAPA (razlog, ako nije otvorena CAPA)',
+                          labelText:
+                              'Odstupanje od CAPA (razlog, ako nije otvorena CAPA)',
                           hintText:
                               'Obavezno pri zatvaranju/odbacivanju ako nema otvorene CAPA',
                           border: const OutlineInputBorder(),
@@ -542,7 +572,8 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(
                             'Nema otvorene CAPA — unesi odstupanje ili otvori CAPA prije spremanja.',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
                                   color: Theme.of(context).colorScheme.error,
                                 ),
                           ),
@@ -660,8 +691,6 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                                 controller: r.label,
                                 decoration: const InputDecoration(
                                   labelText: 'Naziv',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
                                 ),
                               ),
                             ),
@@ -672,8 +701,6 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                                 controller: r.url,
                                 decoration: const InputDecoration(
                                   labelText: 'https://…',
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
                                 ),
                               ),
                             ),

@@ -40,8 +40,7 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
   DateTime? _dueDate;
   bool _saving = false;
 
-  String get _cid =>
-      (widget.companyData['companyId'] ?? '').toString().trim();
+  String get _cid => (widget.companyData['companyId'] ?? '').toString().trim();
 
   static const _statuses = [
     'open',
@@ -108,8 +107,7 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
   Map<String, dynamic> _ishikawaPayload() {
     return {
       for (final k in CapaIshikawaKeys.all)
-        k: _ishikawa[k]!
-            .text
+        k: _ishikawa[k]!.text
             .split(RegExp(r'\r?\n'))
             .map((s) => s.trim())
             .where((s) => s.isNotEmpty)
@@ -192,15 +190,15 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
         ishikawa: _ishikawaPayload(),
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('CAPA je spremljena.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('CAPA je spremljena.')));
       await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorMapper.toMessage(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -233,7 +231,12 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-          ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!)))
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(_error!),
+              ),
+            )
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
@@ -300,10 +303,7 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
                               TextFormField(
                                 controller: _eightD[k],
                                 maxLines: 4,
-                                decoration: const InputDecoration(
-                                  border: OutlineInputBorder(),
-                                  isDense: true,
-                                ),
+                                decoration: const InputDecoration(),
                               ),
                             ],
                           ),
@@ -348,9 +348,7 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
                                 controller: _ishikawa[k],
                                 maxLines: 5,
                                 decoration: const InputDecoration(
-                                  border: OutlineInputBorder(),
                                   hintText: 'Uzrok 1\nUzrok 2',
-                                  isDense: true,
                                 ),
                               ),
                             ],
