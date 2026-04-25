@@ -37,9 +37,8 @@ class ProductionAiHubScreen extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
-              'Nijedan AI modul nije uključen u pretplatu ove kompanije. '
-              'Potreban je barem jedan od: ai_assistant_basic, ai_assistant_production, '
-              'ai_assistant (legacy) ili add-on ai_reports (uz proizvodni modul).',
+              'U pretplati ove tvrtke nema uključenog OperonixAI. '
+              'Obratite se administratoru pretplate kako bi se uključio odgovarajući paket.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -69,8 +68,9 @@ class ProductionAiHubScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            'Različiti AI paketi uključuju različite mogućnosti: opći chat, '
-            'operativni asistent nad podacima, strukturirana analiza (JSON) i Markdown izvještaji.',
+            'Ovisno o pretplati dostupni su: slobodan razgovor, operativni asistent '
+            'uz podatke o praćenju, dublja analitika u strukturiranom obliku i '
+            'dugi tekstualni izvještaj za sastanke.',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -80,9 +80,9 @@ class ProductionAiHubScreen extends StatelessWidget {
             Card(
               child: ListTile(
                 leading: const Icon(Icons.chat_bubble_outline),
-                title: const Text('Chatbot'),
+                title: const Text('Razgovor s asistentom'),
                 subtitle: const Text(
-                  'Slobodan razgovor u MES/OEE kontekstu (Callable aiChat).',
+                  'Opća pitanja o proizvodnji, učinku i srodnim temama, u skladu s ulogom.',
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () =>
@@ -97,7 +97,7 @@ class ProductionAiHubScreen extends StatelessWidget {
                 leading: const Icon(Icons.psychology_outlined),
                 title: const Text(kOperonixAiOperationalAssistantTitle),
                 subtitle: const Text(
-                  'Pitanja uz kontekst praćenja proizvodnje iz baze.',
+                  'Kratka pitanja s uporabom povezanih podataka o nalozima, serijama i statusima.',
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => open(
@@ -108,8 +108,7 @@ class ProductionAiHubScreen extends StatelessWidget {
           ] else if (chatOn) ...[
             const SizedBox(height: 4),
             Text(
-              'Operativni asistent i dubinska analiza zahtijevaju paket '
-              '„AI Assistant Production” ili legacy „ai_assistant”.',
+              'Operativni asistent i dublja analitika u punoj snazi zahtijevaju prošireni OperonixAI paket. Pitajte administratora pretplate.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -129,7 +128,9 @@ class ProductionAiHubScreen extends StatelessWidget {
                 child: ListTile(
                   leading: const Icon(Icons.hub_outlined),
                   title: const Text('Strukturirana analiza'),
-                  subtitle: const Text('SCADA / OEE / tok — JSON payload.'),
+                  subtitle: const Text(
+                    'Učinak, signali s linija i tijek proizvodnje (strukturirani ispis).',
+                  ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () =>
                       open(AiAnalysisScreen(companyData: companyData)),
@@ -141,7 +142,9 @@ class ProductionAiHubScreen extends StatelessWidget {
                 child: ListTile(
                   leading: const Icon(Icons.auto_awesome_outlined),
                   title: const Text('AI izvještaj — proizvodnja'),
-                  subtitle: const Text('Period, praćenje i nalozi (Markdown).'),
+                  subtitle: const Text(
+                    'Dugi formatirani tekst s odabirom perioda: nalozi, praćenje, sažetak.',
+                  ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => open(
                     ProductionAiReportScreen(companyData: companyData),

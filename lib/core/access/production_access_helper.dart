@@ -23,6 +23,9 @@ enum ProductionDashboardCard {
 
   /// SaaS modul [ProductionModuleKeys.aiAssistant]: OperonixAI (chat + operativni asistent).
   aiAssistant,
+
+  /// Personal: obračun radnog vremena (LAN/gateway → events → daily → monthly) — ne miješati s MES/OOE.
+  personalWorkTime,
 }
 
 enum ProductionAccessLevel { hidden, view, manage }
@@ -179,6 +182,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
       ProductionDashboardCard.qualityManagement: ProductionAccessLevel.hidden,
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
+      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
     },
     roleSupervisor: {
       ProductionDashboardCard.products: ProductionAccessLevel.view,
@@ -198,6 +202,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
       ProductionDashboardCard.qualityManagement: ProductionAccessLevel.view,
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
+      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
     },
     roleProductionManager: {
       ProductionDashboardCard.products: ProductionAccessLevel.manage,
@@ -217,6 +222,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.manage,
       ProductionDashboardCard.qualityManagement: ProductionAccessLevel.manage,
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.manage,
+      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.view,
     },
     roleLogisticsManager: {
       ProductionDashboardCard.products: ProductionAccessLevel.hidden,
@@ -237,6 +243,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.qualityManagement: ProductionAccessLevel.view,
       /// OperonixAI (narudžbe, rokovi) — usklađeno s Callable [productionTrackingAssistant].
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
+      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.view,
     },
     roleAdmin: {
       ProductionDashboardCard.products: ProductionAccessLevel.manage,
@@ -256,6 +263,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.manage,
       ProductionDashboardCard.qualityManagement: ProductionAccessLevel.manage,
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.manage,
+      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.manage,
     },
     roleSuperAdmin: {
       ProductionDashboardCard.products: ProductionAccessLevel.manage,
@@ -275,6 +283,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.manage,
       ProductionDashboardCard.qualityManagement: ProductionAccessLevel.manage,
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.manage,
+      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.view,
     },
     roleMaintenanceManager: {
       ProductionDashboardCard.products: ProductionAccessLevel.hidden,
@@ -295,6 +304,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.qualityManagement: ProductionAccessLevel.hidden,
       /// Kontekst proizvodnje (bez RN kvarova — oni su u Maintenance app).
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
+      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.view,
     },
     roleQualityOperator: {
       ProductionDashboardCard.products: ProductionAccessLevel.view,
@@ -314,6 +324,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
       ProductionDashboardCard.qualityManagement: ProductionAccessLevel.manage,
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
+      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
     },
   };
 

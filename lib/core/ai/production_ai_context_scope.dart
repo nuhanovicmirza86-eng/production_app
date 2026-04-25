@@ -115,9 +115,9 @@ class ProductionAiContextScope {
   static String hintForEmptyChat(Map<String, dynamic> companyData) {
     final keys = allowedContextKeys(companyData);
     if (keys.isEmpty) {
-      return 'Odgovori prate tvoju ulogu i uključene module; bez konkretnih brojke iz baze osim u dodatcima s poslužitelja.';
+      return 'Odgovori slijede vašu ulogu i uključene dijelove aplikacije. Točni brojevi i izvještaji ovisi o povezanim podacima.';
     }
-    return 'Domena pomoći u skladu s ulogom: ${allowedLabels(companyData).join(', ')}.';
+    return 'Zapitati možete o sljedećim područjima: ${allowedLabels(companyData).join(', ')}.';
   }
 
   static List<String> allowedLabels(Map<String, dynamic> companyData) {

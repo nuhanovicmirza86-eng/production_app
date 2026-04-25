@@ -1834,6 +1834,22 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
     setState(() => _saving = true);
     try {
       final rawPn = _pnCtrl.text.trim();
+      String? workCenterIdFromOrder;
+      if (rawPn.isNotEmpty) {
+        try {
+          final po = await FirebaseFirestore.instance
+              .collection('production_orders')
+              .doc(rawPn)
+              .get();
+          if (po.exists) {
+            final w = po.data()?['workCenterId']?.toString().trim();
+            workCenterIdFromOrder =
+                (w != null && w.isNotEmpty) ? w : null;
+          }
+        } catch (_) {
+          /* best-effort za IATF kvalifikaciju / sljedljivost */
+        }
+      }
       queuePayload = <String, dynamic>{
         'companyId': _companyId,
         'plantKey': _plantKeyEffective,
@@ -1844,6 +1860,7 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
         'goodQty': _goodQty,
         'unit': _unit,
         'productId': _linkedProductId,
+        'workCenterId': workCenterIdFromOrder,
         'productionOrderId': rawPn.isEmpty ? null : rawPn,
         'rawMaterialOrderCode': rawPn.isEmpty ? null : rawPn,
         'lineOrBatchRef': _batchCtrl.text.trim().isEmpty
@@ -1877,6 +1894,7 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
         goodQty: _goodQty,
         unit: _unit,
         productId: _linkedProductId,
+        workCenterId: workCenterIdFromOrder,
         productionOrderId: rawPn.isEmpty ? null : rawPn,
         rawMaterialOrderCode: rawPn.isEmpty ? null : rawPn,
         lineOrBatchRef: _batchCtrl.text.trim().isEmpty

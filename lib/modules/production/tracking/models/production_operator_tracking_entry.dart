@@ -17,6 +17,8 @@ class ProductionOperatorTrackingEntry {
   final String unit;
 
   final String? productId;
+  /// MES [work_centers] id — sljedljivost i IATF kvalifikacija.
+  final String? workCenterId;
   final String? productionOrderId;
   final String? commercialOrderId;
 
@@ -64,6 +66,7 @@ class ProductionOperatorTrackingEntry {
     required this.quantity,
     required this.unit,
     this.productId,
+    this.workCenterId,
     this.productionOrderId,
     this.commercialOrderId,
     this.rawMaterialOrderCode,
@@ -131,6 +134,7 @@ class ProductionOperatorTrackingEntry {
       quantity: q,
       unit: (d['unit'] ?? 'kom').toString(),
       productId: _s(d['productId']),
+      workCenterId: _s(d['workCenterId']),
       productionOrderId: _s(d['productionOrderId']),
       commercialOrderId: _s(d['commercialOrderId']),
       rawMaterialOrderCode: _s(d['rawMaterialOrderCode']),

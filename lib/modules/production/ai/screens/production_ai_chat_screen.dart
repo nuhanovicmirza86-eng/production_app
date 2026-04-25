@@ -2,7 +2,8 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/ai/production_ai_context_scope.dart';
-import '../../../../core/branding/operonix_ai_branding.dart';
+import '../../../../core/branding/operonix_ai_branding.dart'
+    show kOperonixAiChatScreenTitle;
 import '../services/production_ai_chat_service.dart';
 
 class _ChatLine {
@@ -12,11 +13,16 @@ class _ChatLine {
   const _ChatLine({required this.isUser, required this.text});
 }
 
-/// Slobodni chatbot (Callable [aiChat]) — odvojeno od operativnog asistenta.
+/// Slobodni razgovor s asistentom — odvojeno od operativnog pomoćnika za praćenje.
 class ProductionAiChatScreen extends StatefulWidget {
-  final Map<String, dynamic> companyData;
+  const ProductionAiChatScreen({
+    super.key,
+    required this.companyData,
+    this.initialInputText,
+  });
 
-  const ProductionAiChatScreen({super.key, required this.companyData});
+  final Map<String, dynamic> companyData;
+  final String? initialInputText;
 
   @override
   State<ProductionAiChatScreen> createState() => _ProductionAiChatScreenState();
@@ -29,6 +35,15 @@ class _ProductionAiChatScreenState extends State<ProductionAiChatScreen> {
   final _lines = <_ChatLine>[];
   bool _loading = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final pre = widget.initialInputText;
+    if (pre != null && pre.trim().isNotEmpty) {
+      _input.text = pre.trim();
+    }
+  }
 
   @override
   void dispose() {
@@ -89,7 +104,7 @@ class _ProductionAiChatScreenState extends State<ProductionAiChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('$kOperonixAiShortLabel — Chat (MES/OEE)'),
+        title: const Text(kOperonixAiChatScreenTitle),
       ),
       body: Column(
         children: [

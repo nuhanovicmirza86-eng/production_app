@@ -322,7 +322,7 @@ class _OperonixAnalyticsDashboardScreenState
     if (src == 'scheduled') {
       parts.add('Izvor: noćni raspored');
     } else if (src == 'callable') {
-      parts.add('Izvor: Callable (ručno)');
+      parts.add('Izvor: ručni preračun na poslužitelju');
     }
     if (parts.isEmpty) return null;
     return Text(
@@ -438,7 +438,7 @@ class _OperonixAnalyticsDashboardScreenState
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                 children: [
                   Text(
-                    'OperonixAI — jedan ekran za učinak, zastoje i kvalitet (TEEP + zastoji).',
+                    'Jedan pregled za učinak, zastoje i povezane kvalitativne brojke.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -509,8 +509,8 @@ class _OperonixAnalyticsDashboardScreenState
                     if (snap.teepLoadFailed) ...[
                       const SizedBox(height: 8),
                       Text(
-                        'Napomena: TEEP dnevni sažetci nisu učitani (mreža / pravila). '
-                        'Kartice OEE/OOE/TEEP mogu biti prazne; zastoji su i dalje iz izvornih događaja.',
+                        'Napomena: dnevni sažetci cijelog planiranog fonda nisu učitani (mreža ili ovlasti). '
+                        'Gornje kartice učinka mogu biti prazne; zastoji se i dalje vidi iz zapisnika.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: const Color(0xFFB45309),
                         ),
@@ -518,8 +518,8 @@ class _OperonixAnalyticsDashboardScreenState
                     ] else if (snap.teepFromRecentScan) ...[
                       const SizedBox(height: 8),
                       Text(
-                        'Napomena: TEEP je učitan rezervnim putem (zadnjih 200 dokumenata). '
-                        'Za duge periode otvori Firestore indeks (deploy) ili osloni se na zastoje.',
+                        'Napomena: pregled cijelog fonda učitan je ograničenim obrascem (noviji zapisi). '
+                        'Na vrlo dugom periodu brojke mogu biti nepotpune; zastoji su pouzdaniji izravno iz evidencije zastoja.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: const Color(0xFF92400E),
                         ),

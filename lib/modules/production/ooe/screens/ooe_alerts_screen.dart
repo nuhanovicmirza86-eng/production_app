@@ -85,11 +85,11 @@ class _OoeAlertsScreenState extends State<OoeAlertsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('OOE alarmi'),
+        title: const Text('Alarmi učinka'),
         actions: [
           if (_canAct)
             IconButton(
-              tooltip: 'Evaluiraj praga (server)',
+              tooltip: 'Osvježi pragove na poslužitelju',
               onPressed: _busy ? null : _eval,
               icon: _busy
                   ? const SizedBox(

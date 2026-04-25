@@ -24,6 +24,7 @@ class QualityCallableService {
       inspectionPlanCount: _int(data['inspectionPlanCount']),
       openNcrCount: _int(data['openNcrCount']),
       openCapaCount: _int(data['openCapaCount']),
+      overdueCapaCount: _int(data['overdueCapaCount']),
     );
   }
 
@@ -458,8 +459,12 @@ class QualityCallableService {
     String? description,
     String? severity,
     List<Map<String, String>>? attachments,
-    /// Za HIGH/CRITICAL NCR: ako nema otvorene CAPA, obavezno prije zatvaranja (IATF).
+    /// NCR niska/srednja ozbiljnost: zapis o zatvaranju (alternativa dijelu reaction plana).
+    String? closureNote,
+    /// HIGH/CRITICAL: CAPA lanac ili poslovno odstupanje.
     String? capaWaiverReason,
+    String? sourceModule,
+    List<String>? fiveWhySteps,
   }) async {
     final callable = _functions.httpsCallable('updateQmsNonConformance');
     final res = await callable.call({
@@ -471,7 +476,10 @@ class QualityCallableService {
       if (description != null) 'description': description,
       if (severity != null) 'severity': severity,
       if (attachments != null) 'attachments': attachments,
+      if (closureNote != null) 'closureNote': closureNote,
       if (capaWaiverReason != null) 'capaWaiverReason': capaWaiverReason,
+      if (sourceModule != null) 'sourceModule': sourceModule,
+      if (fiveWhySteps != null) 'fiveWhySteps': fiveWhySteps,
     });
     return Map<String, dynamic>.from((res.data as Map?) ?? const <String, dynamic>{});
   }
@@ -513,6 +521,9 @@ class QualityCallableService {
     String? dueDateIso,
     Map<String, dynamic>? eightD,
     Map<String, dynamic>? ishikawa,
+    String? actionType,
+    /// Negativna verifikacija: vraća CAPA u rad i NCR u UNDER_REVIEW (samo u `waiting_verification`).
+    bool? verificationFailed,
   }) async {
     final callable = _functions.httpsCallable('updateQmsCapaActionPlan');
     await callable.call({
@@ -527,6 +538,8 @@ class QualityCallableService {
       if (dueDateIso != null) 'dueDate': dueDateIso,
       if (eightD != null) 'eightD': eightD,
       if (ishikawa != null) 'ishikawa': ishikawa,
+      if (actionType != null) 'actionType': actionType,
+      if (verificationFailed == true) 'verificationFailed': true,
     });
   }
 
@@ -667,12 +680,14 @@ class QmsDashboardSummary {
   final int inspectionPlanCount;
   final int openNcrCount;
   final int openCapaCount;
+  final int overdueCapaCount;
 
   const QmsDashboardSummary({
     required this.controlPlanCount,
     required this.inspectionPlanCount,
     required this.openNcrCount,
     required this.openCapaCount,
+    this.overdueCapaCount = 0,
   });
 }
 

@@ -250,9 +250,12 @@ class QmsCapaRow {
   final String sourceRefId;
   final String title;
   final String status;
+  final String? actionPlanCode;
+  final String actionType;
   final String? dueDateIso;
   final String? responsibleUserId;
   final String? rootCause;
+  final String? effectivenessResult;
   final String? updatedAtIso;
 
   const QmsCapaRow({
@@ -260,9 +263,12 @@ class QmsCapaRow {
     required this.sourceRefId,
     required this.title,
     required this.status,
+    this.actionPlanCode,
+    this.actionType = 'corrective',
     this.dueDateIso,
     this.responsibleUserId,
     this.rootCause,
+    this.effectivenessResult,
     this.updatedAtIso,
   });
 
@@ -272,9 +278,12 @@ class QmsCapaRow {
       sourceRefId: (m['sourceRefId'] ?? '').toString(),
       title: (m['title'] ?? '').toString(),
       status: (m['status'] ?? '').toString(),
+      actionPlanCode: m['actionPlanCode']?.toString(),
+      actionType: (m['actionType'] ?? 'corrective').toString(),
       dueDateIso: m['dueDate']?.toString(),
       responsibleUserId: m['responsibleUserId']?.toString(),
       rootCause: m['rootCause']?.toString(),
+      effectivenessResult: m['effectivenessResult']?.toString(),
       updatedAtIso: m['updatedAt']?.toString(),
     );
   }

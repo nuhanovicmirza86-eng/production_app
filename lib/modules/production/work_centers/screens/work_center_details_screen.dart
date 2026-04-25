@@ -391,13 +391,13 @@ class _WorkCenterDetailsScreenState extends State<WorkCenterDetailsScreen> {
                 ),
                 _kv('Broj operatera', _wc!.operatorCount.toString()),
                 _sectionTitle(
-                  'OEE / OOE / TEEP',
+                  'Mjerne kategorije učinka',
                   helpTitle: WorkCenterHelpTexts.oeeBlockTitle,
                   helpBody: WorkCenterHelpTexts.oeeBlockBody,
                 ),
-                _kv('OEE relevantan', _wc!.isOeeRelevant ? 'Da' : 'Ne'),
-                _kv('OOE relevantan', _wc!.isOoeRelevant ? 'Da' : 'Ne'),
-                _kv('TEEP relevantan', _wc!.isTeepRelevant ? 'Da' : 'Ne'),
+                _kv('Uključeno u mjeru iskoristivosti resursa', _wc!.isOeeRelevant ? 'Da' : 'Ne'),
+                _kv('Uključeno u mjeru učinkovitosti (bruto)', _wc!.isOoeRelevant ? 'Da' : 'Ne'),
+                _kv('Uključeno u mjeru iskorištenja planiranog fonda vremena', _wc!.isTeepRelevant ? 'Da' : 'Ne'),
                 _sectionTitle(
                   'Povezani asset',
                   helpTitle: WorkCenterHelpTexts.assetTitle,
@@ -432,9 +432,9 @@ class _WorkCenterDetailsScreenState extends State<WorkCenterDetailsScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Planirane funkcije: routing i dozvole po operacijama, '
-                            'zastoji i škart iz MES događaja, OOE/TEEP po smjeni — '
-                            'kad budu povezani model događaja s radnim centrom.',
+                            'U planu: povezivanje ruta, dozvole po operacijama, '
+                            'povijest zastoja i otklona, te sažetak učinka po smjeni, '
+                            'kad se u potpunosti povežu zapisnici s ovim centrom.',
                             style: TextStyle(
                               color: Colors.grey.shade800,
                               fontSize: 14,

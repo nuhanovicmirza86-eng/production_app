@@ -1,4 +1,8 @@
 /// Kanonska imena Firestore kolekcija za QMS (vidi `QUALITY_SCHEMA.md` §9).
+///
+/// **NCR / incident:** operativni zapis nesukladnosti je [nonConformances] (`ncrCode`,
+/// `sourceModule`, `fiveWhySteps`, veza na `action_plans`). Širi „quality_incidents“
+/// koncept mapira se ovdje — zasebna kolekcija nije obavezna za zatvoreni IATF krug.
 abstract final class QualityFirestoreCollections {
   static const controlPlans = 'control_plans';
   static const inspectionPlans = 'inspection_plans';

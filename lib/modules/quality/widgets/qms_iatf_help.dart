@@ -104,6 +104,10 @@ abstract final class QmsIatfStrings {
   static const listCapa = 'CAPA (akcijski plan): korektivne i preventivne akcije za uklanjanje uzroka nesklada; '
       'praćenje statusa, uzroka, akcija i verifikacije. Razlikuj od reakcijskog plana na NCR-u i od PFMEA-e.';
 
+  /// IATF 9.2 — unutarnji audit: plan, nalazi, povezivanje na postojeću CAPA (ID) za sljedivost.
+  static const listInternalAudits = 'Interni audit: zapis o provedenom reviziju (proces, proizvod ili sustav) s nalazima. '
+      'Nalazi mogu sadržavati poveznicu na CAPA zapis. Podaci se čitaju i upisuju samo preko Callable-a, ne izravno iz klijenta.';
+
   static const listPfmea = 'PFMEA (proces): redovi su vezani uz proizvod i opcionalno kontrolni plan u istoj kompaniji. '
       'S, O, D i RPN služe prioritetu; AP može biti izračunat ili ručan (audit). Podaci su samo preko Callable-a.';
 

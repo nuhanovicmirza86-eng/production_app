@@ -50,9 +50,9 @@ class QualityHubScreen extends StatelessWidget {
       ),
       (
         icon: Icons.dashboard_outlined,
-        title: 'Dashboard',
-        subtitle: 'KPI, otvoreni NCR/CAPA',
-        iatfTitle: 'QMS dashboard',
+        title: 'Pregled kvaliteta',
+        subtitle: 'Ključni brojevi, otvorena neslaganja i CAPA',
+        iatfTitle: 'Pregled kvaliteta',
         iatfMessage: QmsIatfStrings.dashboard,
         onTap: () => _pushQms(
           context,
@@ -188,11 +188,22 @@ class QualityHubScreen extends StatelessWidget {
           () => qms.CapaTrackingScreen(companyData: cd),
         ),
       ),
+      (
+        icon: Icons.assignment_turned_in_outlined,
+        title: 'Interni audit',
+        subtitle: 'IATF 9.2 · nalazi i veza na CAPA',
+        iatfTitle: 'Interni audit',
+        iatfMessage: QmsIatfStrings.listInternalAudits,
+        onTap: () => _pushQms(
+          context,
+          () => qms.InternalAuditListScreen(companyData: cd),
+        ),
+      ),
     ];
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Kvalitet (QMS)'),
+        title: const Text('Kvalitet'),
         actions: [
           QmsIatfInfoIcon(
             title: 'QMS i IATF 16949',
@@ -208,7 +219,8 @@ class QualityHubScreen extends StatelessWidget {
             return Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: Text(
-                'IATF-friendly QMS: kontrolni plan → kontrola → NCR → CAPA → sljedljivost.',
+                'IATF zatvoreni krug: NCR → root cause / CAPA → verifikacija → zatvaranje '
+                '(podaci po kompaniji).',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: cs.onSurfaceVariant,
                     ),

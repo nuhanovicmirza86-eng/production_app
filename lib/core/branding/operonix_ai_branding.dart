@@ -9,3 +9,6 @@ const String kOperonixAiShortLabel = 'OperonixAI';
 // Operativni asistent nad podacima praćenja (pod-značaj unutar OperonixAI).
 const String kOperonixAiOperationalAssistantTitle =
     'OperonixAI — Operativni asistent';
+
+/// Naslov ekrana slobodnog chata (bez inženjerskih ukratki poput MES/OEE u AppBaru).
+const String kOperonixAiChatScreenTitle = 'OperonixAI — razgovor o proizvodnji';

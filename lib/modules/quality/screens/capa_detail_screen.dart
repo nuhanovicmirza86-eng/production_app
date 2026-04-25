@@ -37,6 +37,7 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
   Map<String, dynamic>? _plan;
 
   String _status = 'open';
+  String _actionType = 'corrective';
   DateTime? _dueDate;
   bool _saving = false;
 
@@ -133,6 +134,8 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
       _responsible.text = (m['responsibleUserId'] ?? '').toString();
       final st = (m['status'] ?? 'open').toString().toLowerCase();
       _status = _statuses.contains(st) ? st : 'open';
+      final at = (m['actionType'] ?? 'corrective').toString().toLowerCase();
+      _actionType = at == 'preventive' ? 'preventive' : 'corrective';
       final due = m['dueDate']?.toString();
       if (due != null && due.isNotEmpty) {
         _dueDate = DateTime.tryParse(due);
@@ -168,7 +171,99 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
     }
   }
 
+  Future<void> _confirmFailVerification() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Negativna verifikacija'),
+        content: const Text(
+          'CAPA ide u rad, NCR se vraća u pregled (UNDER_REVIEW). Nastaviti?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Odustani'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Potvrdi'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      await _svc.updateQmsCapaActionPlan(
+        companyId: _cid,
+        actionPlanId: widget.actionPlanId,
+        verificationFailed: true,
+        verificationNotes: _verification.text.trim(),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('NCR je vraćen u pregled — doradi CAPA i ponovi ciklus.'),
+        ),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   Future<void> _save() async {
+    if (_status == 'closed') {
+      if (_rootCause.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Zatvaranje CAPA zahtijeva utvrđeni uzrok (root cause).'),
+          ),
+        );
+        return;
+      }
+      if (_actionText.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Zatvaranje CAPA: unesi opis akcija / plana.'),
+          ),
+        );
+        return;
+      }
+      if (_verification.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Zatvaranje CAPA: unesi verifikaciju (dokaz / rezultat).'),
+          ),
+        );
+        return;
+      }
+      if (_responsible.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Zatvaranje CAPA: upiši odgovornu osobu (ID korisnika).'),
+          ),
+        );
+        return;
+      }
+      final was = (_plan?['status'] ?? 'open').toString().toLowerCase();
+      if (was != 'waiting_verification') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Zatvaranje: prvo sačuvaj s statusom „čekajuća verifikacija” (waiting_verification), '
+              'pa zatim zatvori.',
+            ),
+          ),
+        );
+        return;
+      }
+    }
     setState(() => _saving = true);
     try {
       String? dueIso;
@@ -188,6 +283,7 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
         dueDateIso: dueIso,
         eightD: _eightDPayload(),
         ishikawa: _ishikawaPayload(),
+        actionType: _actionType,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -268,6 +364,28 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
                         .toList(),
                     onChanged: (v) {
                       if (v != null) setState(() => _status = v);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey<String>('capa_at_$_actionType'),
+                    initialValue: _actionType,
+                    decoration: const InputDecoration(
+                      labelText: 'Tip CAPA',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'corrective',
+                        child: Text('Korektivna'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'preventive',
+                        child: Text('Preventivna'),
+                      ),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) setState(() => _actionType = v);
                     },
                   ),
                   const SizedBox(height: 16),
@@ -419,6 +537,16 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
                       onPressed: () => setState(() => _dueDate = null),
                       child: const Text('Ukloni rok'),
                     ),
+                  if (_status == 'waiting_verification') ...[
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: _saving ? null : _confirmFailVerification,
+                      icon: const Icon(Icons.error_outline),
+                      label: const Text(
+                        'Verifikacija nije učinkovita — vrati NCR u pregled',
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   FilledButton.icon(
                     onPressed: _saving ? null : _save,

@@ -2,6 +2,7 @@
 
 export 'capa_tracking_screen.dart';
 export 'control_plans_list_screen.dart';
+export 'internal_audit_list_screen.dart';
 export 'execute_inspection_screen.dart';
 export 'inspection_plans_list_screen.dart';
 export 'inspection_results_list_screen.dart';

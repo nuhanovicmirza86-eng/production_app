@@ -34,6 +34,14 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
   late final TextEditingController _phone;
   late final TextEditingController _reportsTo;
   late final TextEditingController _linkedUid;
+  final FocusNode _nameFocus = FocusNode();
+  final FocusNode _jobFocus = FocusNode();
+  final FocusNode _shiftGroupFocus = FocusNode();
+  final FocusNode _hireFocus = FocusNode();
+  final FocusNode _reportsToFocus = FocusNode();
+  final FocusNode _linkedUidFocus = FocusNode();
+  final FocusNode _emailFocus = FocusNode();
+  final FocusNode _phoneFocus = FocusNode();
   String _status = 'active';
   bool _active = true;
   bool _saving = false;
@@ -166,7 +174,51 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
     _phone.dispose();
     _reportsTo.dispose();
     _linkedUid.dispose();
+    _nameFocus.dispose();
+    _jobFocus.dispose();
+    _shiftGroupFocus.dispose();
+    _hireFocus.dispose();
+    _reportsToFocus.dispose();
+    _linkedUidFocus.dispose();
+    _emailFocus.dispose();
+    _phoneFocus.dispose();
     super.dispose();
+  }
+
+  String? _validateHireDate(String? value) {
+    final t = (value ?? '').trim();
+    if (t.isEmpty) return null;
+    final d = DateTime.tryParse(t);
+    if (d == null) return 'Neispravan datum (očekuje se GGGG-MM-DD).';
+    return null;
+  }
+
+  Future<void> _pickHireDate() async {
+    if (_saving) return;
+    final now = DateTime.now();
+    DateTime initial;
+    final raw = _hire.text.trim();
+    if (raw.isNotEmpty) {
+      final p = DateTime.tryParse(raw);
+      initial = p ?? DateTime(now.year, now.month, now.day);
+    } else {
+      initial = DateTime(now.year, now.month, now.day);
+    }
+    final first = DateTime(1950, 1, 1);
+    final last = DateTime(now.year + 2, 12, 31);
+    if (initial.isBefore(first)) initial = first;
+    if (initial.isAfter(last)) initial = last;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: first,
+      lastDate: last,
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _hire.text =
+          '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+    });
   }
 
   Future<void> _save() async {
@@ -449,6 +501,9 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
             ],
             TextFormField(
               controller: _name,
+              focusNode: _nameFocus,
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => _jobFocus.requestFocus(),
               decoration: const InputDecoration(
                 labelText: 'Ime za prikaz u kompaniji *',
               ),
@@ -484,23 +539,53 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
             ),
             TextFormField(
               controller: _job,
+              focusNode: _jobFocus,
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => _shiftGroupFocus.requestFocus(),
               decoration:
                   const InputDecoration(labelText: 'Radno mjesto / uloga'),
             ),
             TextFormField(
               controller: _shiftGroup,
+              focusNode: _shiftGroupFocus,
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => _hireFocus.requestFocus(),
               decoration: const InputDecoration(
                 labelText: 'Smjena / grupa (npr. DAN, tim A)',
               ),
             ),
             TextFormField(
               controller: _hire,
-              decoration: const InputDecoration(
-                labelText: 'Datum zaposlenja (GGGG-MM-DD, opcionalno)',
+              focusNode: _hireFocus,
+              readOnly: true,
+              onTap: _saving
+                  ? null
+                  : () {
+                      _pickHireDate();
+                    },
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => _reportsToFocus.requestFocus(),
+              decoration: InputDecoration(
+                labelText: 'Datum zaposlenja (opcionalno)',
+                helperText:
+                    'Klik za kalendar. Enter: potvrda i prelazak na sljedeće polje.',
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.calendar_today_outlined, size: 22),
+                  tooltip: 'Odabir datuma',
+                  onPressed: _saving
+                      ? null
+                      : () {
+                          _pickHireDate();
+                        },
+                ),
               ),
+              validator: _validateHireDate,
             ),
             TextFormField(
               controller: _reportsTo,
+              focusNode: _reportsToFocus,
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => _linkedUidFocus.requestFocus(),
               decoration: const InputDecoration(
                 labelText: 'Nadređeni (sistemski kôd, opcionalno)',
                 helperText:
@@ -509,6 +594,9 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
             ),
             TextFormField(
               controller: _linkedUid,
+              focusNode: _linkedUidFocus,
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => _emailFocus.requestFocus(),
               decoration: const InputDecoration(
                 labelText:
                     'Veza na korisnički nalog (opcionalno)',
@@ -519,12 +607,19 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
             ),
             TextFormField(
               controller: _email,
+              focusNode: _emailFocus,
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => _phoneFocus.requestFocus(),
               decoration: const InputDecoration(
                 labelText: 'Interni e-mail (operativa)',
               ),
             ),
             TextFormField(
               controller: _phone,
+              focusNode: _phoneFocus,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => FocusManager.instance.primaryFocus
+                  ?.unfocus(),
               decoration: const InputDecoration(
                 labelText: 'Interni telefon (operativa)',
               ),

@@ -43,6 +43,7 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
   final _containment = TextEditingController();
   final _reactionPlan = TextEditingController();
   final _capaWaiverReason = TextEditingController();
+  final _fiveWhy = TextEditingController();
 
   final List<_NcrAttRow> _attachmentRows = [];
 
@@ -53,6 +54,7 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
 
   String _status = 'OPEN';
   String _severity = 'MEDIUM';
+  String _sourceModule = '';
   bool _saving = false;
   bool _holdingLot = false;
 
@@ -84,6 +86,17 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
 
   static const _severities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
+  static const _sourceModules = <String, String>{
+    '': '—',
+    'production': 'Proizvodnja',
+    'maintenance': 'Održavanje',
+    'work_time': 'Radno vrijeme',
+    'supplier': 'Dobavljač',
+    'customer': 'Kupac',
+    'audit': 'Audit',
+    'process': 'Proces (proizvodnja)',
+  };
+
   @override
   void initState() {
     super.initState();
@@ -96,6 +109,7 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
     _containment.dispose();
     _reactionPlan.dispose();
     _capaWaiverReason.dispose();
+    _fiveWhy.dispose();
     for (final r in _attachmentRows) {
       r.dispose();
     }
@@ -132,6 +146,15 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
       final sev = (n['severity'] ?? 'MEDIUM').toString().toUpperCase();
       _severity = _severities.contains(sev) ? sev : 'MEDIUM';
       _capaWaiverReason.text = (n['capaWaiverReason'] ?? '').toString();
+      final sm = n['sourceModule']?.toString().trim() ?? '';
+      _sourceModule =
+          sm.isEmpty || !_sourceModules.containsKey(sm) ? '' : sm;
+      final f5 = n['fiveWhySteps'];
+      if (f5 is List) {
+        _fiveWhy.text = f5.map((e) => e.toString().trim()).join('\n');
+      } else {
+        _fiveWhy.text = '';
+      }
 
       _disposeAttachmentRows();
       final raw = n['attachments'];
@@ -224,13 +247,21 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
     return out;
   }
 
-  /// Otvorena CAPA u smislu backend pravila (OPEN_CAPA_STATUSES).
-  bool _hasOpenCapaLinked() {
-    const open = {'open', 'in_progress', 'waiting_verification'};
-    for (final r in _capaRows) {
-      if (open.contains(r.status.toLowerCase())) return true;
+  /// IATF: zatvaranje NCR (CLOSED) — sve ne-otkazane CAPA su `closed` s effective (ili waiver).
+  bool _ncrCloseCapaChainSatisfied() {
+    if (_capaWaiverReason.text.trim().isNotEmpty) return true;
+    if (_capaRows.isEmpty) return false;
+    final nonCancelled = _capaRows.where(
+      (c) => c.status.toLowerCase() != 'cancelled',
+    );
+    if (nonCancelled.isEmpty) return false;
+    for (final c in nonCancelled) {
+      final st = c.status.toLowerCase();
+      if (st != 'closed') return false;
+      final eff = (c.effectivenessResult ?? 'effective').toLowerCase();
+      if (eff == 'not_effective') return false;
     }
-    return false;
+    return true;
   }
 
   Future<void> _save() async {
@@ -255,15 +286,41 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
       );
       return;
     }
-    if ((_status == 'CLOSED' || _status == 'DISMISSED') &&
+    if (_status == 'CLOSED' &&
         (_severity == 'HIGH' || _severity == 'CRITICAL') &&
-        !_hasOpenCapaLinked() &&
-        _capaWaiverReason.text.trim().isEmpty) {
+        !_ncrCloseCapaChainSatisfied()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Za HIGH/CRITICAL: potrebna je otvorena CAPA ili odstupanje (razlog) prije zatvaranja.',
+            'HIGH/CRITICAL: zatvoreni lanac — sve ne-otkazane CAPA zatvorene s učinkovitošću, '
+            'ili unesi odstupanje (waiver).',
           ),
+        ),
+      );
+      return;
+    }
+    if (_status == 'CLOSED' &&
+        (_severity == 'LOW' || _severity == 'MEDIUM') &&
+        _reactionPlan.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Niska/srednja ozbiljnost: pri zatvaranju unesi reakcijski plan (zapis o zatvaranju / što je učinjeno).',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final whyLines = _fiveWhy.text
+        .split(RegExp(r'\r?\n'))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    if (whyLines.length > 5) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('5 Why: najviše 5 koraka (suzite retke u polju).'),
         ),
       );
       return;
@@ -283,6 +340,8 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
         capaWaiverReason: (_severity == 'HIGH' || _severity == 'CRITICAL')
             ? _capaWaiverReason.text.trim()
             : '',
+        sourceModule: _sourceModule,
+        fiveWhySteps: whyLines.isEmpty ? const [] : whyLines,
       );
       if (!mounted) return;
       final auto = res['capaAutoCreated'] == true;
@@ -553,9 +612,9 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                         maxLines: 3,
                         decoration: InputDecoration(
                           labelText:
-                              'Odstupanje od CAPA (razlog, ako nije otvorena CAPA)',
+                              'Odstupanje od zatvorenog kruga CAPA (waiver)',
                           hintText:
-                              'Obavezno pri zatvaranju/odbacivanju ako nema otvorene CAPA',
+                              'Ako ne možeš zatvoriti sve CAPA s pozitivnom verifikacijom',
                           border: const OutlineInputBorder(),
                           alignLabelWithHint: true,
                           suffixIcon: QmsIatfInfoIcon(
@@ -565,14 +624,17 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                           ),
                         ),
                       ),
-                      if (!_hasOpenCapaLinked() &&
+                      if (!_ncrCloseCapaChainSatisfied() &&
                           _capaWaiverReason.text.trim().isEmpty &&
-                          (_status == 'CLOSED' || _status == 'DISMISSED'))
+                          _status == 'CLOSED')
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(
-                            'Nema otvorene CAPA — unesi odstupanje ili otvori CAPA prije spremanja.',
-                            style: Theme.of(context).textTheme.bodySmall
+                            'Zatvoreni lanac nije ispunjen — dovrši/zatvori CAPA s verifikacijom '
+                            'ili unesi waiver.',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
                                 ?.copyWith(
                                   color: Theme.of(context).colorScheme.error,
                                 ),
@@ -614,6 +676,45 @@ class _NcrDetailScreenState extends State<NcrDetailScreen> {
                       controller: _reactionPlan,
                       maxLines: 3,
                       decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      key: ValueKey<String>('ncr_src_$_sourceModule'),
+                      initialValue: _sourceModules.containsKey(_sourceModule)
+                          ? _sourceModule
+                          : '',
+                      decoration: const InputDecoration(
+                        labelText: 'Modul izvora (IATF sljedljivost)',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _sourceModules.entries
+                          .map(
+                            (e) => DropdownMenuItem(
+                              value: e.key,
+                              child: Text(e.value),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) {
+                        if (v != null) setState(() => _sourceModule = v);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    QmsIatfSectionTitle(
+                      label: '5 Why (sažetak koraka)',
+                      iatfTitle: '5 Why',
+                      iatfMessage:
+                          'Učitaj korake po retku (najviše 5). Potpuna analiza ostaje u CAPA / 8D.',
+                    ),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: _fiveWhy,
+                      maxLines: 5,
+                      decoration: const InputDecoration(
+                        hintText: 'Zašto?\nZašto?\n…',
                         border: OutlineInputBorder(),
                         alignLabelWithHint: true,
                       ),

@@ -395,12 +395,12 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
                                 ),
                                 _kv('Planirani', m.isPlanned ? 'Da' : 'Ne'),
                                 _kv(
-                                  'OEE / OOE / TEEP',
+                                  'Utjecaj na mjere učinka',
                                   () {
                                     final f = <String>[
-                                      if (m.affectsOee) 'OEE',
-                                      if (m.affectsOoe) 'OOE',
-                                      if (m.affectsTeep) 'TEEP',
+                                      if (m.affectsOee) 'iskoristivost resursa',
+                                      if (m.affectsOoe) 'učinak s gubicima',
+                                      if (m.affectsTeep) 'cijeli planirani fond',
                                     ];
                                     return f.isEmpty ? '—' : f.join(', ');
                                   }(),

@@ -251,6 +251,7 @@ class _TrackingEntryCorrectionBodyState extends State<_TrackingEntryCorrectionBo
         productId: _productIdCtrl.text.trim().isEmpty
             ? null
             : _productIdCtrl.text.trim(),
+        workCenterId: widget.entry.workCenterId,
         productionOrderId: rawPn.isEmpty ? null : rawPn,
         commercialOrderId: _commercialCtrl.text.trim().isEmpty
             ? null

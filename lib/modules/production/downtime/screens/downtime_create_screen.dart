@@ -395,7 +395,7 @@ class _DowntimeCreateScreenState extends State<DowntimeCreateScreen> {
                   SwitchListTile(
                     title: const Text('Planirani zastoj'),
                     subtitle: const Text(
-                      'Utiče na OEE zastavice: planirani obično ne smanjuje OEE availability.',
+                      'Kod planiranog zastoja uobičajeno se ne umanjuje iskoristivost resursa (dostupnost).',
                     ),
                     value: _isPlanned,
                     onChanged: (v) {
@@ -407,17 +407,17 @@ class _DowntimeCreateScreenState extends State<DowntimeCreateScreen> {
                   ),
                   if (!_isPlanned) ...[
                     SwitchListTile(
-                      title: const Text('Utječe na OEE'),
+                      title: const Text('Utječe na mjeru iskoristivosti resursa'),
                       value: _affectsOee,
                       onChanged: (v) => setState(() => _affectsOee = v),
                     ),
                     SwitchListTile(
-                      title: const Text('Utječe na OOE'),
+                      title: const Text('Utječe na mjeru učinkovitosti (gubitci)'),
                       value: _affectsOoe,
                       onChanged: (v) => setState(() => _affectsOoe = v),
                     ),
                     SwitchListTile(
-                      title: const Text('Utječe na TEEP'),
+                      title: const Text('Utječe na mjeru cijelog planiranog fonda vremena'),
                       value: _affectsTeep,
                       onChanged: (v) => setState(() => _affectsTeep = v),
                     ),
@@ -425,7 +425,7 @@ class _DowntimeCreateScreenState extends State<DowntimeCreateScreen> {
                     Padding(
                       padding: const EdgeInsets.only(left: 16, bottom: 8),
                       child: Text(
-                        'OEE: ne · OOE: da · TEEP: da (predloženo za planirani zastoj)',
+                        'Iskoristivost resursa: ne; učinak s gubicima: da; cijeli fond: da (uobičajeno za planirano)',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -433,7 +433,7 @@ class _DowntimeCreateScreenState extends State<DowntimeCreateScreen> {
                   TextFormField(
                     controller: _shiftIdCtrl,
                     decoration: const InputDecoration(
-                      labelText: 'ID / šifra smjene (opcionalno)',
+                      labelText: 'Oznaka smjene (opcijalno)',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -441,7 +441,7 @@ class _DowntimeCreateScreenState extends State<DowntimeCreateScreen> {
                   TextFormField(
                     controller: _shiftNameCtrl,
                     decoration: const InputDecoration(
-                      labelText: 'Naziv smjene (opcionalno)',
+                      labelText: 'Naziv smjene (opcijalno)',
                       border: OutlineInputBorder(),
                     ),
                   ),

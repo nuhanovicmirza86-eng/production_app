@@ -18,6 +18,7 @@ import '../../../commercial/orders/services/company_print_identity_service.dart'
 import '../printing/production_order_pdf.dart';
 import '../printing/production_order_qr_payload.dart';
 import '../services/production_order_service.dart';
+import '../widgets/production_order_traceability_dialog.dart';
 import '../../work_centers/screens/work_center_details_screen.dart';
 import 'production_order_edit_screen.dart';
 import 'production_order_mes_assignment_screen.dart';
@@ -1124,7 +1125,7 @@ class _ProductionOrderDetailsScreenState
                     children: [
                       const Expanded(
                         child: Text(
-                          'OOE — segmenti stanja',
+                          'Pregled iskoristivosti — segmenti stanja',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
@@ -1150,7 +1151,7 @@ class _ProductionOrderDetailsScreenState
                     builder: (context, snapshot) {
                       if (snapshot.hasError) {
                         return Text(
-                          'OOE podaci trenutno nisu dostupni (${snapshot.error}).',
+                          'Podaci o učinku trenutno nisu dostupni (${snapshot.error}).',
                         );
                       }
                       if (!snapshot.hasData) {
@@ -1368,12 +1369,26 @@ class _ProductionOrderDetailsScreenState
       appBar: AppBar(
         title: const Text('Detalji proizvodnog naloga'),
         actions: [
-          if (_order != null)
+          if (_order != null) ...[
+            IconButton(
+              tooltip: 'Sljedljivost (IATF)',
+              onPressed: () {
+                showDialog<void>(
+                  context: context,
+                  builder: (ctx) => ProductionOrderTraceabilityDialog(
+                    companyId: _companyId,
+                    productionOrderId: widget.productionOrderId,
+                  ),
+                );
+              },
+              icon: const Icon(Icons.account_tree_outlined),
+            ),
             IconButton(
               tooltip: 'Ispis',
               onPressed: () => _openPrintMenu(context, _order!),
               icon: const Icon(Icons.print_outlined),
             ),
+          ],
         ],
       ),
       body: _isLoading

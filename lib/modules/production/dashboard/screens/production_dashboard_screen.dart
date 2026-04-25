@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:production_app/core/branding/operonix_ai_branding.dart';
 import 'package:production_app/core/theme/operonix_production_brand.dart';
@@ -33,6 +34,7 @@ import '../../ai/screens/production_ai_hub_screen.dart';
 import '../../tracking/screens/production_reports_hub_screen.dart';
 import '../../issues/screens/production_problem_reporting_screen.dart';
 import '../../../workforce/screens/workforce_dashboard_screen.dart';
+import '../../../personal/work_time/screens/work_time_hub_screen.dart';
 import '../../ooe/screens/factory_performance_dashboard_screen.dart';
 import '../../ooe/screens/ooe_dashboard_screen.dart';
 import '../../ooe/screens/teep_analysis_screen.dart';
@@ -114,6 +116,18 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
 
   bool _canViewCard(ProductionDashboardCard card) {
     return ProductionAccessHelper.canView(role: _role, card: card);
+  }
+
+  /// Modul [ProductionModuleKeys.personal]; u [kDebugMode] vidljivo i bez SaaS unosa (demo/razvoj).
+  bool _canAccessPersonalWorkTime() {
+    if (!ProductionAccessHelper.canView(
+      role: _role,
+      card: ProductionDashboardCard.personalWorkTime,
+    )) {
+      return false;
+    }
+    if (kDebugMode) return true;
+    return ProductionModuleKeys.hasModule(companyData, ProductionModuleKeys.personal);
   }
 
   /// Izvještaji praćenja proizvodnje dostupni su ulozi koja ima pristup izvještajima
@@ -261,7 +275,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             icon: Icons.fact_check_outlined,
             title: 'Stanica: prva kontrola',
             subtitle: _hasModule('quality')
-                ? 'QMS: izvršenje kontrole (plan IN_PROCESS). Za tab praćenja koristi „Praćenje proizvodnje“.'
+                ? 'Kontrola kvaliteta u tijeku obrade. Seriju unosite u „Praćenje proizvodnje“.'
                 : 'Puni zaslon — faza u izradi (placeholder do punog unosa).',
             onTap: () => _hasModule('quality')
                 ? openQmsInspectionForStationPhase(
@@ -275,7 +289,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             icon: Icons.verified_outlined,
             title: 'Stanica: završna kontrola',
             subtitle: _hasModule('quality')
-                ? 'QMS: izvršenje kontrole (plan FINAL). Za tab praćenja koristi „Praćenje proizvodnje“.'
+                ? 'Završna kontrola kvalitete. Seriju unosite u „Praćenje proizvodnje“.'
                 : 'Puni zaslon — faza u izradi (placeholder do punog unosa).',
             onTap: () => _hasModule('quality')
                 ? openQmsInspectionForStationPhase(
@@ -300,7 +314,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             icon: Icons.precision_manufacturing_outlined,
             title: 'Radni centri',
             subtitle:
-                'MES šifrarnik: kapacitet, tip, OEE/OOE/TEEP, poveznica na asset.',
+                'Strojevi i linije: kapacitet, tip, povezivanje s učinkom i imovinom.',
             onTap: () => open(WorkCentersListScreen(companyData: companyData)),
           ),
         if (_canViewCard(ProductionDashboardCard.productionProcesses))
@@ -308,7 +322,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             icon: Icons.account_tree_outlined,
             title: 'Procesi',
             subtitle:
-                'Master-data: tip aktivnosti, IATF, QC, sljedljivost, dozvoljeni radni centri (routing bira proces).',
+                'Definicije procesa: tip aktivnosti, kvaliteta, sljedljivost, povezani radni centri; rutiranje bira redoslijed.',
             onTap: () =>
                 open(ProductionProcessesListScreen(companyData: companyData)),
           ),
@@ -317,23 +331,32 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             icon: Icons.groups_2_outlined,
             title: 'Radna snaga',
             subtitle:
-                'F1: profil radnika, smjene, prisutnost, matrica kvalifikacija.',
+                'F1: profil, smjene, prisutnost, tko smije raditi na kojem mjestu.',
             onTap: () =>
                 open(WorkforceDashboardScreen(companyData: companyData)),
+          ),
+        if (_canAccessPersonalWorkTime())
+          _DashboardActionTile(
+            icon: Icons.access_time_filled,
+            title: 'Obračun radnog vremena',
+            subtitle:
+                'Prisutnost, dnevna i mjesečna slaganja, korekcije (modul Osobno).',
+            onTap: () => open(WorkTimeHubScreen(companyData: companyData)),
           ),
         if (_canViewCard(ProductionDashboardCard.downtime))
           _DashboardActionTile(
             icon: Icons.warning_amber_outlined,
             title: 'Zastoji',
             subtitle:
-                'Evidencija, KPI, veza nalog–centar–proces, OEE/OOE/TEEP zastavice, IATF audit.',
+                'Vrijeme zastoja, povezivanje s nalogom i centrom, utjecaj na učinak, audit.',
             onTap: () => open(DowntimesScreen(companyData: companyData)),
           ),
         if (_canViewCard(ProductionDashboardCard.ooe))
           _DashboardActionTile(
             icon: Icons.dashboard_customize_outlined,
             title: 'Učinak pogona',
-            subtitle: 'OEE, OOE i TEEP — isti raspored i tamna tema.',
+            subtitle:
+                'Iskoristivost, gubici, raspoloživost u jednom pregledu (isti raspored, tamna tema).',
             onTap: () => open(
               FactoryPerformanceDashboardScreen(companyData: companyData),
             ),
@@ -341,16 +364,16 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         if (_canViewCard(ProductionDashboardCard.ooe))
           _DashboardActionTile(
             icon: Icons.speed_outlined,
-            title: 'OOE / OEE',
-            subtitle: 'Live stanje, gubici i sažeci smjene (iz događaja).',
+            title: 'Praćenje učinka (uživo)',
+            subtitle: 'Trenutno stanje, gubici i sažetak smjene iz zabilježenih događaja.',
             onTap: () => open(OoeDashboardScreen(companyData: companyData)),
           ),
         if (_canViewCard(ProductionDashboardCard.ooe))
           _DashboardActionTile(
             icon: Icons.percent_outlined,
-            title: 'TEEP i kapacitet',
+            title: 'Puni kapacitet i kalendar',
             subtitle:
-                'Kalendar, iskorištenje, TEEP (dan / tjedan / mjesec, pogon ili stroj).',
+                'Kalendar, iskorištenost opreme, dan / tjedan / mjesec (pogon ili stroj).',
             onTap: () => open(TeepAnalysisScreen(companyData: companyData)),
           ),
         if (_canViewCard(ProductionDashboardCard.operonixAnalytics))
@@ -358,7 +381,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             icon: Icons.hub_outlined,
             title: 'Operonix Analytics',
             subtitle:
-                'KPI (OEE/OOE/TEEP), Pareto, trend, smjene, OperonixAI sažetak, drill-down radnih centara.',
+                'Pregled učinkovitosti, Pareto, trendovi, smjene, sažetak s asistentom, detalji po centrima.',
             onTap: () => open(
               OperonixAnalyticsDashboardScreen(companyData: companyData),
             ),
@@ -398,8 +421,8 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           _canViewCard(ProductionDashboardCard.qualityManagement))
         _DashboardActionTile(
           icon: Icons.assignment_turned_in_outlined,
-          title: 'QMS — Hub kvaliteta',
-          subtitle: 'Kontrolni planovi, kontrole (sken), NCR, CAPA (IATF).',
+          title: 'Kvalitet — središnji izbornik',
+          subtitle: 'Kontrolni planovi, kontrole (sken), neslaganja, CAPA, IATF 16949.',
           onTap: () => open(QualityHubScreen(companyData: companyData)),
         ),
     ];
@@ -497,7 +520,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       tiles: productionTiles,
     );
     addModuleSection(
-      title: 'Kvalitet (QMS)',
+      title: 'Kvalitet',
       subtitle:
           'SaaS modul „quality“: IATF-friendly kontrola — plan, izvršenje, neskladi, CAPA.',
       icon: Icons.fact_check_outlined,
@@ -592,7 +615,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       }
       tiles.add(
         const _ModuleGroupHeader(
-          title: 'Kvalitet (QMS)',
+          title: 'Kvalitet',
           subtitle:
               'Pretplata uključuje modul „quality“: kontrolni plan, kontrole, NCR, CAPA.',
           icon: Icons.assignment_turned_in_outlined,
@@ -602,7 +625,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       tiles.add(
         _DashboardActionTile(
           icon: Icons.dashboard_customize_outlined,
-          title: 'QMS — Hub kvaliteta',
+          title: 'Kvalitet — središnji izbornik',
           subtitle: 'Dashboard, planovi, izvršenje kontrole (sken), NCR, CAPA.',
           onTap: () {
             Navigator.push<void>(
@@ -878,6 +901,19 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       );
     }
 
+    if (_hasModule('production') && _canAccessPersonalWorkTime()) {
+      items.add(
+        _ProdNavItem(
+          builder: (_) => WorkTimeHubScreen(companyData: cd),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.access_time_outlined),
+            selectedIcon: Icon(Icons.access_time_filled),
+            label: 'Vrijeme',
+          ),
+        ),
+      );
+    }
+
     if (_hasModule('production') &&
         _canViewCard(ProductionDashboardCard.downtime)) {
       items.add(
@@ -899,7 +935,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           destination: const NavigationDestination(
             icon: Icon(Icons.speed_outlined),
             selectedIcon: Icon(Icons.speed),
-            label: 'OOE',
+            label: 'Učinak',
           ),
         ),
       );
@@ -1101,7 +1137,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                       const SizedBox(height: 10),
                       _DashboardActionTile(
                         icon: Icons.assignment_turned_in_outlined,
-                        title: 'QMS — Hub kvaliteta',
+                        title: 'Kvalitet — središnji izbornik',
                         subtitle: 'Kontrolni plan, kontrole, NCR, CAPA',
                         onTap: () {
                           _shellScaffoldKey.currentState?.closeDrawer();

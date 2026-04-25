@@ -15,6 +15,9 @@ abstract final class ProductionModuleKeys {
   /// Add-on: Markdown AI izvještaji (uz [aiAssistant] ili [aiAssistantProduction] ili samostalno uz Production).
   static const String aiReports = 'ai_reports';
 
+  /// Personal / obračun radnog vremena (LAN/gateway, tri sloja agregata). U [enabledModules] tenant/SaaS.
+  static const String personal = 'personal';
+
   /// `true` ako je modul eksplicitno u listi (prazna lista = samo legacy [production] u UI logici).
   static bool hasModule(
     Map<String, dynamic> companyData,

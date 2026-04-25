@@ -20,6 +20,7 @@ class ProductionOperatorTrackingCallableService {
     required double goodQty,
     required String unit,
     String? productId,
+    String? workCenterId,
     String? productionOrderId,
     String? commercialOrderId,
     String? rawMaterialOrderCode,
@@ -50,6 +51,9 @@ class ProductionOperatorTrackingCallableService {
     };
     if (productId != null && productId.trim().isNotEmpty) {
       payload['productId'] = productId.trim();
+    }
+    if (workCenterId != null && workCenterId.trim().isNotEmpty) {
+      payload['workCenterId'] = workCenterId.trim();
     }
     if (productionOrderId != null && productionOrderId.trim().isNotEmpty) {
       payload['productionOrderId'] = productionOrderId.trim();
@@ -100,6 +104,7 @@ class ProductionOperatorTrackingCallableService {
     required double goodQty,
     required String unit,
     String? productId,
+    String? workCenterId,
     String? productionOrderId,
     String? commercialOrderId,
     String? rawMaterialOrderCode,
@@ -129,6 +134,9 @@ class ProductionOperatorTrackingCallableService {
     };
     if (productId != null && productId.trim().isNotEmpty) {
       payload['productId'] = productId.trim();
+    }
+    if (workCenterId != null && workCenterId.trim().isNotEmpty) {
+      payload['workCenterId'] = workCenterId.trim();
     }
     if (productionOrderId != null && productionOrderId.trim().isNotEmpty) {
       payload['productionOrderId'] = productionOrderId.trim();

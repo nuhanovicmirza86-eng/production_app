@@ -21,6 +21,7 @@ class _QualityDashboardScreenState extends State<QualityDashboardScreen> {
   int _ip = 0;
   int _ncr = 0;
   int _capa = 0;
+  int _overdueCapa = 0;
 
   String get _cid =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -46,6 +47,7 @@ class _QualityDashboardScreenState extends State<QualityDashboardScreen> {
         _ip = s.inspectionPlanCount;
         _ncr = s.openNcrCount;
         _capa = s.openCapaCount;
+        _overdueCapa = s.overdueCapaCount;
         _loading = false;
       });
     } catch (e) {
@@ -61,10 +63,10 @@ class _QualityDashboardScreenState extends State<QualityDashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('QMS dashboard'),
+        title: const Text('Pregled kvaliteta'),
         actions: [
           QmsIatfInfoIcon(
-            title: 'QMS dashboard',
+            title: 'Pregled kvaliteta',
             message: QmsIatfStrings.dashboard,
           ),
         ],
@@ -80,7 +82,7 @@ class _QualityDashboardScreenState extends State<QualityDashboardScreen> {
               _KpiCard(
                 title: 'Kontrolni planovi',
                 value: '$_cp',
-                subtitle: 'Podaci samo preko Callable (klijent nema read na kolekciju)',
+                subtitle: 'Pregled zbroja iz središnje evidencije (bez neposrednog čitanja tablica s ovog ekrana)',
                 iatfTitle: 'Kontrolni plan',
                 iatfMessage: QmsIatfStrings.kpiControlPlans,
               ),
@@ -108,10 +110,18 @@ class _QualityDashboardScreenState extends State<QualityDashboardScreen> {
                 iatfTitle: 'CAPA',
                 iatfMessage: QmsIatfStrings.kpiCapa,
               ),
+              const SizedBox(height: 12),
+              _KpiCard(
+                title: 'Prekoračen rok CAPA',
+                value: '$_overdueCapa',
+                subtitle: 'Otvorene CAPA s prošlim rokom (due date)',
+                iatfTitle: 'Rok CAPA',
+                iatfMessage: QmsIatfStrings.kpiCapa,
+              ),
             ],
             const SizedBox(height: 24),
             Text(
-              'Trendovi (scrap/defect), Pareto i IATF izvještaji — sljedeća faza.',
+              'Trendovi (scrap/defect), Pareto i dodatne analitike — proširuju se s modulom.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),

@@ -229,12 +229,12 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
     return Scaffold(
       appBar: AppBar(
         title: hint == null || hint.isEmpty
-            ? const Text('OOE — live')
+            ? const Text('Praćenje učinka (uživo)')
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('OOE — live'),
+                  const Text('Praćenje učinka (uživo)'),
                   Text(
                     hint,
                     style: TextStyle(
@@ -255,7 +255,7 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
           if (_canViewOoe)
             IconButton(
               icon: const Icon(Icons.view_quilt_outlined),
-              tooltip: 'SCADA — pregled pogon i performanse',
+              tooltip: 'Mrežni pregled strojeva (kao SCADA)',
               onPressed: () => _push(ScadaLiveHubScreen(companyData: widget.companyData)),
             ),
           if (_canAnalytics || _canManageOoe)
@@ -293,7 +293,7 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
                     child: ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(Icons.notifications_active_outlined),
-                      title: Text('OOE alarmi'),
+                      title: Text('Alarmi učinka'),
                     ),
                   ),
                 if (_canManageOoe) ...[
@@ -310,7 +310,7 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
                     child: ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(Icons.flag_outlined),
-                      title: Text('Ciljevi OOE'),
+                      title: Text('Ciljevi učinka po stroju'),
                     ),
                   ),
                 ],
@@ -507,7 +507,7 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
                       segments: const [
                         ButtonSegment(
                           value: _LiveCardSort.ooeDesc,
-                          label: Text('OOE'),
+                          label: Text('Učinak'),
                           icon: Icon(Icons.south),
                         ),
                         ButtonSegment(
