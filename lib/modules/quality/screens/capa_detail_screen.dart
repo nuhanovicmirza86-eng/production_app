@@ -51,6 +51,48 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
     'cancelled',
   ];
 
+  /// Usklađeno s tranzicijama u `updateQmsCapaActionPlan` (quality_qms_writes.js).
+  static const Map<String, String> _capaStatusLabelHr = {
+    'open': 'Otvoreno',
+    'in_progress': 'U radu',
+    'waiting_verification': 'Čekajuća verifikacija',
+    'closed': 'Zatvoreno',
+    'cancelled': 'Otkazano',
+  };
+
+  static String _capaStatusMenuLabel(String code) {
+    final h = _capaStatusLabelHr[code];
+    if (h == null) return code;
+    return '$h ($code)';
+  }
+
+  static List<String> _allowedNextCapaStatuses(String current) {
+    final c = current.toLowerCase();
+    switch (c) {
+      case 'open':
+        return const ['open', 'in_progress', 'cancelled'];
+      case 'in_progress':
+        return const [
+          'in_progress',
+          'waiting_verification',
+          'cancelled',
+        ];
+      case 'waiting_verification':
+        return const ['waiting_verification', 'in_progress', 'closed'];
+      case 'closed':
+        return const ['closed'];
+      case 'cancelled':
+        return const ['cancelled'];
+      default:
+        return [c];
+    }
+  }
+
+  bool get _capaStatusLocked {
+    final c = _status.toLowerCase();
+    return c == 'closed' || c == 'cancelled';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -359,12 +401,19 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
                       labelText: 'Status',
                       border: OutlineInputBorder(),
                     ),
-                    items: _statuses
-                        .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                    items: _allowedNextCapaStatuses(_status)
+                        .map(
+                          (s) => DropdownMenuItem(
+                            value: s,
+                            child: Text(_capaStatusMenuLabel(s)),
+                          ),
+                        )
                         .toList(),
-                    onChanged: (v) {
-                      if (v != null) setState(() => _status = v);
-                    },
+                    onChanged: _capaStatusLocked
+                        ? null
+                        : (v) {
+                            if (v != null) setState(() => _status = v);
+                          },
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(

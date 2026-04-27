@@ -1,16 +1,20 @@
 import 'dart:async' show unawaited;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:production_app/core/theme/operonix_production_brand.dart';
+import 'package:production_app/modules/workforce/models/workforce_employee.dart';
 import 'package:production_app/modules/personal/work_time/models/orv_demo_data.dart';
 import 'package:production_app/modules/personal/work_time/models/work_time_matrix_demo.dart';
 import 'package:production_app/modules/personal/work_time/models/work_time_rules_draft.dart';
 import 'package:production_app/modules/personal/work_time/services/work_time_matrix_service.dart';
 import 'package:production_app/modules/personal/work_time/services/work_time_rules_service.dart';
 import 'package:production_app/modules/personal/work_time/widgets/orv_employee_list_column.dart';
-import 'package:production_app/modules/personal/work_time/widgets/orv_event_control_block.dart';
+import 'package:production_app/modules/personal/work_time/widgets/work_time_event_panel.dart';
 import 'package:production_app/modules/personal/work_time/widgets/orv_summary_rail.dart';
 import 'package:production_app/modules/personal/work_time/widgets/orv_month_dropdown.dart';
+import 'package:production_app/modules/personal/work_time/models/orv_lanes_from_events.dart';
+import 'package:production_app/modules/personal/work_time/services/work_time_operational_service.dart';
 import 'package:production_app/modules/personal/work_time/widgets/orv_work_time_timeline.dart';
 
 /// Dnevna evidencija: radnici, prijave, planirani i stvarni rad u mreži 0–24 h.
@@ -28,6 +32,7 @@ class _WorkTimeAttendanceWorkspaceScreenState
     extends State<WorkTimeAttendanceWorkspaceScreen> {
   final WorkTimeMatrixService _matrixSvc = WorkTimeMatrixService();
   final WorkTimeRulesService _rulesSvc = WorkTimeRulesService();
+  final WorkTimeOperationalService _opSvc = WorkTimeOperationalService();
   late int _year;
   late int _month;
   OrvListFilter _listFilter = OrvListFilter.all;
@@ -35,6 +40,14 @@ class _WorkTimeAttendanceWorkspaceScreenState
   WorkTimeMatrixSnapshot? _matrix;
   bool _matrixLoading = true;
   WorkTimeRulesDraft? _rules;
+  List<OrvDemoEmployee> _loadedEmployees = [];
+  List<Map<String, dynamic>> _monthEvents = <Map<String, dynamic>>[];
+  bool _monthEventsLoading = false;
+
+  String get _companyId =>
+      (widget.companyData['companyId'] ?? '').toString().trim();
+  String get _plantKey =>
+      (widget.companyData['plantKey'] ?? '').toString().trim();
 
   @override
   void initState() {
@@ -42,11 +55,91 @@ class _WorkTimeAttendanceWorkspaceScreenState
     final n = DateTime.now();
     _year = n.year;
     _month = n.month;
+    unawaited(_loadWorkforce());
     if (OrvDemoData.employees.isNotEmpty) {
       _selectedId = OrvDemoData.employees.first.id;
     }
     unawaited(_loadRules());
     _refreshMatrix();
+  }
+
+  Future<void> _loadWorkforce() async {
+    if (_companyId.isEmpty) {
+      return;
+    }
+    try {
+      final sc = await _opSvc.listMyManagedEmployees(
+        companyId: _companyId,
+        plantKey: _plantKey,
+      );
+      Set<String>? scope;
+      if (sc.restricted && sc.employeeDocIds != null) {
+        scope = sc.employeeDocIds!.toSet();
+      }
+      final snap = await FirebaseFirestore.instance
+          .collection('workforce_employees')
+          .where('companyId', isEqualTo: _companyId)
+          .where('plantKey', isEqualTo: _plantKey)
+          .orderBy('displayName')
+          .limit(200)
+          .get();
+      var list = snap.docs
+          .map(WorkforceEmployee.fromDoc)
+          .map(
+            (w) => OrvDemoEmployee(
+              id: w.id,
+              lastName: w.displayName,
+              firstName: w.employeeCode,
+            ),
+          )
+          .toList();
+      if (scope != null && scope.isNotEmpty) {
+        list = list.where((e) => scope!.contains(e.id)).toList();
+      }
+      if (mounted) {
+        setState(() {
+          _loadedEmployees = list;
+          if (list.isNotEmpty && (_selectedId == null || _selectedId!.isEmpty)) {
+            _selectedId = list.first.id;
+          }
+          if (list.isNotEmpty &&
+              _selectedId != null &&
+              !list.any((e) => e.id == _selectedId)) {
+            _selectedId = list.first.id;
+          }
+        });
+      }
+    } catch (e, st) {
+      debugPrint('workforce za ORV: $e $st');
+    }
+  }
+
+  Future<void> _loadMonthEvents() async {
+    if (_companyId.isEmpty) {
+      return;
+    }
+    if (mounted) {
+      setState(() => _monthEventsLoading = true);
+    }
+    try {
+      final items = await _opSvc.listEvents(
+        companyId: _companyId,
+        plantKey: _plantKey,
+        year: _year,
+        month: _month,
+      );
+      if (mounted) {
+        setState(() {
+          _monthEvents = items;
+          _monthEventsLoading = false;
+        });
+      }
+    } catch (e, st) {
+      debugPrint('ORV mjesec događaja: $e $st');
+      if (mounted) {
+        setState(() => _monthEventsLoading = false);
+      }
+    }
   }
 
   Future<void> _loadRules() async {
@@ -67,6 +160,7 @@ class _WorkTimeAttendanceWorkspaceScreenState
   void _refreshMatrix() {
     if (!mounted) return;
     setState(() => _matrixLoading = true);
+    unawaited(_loadMonthEvents());
     unawaited(
       _matrixSvc
           .getMonthSnapshot(
@@ -94,7 +188,8 @@ class _WorkTimeAttendanceWorkspaceScreenState
   }
 
   List<OrvDemoEmployee> get _visibleEmployees {
-    final all = OrvDemoData.employees;
+    final all =
+        _loadedEmployees.isNotEmpty ? _loadedEmployees : OrvDemoData.employees;
     switch (_listFilter) {
       case OrvListFilter.all:
         return all;
@@ -114,8 +209,14 @@ class _WorkTimeAttendanceWorkspaceScreenState
       );
     }
     final matrix = _matrix!;
-    final lanes = OrvDemoData.daysFor(_year, _month);
-    final events = OrvDemoData.eventsFor(year: _year, month: _month);
+    final baseLanes = OrvDemoData.daysFor(_year, _month);
+    final lanes = orvDayLanesWithEvents(
+      year: _year,
+      month: _month,
+      employeeDocId: _selectedId,
+      baseLanes: baseLanes,
+      monthEvents: _monthEvents,
+    );
     OrvDemoEmployee? selectedEmployee;
     for (final e in _visibleEmployees) {
       if (e.id == _selectedId) {
@@ -139,12 +240,12 @@ class _WorkTimeAttendanceWorkspaceScreenState
         actions: [
           IconButton(
             tooltip: 'Poništi filtar',
-            onPressed: () {
+              onPressed: () {
               setState(() {
                 _listFilter = OrvListFilter.all;
-                _selectedId = OrvDemoData.employees.isNotEmpty
-                    ? OrvDemoData.employees.first.id
-                    : null;
+                final v = _visibleEmployees;
+                _selectedId =
+                    v.isNotEmpty ? v.first.id : _selectedId;
               });
             },
             icon: const Icon(Icons.filter_alt_off_outlined),
@@ -173,9 +274,21 @@ class _WorkTimeAttendanceWorkspaceScreenState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (_matrixLoading) const LinearProgressIndicator(minHeight: 2),
+              if (_monthEventsLoading) const LinearProgressIndicator(minHeight: 2),
               _toolbar(context),
               _legendBar(context),
               if (_showEarlyArrivalPanel(lanes)) _earlyArrivalPanel(context),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 0, 10, 4),
+                child: Text(
+                  _monthEvents.isEmpty
+                      ? 'Dnevna mreža: crvena traka s demo podatkom dok nema otkučaja u mjesecu; '
+                          'kategorije sati u Callable izlazu (dnevni/mjesečni sažetak).'
+                      : 'Crvena traka = stvarni in/out u mjesecu za odabranog radnika; siva = plan (demo). '
+                          'Konačni sati: dnevni/mjesečni sažetak.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
@@ -199,13 +312,18 @@ class _WorkTimeAttendanceWorkspaceScreenState
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Expanded(
-                                  flex: 2,
-                                  child: ConstrainedBox(
+                                    flex: 2,
+                                    child: ConstrainedBox(
                                     constraints: const BoxConstraints(
                                       minHeight: 200,
                                     ),
-                                    child: OrvEventControlBlock(
-                                      events: events,
+                                    child: WorkTimeEventPanel(
+                                      companyData: widget.companyData,
+                                      employeeDocId: _selectedId,
+                                      year: _year,
+                                      month: _month,
+                                      onEventsChanged: () =>
+                                          unawaited(_loadMonthEvents()),
                                     ),
                                   ),
                                 ),

@@ -2,7 +2,11 @@ name: production_app
 description: "Operonix Production – MES i upravljanje proizvodnjom."
 publish_to: 'none'
 
-version: 1.0.0+1
+# 1.0.1+6 — production_execution: mesExecutionUpdate + 033 klijent write isključen (Faza 3a).
+# 1.0.1+5 — Izvještaji Otpad i kvalitet: testovi agregatora, izvoz Excel (.xlsx) + CSV.
+# 1.0.1+4 — Izvještaji Otpad i kvalitet (operativno praćenje): sažetak, CSV, trend RC.
+# 1.0.1+3 — production_orders + snapshot/audit + MES order patch preko Callables (Faza 2B thin rules).
+version: 1.0.1+6
 
 environment:
   sdk: ^3.11.4
@@ -13,6 +17,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
+  intl: ^0.20.2
   cupertino_icons: ^1.0.8
   firebase_core: ^4.4.0
   firebase_auth: ^6.1.4

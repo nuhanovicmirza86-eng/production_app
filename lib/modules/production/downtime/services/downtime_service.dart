@@ -1,30 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/downtime_event_model.dart';
+import 'downtime_callable_service.dart';
 
 class DowntimeService {
-  DowntimeService({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+  DowntimeService({FirebaseFirestore? firestore, DowntimeCallableService? callables})
+    : _firestore = firestore ?? FirebaseFirestore.instance,
+      _callables = callables ?? DowntimeCallableService();
 
   final FirebaseFirestore _firestore;
+  final DowntimeCallableService _callables;
 
   CollectionReference<Map<String, dynamic>> get _col =>
       _firestore.collection('downtime_events');
 
   static String _s(dynamic v) => (v ?? '').toString().trim();
-
-  String _generateDowntimeCode({
-    required String plantKey,
-    required DateTime now,
-  }) {
-    final y = now.year.toString().substring(2);
-    final mo = now.month.toString().padLeft(2, '0');
-    final d = now.day.toString().padLeft(2, '0');
-    final millis = now.millisecondsSinceEpoch.toString();
-    final tail = millis.length > 4 ? millis.substring(millis.length - 4) : millis;
-    final pk = plantKey.trim().isEmpty ? 'PL' : plantKey.trim();
-    return 'Z-$pk-$y$mo$d-$tail';
-  }
 
   Stream<List<DowntimeEventModel>> watchDowntimeEvents({
     required String companyId,
@@ -78,14 +68,7 @@ class DowntimeService {
     final uid = _s(reportedBy);
     if (uid.isEmpty) throw Exception('Nedostaje korisnik za audit.');
 
-    final doc = _col.doc();
-    final now = DateTime.now();
-    final code = _generateDowntimeCode(plantKey: plantKey, now: now);
-
-    await doc.set({
-      'companyId': companyId.trim(),
-      'plantKey': plantKey.trim(),
-      'downtimeCode': code,
+    final create = <String, dynamic>{
       'productionOrderId': productionOrderId.trim(),
       'productionOrderCode': productionOrderCode.trim(),
       'workCenterId': workCenterId.trim(),
@@ -99,11 +82,8 @@ class DowntimeService {
       'downtimeCategory': downtimeCategory.trim(),
       'downtimeReason': downtimeReason.trim(),
       'description': description.trim(),
-      'status': DowntimeEventStatus.open,
       'severity': severity.trim().isEmpty ? DowntimeSeverity.medium : severity.trim(),
-      'startedAt': Timestamp.fromDate(startedAt),
-      'endedAt': null,
-      'durationMinutes': null,
+      'startedAt': startedAt.toIso8601String(),
       'isPlanned': isPlanned,
       'affectsOee': affectsOee,
       'affectsOoe': affectsOoe,
@@ -111,20 +91,15 @@ class DowntimeService {
       'operatorId': operatorId.trim().isEmpty ? uid : operatorId.trim(),
       'reportedBy': uid,
       'reportedByName': reportedByName.trim(),
-      'resolvedBy': '',
-      'resolvedByName': '',
-      'verifiedBy': '',
-      'verifiedByName': '',
       'correctiveActionRequired': correctiveActionRequired,
       'correctiveActionId': correctiveActionId.trim(),
       'attachments': attachments,
-      'createdAt': Timestamp.fromDate(now),
-      'createdBy': uid,
-      'updatedAt': Timestamp.fromDate(now),
-      'updatedBy': uid,
-    });
-
-    return doc.id;
+    };
+    return _callables.create(
+      companyId: companyId,
+      plantKey: plantKey,
+      create: create,
+    );
   }
 
   Future<void> updateStatus({
@@ -141,21 +116,12 @@ class DowntimeService {
     if (id.isEmpty || cid.isEmpty || pk.isEmpty || uid.isEmpty) {
       throw Exception('Nedostaju parametri za ažuriranje.');
     }
-
-    final ref = _col.doc(id);
-    final snap = await ref.get();
-    if (!snap.exists) throw Exception('Zastoj nije pronađen.');
-    final m = DowntimeEventModel.fromDoc(snap);
-    if (m.companyId != cid || m.plantKey != pk) {
-      throw Exception('Nemaš pristup ovom zastoju.');
-    }
-
-    final now = DateTime.now();
-    await ref.update({
-      'status': newStatus.trim(),
-      'updatedAt': Timestamp.fromDate(now),
-      'updatedBy': uid,
-    });
+    await _callables.updateStatus(
+      downtimeId: id,
+      companyId: cid,
+      plantKey: pk,
+      newStatus: newStatus,
+    );
   }
 
   Future<void> resolveDowntime({
@@ -173,29 +139,13 @@ class DowntimeService {
     if (id.isEmpty || cid.isEmpty || pk.isEmpty || uid.isEmpty) {
       throw Exception('Nedostaju parametri za zatvaranje.');
     }
-
-    final ref = _col.doc(id);
-    final snap = await ref.get();
-    if (!snap.exists) throw Exception('Zastoj nije pronađen.');
-    final m = DowntimeEventModel.fromDoc(snap);
-    if (m.companyId != cid || m.plantKey != pk) {
-      throw Exception('Nemaš pristup ovom zastoju.');
-    }
-
-    final end = endedAt ?? DateTime.now();
-    var mins = end.difference(m.startedAt).inMinutes;
-    if (mins < 0) mins = 0;
-
-    final now = DateTime.now();
-    await ref.update({
-      'status': DowntimeEventStatus.resolved,
-      'endedAt': Timestamp.fromDate(end),
-      'durationMinutes': mins,
-      'resolvedBy': uid,
-      'resolvedByName': actorDisplayName.trim(),
-      'updatedAt': Timestamp.fromDate(now),
-      'updatedBy': uid,
-    });
+    await _callables.resolve(
+      downtimeId: id,
+      companyId: cid,
+      plantKey: pk,
+      actorDisplayName: actorDisplayName,
+      endedAt: endedAt,
+    );
   }
 
   Future<void> verifyDowntime({
@@ -212,26 +162,12 @@ class DowntimeService {
     if (id.isEmpty || cid.isEmpty || pk.isEmpty || uid.isEmpty) {
       throw Exception('Nedostaju parametri za verifikaciju.');
     }
-
-    final ref = _col.doc(id);
-    final snap = await ref.get();
-    if (!snap.exists) throw Exception('Zastoj nije pronađen.');
-    final m = DowntimeEventModel.fromDoc(snap);
-    if (m.companyId != cid || m.plantKey != pk) {
-      throw Exception('Nemaš pristup ovom zastoju.');
-    }
-    if (m.status != DowntimeEventStatus.resolved) {
-      throw Exception('Samo zastoj u statusu „Riješen“ može biti verificiran.');
-    }
-
-    final now = DateTime.now();
-    await ref.update({
-      'status': DowntimeEventStatus.verified,
-      'verifiedBy': uid,
-      'verifiedByName': actorDisplayName.trim(),
-      'updatedAt': Timestamp.fromDate(now),
-      'updatedBy': uid,
-    });
+    await _callables.verify(
+      downtimeId: id,
+      companyId: cid,
+      plantKey: pk,
+      actorDisplayName: actorDisplayName,
+    );
   }
 
   Future<void> rejectDowntime({
@@ -249,29 +185,13 @@ class DowntimeService {
     if (id.isEmpty || cid.isEmpty || pk.isEmpty || uid.isEmpty) {
       throw Exception('Nedostaju parametri.');
     }
-
-    final ref = _col.doc(id);
-    final snap = await ref.get();
-    if (!snap.exists) throw Exception('Zastoj nije pronađen.');
-    final m = DowntimeEventModel.fromDoc(snap);
-    if (m.companyId != cid || m.plantKey != pk) {
-      throw Exception('Nemaš pristup ovom zastoju.');
-    }
-
-    final now = DateTime.now();
-    final extra = _s(noteAppend);
-    final desc = extra.isEmpty
-        ? m.description
-        : '${m.description}\n[Odbijeno: $extra]'.trim();
-
-    await ref.update({
-      'status': DowntimeEventStatus.rejected,
-      'description': desc,
-      'updatedAt': Timestamp.fromDate(now),
-      'updatedBy': uid,
-      'resolvedBy': uid,
-      'resolvedByName': actorDisplayName.trim(),
-    });
+    await _callables.reject(
+      downtimeId: id,
+      companyId: cid,
+      plantKey: pk,
+      actorDisplayName: actorDisplayName,
+      noteAppend: noteAppend,
+    );
   }
 
   Future<void> archiveDowntime({
@@ -280,12 +200,10 @@ class DowntimeService {
     required String plantKey,
     required String actorUid,
   }) async {
-    await updateStatus(
+    await _callables.archive(
       downtimeId: downtimeId,
       companyId: companyId,
       plantKey: plantKey,
-      actorUid: actorUid,
-      newStatus: DowntimeEventStatus.archived,
     );
   }
 

@@ -1,6 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
+import '../../../../core/saas/production_module_keys.dart';
+import '../../personal/work_time/screens/work_time_hub_screen.dart';
+import '../../personal/work_time/services/work_time_access.dart';
 import '../attendance/attendance_screen.dart';
 import '../compliance_documents/compliance_list_screen.dart';
 import '../employee_profiles/employee_list_screen.dart';
@@ -35,6 +39,13 @@ class WorkforceDashboardScreen extends StatelessWidget {
         role: _role,
         card: ProductionDashboardCard.shifts,
       );
+
+  /// Isto kao [ProductionDashboardScreen._canAccessPersonalWorkTime]: uloga + modul Osobno.
+  bool get _canAccessPersonalWorkTime {
+    if (!WorkTimeAccess.canOpenHub(_role)) return false;
+    if (kDebugMode) return true;
+    return ProductionModuleKeys.hasModule(companyData, ProductionModuleKeys.personal);
+  }
 
   void _open(BuildContext context, Widget page) {
     Navigator.of(context).push<void>(
@@ -98,6 +109,18 @@ class WorkforceDashboardScreen extends StatelessWidget {
               AttendanceScreen(companyData: companyData),
             ),
           ),
+          if (_canAccessPersonalWorkTime)
+            _tile(
+              context,
+              icon: Icons.access_time_filled,
+              title: 'Obračun radnog vremena',
+              subtitle:
+                  'Prijave, dnevna i mjesečna evidencija, korekcije (modul Osobno).',
+              onTap: () => _open(
+                context,
+                WorkTimeHubScreen(companyData: companyData),
+              ),
+            ),
           _tile(
             context,
             icon: Icons.grid_on_outlined,

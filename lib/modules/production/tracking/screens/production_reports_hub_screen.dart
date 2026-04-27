@@ -11,6 +11,9 @@ import '../../ai_analysis/screens/ai_analysis_screen.dart';
 import '../../analytics/screens/operonix_analytics_dashboard_screen.dart';
 import '../../reports/screens/production_ai_report_screen.dart';
 import 'production_operator_tracking_day_report_screen.dart';
+import 'quality_trend_by_line_report_screen.dart';
+import 'waste_by_product_report_screen.dart';
+import 'waste_by_scrap_type_report_screen.dart';
 
 /// Centralno mjesto za izvještaje iz praćenja proizvodnje (otpadi, dnevni sastav, IATF).
 class ProductionReportsHubScreen extends StatelessWidget {
@@ -179,19 +182,43 @@ class ProductionReportsHubScreen extends StatelessWidget {
             icon: Icons.pie_chart_outline,
             title: 'Otpad po tipu škarta',
             subtitle: 'Agregacija po periodu i pogonskoj jedinici.',
-            onTap: () => _soon(context, 'Otpad po tipu'),
+            onTap: () {
+              Navigator.push<void>(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      WasteByScrapTypeReportScreen(companyData: companyData),
+                ),
+              );
+            },
           ),
           _ReportTile(
             icon: Icons.stacked_bar_chart,
             title: 'Otpad po proizvodu (dnevna proizvodnja)',
-            subtitle: 'Usporedba dobrog komada i škarta po smjeni / danu.',
-            onTap: () => _soon(context, 'Otpad po proizvodu'),
+            subtitle: 'Dnevno: dobar komad, škart i postotak — iz operativnog praćenja (tri faze).',
+            onTap: () {
+              Navigator.push<void>(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      WasteByProductReportScreen(companyData: companyData),
+                ),
+              );
+            },
           ),
           _ReportTile(
             icon: Icons.trending_up,
             title: 'Trend kvaliteta po proizvodnoj liniji',
             subtitle: 'KPI i signalizacija odstupanja.',
-            onTap: () => _soon(context, 'Trend kvaliteta'),
+            onTap: () {
+              Navigator.push<void>(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      QualityTrendByLineReportScreen(companyData: companyData),
+                ),
+              );
+            },
           ),
           const Divider(height: 24),
           _SectionHeader(theme, 'Dnevna i operativna evidencija'),
@@ -242,7 +269,7 @@ class ProductionReportsHubScreen extends StatelessWidget {
             child: Text(
               qms
                   ? 'QMS modul: operativni podaci (kontrole, NCR, CAPA) dolaze preko Callable-a. '
-                      'Agregacije otpada po tipu i trendovi i dalje zahtijevaju dodatne izvještaje (u pripremi).'
+                      'Izvještaji „Otpad i kvalitet“ čitaju agregate iz operativnog praćenja (sve tri faze) za pogon u sesiji.'
                   : 'Napomena: detaljne kalkulacije i izvoz (PDF/Excel) vezat će se na iste kolekcije kao operativni unos u tabovima praćenja. '
                       'Za QMS aktiviraj pretplatu na modul „quality“.',
               style: theme.textTheme.bodySmall?.copyWith(

@@ -1,8 +1,10 @@
 import 'dart:async' show unawaited;
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:production_app/modules/personal/work_time/models/work_time_matrix_demo.dart';
 import 'package:production_app/modules/personal/work_time/services/work_time_matrix_service.dart';
+import 'package:production_app/modules/personal/work_time/services/work_time_operational_service.dart';
 import 'package:production_app/modules/personal/work_time/models/work_time_settlement_status.dart';
 import 'package:production_app/modules/personal/work_time/widgets/work_time_demo_banner.dart';
 import 'package:production_app/modules/personal/work_time/widgets/work_time_period_bar.dart';
@@ -22,10 +24,13 @@ class WorkTimePayrollExportScreen extends StatefulWidget {
 class _WorkTimePayrollExportScreenState
     extends State<WorkTimePayrollExportScreen> {
   final WorkTimeMatrixService _matrixSvc = WorkTimeMatrixService();
+  final WorkTimeOperationalService _ops = WorkTimeOperationalService();
   late int _year;
   late int _month;
   WorkTimeMatrixSnapshot? _matrix;
   bool _matrixLoading = true;
+  bool _exportBusy = false;
+  List<Map<String, dynamic>> _pastExports = [];
 
   @override
   void initState() {
@@ -34,6 +39,18 @@ class _WorkTimePayrollExportScreenState
     _year = n.year;
     _month = n.month;
     _refreshMatrix();
+    unawaited(_loadExports());
+  }
+
+  Future<void> _loadExports() async {
+    try {
+      final l = await _ops.listPayrollExports(
+        companyId: workTimeCompanyIdFrom(widget.companyData),
+      );
+      if (mounted) {
+        setState(() => _pastExports = l);
+      }
+    } catch (_) {}
   }
 
   void _refreshMatrix() {
@@ -68,6 +85,7 @@ class _WorkTimePayrollExportScreenState
     final s = _matrix!;
     final t = Theme.of(context);
     const exportOk = {
+      WorkTimeSettlementStatus.readyForApproval,
       WorkTimeSettlementStatus.locked,
       WorkTimeSettlementStatus.approved,
       WorkTimeSettlementStatus.exported,
@@ -91,6 +109,7 @@ class _WorkTimePayrollExportScreenState
                 _month = m;
               });
               _refreshMatrix();
+              unawaited(_loadExports());
             },
           ),
           const SizedBox(height: 12),
@@ -121,20 +140,79 @@ class _WorkTimePayrollExportScreenState
           ],
           const SizedBox(height: 20),
           FilledButton.icon(
-            onPressed: canExport
-                ? () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Izvoz u sustav za plaće još nije uključen. Kontaktirajte podršku kad bude dostupno.'),
-                      ),
-                    );
-                  }
+            onPressed: canExport && !_exportBusy
+                ? () => unawaited(_runExport())
                 : null,
-            icon: const Icon(Icons.file_download_outlined),
-            label: const Text('Napravi datoteku za plaće'),
+            icon: _exportBusy
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.file_download_outlined),
+            label: const Text('Napravi CSV iz agregata (Callable)'),
           ),
+          if (_pastExports.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Text('Zadnji izvozi', style: t.textTheme.titleSmall),
+            for (final e in _pastExports)
+              ListTile(
+                dense: true,
+                title: Text('${e['year']}-${e['month']} · ${e['lineCount'] ?? 0} redova'),
+                subtitle: Text('ID: ${e['id'] ?? ""}'),
+              ),
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> _runExport() async {
+    setState(() => _exportBusy = true);
+    final m = ScaffoldMessenger.of(context);
+    try {
+      final r = await _ops.createPayrollExport(
+        companyId: workTimeCompanyIdFrom(widget.companyData),
+        plantKey: workTimePlantKeyFrom(widget.companyData),
+        year: _year,
+        month: _month,
+      );
+      if (!mounted) {
+        return;
+      }
+      final csv = (r['csv'] ?? '').toString();
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('CSV sadržaj'),
+          content: SingleChildScrollView(
+            child: SelectableText(
+              csv.isEmpty ? 'Prazan odgovor (provjeri mjesec i status).' : csv,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Zatvori'),
+            ),
+          ],
+        ),
+      );
+      m.showSnackBar(const SnackBar(content: Text('Izvoz zabilježen (payroll_exports + audit).')));
+      unawaited(_loadExports());
+      _refreshMatrix();
+    } on FirebaseFunctionsException catch (e) {
+      if (mounted) {
+        m.showSnackBar(SnackBar(content: Text(e.message ?? e.code)));
+      }
+    } catch (e) {
+      if (mounted) {
+        m.showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _exportBusy = false);
+      }
+    }
   }
 }

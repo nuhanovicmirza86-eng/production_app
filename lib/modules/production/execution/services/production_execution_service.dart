@@ -3,18 +3,20 @@ import 'dart:math' show min;
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../ooe/services/ooe_execution_integration.dart';
+import 'production_execution_callable_service.dart';
 
 class ProductionExecutionService {
-  final FirebaseFirestore _firestore;
+  ProductionExecutionService({
+    FirebaseFirestore? firestore,
+    ProductionExecutionCallableService? callables,
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _callables = callables ?? ProductionExecutionCallableService();
 
-  ProductionExecutionService({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore;
+  final ProductionExecutionCallableService _callables;
 
   CollectionReference<Map<String, dynamic>> get _execution =>
       _firestore.collection('production_execution');
-
-  CollectionReference<Map<String, dynamic>> get _productionOrders =>
-      _firestore.collection('production_orders');
 
   String _s(dynamic value) => (value ?? '').toString().trim();
 
@@ -94,38 +96,6 @@ class ProductionExecutionService {
     }
   }
 
-  void _validateStatus(String status) {
-    const allowed = <String>{'started', 'paused', 'completed'};
-
-    if (!allowed.contains(status)) {
-      throw Exception('status execution zapisa nije validan.');
-    }
-  }
-
-  Future<Map<String, dynamic>> _requireExecutionDoc({
-    required String executionId,
-    required String companyId,
-    required String plantKey,
-  }) async {
-    final doc = await _execution.doc(executionId).get();
-
-    if (!doc.exists) {
-      throw Exception('Execution zapis ne postoji.');
-    }
-
-    final data = doc.data();
-    if (data == null) {
-      throw Exception('Execution zapis nema podatke.');
-    }
-
-    if (_s(data['companyId']) != companyId ||
-        _s(data['plantKey']) != plantKey) {
-      throw Exception('Nemaš pristup ovom execution zapisu.');
-    }
-
-    return <String, dynamic>{'id': doc.id, ...data};
-  }
-
   Future<String> startExecution({
     required String companyId,
     required String plantKey,
@@ -174,11 +144,9 @@ class ProductionExecutionService {
     final normalizedStepName = _s(stepName);
     final normalizedExecutionType = _s(executionType).toLowerCase();
     final normalizedOperatorId = _s(operatorId);
-    final normalizedOperatorName = _nullableString(operatorName);
     final normalizedCreatedBy = _s(createdBy).isEmpty
         ? normalizedOperatorId
         : _s(createdBy);
-    final normalizedUnit = _nullableString(unit);
 
     if (normalizedCompanyId.isEmpty) {
       throw Exception('companyId je obavezan.');
@@ -234,93 +202,58 @@ class ProductionExecutionService {
       );
     }
 
-    final now = DateTime.now();
-    final execRef = _execution.doc();
-
-    final payload = <String, dynamic>{
-      'companyId': normalizedCompanyId,
-      'plantKey': normalizedPlantKey,
-      'productionOrderId': normalizedOrderId,
-      'productionOrderCode': normalizedOrderCode,
-      'productId': normalizedProductId,
-      'productCode': normalizedProductCode,
-      'productName': normalizedProductName,
-      'routingId': normalizedRoutingId,
-      'routingVersion': normalizedRoutingVersion,
-      'stepId': normalizedStepId,
-      'stepCode': _nullableString(stepCode),
-      'stepName': normalizedStepName,
-      'executionType': normalizedExecutionType,
-      'status': 'started',
-      'startedAt': now,
-      'endedAt': null,
-      'operatorId': normalizedOperatorId,
-      'operatorName': normalizedOperatorName,
-      'goodQty': goodQty ?? 0,
-      'scrapQty': scrapQty ?? 0,
-      'reworkQty': reworkQty ?? 0,
-      'unit': normalizedUnit,
-      'parameters': _cleanParameters(parameters),
-      'materialsUsed': _cleanMaterialsUsed(materialsUsed),
-      'notes': _nullableString(notes),
-      'workCenterId': _nullableString(workCenterId),
-      'workCenterCode': _nullableString(workCenterCode),
-      'workCenterName': _nullableString(workCenterName),
-      'lineId': _nullableString(lineId),
-      'lineCode': _nullableString(lineCode),
-      'lineName': _nullableString(lineName),
-      'machineId': _nullableString(machineId),
-      'machineCode': _nullableString(machineCode),
-      'machineName': _nullableString(machineName),
-      'shiftCode': _nullableString(shiftCode),
-      'createdAt': now,
-      'createdBy': normalizedCreatedBy,
-      'updatedAt': now,
-      'updatedBy': normalizedCreatedBy,
-    };
-
-    final orderRef = _productionOrders.doc(normalizedOrderId);
-
-    await _firestore.runTransaction((tx) async {
-      final orderSnap = await tx.get(orderRef);
-      if (!orderSnap.exists) {
-        throw Exception('Proizvodni nalog ne postoji.');
-      }
-      final od = orderSnap.data();
-      if (od == null) {
-        throw Exception('Proizvodni nalog nema podatke.');
-      }
-      if (_s(od['companyId']) != normalizedCompanyId ||
-          _s(od['plantKey']) != normalizedPlantKey) {
-        throw Exception('Nalog ne pripada ovoj kompaniji / pogonu.');
-      }
-      final orderStatus = _s(od['status']).toLowerCase();
-      if (orderStatus != 'released' && orderStatus != 'in_progress') {
-        throw Exception(
-          'Nalog mora biti pušten (released) ili u toku da bi se pokrenuo rad.',
-        );
-      }
-
-      tx.set(execRef, payload);
-
-      if (orderStatus == 'released') {
-        tx.update(orderRef, {
-          'status': 'in_progress',
-          'updatedAt': now,
-          'updatedBy': normalizedCreatedBy,
-        });
-      }
-    });
-
-    await OoeExecutionIntegration.onExecutionStarted(
-      companyScope: <String, dynamic>{
-        'companyId': normalizedCompanyId,
-        'plantKey': normalizedPlantKey,
-      },
-      executionPayload: payload,
+    final id = await _callables.startExecution(
+      companyId: normalizedCompanyId,
+      plantKey: normalizedPlantKey,
+      productionOrderId: normalizedOrderId,
+      productionOrderCode: normalizedOrderCode,
+      productId: normalizedProductId,
+      productCode: normalizedProductCode,
+      productName: normalizedProductName,
+      routingId: normalizedRoutingId,
+      routingVersion: normalizedRoutingVersion,
+      stepId: normalizedStepId,
+      stepName: normalizedStepName,
+      executionType: normalizedExecutionType,
+      operatorId: normalizedOperatorId,
+      operatorName: operatorName,
+      createdBy: normalizedCreatedBy,
+      stepCode: stepCode,
+      unit: unit,
+      workCenterId: workCenterId,
+      workCenterCode: workCenterCode,
+      workCenterName: workCenterName,
+      lineId: lineId,
+      lineCode: lineCode,
+      lineName: lineName,
+      machineId: machineId,
+      machineCode: machineCode,
+      machineName: machineName,
+      shiftCode: shiftCode,
+      notes: notes,
+      goodQty: goodQty,
+      scrapQty: scrapQty,
+      reworkQty: reworkQty,
+      parameters: parameters,
+      materialsUsed: materialsUsed,
     );
 
-    return execRef.id;
+    final afterStart = await getById(
+      executionId: id,
+      companyId: normalizedCompanyId,
+      plantKey: normalizedPlantKey,
+    );
+    if (afterStart != null) {
+      await OoeExecutionIntegration.onExecutionStarted(
+        companyScope: <String, dynamic>{
+          'companyId': normalizedCompanyId,
+          'plantKey': normalizedPlantKey,
+        },
+        executionPayload: afterStart,
+      );
+    }
+
+    return id;
   }
 
   Future<void> saveProgress({
@@ -354,63 +287,22 @@ class ProductionExecutionService {
       throw Exception('updatedBy je obavezan.');
     }
 
-    final current = await _requireExecutionDoc(
+    await _callables.executeUpdate(
+      action: 'saveProgress',
       executionId: normalizedExecutionId,
       companyId: normalizedCompanyId,
       plantKey: normalizedPlantKey,
+      updatedBy: normalizedUpdatedBy,
+      goodQty: goodQty,
+      scrapQty: scrapQty,
+      reworkQty: reworkQty,
+      unit: unit,
+      notes: notes,
+      parameters: parameters != null ? _cleanParameters(parameters) : null,
+      materialsUsed: materialsUsed != null
+          ? _cleanMaterialsUsed(materialsUsed)
+          : null,
     );
-
-    final currentStatus = _s(current['status']).toLowerCase();
-    _validateStatus(currentStatus);
-
-    if (currentStatus == 'completed') {
-      throw Exception('Completed execution se ne može mijenjati.');
-    }
-
-    final updates = <String, dynamic>{
-      'updatedAt': DateTime.now(),
-      'updatedBy': normalizedUpdatedBy,
-    };
-
-    if (goodQty != null) {
-      updates['goodQty'] = goodQty;
-    }
-
-    if (scrapQty != null) {
-      updates['scrapQty'] = scrapQty;
-    }
-
-    if (reworkQty != null) {
-      updates['reworkQty'] = reworkQty;
-    }
-
-    if (unit != null) {
-      final normalizedUnit = _nullableString(unit);
-      if (normalizedUnit == null) {
-        updates['unit'] = FieldValue.delete();
-      } else {
-        updates['unit'] = normalizedUnit;
-      }
-    }
-
-    if (notes != null) {
-      final normalizedNotes = _nullableString(notes);
-      if (normalizedNotes == null) {
-        updates['notes'] = FieldValue.delete();
-      } else {
-        updates['notes'] = normalizedNotes;
-      }
-    }
-
-    if (parameters != null) {
-      updates['parameters'] = _cleanParameters(parameters);
-    }
-
-    if (materialsUsed != null) {
-      updates['materialsUsed'] = _cleanMaterialsUsed(materialsUsed);
-    }
-
-    await _execution.doc(normalizedExecutionId).update(updates);
   }
 
   Future<void> pauseExecution({
@@ -447,71 +339,23 @@ class ProductionExecutionService {
       throw Exception('updatedBy je obavezan.');
     }
 
-    final current = await _requireExecutionDoc(
+    await _callables.executeUpdate(
+      action: 'pause',
       executionId: normalizedExecutionId,
       companyId: normalizedCompanyId,
       plantKey: normalizedPlantKey,
+      updatedBy: normalizedUpdatedBy,
+      ooePauseReasonCode: ooePauseReasonCode,
+      goodQty: goodQty,
+      scrapQty: scrapQty,
+      reworkQty: reworkQty,
+      unit: unit,
+      notes: notes,
+      parameters: parameters != null ? _cleanParameters(parameters) : null,
+      materialsUsed: materialsUsed != null
+          ? _cleanMaterialsUsed(materialsUsed)
+          : null,
     );
-
-    final currentStatus = _s(current['status']).toLowerCase();
-    _validateStatus(currentStatus);
-
-    if (currentStatus == 'completed') {
-      throw Exception('Completed execution se ne može pauzirati.');
-    }
-
-    final updates = <String, dynamic>{
-      'status': 'paused',
-      'updatedAt': DateTime.now(),
-      'updatedBy': normalizedUpdatedBy,
-    };
-
-    final pr = ooePauseReasonCode;
-    if (pr == null || _s(pr).isEmpty) {
-      updates['ooePauseReasonCode'] = FieldValue.delete();
-    } else {
-      updates['ooePauseReasonCode'] = _s(pr).toUpperCase();
-    }
-
-    if (goodQty != null) {
-      updates['goodQty'] = goodQty;
-    }
-
-    if (scrapQty != null) {
-      updates['scrapQty'] = scrapQty;
-    }
-
-    if (reworkQty != null) {
-      updates['reworkQty'] = reworkQty;
-    }
-
-    if (unit != null) {
-      final normalizedUnit = _nullableString(unit);
-      if (normalizedUnit == null) {
-        updates['unit'] = FieldValue.delete();
-      } else {
-        updates['unit'] = normalizedUnit;
-      }
-    }
-
-    if (notes != null) {
-      final normalizedNotes = _nullableString(notes);
-      if (normalizedNotes == null) {
-        updates['notes'] = FieldValue.delete();
-      } else {
-        updates['notes'] = normalizedNotes;
-      }
-    }
-
-    if (parameters != null) {
-      updates['parameters'] = _cleanParameters(parameters);
-    }
-
-    if (materialsUsed != null) {
-      updates['materialsUsed'] = _cleanMaterialsUsed(materialsUsed);
-    }
-
-    await _execution.doc(normalizedExecutionId).update(updates);
 
     final afterPause = await getById(
       executionId: normalizedExecutionId,
@@ -554,36 +398,14 @@ class ProductionExecutionService {
       throw Exception('updatedBy je obavezan.');
     }
 
-    final current = await _requireExecutionDoc(
+    await _callables.executeUpdate(
+      action: 'resume',
       executionId: normalizedExecutionId,
       companyId: normalizedCompanyId,
       plantKey: normalizedPlantKey,
+      updatedBy: normalizedUpdatedBy,
+      notes: notes,
     );
-
-    final currentStatus = _s(current['status']).toLowerCase();
-    _validateStatus(currentStatus);
-
-    if (currentStatus == 'completed') {
-      throw Exception('Completed execution se ne može nastaviti.');
-    }
-
-    final updates = <String, dynamic>{
-      'status': 'started',
-      'updatedAt': DateTime.now(),
-      'updatedBy': normalizedUpdatedBy,
-      'ooePauseReasonCode': FieldValue.delete(),
-    };
-
-    if (notes != null) {
-      final normalizedNotes = _nullableString(notes);
-      if (normalizedNotes == null) {
-        updates['notes'] = FieldValue.delete();
-      } else {
-        updates['notes'] = normalizedNotes;
-      }
-    }
-
-    await _execution.doc(normalizedExecutionId).update(updates);
 
     final afterResume = await getById(
       executionId: normalizedExecutionId,
@@ -632,108 +454,19 @@ class ProductionExecutionService {
       throw Exception('updatedBy je obavezan.');
     }
 
-    final now = DateTime.now();
-    final execRef = _execution.doc(normalizedExecutionId);
-
-    final updates = <String, dynamic>{
-      'status': 'completed',
-      'endedAt': now,
-      'updatedAt': now,
-      'updatedBy': normalizedUpdatedBy,
-    };
-
-    if (goodQty != null) {
-      updates['goodQty'] = goodQty;
-    }
-
-    if (scrapQty != null) {
-      updates['scrapQty'] = scrapQty;
-    }
-
-    if (reworkQty != null) {
-      updates['reworkQty'] = reworkQty;
-    }
-
-    if (unit != null) {
-      final normalizedUnit = _nullableString(unit);
-      if (normalizedUnit == null) {
-        updates['unit'] = FieldValue.delete();
-      } else {
-        updates['unit'] = normalizedUnit;
-      }
-    }
-
-    if (notes != null) {
-      final normalizedNotes = _nullableString(notes);
-      if (normalizedNotes == null) {
-        updates['notes'] = FieldValue.delete();
-      } else {
-        updates['notes'] = normalizedNotes;
-      }
-    }
-
-    if (parameters != null) {
-      updates['parameters'] = _cleanParameters(parameters);
-    }
-
-    if (materialsUsed != null) {
-      updates['materialsUsed'] = _cleanMaterialsUsed(materialsUsed);
-    }
-
-    await _firestore.runTransaction((tx) async {
-      final execSnap = await tx.get(execRef);
-      if (!execSnap.exists) {
-        throw Exception('Execution zapis ne postoji.');
-      }
-      final ex = execSnap.data();
-      if (ex == null) {
-        throw Exception('Execution zapis nema podatke.');
-      }
-      if (_s(ex['companyId']) != normalizedCompanyId ||
-          _s(ex['plantKey']) != normalizedPlantKey) {
-        throw Exception('Nemaš pristup ovom execution zapisu.');
-      }
-      final currentStatus = _s(ex['status']).toLowerCase();
-      _validateStatus(currentStatus);
-      if (currentStatus == 'completed') {
-        throw Exception('Execution je već završen.');
-      }
-
-      final orderId = _s(ex['productionOrderId']);
-      if (orderId.isEmpty) {
-        throw Exception('productionOrderId nedostaje na execution zapisu.');
-      }
-      final orderRef = _productionOrders.doc(orderId);
-      final orderSnap = await tx.get(orderRef);
-      if (!orderSnap.exists) {
-        throw Exception('Proizvodni nalog ne postoji.');
-      }
-      final od = orderSnap.data();
-      if (od == null) {
-        throw Exception('Proizvodni nalog nema podatke.');
-      }
-      if (_s(od['companyId']) != normalizedCompanyId ||
-          _s(od['plantKey']) != normalizedPlantKey) {
-        throw Exception('Nalog ne pripada ovoj kompaniji / pogonu.');
-      }
-
-      final finalGood = goodQty ?? _d(ex['goodQty']);
-      final finalScrap = scrapQty ?? _d(ex['scrapQty']);
-      final finalRework = reworkQty ?? _d(ex['reworkQty']);
-
-      final curG = _d(od['producedGoodQty']);
-      final curS = _d(od['producedScrapQty']);
-      final curR = _d(od['producedReworkQty']);
-
-      tx.update(execRef, updates);
-      tx.update(orderRef, {
-        'producedGoodQty': curG + finalGood,
-        'producedScrapQty': curS + finalScrap,
-        'producedReworkQty': curR + finalRework,
-        'updatedAt': now,
-        'updatedBy': normalizedUpdatedBy,
-      });
-    });
+    await _callables.completeExecution(
+      executionId: normalizedExecutionId,
+      companyId: normalizedCompanyId,
+      plantKey: normalizedPlantKey,
+      updatedBy: normalizedUpdatedBy,
+      goodQty: goodQty,
+      scrapQty: scrapQty,
+      reworkQty: reworkQty,
+      unit: unit,
+      notes: notes,
+      parameters: parameters,
+      materialsUsed: materialsUsed,
+    );
 
     final afterComplete = await getById(
       executionId: normalizedExecutionId,

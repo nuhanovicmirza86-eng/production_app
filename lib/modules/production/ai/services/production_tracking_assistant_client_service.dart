@@ -13,6 +13,8 @@ class ProductionTrackingAssistantClientService {
     required String companyId,
     required String plantKey,
     required String prompt,
+    String? evaluationEmployeeDocId,
+    String? evaluationPeriodYyyyMm,
   }) async {
     final cid = companyId.trim();
     final pk = plantKey.trim();
@@ -24,12 +26,20 @@ class ProductionTrackingAssistantClientService {
       throw StateError('Predugačak upit.');
     }
 
-    final callable = _functions.httpsCallable('productionTrackingAssistant');
-    final raw = await callable.call<Map<String, dynamic>>({
+    final payload = <String, dynamic>{
       'companyId': cid,
       'plantKey': pk,
       'prompt': p,
-    });
+    };
+    final eid = (evaluationEmployeeDocId ?? '').trim();
+    final per = (evaluationPeriodYyyyMm ?? '').trim();
+    if (eid.isNotEmpty && per.isNotEmpty) {
+      payload['evaluationEmployeeDocId'] = eid;
+      payload['evaluationPeriodYyyyMm'] = per;
+    }
+
+    final callable = _functions.httpsCallable('productionTrackingAssistant');
+    final raw = await callable.call<Map<String, dynamic>>(payload);
     final data = raw.data;
     if (data['success'] != true) {
       throw StateError('Asistent nije uspio.');

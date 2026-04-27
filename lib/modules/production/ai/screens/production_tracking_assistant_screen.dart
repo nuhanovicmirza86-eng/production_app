@@ -16,10 +16,24 @@ class ProductionTrackingAssistantScreen extends StatefulWidget {
   /// Unaprijed ispunjen upit (npr. zalijepljen iz „Brzi izvještaji“ / drugih ekrana).
   final String? initialPrompt;
 
+  /// Učitava backend fokus-blok s ORV, MES, zastojima, feedbackom (Callable).
+  final String? evaluationEmployeeDocId;
+  final String? evaluationPeriodYyyyMm;
+
+  /// Kad je [true] i [initialPrompt] nije prazan, prvi se upit automatski šalje nakon učitavanja.
+  final bool autoSendInitialPrompt;
+
+  /// Prazni spremljeni thread za taj pogon (npr. fokus „evidencija ocjene“) da se odmah učitaju novi kontekst i upit.
+  final bool startFreshThread;
+
   const ProductionTrackingAssistantScreen({
     super.key,
     required this.companyData,
     this.initialPrompt,
+    this.evaluationEmployeeDocId,
+    this.evaluationPeriodYyyyMm,
+    this.autoSendInitialPrompt = false,
+    this.startFreshThread = false,
   });
 
   @override
@@ -84,6 +98,9 @@ class _ProductionTrackingAssistantScreenState
       if (mounted) setState(() => _restored = true);
       return;
     }
+    if (widget.startFreshThread) {
+      await ProductionAiChatPersistence.clear(_companyId, _plantKey);
+    }
     final list = await ProductionAiChatPersistence.load(_companyId, _plantKey);
     if (!mounted) return;
     setState(() {
@@ -97,6 +114,15 @@ class _ProductionTrackingAssistantScreenState
       _prompt.text = seed;
     }
     _scrollToEnd();
+    if (widget.autoSendInitialPrompt &&
+        _prompt.text.trim().isNotEmpty &&
+        _turns.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          unawaited(_ask());
+        }
+      });
+    }
   }
 
   void _schedulePersist() {
@@ -152,6 +178,8 @@ class _ProductionTrackingAssistantScreenState
         companyId: _companyId,
         plantKey: _plantKey,
         prompt: q,
+        evaluationEmployeeDocId: widget.evaluationEmployeeDocId,
+        evaluationPeriodYyyyMm: widget.evaluationPeriodYyyyMm,
       );
       if (!mounted) return;
       setState(() {

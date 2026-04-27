@@ -7,6 +7,7 @@ import 'package:production_app/modules/personal/work_time/models/work_time_matri
 import 'package:production_app/modules/personal/work_time/services/work_time_matrix_service.dart';
 import 'package:production_app/modules/personal/work_time/services/work_time_recompute_service.dart';
 import 'package:production_app/modules/personal/work_time/services/work_time_access.dart';
+import 'package:production_app/modules/personal/work_time/services/work_time_operational_service.dart';
 import 'package:production_app/modules/personal/work_time/models/work_time_settlement_status.dart';
 import 'package:production_app/modules/personal/work_time/widgets/work_time_demo_banner.dart';
 import 'package:production_app/modules/personal/work_time/widgets/work_time_period_bar.dart';
@@ -25,11 +26,13 @@ class WorkTimeMonthlyScreen extends StatefulWidget {
 class _WorkTimeMonthlyScreenState extends State<WorkTimeMonthlyScreen> {
   final WorkTimeMatrixService _matrixSvc = WorkTimeMatrixService();
   final WorkTimeRecomputeService _recomputeSvc = WorkTimeRecomputeService();
+  final WorkTimeOperationalService _ops = WorkTimeOperationalService();
   late int _year;
   late int _month;
   WorkTimeMatrixSnapshot? _matrix;
   bool _matrixLoading = true;
   bool _recomputeBusy = false;
+  bool _recomputeDailyBusy = false;
 
   @override
   void initState() {
@@ -130,6 +133,82 @@ class _WorkTimeMonthlyScreenState extends State<WorkTimeMonthlyScreen> {
     }
   }
 
+  Future<void> _onRecomputeDailyFromEvents() async {
+    if (_recomputeDailyBusy) {
+      return;
+    }
+    setState(() => _recomputeDailyBusy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final errColor = Theme.of(context).colorScheme.error;
+    try {
+      final res = await _ops.recomputeDailySummariesForMonth(
+        companyId: workTimeCompanyIdFrom(widget.companyData),
+        plantKey: workTimePlantKeyFrom(widget.companyData),
+        year: _year,
+        month: _month,
+      );
+      if (!mounted) {
+        return;
+      }
+      final n = res['dailyDocumentsWritten'];
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Dnevni sažetci ažurirani iz događaja. Zapisa: ${n ?? 0}. Zatim preračunaj mjesec (ikona kalkulatora).',
+          ),
+        ),
+      );
+      _refreshMatrix();
+    } on FirebaseFunctionsException catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(e.message ?? e.code),
+            backgroundColor: errColor,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('$e'), backgroundColor: errColor),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _recomputeDailyBusy = false);
+      }
+    }
+  }
+
+  Future<void> _onSetSettlement(String value) async {
+    if (!WorkTimeAccess.canOpenTenantAdminScreens(
+      ProductionAccessHelper.normalizeRole(widget.companyData['role']),
+    )) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await _ops.setMonthSettlementStatus(
+        companyId: workTimeCompanyIdFrom(widget.companyData),
+        plantKey: workTimePlantKeyFrom(widget.companyData),
+        year: _year,
+        month: _month,
+        settlementStatus: value,
+      );
+      if (mounted) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Status obračuna ažuriran (audit).')),
+        );
+        _refreshMatrix();
+      }
+    } on FirebaseFunctionsException catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(e.message ?? e.code)));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_matrix == null) {
@@ -147,7 +226,20 @@ class _WorkTimeMonthlyScreenState extends State<WorkTimeMonthlyScreen> {
         actions: _isTenantAdmin
             ? [
                 IconButton(
-                  tooltip: 'Preračunaj mjesec iz dnevnih sažetaka',
+                  tooltip: '1) Dnevni sažetci iz sirovih događaja (in/out)',
+                  onPressed: _recomputeDailyBusy
+                      ? null
+                      : () => unawaited(_onRecomputeDailyFromEvents()),
+                  icon: _recomputeDailyBusy
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.event_repeat_outlined),
+                ),
+                IconButton(
+                  tooltip: '2) Mjesečni sažetak iz dnevnih redova',
                   onPressed: _recomputeBusy ? null : () => unawaited(_onRecomputeMonth()),
                   icon: _recomputeBusy
                       ? const SizedBox(
@@ -225,6 +317,48 @@ class _WorkTimeMonthlyScreenState extends State<WorkTimeMonthlyScreen> {
                     style: t.textTheme.bodySmall?.copyWith(
                       color: t.colorScheme.error,
                     ),
+                  ),
+                ],
+                if (_isTenantAdmin) ...[
+                  const SizedBox(height: 8),
+                  Text('Promjena statusa (audit)', style: t.textTheme.labelLarge),
+                  const SizedBox(height: 4),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey<String>(s.settlementStatus),
+                    initialValue: WorkTimeSettlementStatus.isKnown(s.settlementStatus)
+                        ? s.settlementStatus
+                        : WorkTimeSettlementStatus.draft,
+                    items: const [
+                      DropdownMenuItem(
+                        value: WorkTimeSettlementStatus.draft,
+                        child: Text('Nacrt (draft)'),
+                      ),
+                      DropdownMenuItem(
+                        value: WorkTimeSettlementStatus.needsReview,
+                        child: Text('Treba pregled (needs_review)'),
+                      ),
+                      DropdownMenuItem(
+                        value: WorkTimeSettlementStatus.readyForApproval,
+                        child: Text('Spremno za odobrenje'),
+                      ),
+                      DropdownMenuItem(
+                        value: WorkTimeSettlementStatus.approved,
+                        child: Text('Odobreno'),
+                      ),
+                      DropdownMenuItem(
+                        value: WorkTimeSettlementStatus.locked,
+                        child: Text('Zaključano (locked)'),
+                      ),
+                      DropdownMenuItem(
+                        value: WorkTimeSettlementStatus.exported,
+                        child: Text('Izvoz završen (exported)'),
+                      ),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) {
+                        unawaited(_onSetSettlement(v));
+                      }
+                    },
                   ),
                 ],
               ],
