@@ -54,6 +54,21 @@ abstract final class DevelopmentDisplay {
     }
   }
 
+  static String taskStatusLabel(String code) {
+    switch (code.trim()) {
+      case DevelopmentTaskStatuses.open:
+        return 'Otvoren';
+      case DevelopmentTaskStatuses.inProgress:
+        return 'U tijeku';
+      case DevelopmentTaskStatuses.done:
+        return 'Gotov';
+      case DevelopmentTaskStatuses.cancelled:
+        return 'Otkazan';
+      default:
+        return code.isEmpty ? '—' : code;
+    }
+  }
+
   static String teamProjectRoleLabel(String code) {
     switch (code.trim()) {
       case DevelopmentTeamProjectRoles.projectManager:

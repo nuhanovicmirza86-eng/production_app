@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/development_project_model.dart';
+import '../models/development_project_task_model.dart';
 import '../utils/development_constants.dart';
 
 /// Rezultat Callable `createDevelopmentProject`.
@@ -64,6 +65,73 @@ class DevelopmentProjectService {
     final doc = await _collection.doc(projectId).get();
     if (!doc.exists) return null;
     return DevelopmentProjectModel.fromDoc(doc);
+  }
+
+  CollectionReference<Map<String, dynamic>> _tasksCol(String projectId) =>
+      _collection.doc(projectId).collection('tasks');
+
+  /// Zadaci projekta (podkolekcija `tasks`).
+  Stream<List<DevelopmentProjectTaskModel>> watchTasks(
+    String projectId, {
+    int limit = 200,
+  }) {
+    return _tasksCol(projectId)
+        .orderBy('updatedAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map(DevelopmentProjectTaskModel.fromDoc)
+              .toList(growable: false),
+        );
+  }
+
+  /// Kreiranje zadatka — Callable `createDevelopmentProjectTask`.
+  Future<String> createTaskViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+    required String title,
+    String? description,
+    String status = DevelopmentTaskStatuses.open,
+  }) async {
+    final callable = _functions().httpsCallable('createDevelopmentProjectTask');
+    final payload = <String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+      'title': title.trim(),
+      'status': status.trim(),
+    };
+    final d = description?.trim();
+    if (d != null && d.isNotEmpty) payload['description'] = d;
+
+    final res = await callable.call(payload);
+    final raw = res.data;
+    if (raw is! Map) {
+      throw Exception('Očekivan odgovor s poslužitelja nije stigao.');
+    }
+    final id = Map<String, dynamic>.from(raw)['taskId']?.toString() ?? '';
+    if (id.isEmpty) throw Exception('Nije vraćen taskId.');
+    return id;
+  }
+
+  /// Ažuriranje zadatka — Callable `updateDevelopmentProjectTask`.
+  Future<void> updateTaskViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+    required String taskId,
+    required Map<String, dynamic> patch,
+  }) async {
+    final callable = _functions().httpsCallable('updateDevelopmentProjectTask');
+    await callable.call(<String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+      'taskId': taskId,
+      'patch': patch,
+    });
   }
 
   /// Kreiranje projekta — Callable `createDevelopmentProject`.

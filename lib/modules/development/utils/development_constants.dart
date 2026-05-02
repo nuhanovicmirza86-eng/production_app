@@ -97,6 +97,21 @@ abstract final class DevelopmentRiskLevels {
   static const String critical = 'critical';
 }
 
+/// Statusi zadatka u `development_projects/.../tasks`.
+abstract final class DevelopmentTaskStatuses {
+  static const String open = 'open';
+  static const String inProgress = 'in_progress';
+  static const String done = 'done';
+  static const String cancelled = 'cancelled';
+
+  static const List<String> all = [
+    open,
+    inProgress,
+    done,
+    cancelled,
+  ];
+}
+
 /// Uloga na projektu (`team[].projectRole`) — ne miješati s globalnim `users.role`.
 abstract final class DevelopmentTeamProjectRoles {
   static const String projectManager = 'project_manager';

@@ -45,6 +45,27 @@ class DevelopmentPermissions {
     return canCreateDevelopmentProject(role: role, companyData: companyData);
   }
 
+  /// Zadaci (`tasks` podprojekat) — Callables [createDevelopmentProjectTask] / [updateDevelopmentProjectTask].
+  static bool canMutateDevelopmentTasks({
+    required String? role,
+    required Map<String, dynamic> companyData,
+  }) {
+    if (!ProductionModuleKeys.hasModule(companyData, ProductionModuleKeys.development)) {
+      return false;
+    }
+    final r = _norm(role);
+    if (ProductionAccessHelper.isSuperAdminRole(r) ||
+        ProductionAccessHelper.isAdminRole(r)) {
+      return true;
+    }
+    return r == ProductionAccessHelper.roleProjectManager ||
+        r == ProductionAccessHelper.roleDevelopmentEngineer ||
+        r == ProductionAccessHelper.roleQualityOperator ||
+        r == ProductionAccessHelper.roleQualityControl ||
+        r == ProductionAccessHelper.roleProductionManager ||
+        r == ProductionAccessHelper.roleSupervisor;
+  }
+
   /// Tim projekta — Callable [replaceDevelopmentProjectTeam]: admin/super_admin ili trenutni PM.
   static bool canEditDevelopmentProjectTeam({
     required String? role,
