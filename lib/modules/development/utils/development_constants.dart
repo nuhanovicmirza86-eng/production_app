@@ -112,6 +112,23 @@ abstract final class DevelopmentTaskStatuses {
   ];
 }
 
+/// Status Gate faze u `development_projects/.../stages`.
+abstract final class DevelopmentStageStatuses {
+  static const String pending = 'pending';
+  static const String inProgress = 'in_progress';
+  static const String completed = 'completed';
+  static const String skipped = 'skipped';
+  static const String blocked = 'blocked';
+
+  static const List<String> all = [
+    pending,
+    inProgress,
+    completed,
+    skipped,
+    blocked,
+  ];
+}
+
 /// Status rizika u `development_projects/.../risks`.
 abstract final class DevelopmentRiskStatuses {
   static const String open = 'open';

@@ -69,6 +69,23 @@ abstract final class DevelopmentDisplay {
     }
   }
 
+  static String stageStatusLabel(String code) {
+    switch (code.trim()) {
+      case DevelopmentStageStatuses.pending:
+        return 'Na čekanju';
+      case DevelopmentStageStatuses.inProgress:
+        return 'U tijeku';
+      case DevelopmentStageStatuses.completed:
+        return 'Završeno';
+      case DevelopmentStageStatuses.skipped:
+        return 'Preskočeno';
+      case DevelopmentStageStatuses.blocked:
+        return 'Blokirano';
+      default:
+        return code.isEmpty ? '—' : code;
+    }
+  }
+
   static String riskStatusLabel(String code) {
     switch (code.trim()) {
       case DevelopmentRiskStatuses.open:

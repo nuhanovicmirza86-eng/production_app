@@ -3,6 +3,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/development_project_model.dart';
 import '../models/development_project_risk_model.dart';
+import '../models/development_project_stage_model.dart';
 import '../models/development_project_task_model.dart';
 import '../utils/development_constants.dart';
 
@@ -74,6 +75,9 @@ class DevelopmentProjectService {
   CollectionReference<Map<String, dynamic>> _risksCol(String projectId) =>
       _collection.doc(projectId).collection('risks');
 
+  CollectionReference<Map<String, dynamic>> _stagesCol(String projectId) =>
+      _collection.doc(projectId).collection('stages');
+
   /// Zadaci projekta (podkolekcija `tasks`).
   Stream<List<DevelopmentProjectTaskModel>> watchTasks(
     String projectId, {
@@ -102,6 +106,18 @@ class DevelopmentProjectService {
         .map(
           (snap) => snap.docs
               .map(DevelopmentProjectRiskModel.fromDoc)
+              .toList(growable: false),
+        );
+  }
+
+  /// Stage-Gate faze (`stages`), sortirano po [sortOrder].
+  Stream<List<DevelopmentProjectStageModel>> watchStages(String projectId) {
+    return _stagesCol(projectId)
+        .orderBy('sortOrder')
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map(DevelopmentProjectStageModel.fromDoc)
               .toList(growable: false),
         );
   }
@@ -319,5 +335,42 @@ class DevelopmentProjectService {
       throw Exception('Prazan AI odgovor.');
     }
     return md;
+  }
+
+  /// Ako backend nema `stages` (stari projekti), PM/admin poziva seed.
+  Future<bool> seedStagesIfEmptyViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+  }) async {
+    final callable =
+        _functions().httpsCallable('seedDevelopmentProjectStagesIfEmpty');
+    final res = await callable.call(<String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+    });
+    final raw = res.data;
+    if (raw is! Map) return false;
+    return Map<String, dynamic>.from(raw)['seeded'] == true;
+  }
+
+  /// Patch jedne faze (G0–G9) — Callable `updateDevelopmentProjectStage`.
+  Future<void> updateStageViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+    required String stageId,
+    required Map<String, dynamic> patch,
+  }) async {
+    final callable =
+        _functions().httpsCallable('updateDevelopmentProjectStage');
+    await callable.call(<String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+      'stageId': stageId,
+      'patch': patch,
+    });
   }
 }

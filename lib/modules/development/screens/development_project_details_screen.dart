@@ -9,6 +9,7 @@ import '../utils/development_permissions.dart';
 import 'development_project_edit_screen.dart';
 import 'development_project_team_screen.dart';
 import '../widgets/development_project_risks_section.dart';
+import '../widgets/development_project_stages_section.dart';
 import '../widgets/development_project_tasks_section.dart';
 
 /// Korak 5 MVP — pregled projekta (live stream).
@@ -97,6 +98,11 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
                   _kv(context, 'Prioritet', p.priority),
                   _kv(context, 'Rizik', p.riskLevel),
                 ],
+              ),
+              DevelopmentProjectStagesSection(
+                companyData: companyData,
+                project: p,
+                currentUserId: FirebaseAuth.instance.currentUser?.uid,
               ),
               _SectionCard(
                 title: 'Poslovna godina',

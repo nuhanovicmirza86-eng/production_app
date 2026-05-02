@@ -74,6 +74,35 @@ class DevelopmentPermissions {
     return canMutateDevelopmentTasks(role: role, companyData: companyData);
   }
 
+  /// Faze Stage-Gate (`stages`) — Callable [updateDevelopmentProjectStage].
+  static bool canMutateDevelopmentStages({
+    required String? role,
+    required Map<String, dynamic> companyData,
+  }) {
+    return canMutateDevelopmentTasks(role: role, companyData: companyData);
+  }
+
+  /// Inicijalizacija `stages` ako nedostaju — Callable [seedDevelopmentProjectStagesIfEmpty].
+  static bool canSeedDevelopmentStages({
+    required String? role,
+    required Map<String, dynamic> companyData,
+    required DevelopmentProjectModel project,
+    String? currentUserId,
+  }) {
+    if (!ProductionModuleKeys.hasModule(companyData, ProductionModuleKeys.development)) {
+      return false;
+    }
+    final r = _norm(role);
+    final uid = (currentUserId ?? '').trim();
+    if (ProductionAccessHelper.isSuperAdminRole(r) ||
+        ProductionAccessHelper.isAdminRole(r)) {
+      return true;
+    }
+    return r == ProductionAccessHelper.roleProjectManager &&
+        uid.isNotEmpty &&
+        uid == project.projectManagerId;
+  }
+
   /// AI sažetak projekta — Callable [runDevelopmentProjectAiAnalysis]; pretplata + uloga.
   static bool canRunDevelopmentProjectAi({
     required String? role,
