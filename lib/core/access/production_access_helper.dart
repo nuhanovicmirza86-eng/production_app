@@ -444,6 +444,32 @@ class ProductionAccessHelper {
     },
   };
 
+  /// Uloge koje imaju zapis u [_roleMatrix], stabilnim redom (referentni ekrani).
+  static List<String> allMatrixRolesSorted() {
+    const priority = <String>[
+      roleSuperAdmin,
+      roleAdmin,
+      roleProjectManager,
+      roleProductionManager,
+      roleDevelopmentEngineer,
+      roleSupervisor,
+      roleProductionOperator,
+      roleQualityOperator,
+      roleQualityControl,
+      roleManagementViewer,
+      roleLogisticsManager,
+      roleMaintenanceManager,
+    ];
+    final remaining = _roleMatrix.keys.toSet();
+    final out = <String>[];
+    for (final r in priority) {
+      if (remaining.remove(r)) out.add(r);
+    }
+    final tail = remaining.toList()..sort();
+    out.addAll(tail);
+    return out;
+  }
+
   static bool isAdminRole(String role) {
     return normalizeRole(role) == roleAdmin;
   }

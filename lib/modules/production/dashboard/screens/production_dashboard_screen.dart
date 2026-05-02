@@ -45,6 +45,7 @@ import '../../execution/screens/process_execution_hub_screen.dart';
 import '../../qr/production_qr_scan_flow.dart';
 import '../../../quality/screens/execute_inspection_screen.dart';
 import '../../../development/screens/development_projects_list_screen.dart';
+import '../../../development/screens/development_roles_permissions_screen.dart';
 import '../../../quality/screens/quality_hub_screen.dart';
 
 class _ProdNavItem {
@@ -1237,6 +1238,28 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                           );
                         },
                       ),
+                      if (ProductionAccessHelper.isSuperAdminRole(
+                            cd['role']?.toString() ?? '',
+                          )) ...[
+                        const SizedBox(height: 10),
+                        _DashboardActionTile(
+                          icon: Icons.table_rows_outlined,
+                          title: 'Razvoj — uloge i dozvole',
+                          subtitle: 'Matrica po ulozi (samo super admin)',
+                          onTap: () {
+                            _shellScaffoldKey.currentState?.closeDrawer();
+                            Navigator.push<void>(
+                              context,
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    DevelopmentRolesPermissionsScreen(
+                                  companyData: cd,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ],
                   ],
                   const SizedBox(height: 10),

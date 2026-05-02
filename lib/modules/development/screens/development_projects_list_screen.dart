@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/company_plant_display_name.dart';
 import '../models/development_project_model.dart';
 import '../services/development_project_service.dart';
@@ -7,6 +8,7 @@ import '../utils/development_permissions.dart';
 import '../widgets/development_project_card.dart';
 import 'development_project_create_screen.dart';
 import 'development_project_details_screen.dart';
+import 'development_roles_permissions_screen.dart';
 
 /// Lista projekata razvoja / NPI — filtrirano po tenantu, pogonu i opcijski poslovnoj godini.
 class DevelopmentProjectsListScreen extends StatefulWidget {
@@ -38,6 +40,10 @@ class _DevelopmentProjectsListScreenState
         companyData: widget.companyData,
       );
 
+  bool get _isSuperAdmin => ProductionAccessHelper.isSuperAdminRole(
+        widget.companyData['role']?.toString() ?? '',
+      );
+
   @override
   void initState() {
     super.initState();
@@ -62,6 +68,21 @@ class _DevelopmentProjectsListScreenState
       appBar: AppBar(
         title: Text(title),
         actions: [
+          if (_isSuperAdmin)
+            IconButton(
+              tooltip: 'Matrica uloga i dozvola (super admin)',
+              icon: const Icon(Icons.table_rows_outlined),
+              onPressed: () {
+                Navigator.push<void>(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => DevelopmentRolesPermissionsScreen(
+                      companyData: widget.companyData,
+                    ),
+                  ),
+                );
+              },
+            ),
           IconButton(
             tooltip: 'Prikazuju se samo projekti vaše organizacije i odabranog pogona.',
             icon: const Icon(Icons.info_outline),
