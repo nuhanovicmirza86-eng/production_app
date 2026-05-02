@@ -44,6 +44,7 @@ import '../../downtime/screens/downtimes_screen.dart';
 import '../../execution/screens/process_execution_hub_screen.dart';
 import '../../qr/production_qr_scan_flow.dart';
 import '../../../quality/screens/execute_inspection_screen.dart';
+import '../../../development/screens/development_projects_list_screen.dart';
 import '../../../quality/screens/quality_hub_screen.dart';
 
 class _ProdNavItem {
@@ -427,6 +428,19 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         ),
     ];
 
+    final developmentTiles = <Widget>[
+      if (ProductionModuleKeys.hasModule(companyData, ProductionModuleKeys.development) &&
+          _canViewCard(ProductionDashboardCard.developmentGovernance))
+        _DashboardActionTile(
+          icon: Icons.account_tree_outlined,
+          title: 'Razvoj / NPI / Projekti',
+          subtitle:
+              'Portfolio, Stage-Gate, KPI i veza prema proizvodnji i kvalitetu (pretplata „development“).',
+          onTap: () =>
+              open(DevelopmentProjectsListScreen(companyData: companyData)),
+        ),
+    ];
+
     final commercialTiles = <Widget>[
       if (_canAccessOrders())
         _DashboardActionTile(
@@ -525,6 +539,13 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           'SaaS modul „quality“: IATF-friendly kontrola — plan, izvršenje, neskladi, CAPA.',
       icon: Icons.fact_check_outlined,
       tiles: qualityTiles,
+    );
+    addModuleSection(
+      title: 'Razvoj i projekti',
+      subtitle:
+          'SaaS modul „development“: NPI, Stage-Gate, portfolio po poslovnoj godini i pogonu.',
+      icon: Icons.account_tree_outlined,
+      tiles: developmentTiles,
     );
     addModuleSection(
       title: 'Komercijalno',
@@ -632,6 +653,38 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
               context,
               MaterialPageRoute<void>(
                 builder: (_) => QualityHubScreen(companyData: companyData),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    if (ProductionModuleKeys.hasModule(companyData, ProductionModuleKeys.development) &&
+        _canViewCard(ProductionDashboardCard.developmentGovernance)) {
+      if (tiles.isNotEmpty) {
+        tiles.add(const SizedBox(height: sectionGap));
+      }
+      tiles.add(
+        const _ModuleGroupHeader(
+          title: 'Razvoj i projekti',
+          subtitle:
+              'Pretplata uključuje modul „development“: portfolio, NPI, Stage-Gate.',
+          icon: Icons.account_tree_outlined,
+        ),
+      );
+      tiles.add(const SizedBox(height: afterHeader));
+      tiles.add(
+        _DashboardActionTile(
+          icon: Icons.account_tree_outlined,
+          title: 'Razvoj / NPI / Projekti',
+          subtitle: 'Lista projekata za odabrani pogon i poslovnu godinu.',
+          onTap: () {
+            Navigator.push<void>(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    DevelopmentProjectsListScreen(companyData: companyData),
               ),
             );
           },
@@ -770,6 +823,20 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             icon: Icon(Icons.assignment_turned_in_outlined),
             selectedIcon: Icon(Icons.assignment_turned_in),
             label: 'Kvalitet',
+          ),
+        ),
+      );
+    }
+
+    if (ProductionModuleKeys.hasModule(cd, ProductionModuleKeys.development) &&
+        _canViewCard(ProductionDashboardCard.developmentGovernance)) {
+      items.add(
+        _ProdNavItem(
+          builder: (_) => DevelopmentProjectsListScreen(companyData: cd),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.account_tree_outlined),
+            selectedIcon: Icon(Icons.account_tree),
+            label: 'Razvoj',
           ),
         ),
       );
@@ -1145,6 +1212,27 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                             context,
                             MaterialPageRoute<void>(
                               builder: (_) => QualityHubScreen(companyData: cd),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                    if (ProductionModuleKeys.hasModule(cd, ProductionModuleKeys.development) &&
+                        _canViewCard(
+                          ProductionDashboardCard.developmentGovernance,
+                        )) ...[
+                      const SizedBox(height: 10),
+                      _DashboardActionTile(
+                        icon: Icons.account_tree_outlined,
+                        title: 'Razvoj / NPI / Projekti',
+                        subtitle: 'Portfolio i projekti',
+                        onTap: () {
+                          _shellScaffoldKey.currentState?.closeDrawer();
+                          Navigator.push<void>(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  DevelopmentProjectsListScreen(companyData: cd),
                             ),
                           );
                         },
