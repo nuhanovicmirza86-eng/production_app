@@ -3,6 +3,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:production_app/modules/auth/register/screens/pending_users_screen.dart';
+import 'package:production_app/modules/development/screens/development_project_details_screen.dart';
 import 'package:production_app/modules/production/ooe/screens/ooe_dashboard_screen.dart';
 import 'package:production_app/modules/production/ooe/screens/ooe_shift_summary_screen.dart';
 import 'package:production_app/modules/production/production_orders/screens/production_order_details_screen.dart';
@@ -94,6 +95,24 @@ class MesInboxScreen extends StatelessWidget {
               builder: (_) => OoeShiftSummaryScreen(
                 companyData: cd,
                 initialSummaryDocId: sid,
+              ),
+            ),
+          );
+        }
+        break;
+      case 'development_project':
+        var devPid = _s(data['entityId']);
+        final dex = data['extra'];
+        if (devPid.isEmpty && dex is Map) {
+          devPid = _s(dex['developmentProjectId']);
+        }
+        if (devPid.isNotEmpty) {
+          await Navigator.push<void>(
+            context,
+            MaterialPageRoute<void>(
+              builder: (_) => DevelopmentProjectDetailsScreen(
+                companyData: cd,
+                projectId: devPid,
               ),
             ),
           );
