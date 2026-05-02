@@ -262,3 +262,43 @@ abstract final class DevelopmentApprovalStatuses {
     withdrawn,
   ];
 }
+
+/// Vrsta izmjene / ECO u `development_projects/.../changes`.
+abstract final class DevelopmentChangeKinds {
+  static const String eco = 'eco';
+  static const String design = 'design';
+  static const String process = 'process';
+  static const String tooling = 'tooling';
+  static const String supplier = 'supplier';
+  static const String regulatory = 'regulatory';
+  static const String other = 'other';
+
+  static const List<String> all = [
+    eco,
+    design,
+    process,
+    tooling,
+    supplier,
+    regulatory,
+    other,
+  ];
+}
+
+/// Status izmjene.
+abstract final class DevelopmentChangeStatuses {
+  static const String open = 'open';
+  static const String inReview = 'in_review';
+  static const String approved = 'approved';
+  static const String implemented = 'implemented';
+  static const String rejected = 'rejected';
+  static const String cancelled = 'cancelled';
+
+  static const List<String> all = [
+    open,
+    inReview,
+    approved,
+    implemented,
+    rejected,
+    cancelled,
+  ];
+}

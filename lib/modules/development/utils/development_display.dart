@@ -235,4 +235,44 @@ abstract final class DevelopmentDisplay {
         return code.isEmpty ? '—' : code;
     }
   }
+
+  static String changeKindLabel(String code) {
+    switch (code.trim()) {
+      case DevelopmentChangeKinds.eco:
+        return 'ECO / promjena';
+      case DevelopmentChangeKinds.design:
+        return 'Dizajn';
+      case DevelopmentChangeKinds.process:
+        return 'Proces';
+      case DevelopmentChangeKinds.tooling:
+        return 'Alat / oprema';
+      case DevelopmentChangeKinds.supplier:
+        return 'Dobavljač';
+      case DevelopmentChangeKinds.regulatory:
+        return 'Regulatorno';
+      case DevelopmentChangeKinds.other:
+        return 'Ostalo';
+      default:
+        return code.isEmpty ? '—' : code;
+    }
+  }
+
+  static String changeStatusLabel(String code) {
+    switch (code.trim()) {
+      case DevelopmentChangeStatuses.open:
+        return 'Otvoreno';
+      case DevelopmentChangeStatuses.inReview:
+        return 'U pregledu';
+      case DevelopmentChangeStatuses.approved:
+        return 'Odobreno';
+      case DevelopmentChangeStatuses.implemented:
+        return 'Implementirano';
+      case DevelopmentChangeStatuses.rejected:
+        return 'Odbijeno';
+      case DevelopmentChangeStatuses.cancelled:
+        return 'Otkazano';
+      default:
+        return code.isEmpty ? '—' : code;
+    }
+  }
 }

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/development_project_approval_model.dart';
+import '../models/development_project_change_model.dart';
 import '../models/development_project_document_model.dart';
 import '../models/development_project_model.dart';
 import '../models/development_project_risk_model.dart';
@@ -18,6 +19,49 @@ class DevelopmentProjectCreateResult {
 
   final String projectId;
   final String projectCode;
+}
+
+/// Odgovor Callabla `checkDevelopmentProjectReleaseReadiness`.
+class DevelopmentReleaseReadinessResult {
+  const DevelopmentReleaseReadinessResult({
+    required this.ok,
+    required this.targetGate,
+    required this.blockers,
+    required this.notes,
+  });
+
+  final bool ok;
+  final String targetGate;
+  final List<Map<String, dynamic>> blockers;
+  final List<String> notes;
+
+  static DevelopmentReleaseReadinessResult parse(dynamic raw) {
+    if (raw is! Map) {
+      throw Exception('Očekivan odgovor s poslužitelja nije stigao.');
+    }
+    final m = Map<String, dynamic>.from(raw);
+    final bl = m['blockers'];
+    final blockers = <Map<String, dynamic>>[];
+    if (bl is List) {
+      for (final x in bl) {
+        if (x is Map) blockers.add(Map<String, dynamic>.from(x));
+      }
+    }
+    final n = m['notes'];
+    final notes = <String>[];
+    if (n is List) {
+      for (final x in n) {
+        final s = x?.toString().trim() ?? '';
+        if (s.isNotEmpty) notes.add(s);
+      }
+    }
+    return DevelopmentReleaseReadinessResult(
+      ok: m['ok'] == true,
+      targetGate: (m['targetGate'] ?? 'G8').toString(),
+      blockers: blockers,
+      notes: notes,
+    );
+  }
 }
 
 /// Čitanje kolekcije `development_projects`; mutacije preko Callable (Admin SDK).
@@ -80,6 +124,9 @@ class DevelopmentProjectService {
   CollectionReference<Map<String, dynamic>> _approvalsCol(String projectId) =>
       _collection.doc(projectId).collection('approvals');
 
+  CollectionReference<Map<String, dynamic>> _changesCol(String projectId) =>
+      _collection.doc(projectId).collection('changes');
+
   CollectionReference<Map<String, dynamic>> _stagesCol(String projectId) =>
       _collection.doc(projectId).collection('stages');
 
@@ -130,6 +177,22 @@ class DevelopmentProjectService {
         .map(
           (snap) => snap.docs
               .map(DevelopmentProjectApprovalModel.fromDoc)
+              .toList(growable: false),
+        );
+  }
+
+  /// Inženjerske izmjene (`changes`).
+  Stream<List<DevelopmentProjectChangeModel>> watchChanges(
+    String projectId, {
+    int limit = 200,
+  }) {
+    return _changesCol(projectId)
+        .orderBy('updatedAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map(DevelopmentProjectChangeModel.fromDoc)
               .toList(growable: false),
         );
   }
@@ -382,6 +445,87 @@ class DevelopmentProjectService {
       'approvalId': approvalId,
       'patch': patch,
     });
+  }
+
+  /// Kreiranje izmjene — Callable `createDevelopmentProjectChange`.
+  Future<String> createChangeViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+    required String title,
+    String? description,
+    String changeKind = DevelopmentChangeKinds.eco,
+    String status = DevelopmentChangeStatuses.open,
+    bool? blocksRelease,
+    String? linkedGate,
+    String? linkedDocumentId,
+    String? externalRef,
+  }) async {
+    final callable =
+        _functions().httpsCallable('createDevelopmentProjectChange');
+    final payload = <String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+      'title': title.trim(),
+      'changeKind': changeKind.trim(),
+      'status': status.trim(),
+    };
+    final d = description?.trim();
+    if (d != null && d.isNotEmpty) payload['description'] = d;
+    if (blocksRelease != null) payload['blocksRelease'] = blocksRelease;
+    final g = linkedGate?.trim();
+    if (g != null && g.isNotEmpty) payload['linkedGate'] = g;
+    final docId = linkedDocumentId?.trim();
+    if (docId != null && docId.isNotEmpty) payload['linkedDocumentId'] = docId;
+    final ext = externalRef?.trim();
+    if (ext != null && ext.isNotEmpty) payload['externalRef'] = ext;
+
+    final res = await callable.call(payload);
+    final raw = res.data;
+    if (raw is! Map) {
+      throw Exception('Očekivan odgovor s poslužitelja nije stigao.');
+    }
+    final id = Map<String, dynamic>.from(raw)['changeId']?.toString() ?? '';
+    if (id.isEmpty) throw Exception('Nije vraćen changeId.');
+    return id;
+  }
+
+  /// Ažuriranje izmjene — Callable `updateDevelopmentProjectChange`.
+  Future<void> updateChangeViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+    required String changeId,
+    required Map<String, dynamic> patch,
+  }) async {
+    final callable =
+        _functions().httpsCallable('updateDevelopmentProjectChange');
+    await callable.call(<String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+      'changeId': changeId,
+      'patch': patch,
+    });
+  }
+
+  /// Heuristička provjera prema §10 arhitekture — Callable `checkDevelopmentProjectReleaseReadiness`.
+  Future<DevelopmentReleaseReadinessResult> checkReleaseReadinessViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+    String targetGate = DevelopmentGateCodes.g8,
+  }) async {
+    final callable =
+        _functions().httpsCallable('checkDevelopmentProjectReleaseReadiness');
+    final res = await callable.call(<String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+      'targetGate': targetGate.trim(),
+    });
+    return DevelopmentReleaseReadinessResult.parse(res.data);
   }
 
   /// Kreiranje projekta — Callable `createDevelopmentProject`.

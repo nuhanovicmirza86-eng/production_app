@@ -82,6 +82,33 @@ class DevelopmentPermissions {
     return canMutateDevelopmentTasks(role: role, companyData: companyData);
   }
 
+  /// Evidencija izmjena (`changes`) — ista matrica kao zadaci / rizici.
+  static bool canMutateDevelopmentChanges({
+    required String? role,
+    required Map<String, dynamic> companyData,
+  }) {
+    return canMutateDevelopmentTasks(role: role, companyData: companyData);
+  }
+
+  /// Callable [checkDevelopmentProjectReleaseReadiness] — uža matrica (PM, kvaliteta, proizvodnja, NPI tim).
+  static bool canCheckDevelopmentReleaseReadiness({
+    required String? role,
+    required Map<String, dynamic> companyData,
+  }) {
+    if (!ProductionModuleKeys.hasModule(companyData, ProductionModuleKeys.development)) {
+      return false;
+    }
+    final r = _norm(role);
+    if (ProductionAccessHelper.isSuperAdminRole(r) ||
+        ProductionAccessHelper.isAdminRole(r)) {
+      return true;
+    }
+    if (canMutateDevelopmentTasks(role: role, companyData: companyData)) {
+      return true;
+    }
+    return canDecideDevelopmentApproval(role: role, companyData: companyData);
+  }
+
   /// Odluka na zahtjevu (odobri / odbij) — usklađeno s [canDecideDevelopmentApproval] u Callableima.
   static bool canDecideDevelopmentApproval({
     required String? role,
