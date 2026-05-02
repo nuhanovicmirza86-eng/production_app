@@ -9,6 +9,7 @@ import '../utils/development_permissions.dart';
 import 'development_project_edit_screen.dart';
 import 'development_project_team_screen.dart';
 import '../widgets/development_project_documents_section.dart';
+import '../widgets/development_project_approvals_section.dart';
 import '../widgets/development_project_risks_section.dart';
 import '../widgets/development_project_stages_section.dart';
 import '../widgets/development_project_tasks_section.dart';
@@ -182,6 +183,10 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
                 project: p,
               ),
               DevelopmentProjectRisksSection(
+                companyData: companyData,
+                project: p,
+              ),
+              DevelopmentProjectApprovalsSection(
                 companyData: companyData,
                 project: p,
               ),

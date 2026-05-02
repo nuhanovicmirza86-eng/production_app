@@ -207,4 +207,32 @@ abstract final class DevelopmentDisplay {
         return code.isEmpty ? '—' : code;
     }
   }
+
+  static String approvalKindLabel(String code) {
+    switch (code.trim()) {
+      case DevelopmentApprovalKinds.general:
+        return 'Općenito';
+      case DevelopmentApprovalKinds.gatePass:
+        return 'Prolaz kroz Gate';
+      case DevelopmentApprovalKinds.documentSignoff:
+        return 'Potpis dokumenta';
+      default:
+        return code.isEmpty ? '—' : code;
+    }
+  }
+
+  static String approvalStatusLabel(String code) {
+    switch (code.trim()) {
+      case DevelopmentApprovalStatuses.pending:
+        return 'Na čekanju';
+      case DevelopmentApprovalStatuses.approved:
+        return 'Odobreno';
+      case DevelopmentApprovalStatuses.rejected:
+        return 'Odbijeno';
+      case DevelopmentApprovalStatuses.withdrawn:
+        return 'Povučeno';
+      default:
+        return code.isEmpty ? '—' : code;
+    }
+  }
 }

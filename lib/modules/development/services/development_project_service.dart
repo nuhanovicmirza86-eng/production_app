@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../models/development_project_approval_model.dart';
 import '../models/development_project_document_model.dart';
 import '../models/development_project_model.dart';
 import '../models/development_project_risk_model.dart';
@@ -76,6 +77,9 @@ class DevelopmentProjectService {
   CollectionReference<Map<String, dynamic>> _risksCol(String projectId) =>
       _collection.doc(projectId).collection('risks');
 
+  CollectionReference<Map<String, dynamic>> _approvalsCol(String projectId) =>
+      _collection.doc(projectId).collection('approvals');
+
   CollectionReference<Map<String, dynamic>> _stagesCol(String projectId) =>
       _collection.doc(projectId).collection('stages');
 
@@ -110,6 +114,22 @@ class DevelopmentProjectService {
         .map(
           (snap) => snap.docs
               .map(DevelopmentProjectRiskModel.fromDoc)
+              .toList(growable: false),
+        );
+  }
+
+  /// Zahtjevi za odobrenje (`approvals`).
+  Stream<List<DevelopmentProjectApprovalModel>> watchApprovals(
+    String projectId, {
+    int limit = 200,
+  }) {
+    return _approvalsCol(projectId)
+        .orderBy('updatedAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map(DevelopmentProjectApprovalModel.fromDoc)
               .toList(growable: false),
         );
   }
@@ -304,6 +324,62 @@ class DevelopmentProjectService {
       'plantKey': plantKey,
       'projectId': projectId,
       'riskId': riskId,
+      'patch': patch,
+    });
+  }
+
+  /// Kreiranje zahtjeva za odobrenje — Callable `createDevelopmentProjectApproval`.
+  Future<String> createApprovalViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+    required String title,
+    String? description,
+    String approvalKind = DevelopmentApprovalKinds.general,
+    String? linkedGate,
+    String? linkedDocumentId,
+  }) async {
+    final callable =
+        _functions().httpsCallable('createDevelopmentProjectApproval');
+    final payload = <String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+      'title': title.trim(),
+      'approvalKind': approvalKind.trim(),
+    };
+    final d = description?.trim();
+    if (d != null && d.isNotEmpty) payload['description'] = d;
+    final g = linkedGate?.trim();
+    if (g != null && g.isNotEmpty) payload['linkedGate'] = g;
+    final docId = linkedDocumentId?.trim();
+    if (docId != null && docId.isNotEmpty) payload['linkedDocumentId'] = docId;
+
+    final res = await callable.call(payload);
+    final raw = res.data;
+    if (raw is! Map) {
+      throw Exception('Očekivan odgovor s poslužitelja nije stigao.');
+    }
+    final id = Map<String, dynamic>.from(raw)['approvalId']?.toString() ?? '';
+    if (id.isEmpty) throw Exception('Nije vraćen approvalId.');
+    return id;
+  }
+
+  /// Ažuriranje odobrenja — Callable `updateDevelopmentProjectApproval`.
+  Future<void> updateApprovalViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+    required String approvalId,
+    required Map<String, dynamic> patch,
+  }) async {
+    final callable =
+        _functions().httpsCallable('updateDevelopmentProjectApproval');
+    await callable.call(<String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+      'approvalId': approvalId,
       'patch': patch,
     });
   }

@@ -74,6 +74,55 @@ class DevelopmentPermissions {
     return canMutateDevelopmentTasks(role: role, companyData: companyData);
   }
 
+  /// Zahtjevi za odobrenje (`approvals`) — predlaganje / uređivanje dok je pending: ista matrica kao zadaci.
+  static bool canMutateDevelopmentApprovals({
+    required String? role,
+    required Map<String, dynamic> companyData,
+  }) {
+    return canMutateDevelopmentTasks(role: role, companyData: companyData);
+  }
+
+  /// Odluka na zahtjevu (odobri / odbij) — usklađeno s [canDecideDevelopmentApproval] u Callableima.
+  static bool canDecideDevelopmentApproval({
+    required String? role,
+    required Map<String, dynamic> companyData,
+  }) {
+    if (!ProductionModuleKeys.hasModule(companyData, ProductionModuleKeys.development)) {
+      return false;
+    }
+    final r = _norm(role);
+    if (ProductionAccessHelper.isSuperAdminRole(r) ||
+        ProductionAccessHelper.isAdminRole(r)) {
+      return true;
+    }
+    return r == ProductionAccessHelper.roleProjectManager ||
+        r == ProductionAccessHelper.roleQualityOperator ||
+        r == ProductionAccessHelper.roleQualityControl ||
+        r == ProductionAccessHelper.roleProductionManager;
+  }
+
+  /// Povlačenje pending zahtjeva — admin, kreator ili operativci matrice zadataka (kao backend).
+  static bool canWithdrawDevelopmentApproval({
+    required String? role,
+    required Map<String, dynamic> companyData,
+    required String createdByUid,
+    String? currentUserId,
+  }) {
+    if (!ProductionModuleKeys.hasModule(companyData, ProductionModuleKeys.development)) {
+      return false;
+    }
+    final r = _norm(role);
+    final uid = (currentUserId ?? '').trim();
+    if (ProductionAccessHelper.isSuperAdminRole(r) ||
+        ProductionAccessHelper.isAdminRole(r)) {
+      return true;
+    }
+    if (uid.isNotEmpty && uid == createdByUid.trim()) {
+      return true;
+    }
+    return canMutateDevelopmentTasks(role: role, companyData: companyData);
+  }
+
   /// Faze Stage-Gate (`stages`) — Callable [updateDevelopmentProjectStage].
   static bool canMutateDevelopmentStages({
     required String? role,

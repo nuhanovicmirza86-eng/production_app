@@ -234,3 +234,31 @@ abstract final class DevelopmentRiskCategories {
     regulatory,
   ];
 }
+
+/// Vrsta zahtjeva u `development_projects/.../approvals` (Callable šema).
+abstract final class DevelopmentApprovalKinds {
+  static const String general = 'general';
+  static const String gatePass = 'gate_pass';
+  static const String documentSignoff = 'document_signoff';
+
+  static const List<String> all = [
+    general,
+    gatePass,
+    documentSignoff,
+  ];
+}
+
+/// Status zapisa odobrenja.
+abstract final class DevelopmentApprovalStatuses {
+  static const String pending = 'pending';
+  static const String approved = 'approved';
+  static const String rejected = 'rejected';
+  static const String withdrawn = 'withdrawn';
+
+  static const List<String> all = [
+    pending,
+    approved,
+    rejected,
+    withdrawn,
+  ];
+}
