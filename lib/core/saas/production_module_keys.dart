@@ -88,6 +88,14 @@ abstract final class ProductionModuleKeys {
         hasModule(companyData, ProductionModuleKeys.aiAssistantProduction);
   }
 
+  /// AI sažetak jednog projekta razvoja — Callable [runDevelopmentProjectAiAnalysis].
+  /// Potreban modul [development] te [developmentAi] ili [hasAiProductionAnalyticsModule].
+  static bool canUseDevelopmentProjectAi(Map<String, dynamic> companyData) {
+    if (!hasModule(companyData, development)) return false;
+    return hasDevelopmentCapability(companyData, developmentAi) ||
+        hasAiProductionAnalyticsModule(companyData);
+  }
+
   /// AI izvještaj (Markdown) — legacy, Production paket ili add-on [aiReports].
   static bool hasAiProductionMarkdownReportModule(
     Map<String, dynamic> companyData,

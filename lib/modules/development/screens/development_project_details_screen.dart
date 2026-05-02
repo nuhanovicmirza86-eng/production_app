@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../models/development_project_model.dart';
 import '../services/development_project_service.dart';
@@ -221,6 +222,83 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
               _SectionCard(
                 title: 'AI uvidi',
                 children: [
+                  if (DevelopmentPermissions.canRunDevelopmentProjectAi(
+                    role: companyData['role']?.toString(),
+                    companyData: companyData,
+                  ))
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: FilledButton.tonalIcon(
+                        onPressed: () async {
+                          final nav = Navigator.of(context, rootNavigator: true);
+                          final service = DevelopmentProjectService();
+                          final cid = (companyData['companyId'] ?? '')
+                              .toString()
+                              .trim();
+                          final pk =
+                              (companyData['plantKey'] ?? '').toString().trim();
+                          showDialog<void>(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (ctx) => const AlertDialog(
+                              content: Row(
+                                children: [
+                                  CircularProgressIndicator(),
+                                  SizedBox(width: 16),
+                                  Expanded(
+                                    child: Text('AI generiše sažetak…'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                          try {
+                            final md =
+                                await service.runDevelopmentProjectAiAnalysis(
+                              companyId: cid,
+                              plantKey: pk,
+                              projectId: p.id,
+                            );
+                            nav.pop();
+                            if (!context.mounted) return;
+                            await showDialog<void>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('AI sažetak projekta'),
+                                content: SizedBox(
+                                  width: double.maxFinite,
+                                  height: 400,
+                                  child: MarkdownBody(
+                                    data: md,
+                                    selectable: true,
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: const Text('Zatvori'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          } catch (e) {
+                            nav.pop();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('AI: $e')),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.auto_awesome_outlined),
+                        label: const Text('Generiraj AI sažetak'),
+                      ),
+                    ),
+                  if (DevelopmentPermissions.canRunDevelopmentProjectAi(
+                    role: companyData['role']?.toString(),
+                    companyData: companyData,
+                  ))
+                    const SizedBox(height: 12),
                   if (ai.riskPrediction.isNotEmpty)
                     _kv(context, 'Predikcija rizika', ai.riskPrediction),
                   if (ai.delayProbability != null)
@@ -231,9 +309,24 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
                       'Preporuke',
                       '${ai.recommendedActionCount}',
                     ),
-                  if (ai.riskPrediction.isEmpty && ai.delayProbability == null)
+                  if (!DevelopmentPermissions.canRunDevelopmentProjectAi(
+                        role: companyData['role']?.toString(),
+                        companyData: companyData,
+                      ) &&
+                      ai.riskPrediction.isEmpty &&
+                      ai.delayProbability == null)
                     Text(
                       'AI analiza još nije pokrenuta.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  if (DevelopmentPermissions.canRunDevelopmentProjectAi(
+                        role: companyData['role']?.toString(),
+                        companyData: companyData,
+                      ) &&
+                      ai.riskPrediction.isEmpty &&
+                      ai.delayProbability == null)
+                    Text(
+                      'Polja ispod pune se iz agregata; koristi dugme za svježi sažetak.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                 ],

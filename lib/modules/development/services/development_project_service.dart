@@ -289,4 +289,35 @@ class DevelopmentProjectService {
       'team': team,
     });
   }
+
+  /// AI sažetak (Vertex) — Callable `runDevelopmentProjectAiAnalysis`; kontekst učitava backend.
+  Future<String> runDevelopmentProjectAiAnalysis({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+    String? analysisFocus,
+  }) async {
+    final callable =
+        _functions().httpsCallable('runDevelopmentProjectAiAnalysis');
+    final payload = <String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+    };
+    final f = analysisFocus?.trim();
+    if (f != null && f.isNotEmpty) {
+      payload['analysisFocus'] = f;
+    }
+    final res = await callable.call(payload);
+    final raw = res.data;
+    if (raw is! Map) {
+      throw Exception('Očekivan odgovor s poslužitelja nije stigao.');
+    }
+    final md =
+        Map<String, dynamic>.from(raw)['analysisMarkdown']?.toString() ?? '';
+    if (md.isEmpty) {
+      throw Exception('Prazan AI odgovor.');
+    }
+    return md;
+  }
 }

@@ -74,6 +74,31 @@ class DevelopmentPermissions {
     return canMutateDevelopmentTasks(role: role, companyData: companyData);
   }
 
+  /// AI sažetak projekta — Callable [runDevelopmentProjectAiAnalysis]; pretplata + uloga.
+  static bool canRunDevelopmentProjectAi({
+    required String? role,
+    required Map<String, dynamic> companyData,
+  }) {
+    if (!ProductionModuleKeys.canUseDevelopmentProjectAi(companyData)) {
+      return false;
+    }
+    final r = _norm(role);
+    if (ProductionAccessHelper.isSuperAdminRole(r) ||
+        ProductionAccessHelper.isAdminRole(r)) {
+      return true;
+    }
+    return r == ProductionAccessHelper.roleProjectManager ||
+        r == ProductionAccessHelper.roleDevelopmentEngineer ||
+        r == ProductionAccessHelper.roleQualityOperator ||
+        r == ProductionAccessHelper.roleQualityControl ||
+        r == ProductionAccessHelper.roleProductionManager ||
+        r == ProductionAccessHelper.roleSupervisor ||
+        r == ProductionAccessHelper.roleProductionOperator ||
+        r == ProductionAccessHelper.roleManagementViewer ||
+        r == ProductionAccessHelper.roleMaintenanceManager ||
+        r == ProductionAccessHelper.roleLogisticsManager;
+  }
+
   /// Tim projekta — Callable [replaceDevelopmentProjectTeam]: admin/super_admin ili trenutni PM.
   static bool canEditDevelopmentProjectTeam({
     required String? role,
