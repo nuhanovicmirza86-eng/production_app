@@ -69,6 +69,69 @@ abstract final class DevelopmentDisplay {
     }
   }
 
+  static String riskStatusLabel(String code) {
+    switch (code.trim()) {
+      case DevelopmentRiskStatuses.open:
+        return 'Otvoren';
+      case DevelopmentRiskStatuses.mitigating:
+        return 'U ublažavanju';
+      case DevelopmentRiskStatuses.mitigated:
+        return 'Ublažen';
+      case DevelopmentRiskStatuses.accepted:
+        return 'Prihvaćen';
+      case DevelopmentRiskStatuses.closed:
+        return 'Zatvoren';
+      case DevelopmentRiskStatuses.cancelled:
+        return 'Otkazan';
+      default:
+        return code.isEmpty ? '—' : code;
+    }
+  }
+
+  static String riskSeverityLabel(String code) {
+    switch (code.trim()) {
+      case DevelopmentRiskLevels.low:
+        return 'Nizak';
+      case DevelopmentRiskLevels.medium:
+        return 'Srednji';
+      case DevelopmentRiskLevels.high:
+        return 'Visok';
+      case DevelopmentRiskLevels.critical:
+        return 'Kritičan';
+      default:
+        return code.isEmpty ? '—' : code;
+    }
+  }
+
+  static String riskCategoryLabel(String code) {
+    switch (code.trim()) {
+      case DevelopmentRiskCategories.technical:
+        return 'Tehnički';
+      case DevelopmentRiskCategories.quality:
+        return 'Kvaliteta';
+      case DevelopmentRiskCategories.supplier:
+        return 'Dobavljač';
+      case DevelopmentRiskCategories.capacity:
+        return 'Kapacitet';
+      case DevelopmentRiskCategories.cost:
+        return 'Trošak';
+      case DevelopmentRiskCategories.deadline:
+        return 'Rok';
+      case DevelopmentRiskCategories.customer:
+        return 'Kupac';
+      case DevelopmentRiskCategories.tooling:
+        return 'Alat / oprema';
+      case DevelopmentRiskCategories.production:
+        return 'Proizvodnja';
+      case DevelopmentRiskCategories.logistics:
+        return 'Logistika';
+      case DevelopmentRiskCategories.regulatory:
+        return 'Regulatorno';
+      default:
+        return code.isEmpty ? '—' : code;
+    }
+  }
+
   static String teamProjectRoleLabel(String code) {
     switch (code.trim()) {
       case DevelopmentTeamProjectRoles.projectManager:

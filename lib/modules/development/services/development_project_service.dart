@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/development_project_model.dart';
+import '../models/development_project_risk_model.dart';
 import '../models/development_project_task_model.dart';
 import '../utils/development_constants.dart';
 
@@ -70,6 +71,9 @@ class DevelopmentProjectService {
   CollectionReference<Map<String, dynamic>> _tasksCol(String projectId) =>
       _collection.doc(projectId).collection('tasks');
 
+  CollectionReference<Map<String, dynamic>> _risksCol(String projectId) =>
+      _collection.doc(projectId).collection('risks');
+
   /// Zadaci projekta (podkolekcija `tasks`).
   Stream<List<DevelopmentProjectTaskModel>> watchTasks(
     String projectId, {
@@ -82,6 +86,22 @@ class DevelopmentProjectService {
         .map(
           (snap) => snap.docs
               .map(DevelopmentProjectTaskModel.fromDoc)
+              .toList(growable: false),
+        );
+  }
+
+  /// Rizici projekta (podkolekcija `risks`).
+  Stream<List<DevelopmentProjectRiskModel>> watchRisks(
+    String projectId, {
+    int limit = 200,
+  }) {
+    return _risksCol(projectId)
+        .orderBy('updatedAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map(DevelopmentProjectRiskModel.fromDoc)
               .toList(growable: false),
         );
   }
@@ -130,6 +150,66 @@ class DevelopmentProjectService {
       'plantKey': plantKey,
       'projectId': projectId,
       'taskId': taskId,
+      'patch': patch,
+    });
+  }
+
+  /// Kreiranje rizika — Callable `createDevelopmentProjectRisk`.
+  Future<String> createRiskViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+    required String title,
+    String? description,
+    String severity = DevelopmentRiskLevels.medium,
+    String status = DevelopmentRiskStatuses.open,
+    String? category,
+    bool? blocksRelease,
+    String? mitigationNote,
+  }) async {
+    final callable =
+        _functions().httpsCallable('createDevelopmentProjectRisk');
+    final payload = <String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+      'title': title.trim(),
+      'severity': severity.trim(),
+      'status': status.trim(),
+    };
+    final d = description?.trim();
+    if (d != null && d.isNotEmpty) payload['description'] = d;
+    final c = category?.trim();
+    if (c != null && c.isNotEmpty) payload['category'] = c;
+    if (blocksRelease != null) payload['blocksRelease'] = blocksRelease;
+    final m = mitigationNote?.trim();
+    if (m != null && m.isNotEmpty) payload['mitigationNote'] = m;
+
+    final res = await callable.call(payload);
+    final raw = res.data;
+    if (raw is! Map) {
+      throw Exception('Očekivan odgovor s poslužitelja nije stigao.');
+    }
+    final id = Map<String, dynamic>.from(raw)['riskId']?.toString() ?? '';
+    if (id.isEmpty) throw Exception('Nije vraćen riskId.');
+    return id;
+  }
+
+  /// Ažuriranje rizika — Callable `updateDevelopmentProjectRisk`.
+  Future<void> updateRiskViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+    required String riskId,
+    required Map<String, dynamic> patch,
+  }) async {
+    final callable =
+        _functions().httpsCallable('updateDevelopmentProjectRisk');
+    await callable.call(<String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+      'riskId': riskId,
       'patch': patch,
     });
   }

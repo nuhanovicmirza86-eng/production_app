@@ -66,6 +66,14 @@ class DevelopmentPermissions {
         r == ProductionAccessHelper.roleSupervisor;
   }
 
+  /// Rizici (`risks`) — Callables [createDevelopmentProjectRisk] / [updateDevelopmentProjectRisk]; ista matrica kao zadaci.
+  static bool canMutateDevelopmentRisks({
+    required String? role,
+    required Map<String, dynamic> companyData,
+  }) {
+    return canMutateDevelopmentTasks(role: role, companyData: companyData);
+  }
+
   /// Tim projekta — Callable [replaceDevelopmentProjectTeam]: admin/super_admin ili trenutni PM.
   static bool canEditDevelopmentProjectTeam({
     required String? role,

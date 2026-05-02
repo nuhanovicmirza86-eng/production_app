@@ -112,6 +112,25 @@ abstract final class DevelopmentTaskStatuses {
   ];
 }
 
+/// Status rizika u `development_projects/.../risks`.
+abstract final class DevelopmentRiskStatuses {
+  static const String open = 'open';
+  static const String mitigating = 'mitigating';
+  static const String mitigated = 'mitigated';
+  static const String accepted = 'accepted';
+  static const String closed = 'closed';
+  static const String cancelled = 'cancelled';
+
+  static const List<String> all = [
+    open,
+    mitigating,
+    mitigated,
+    accepted,
+    closed,
+    cancelled,
+  ];
+}
+
 /// Uloga na projektu (`team[].projectRole`) — ne miješati s globalnim `users.role`.
 abstract final class DevelopmentTeamProjectRoles {
   static const String projectManager = 'project_manager';
@@ -145,4 +164,18 @@ abstract final class DevelopmentRiskCategories {
   static const String production = 'production';
   static const String logistics = 'logistics';
   static const String regulatory = 'regulatory';
+
+  static const List<String> all = [
+    technical,
+    quality,
+    supplier,
+    capacity,
+    cost,
+    deadline,
+    customer,
+    tooling,
+    production,
+    logistics,
+    regulatory,
+  ];
 }
