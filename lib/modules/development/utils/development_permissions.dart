@@ -109,6 +109,24 @@ class DevelopmentPermissions {
     return canDecideDevelopmentApproval(role: role, companyData: companyData);
   }
 
+  /// Zapis release u proizvodnju — Callable [recordDevelopmentProjectReleaseToProduction]
+  /// (admin / super_admin / voditelj projekta / menadžer proizvodnje).
+  static bool canRecordDevelopmentReleaseToProduction({
+    required String? role,
+    required Map<String, dynamic> companyData,
+  }) {
+    if (!ProductionModuleKeys.hasModule(companyData, ProductionModuleKeys.development)) {
+      return false;
+    }
+    final r = _norm(role);
+    if (ProductionAccessHelper.isSuperAdminRole(r) ||
+        ProductionAccessHelper.isAdminRole(r)) {
+      return true;
+    }
+    return r == ProductionAccessHelper.roleProjectManager ||
+        r == ProductionAccessHelper.roleProductionManager;
+  }
+
   /// Odluka na zahtjevu (odobri / odbij) — usklađeno s [canDecideDevelopmentApproval] u Callableima.
   static bool canDecideDevelopmentApproval({
     required String? role,

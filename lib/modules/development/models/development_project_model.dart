@@ -75,6 +75,11 @@ class DevelopmentProjectModel {
   final DateTime? closedAt;
   final String? closedBy;
 
+  final DateTime? releasedToProductionAt;
+  final String? releasedToProductionBy;
+  final String? releasedToProductionByName;
+  final String? releasedToProductionGate;
+
   const DevelopmentProjectModel({
     required this.id,
     required this.companyId,
@@ -125,6 +130,10 @@ class DevelopmentProjectModel {
     required this.updatedBy,
     this.closedAt,
     this.closedBy,
+    this.releasedToProductionAt,
+    this.releasedToProductionBy,
+    this.releasedToProductionByName,
+    this.releasedToProductionGate,
   });
 
   static String _s(dynamic v) => (v ?? '').toString().trim();
@@ -255,6 +264,19 @@ class DevelopmentProjectModel {
       updatedBy: _s(data['updatedBy']),
       closedAt: _ts(data['closedAt']),
       closedBy: _s(data['closedBy']).isEmpty ? null : _s(data['closedBy']),
+      releasedToProductionAt: _ts(data['releasedToProductionAt']),
+      releasedToProductionBy: () {
+        final s = _s(data['releasedToProductionBy']);
+        return s.isEmpty ? null : s;
+      }(),
+      releasedToProductionByName: () {
+        final s = _s(data['releasedToProductionByName']);
+        return s.isEmpty ? null : s;
+      }(),
+      releasedToProductionGate: () {
+        final s = _s(data['releasedToProductionGate']);
+        return s.isEmpty ? null : s;
+      }(),
     );
   }
 }

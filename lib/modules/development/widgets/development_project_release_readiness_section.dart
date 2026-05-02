@@ -1,5 +1,6 @@
 // ignore_for_file: deprecated_member_use
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../models/development_project_model.dart';
@@ -31,6 +32,18 @@ class _DevelopmentProjectReleaseReadinessSectionState
         role: widget.companyData['role']?.toString(),
         companyData: widget.companyData,
       );
+
+  bool get _canRecord =>
+      DevelopmentPermissions.canRecordDevelopmentReleaseToProduction(
+        role: widget.companyData['role']?.toString(),
+        companyData: widget.companyData,
+      );
+
+  bool get _alreadyReleased =>
+      widget.project.releasedToProductionAt != null;
+
+  bool get _hasProductId =>
+      (widget.project.productId ?? '').trim().isNotEmpty;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -133,9 +146,78 @@ class _DevelopmentProjectReleaseReadinessSectionState
     }
   }
 
+  Future<void> _recordRelease() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Release u proizvodnju'),
+        content: Text(
+          'Zabilježiti puštanje u proizvodnju za referentni gate $_targetGate? '
+          'Na poslužitelju se provjeravaju ista pravila kao kod „Provjeri”.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Odustani'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Zabilježi'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    final nav = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Expanded(child: Text('Zapisujem release…')),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final service = DevelopmentProjectService();
+      await service.recordReleaseToProductionViaCallable(
+        companyId: _companyId,
+        plantKey: _plantKey,
+        projectId: widget.project.id,
+        targetGate: _targetGate,
+      );
+      nav.pop();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Release u proizvodnju je zabilježen.')),
+      );
+    } on FirebaseFunctionsException catch (e) {
+      nav.pop();
+      if (mounted) {
+        final m = e.message?.trim();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text((m != null && m.isNotEmpty) ? m : e.toString())),
+        );
+      }
+    } catch (e) {
+      nav.pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Release: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (!_canRun) {
+    if (!_canRun && !_canRecord && !_alreadyReleased) {
       return const SizedBox.shrink();
     }
 
@@ -160,6 +242,40 @@ class _DevelopmentProjectReleaseReadinessSectionState
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
             ),
+            if (_alreadyReleased) ...[
+              const SizedBox(height: 12),
+              Material(
+                color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Projekat je pušten u proizvodnju',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Gate: ${widget.project.releasedToProductionGate ?? '—'} · '
+                        '${widget.project.releasedToProductionAt!.toLocal()}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      if ((widget.project.releasedToProductionByName ?? '')
+                          .trim()
+                          .isNotEmpty)
+                        Text(
+                          'Korisnik: ${widget.project.releasedToProductionByName}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             Row(
               children: [
@@ -182,12 +298,31 @@ class _DevelopmentProjectReleaseReadinessSectionState
                   ),
                 ),
                 const SizedBox(width: 12),
-                FilledButton.tonal(
-                  onPressed: _runCheck,
-                  child: const Text('Provjeri'),
-                ),
+                if (_canRun)
+                  FilledButton.tonal(
+                    onPressed: _runCheck,
+                    child: const Text('Provjeri'),
+                  ),
               ],
             ),
+            if (_canRecord && !_alreadyReleased) ...[
+              const SizedBox(height: 12),
+              if (!_hasProductId)
+                Text(
+                  'Prije zapisa releasea u sustavu mora biti postavljen proizvod na projektu (productId).',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                )
+              else
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton(
+                    onPressed: _recordRelease,
+                    child: const Text('Zabilježi release u proizvodnju'),
+                  ),
+                ),
+            ],
           ],
         ),
       ),

@@ -101,6 +101,22 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
                   _kv(context, 'Napredak', '${p.progressPercent}%'),
                   _kv(context, 'Prioritet', p.priority),
                   _kv(context, 'Rizik', p.riskLevel),
+                  if (p.releasedToProductionAt != null) ...[
+                    _kv(
+                      context,
+                      'Release u proizvodnju',
+                      p.releasedToProductionGate?.isNotEmpty == true
+                          ? p.releasedToProductionGate!
+                          : 'Da',
+                    ),
+                    _kv(
+                      context,
+                      'Release (datum)',
+                      p.releasedToProductionAt!.toLocal().toString(),
+                    ),
+                    if ((p.releasedToProductionByName ?? '').trim().isNotEmpty)
+                      _kv(context, 'Release (korisnik)', p.releasedToProductionByName!),
+                  ],
                 ],
               ),
               DevelopmentProjectStagesSection(

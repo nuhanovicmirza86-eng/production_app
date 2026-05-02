@@ -528,6 +528,31 @@ class DevelopmentProjectService {
     return DevelopmentReleaseReadinessResult.parse(res.data);
   }
 
+  /// Callable `recordDevelopmentProjectReleaseToProduction` — zapis na projektu nakon provjere blokada.
+  Future<Map<String, dynamic>> recordReleaseToProductionViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+    String targetGate = DevelopmentGateCodes.g8,
+  }) async {
+    final callable = _functions()
+        .httpsCallable('recordDevelopmentProjectReleaseToProduction');
+    final res = await callable.call(<String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+      'targetGate': targetGate.trim(),
+    });
+    final raw = res.data;
+    if (raw is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(raw);
+    }
+    if (raw is Map) {
+      return Map<String, dynamic>.from(raw);
+    }
+    return <String, dynamic>{'ok': true};
+  }
+
   /// Kreiranje projekta — Callable `createDevelopmentProject`.
   Future<DevelopmentProjectCreateResult> createProjectViaCallable({
     required String companyId,
