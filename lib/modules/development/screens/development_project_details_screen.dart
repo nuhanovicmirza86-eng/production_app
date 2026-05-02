@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../models/development_project_model.dart';
@@ -5,6 +6,7 @@ import '../services/development_project_service.dart';
 import '../utils/development_display.dart';
 import '../utils/development_permissions.dart';
 import 'development_project_edit_screen.dart';
+import 'development_project_team_screen.dart';
 
 /// Korak 5 MVP — pregled projekta (live stream).
 class DevelopmentProjectDetailsScreen extends StatelessWidget {
@@ -136,6 +138,32 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
                       context,
                       'Članovi (ID)',
                       p.teamMemberIds.join(', '),
+                    ),
+                  if (DevelopmentPermissions.canEditDevelopmentProjectTeam(
+                    role: companyData['role']?.toString(),
+                    companyData: companyData,
+                    project: p,
+                    currentUserId: FirebaseAuth.instance.currentUser?.uid,
+                  ))
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).push<void>(
+                              MaterialPageRoute<void>(
+                                builder: (_) => DevelopmentProjectTeamScreen(
+                                  companyData: companyData,
+                                  project: p,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.groups_2_outlined),
+                          label: const Text('Uredi tim'),
+                        ),
+                      ),
                     ),
                 ],
               ),

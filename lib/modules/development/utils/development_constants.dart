@@ -106,6 +106,16 @@ abstract final class DevelopmentTeamProjectRoles {
   static const String logisticsReviewer = 'logistics_reviewer';
   static const String maintenanceReviewer = 'maintenance_reviewer';
   static const String sponsor = 'sponsor';
+
+  static const List<String> all = [
+    projectManager,
+    technicalOwner,
+    qualityReviewer,
+    productionReviewer,
+    logisticsReviewer,
+    maintenanceReviewer,
+    sponsor,
+  ];
 }
 
 abstract final class DevelopmentRiskCategories {

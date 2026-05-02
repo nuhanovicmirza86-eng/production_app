@@ -40,6 +40,19 @@ class DevelopmentProjectTeamMember {
     );
   }
 
+  /// Payload za Callable [replaceDevelopmentProjectTeam].
+  Map<String, dynamic> toCallableMap() {
+    return {
+      'userId': userId,
+      'displayName': displayName,
+      'projectRole': projectRole,
+      'systemRole': systemRole,
+      'canEditTasks': canEditTasks,
+      'canUploadDocuments': canUploadDocuments,
+      'canApproveGate': canApproveGate,
+    };
+  }
+
   static List<DevelopmentProjectTeamMember> listFromField(dynamic raw) {
     if (raw is! List) return [];
     final out = <DevelopmentProjectTeamMember>[];

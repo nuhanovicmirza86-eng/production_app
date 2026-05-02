@@ -45,6 +45,27 @@ class DevelopmentPermissions {
     return canCreateDevelopmentProject(role: role, companyData: companyData);
   }
 
+  /// Tim projekta — Callable [replaceDevelopmentProjectTeam]: admin/super_admin ili trenutni PM.
+  static bool canEditDevelopmentProjectTeam({
+    required String? role,
+    required Map<String, dynamic> companyData,
+    required DevelopmentProjectModel project,
+    required String? currentUserId,
+  }) {
+    if (!ProductionModuleKeys.hasModule(companyData, ProductionModuleKeys.development)) {
+      return false;
+    }
+    final r = _norm(role);
+    final uid = (currentUserId ?? '').trim();
+    if (r == ProductionAccessHelper.roleSuperAdmin ||
+        r == ProductionAccessHelper.roleAdmin) {
+      return true;
+    }
+    return r == ProductionAccessHelper.roleProjectManager &&
+        uid.isNotEmpty &&
+        uid == project.projectManagerId;
+  }
+
   /// Agregirani KPI portfelja na listi — development engineer vidi samo ako je na projektu (kad je [project] zadan).
   static bool canViewDevelopmentPortfolioKpi({
     required String? role,

@@ -125,4 +125,20 @@ class DevelopmentProjectService {
       'patch': patch,
     });
   }
+
+  /// Zamjena `team` + `teamMemberIds` + PM — Callable `replaceDevelopmentProjectTeam`.
+  Future<void> replaceProjectTeamViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+    required List<Map<String, dynamic>> team,
+  }) async {
+    final callable = _functions().httpsCallable('replaceDevelopmentProjectTeam');
+    await callable.call(<String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+      'team': team,
+    });
+  }
 }
