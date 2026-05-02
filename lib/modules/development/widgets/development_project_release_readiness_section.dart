@@ -8,7 +8,7 @@ import '../services/development_project_service.dart';
 import '../utils/development_constants.dart';
 import '../utils/development_permissions.dart';
 
-/// Heuristička provjera spremnosti za release (Callable §10 — bez povezivanja na proizvod).
+/// Heuristička provjera spremnosti za release (arhitektura modula Razvoj — bez povezivanja na proizvod).
 class DevelopmentProjectReleaseReadinessSection extends StatefulWidget {
   const DevelopmentProjectReleaseReadinessSection({
     super.key,
