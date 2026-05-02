@@ -129,6 +129,44 @@ abstract final class DevelopmentStageStatuses {
   ];
 }
 
+/// Tip dokumenta u `development_projects/.../documents` (metadata).
+abstract final class DevelopmentDocumentTypes {
+  static const String spec = 'spec';
+  static const String drawing = 'drawing';
+  static const String protocol = 'protocol';
+  static const String certificate = 'certificate';
+  static const String checklist = 'checklist';
+  static const String report = 'report';
+  static const String other = 'other';
+
+  static const List<String> all = [
+    spec,
+    drawing,
+    protocol,
+    certificate,
+    checklist,
+    report,
+    other,
+  ];
+}
+
+/// Status dokumenta.
+abstract final class DevelopmentDocumentStatuses {
+  static const String draft = 'draft';
+  static const String submitted = 'submitted';
+  static const String approved = 'approved';
+  static const String obsolete = 'obsolete';
+  static const String rejected = 'rejected';
+
+  static const List<String> all = [
+    draft,
+    submitted,
+    approved,
+    obsolete,
+    rejected,
+  ];
+}
+
 /// Status rizika u `development_projects/.../risks`.
 abstract final class DevelopmentRiskStatuses {
   static const String open = 'open';

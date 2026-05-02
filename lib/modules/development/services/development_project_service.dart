@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../models/development_project_document_model.dart';
 import '../models/development_project_model.dart';
 import '../models/development_project_risk_model.dart';
 import '../models/development_project_stage_model.dart';
@@ -78,6 +79,9 @@ class DevelopmentProjectService {
   CollectionReference<Map<String, dynamic>> _stagesCol(String projectId) =>
       _collection.doc(projectId).collection('stages');
 
+  CollectionReference<Map<String, dynamic>> _documentsCol(String projectId) =>
+      _collection.doc(projectId).collection('documents');
+
   /// Zadaci projekta (podkolekcija `tasks`).
   Stream<List<DevelopmentProjectTaskModel>> watchTasks(
     String projectId, {
@@ -118,6 +122,22 @@ class DevelopmentProjectService {
         .map(
           (snap) => snap.docs
               .map(DevelopmentProjectStageModel.fromDoc)
+              .toList(growable: false),
+        );
+  }
+
+  /// Evidencija dokumenata (metadata).
+  Stream<List<DevelopmentProjectDocumentModel>> watchDocuments(
+    String projectId, {
+    int limit = 120,
+  }) {
+    return _documentsCol(projectId)
+        .orderBy('updatedAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map(DevelopmentProjectDocumentModel.fromDoc)
               .toList(growable: false),
         );
   }
@@ -166,6 +186,64 @@ class DevelopmentProjectService {
       'plantKey': plantKey,
       'projectId': projectId,
       'taskId': taskId,
+      'patch': patch,
+    });
+  }
+
+  /// Kreiranje zapisa dokumenta — Callable `createDevelopmentProjectDocument`.
+  Future<String> createDocumentViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+    required String title,
+    String? description,
+    String docType = DevelopmentDocumentTypes.other,
+    String status = DevelopmentDocumentStatuses.draft,
+    String? linkedGate,
+    String? externalRef,
+  }) async {
+    final callable =
+        _functions().httpsCallable('createDevelopmentProjectDocument');
+    final payload = <String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+      'title': title.trim(),
+      'docType': docType.trim(),
+      'status': status.trim(),
+    };
+    final d = description?.trim();
+    if (d != null && d.isNotEmpty) payload['description'] = d;
+    final g = linkedGate?.trim();
+    if (g != null && g.isNotEmpty) payload['linkedGate'] = g;
+    final e = externalRef?.trim();
+    if (e != null && e.isNotEmpty) payload['externalRef'] = e;
+
+    final res = await callable.call(payload);
+    final raw = res.data;
+    if (raw is! Map) {
+      throw Exception('Očekivan odgovor s poslužitelja nije stigao.');
+    }
+    final id = Map<String, dynamic>.from(raw)['documentId']?.toString() ?? '';
+    if (id.isEmpty) throw Exception('Nije vraćen documentId.');
+    return id;
+  }
+
+  /// Ažuriranje dokumenta — Callable `updateDevelopmentProjectDocument`.
+  Future<void> updateDocumentViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+    required String documentId,
+    required Map<String, dynamic> patch,
+  }) async {
+    final callable =
+        _functions().httpsCallable('updateDevelopmentProjectDocument');
+    await callable.call(<String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+      'documentId': documentId,
       'patch': patch,
     });
   }

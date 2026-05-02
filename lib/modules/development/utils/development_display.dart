@@ -149,6 +149,44 @@ abstract final class DevelopmentDisplay {
     }
   }
 
+  static String documentTypeLabel(String code) {
+    switch (code.trim()) {
+      case DevelopmentDocumentTypes.spec:
+        return 'Specifikacija';
+      case DevelopmentDocumentTypes.drawing:
+        return 'Crtež';
+      case DevelopmentDocumentTypes.protocol:
+        return 'Protokol';
+      case DevelopmentDocumentTypes.certificate:
+        return 'Certifikat';
+      case DevelopmentDocumentTypes.checklist:
+        return 'Kontrolna lista';
+      case DevelopmentDocumentTypes.report:
+        return 'Izvještaj';
+      case DevelopmentDocumentTypes.other:
+        return 'Ostalo';
+      default:
+        return code.isEmpty ? '—' : code;
+    }
+  }
+
+  static String documentStatusLabel(String code) {
+    switch (code.trim()) {
+      case DevelopmentDocumentStatuses.draft:
+        return 'Nacrt';
+      case DevelopmentDocumentStatuses.submitted:
+        return 'Predan';
+      case DevelopmentDocumentStatuses.approved:
+        return 'Odobren';
+      case DevelopmentDocumentStatuses.obsolete:
+        return 'Zastario';
+      case DevelopmentDocumentStatuses.rejected:
+        return 'Odbijen';
+      default:
+        return code.isEmpty ? '—' : code;
+    }
+  }
+
   static String teamProjectRoleLabel(String code) {
     switch (code.trim()) {
       case DevelopmentTeamProjectRoles.projectManager:

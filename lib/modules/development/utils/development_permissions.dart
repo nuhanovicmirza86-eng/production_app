@@ -82,6 +82,14 @@ class DevelopmentPermissions {
     return canMutateDevelopmentTasks(role: role, companyData: companyData);
   }
 
+  /// Dokumenti (`documents`) — Callables [createDevelopmentProjectDocument] / [updateDevelopmentProjectDocument].
+  static bool canMutateDevelopmentDocuments({
+    required String? role,
+    required Map<String, dynamic> companyData,
+  }) {
+    return canMutateDevelopmentTasks(role: role, companyData: companyData);
+  }
+
   /// Inicijalizacija `stages` ako nedostaju — Callable [seedDevelopmentProjectStagesIfEmpty].
   static bool canSeedDevelopmentStages({
     required String? role,
