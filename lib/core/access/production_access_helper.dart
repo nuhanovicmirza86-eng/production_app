@@ -55,7 +55,6 @@ class ProductionAccessHelper {
   const ProductionAccessHelper._();
 
   static const String roleProductionOperator = 'production_operator';
-  static const String roleSupervisor = 'supervisor';
   static const String roleProductionManager = 'production_manager';
 
   /// Voditelj projekta (NPI / Stage-Gate) — **nije** isto što i menadžer proizvodnje.
@@ -70,7 +69,7 @@ class ProductionAccessHelper {
   static const String roleMaintenanceManager = 'maintenance_manager';
   static const String roleAdmin = 'admin';
 
-  /// [quality_operator] — QMS ekrani; ne miješati s ulogom [roleSupervisor].
+  /// [quality_operator] — QMS ekrani.
   static const String roleQualityOperator = 'quality_operator';
 
   /// Kontrola kvaliteta / reviewer u NPI toku — u bazi može i `quality_engineer` (mapira se u [normalizeRole]).
@@ -98,13 +97,16 @@ class ProductionAccessHelper {
     if (r == 'quality_engineer') {
       r = roleQualityControl;
     }
+    // Povijesni string u `users.role` (zastarjelo) — kanonski kod je [roleProductionManager].
+    if (r == 'supervisor') {
+      r = roleProductionManager;
+    }
     return r;
   }
 
   /// Tekst za prikaz u UI (npr. „Uloga: …”). Za tenant admin uvijek tačno **„Admin”**
   /// (nikad „Administrator” ili sirovi kod iz baze).
-  /// Za [roleSupervisor] nema zasebnog „poslovnog” naziva u proizvodu — prikaz je isti kôd kao u bazi
-  /// (`supervisor`). [roleQualityOperator] = **Operater kvaliteta** (druga uloga, fiksno).
+  /// [roleQualityOperator] = **Operater kvaliteta** (fiksno).
   static String displayRoleLabel(dynamic role) {
     final s = (role ?? '').toString().trim().toLowerCase();
     if (s == 'admin' ||
@@ -127,8 +129,6 @@ class ProductionAccessHelper {
         return 'Menadžer proizvodnje';
       case roleLogisticsManager:
         return 'Menadžer logistike';
-      case roleSupervisor:
-        return 'supervisor';
       case roleProductionOperator:
         return 'Operater proizvodnje';
       case roleQualityOperator:
@@ -199,7 +199,7 @@ class ProductionAccessHelper {
     return const [];
   }
 
-  static const Map<String, Map<ProductionDashboardCard, ProductionAccessLevel>>
+  static final Map<String, Map<ProductionDashboardCard, ProductionAccessLevel>>
   _roleMatrix = {
     roleProductionOperator: {
       ProductionDashboardCard.products: ProductionAccessLevel.view,
@@ -209,7 +209,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.workCenters: ProductionAccessLevel.hidden,
       ProductionDashboardCard.productionProcesses: ProductionAccessLevel.hidden,
       ProductionDashboardCard.shifts: ProductionAccessLevel.hidden,
-      /// Zastoji: prijava na podu; IATF verifikacija zatvaranja: admin / menadžer proizvodnje / super admin, ne uloga `supervisor`.
+      /// Zastoji: prijava na podu; IATF verifikacija zatvaranja: admin / menadžer proizvodnje / super admin.
       ProductionDashboardCard.downtime: ProductionAccessLevel.manage,
       /// Live OOE pregled (bez uređivanja kataloga razloga).
       ProductionDashboardCard.ooe: ProductionAccessLevel.view,
@@ -217,33 +217,12 @@ class ProductionAccessHelper {
       ProductionDashboardCard.problemReporting: ProductionAccessLevel.manage,
       /// Hub „Evidencija procesa“ je za menadžment; operater i dalje ulazi u izvršenje iz detalja naloga.
       ProductionDashboardCard.processExecution: ProductionAccessLevel.hidden,
-      /// Operater na podu: praćenje i nalozi; analitički hub (Izvještaji) ostaje menadžeru / uloga `supervisor` gdje pristup postoji.
+      /// Izvještaji: operater na podu ih ne vidi; menadžer proizvodnje u svojoj matrici.
       ProductionDashboardCard.reports: ProductionAccessLevel.hidden,
       ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
       ProductionDashboardCard.developmentGovernance: ProductionAccessLevel.hidden,
       ProductionDashboardCard.qualityManagement: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
-      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
-    },
-    roleSupervisor: {
-      ProductionDashboardCard.products: ProductionAccessLevel.view,
-      ProductionDashboardCard.productionOrders: ProductionAccessLevel.manage,
-      ProductionDashboardCard.productionTracking: ProductionAccessLevel.manage,
-      ProductionDashboardCard.stationPages: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.workCenters: ProductionAccessLevel.view,
-      ProductionDashboardCard.productionProcesses: ProductionAccessLevel.view,
-      ProductionDashboardCard.shifts: ProductionAccessLevel.manage,
-      ProductionDashboardCard.downtime: ProductionAccessLevel.manage,
-      ProductionDashboardCard.ooe: ProductionAccessLevel.manage,
-      ProductionDashboardCard.operonixAnalytics: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.problemReporting: ProductionAccessLevel.manage,
-      ProductionDashboardCard.processExecution: ProductionAccessLevel.manage,
-      ProductionDashboardCard.reports: ProductionAccessLevel.view,
-      ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.developmentGovernance: ProductionAccessLevel.view,
-      ProductionDashboardCard.qualityManagement: ProductionAccessLevel.view,
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
       ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
     },
@@ -438,6 +417,8 @@ class ProductionAccessHelper {
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
       ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
     },
+    roleQualityControl:
+        _accessDevelopmentHubOnly(ProductionAccessLevel.view),
   };
 
   /// Uloge koje imaju zapis u [_roleMatrix], stabilnim redom (referentni ekrani).
@@ -448,7 +429,6 @@ class ProductionAccessHelper {
       roleProjectManager,
       roleProductionManager,
       roleDevelopmentEngineer,
-      roleSupervisor,
       roleProductionOperator,
       roleQualityOperator,
       roleQualityControl,
@@ -495,7 +475,7 @@ class ProductionAccessHelper {
   }
 
   /// IATF: potvrda zatvaranja zastoja — ne samo „klik“ od strane operatera.
-  /// Ovdje nije uključena uloga [roleSupervisor] (ne miješati s [roleQualityOperator] / Operater kvaliteta).
+  /// Ne uključuje operativne uloge bez menadžerske ovlasti (npr. [roleQualityOperator]).
   static bool canVerifyDowntime(String role) {
     final r = normalizeRole(role);
     return r == roleProductionManager ||
