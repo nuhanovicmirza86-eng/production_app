@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:production_app/core/branding/operonix_ai_branding.dart';
 import 'package:production_app/core/theme/operonix_production_brand.dart';
 import 'package:production_app/screens/about_screen.dart';
+import 'package:production_app/screens/super_admin_project_roles_screen.dart';
 
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/saas/production_module_keys.dart';
@@ -614,6 +615,37 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     const afterHeader = 8.0;
     final tiles = <Widget>[];
 
+    if (ProductionAccessHelper.isSuperAdminFromCompanySession(companyData)) {
+      tiles.add(
+        const _ModuleGroupHeader(
+          title: 'Super admin',
+          subtitle:
+              'Referentni pregled uloga i matrice kartica za cijelu Production aplikaciju.',
+          icon: Icons.verified_user_outlined,
+        ),
+      );
+      tiles.add(const SizedBox(height: afterHeader));
+      tiles.add(
+        _DashboardActionTile(
+          icon: Icons.hub_outlined,
+          title: 'Sve uloge i karakteristike',
+          subtitle:
+              'Kanonske uloge, kratki opis i pristup po karticama (pregled / upravljanje / nema).',
+          onTap: () {
+            Navigator.push<void>(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => SuperAdminProjectRolesScreen(
+                  companyData: companyData,
+                ),
+              ),
+            );
+          },
+        ),
+      );
+      tiles.add(const SizedBox(height: sectionGap));
+    }
+
     if (_canViewCard(ProductionDashboardCard.registrations)) {
       tiles.add(
         const _ModuleGroupHeader(
@@ -1163,6 +1195,28 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (ProductionAccessHelper.isSuperAdminFromCompanySession(
+                        cd,
+                      )) ...[
+                    _DashboardActionTile(
+                      icon: Icons.hub_outlined,
+                      title: 'Sve uloge i karakteristike',
+                      subtitle:
+                          'Matrica aplikacije — sve kanonske uloge (super admin)',
+                      onTap: () {
+                        _shellScaffoldKey.currentState?.closeDrawer();
+                        Navigator.push<void>(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => SuperAdminProjectRolesScreen(
+                              companyData: cd,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   if (_hasModule('production')) ...[
                     if (_canAccessOrders()) ...[
                       const SizedBox(height: 10),
