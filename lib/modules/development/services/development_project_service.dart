@@ -606,6 +606,7 @@ class DevelopmentProjectService {
     required String projectType,
     String priority = DevelopmentPriorities.medium,
     String? customerName,
+    String? customerId,
     String? projectManagerId,
   }) async {
     final callable =
@@ -624,6 +625,10 @@ class DevelopmentProjectService {
     final cn = customerName?.trim();
     if (cn != null && cn.isNotEmpty) {
       payload['customerName'] = cn;
+    }
+    final cusId = customerId?.trim();
+    if (cusId != null && cusId.isNotEmpty) {
+      payload['customerId'] = cusId;
     }
     final pm = projectManagerId?.trim();
     if (pm != null && pm.isNotEmpty) {

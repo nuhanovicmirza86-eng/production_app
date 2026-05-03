@@ -5,6 +5,7 @@ import '../services/development_project_service.dart';
 import '../utils/development_constants.dart';
 import '../utils/development_display.dart';
 import 'development_project_details_screen.dart';
+import '../widgets/development_customer_picker_sheet.dart';
 
 /// Otvaranje NPI / Stage-Gate projekta — poslovna godina na backendu iz **aktivne** godine šifrarnika
 /// (ili kalendara ako šifrarnik ne postoji); bez ručnog biranja godine u UI.
@@ -59,6 +60,7 @@ class _DevelopmentProjectCreateScreenState
   String _projectType = DevelopmentProjectTypes.customerNewProduct;
   String _priority = DevelopmentPriorities.medium;
   bool _submitting = false;
+  String? _linkedCustomerId;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -105,6 +107,9 @@ class _DevelopmentProjectCreateScreenState
         customerName: _customerCtrl.text.trim().isEmpty
             ? null
             : _customerCtrl.text.trim(),
+        customerId: (_linkedCustomerId != null && _linkedCustomerId!.trim().isNotEmpty)
+            ? _linkedCustomerId!.trim()
+            : null,
       );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -352,6 +357,56 @@ class _DevelopmentProjectCreateScreenState
                         prefixIcon: Icon(Icons.business_outlined),
                       ),
                       textCapitalization: TextCapitalization.words,
+                    ),
+                    const SizedBox(height: 8),
+                    if (_linkedCustomerId != null &&
+                        _linkedCustomerId!.trim().isNotEmpty)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: InputChip(
+                          label: Text(
+                            'Povezano na šifarnik (customerId: ${_linkedCustomerId!.trim()})',
+                            style: tt.bodySmall,
+                          ),
+                          onDeleted: _submitting
+                              ? null
+                              : () => setState(() => _linkedCustomerId = null),
+                        ),
+                      ),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _submitting
+                              ? null
+                              : () async {
+                                  final m = await showDevelopmentCustomerPickerSheet(
+                                    context,
+                                    companyId: _companyId,
+                                  );
+                                  if (!context.mounted) return;
+                                  if (m != null) {
+                                    setState(() {
+                                      _linkedCustomerId = m.id;
+                                      if (m.name.trim().isNotEmpty) {
+                                        _customerCtrl.text = m.name.trim();
+                                      }
+                                    });
+                                  }
+                                },
+                          icon: const Icon(Icons.link),
+                          label: const Text('Odaberi kupca iz šifrarnika'),
+                        ),
+                        if (_linkedCustomerId != null &&
+                            _linkedCustomerId!.trim().isNotEmpty)
+                          TextButton(
+                            onPressed: _submitting
+                                ? null
+                                : () => setState(() => _linkedCustomerId = null),
+                            child: const Text('Ukloni vezu s šifrarnikom'),
+                          ),
+                      ],
                     ),
                   ],
                 ),

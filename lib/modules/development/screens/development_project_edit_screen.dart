@@ -7,6 +7,7 @@ import '../models/development_project_model.dart';
 import '../services/development_project_service.dart';
 import '../utils/development_constants.dart';
 import '../utils/development_display.dart';
+import '../widgets/development_customer_picker_sheet.dart';
 
 /// Uređivanje osnovnih polja — Callable `updateDevelopmentProject`.
 class DevelopmentProjectEditScreen extends StatefulWidget {
@@ -51,6 +52,7 @@ class _DevelopmentProjectEditScreenState
   DateTime? _plannedStart;
   DateTime? _plannedEnd;
   bool _submitting = false;
+  String? _linkedCustomerId;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -95,6 +97,9 @@ class _DevelopmentProjectEditScreenState
     _marginCtrl = TextEditingController(
       text: p.estimatedMargin?.toString() ?? '',
     );
+
+    final pid = (p.customerId ?? '').trim();
+    _linkedCustomerId = pid.isNotEmpty ? pid : null;
 
     _projectType = DevelopmentProjectTypes.all.contains(p.projectType)
         ? p.projectType
@@ -202,6 +207,11 @@ class _DevelopmentProjectEditScreenState
       patch.remove('estimatedRevenue');
       patch.remove('estimatedMargin');
     }
+
+    patch['customerId'] = (_linkedCustomerId != null &&
+            _linkedCustomerId!.trim().isNotEmpty)
+        ? _linkedCustomerId!.trim()
+        : null;
 
     if (_plannedStart != null) {
       patch['plannedStartDate'] = _plannedStart!.millisecondsSinceEpoch;
@@ -429,9 +439,60 @@ class _DevelopmentProjectEditScreenState
             TextFormField(
               controller: _customerCtrl,
               decoration: const InputDecoration(
-                labelText: 'Kupac',
+                labelText: 'Kupac (naziv)',
                 border: OutlineInputBorder(),
+                helperText:
+                    'Za CSR / Launch Intelligence poveži šifarnik — backend povlači naziv iz kupca.',
               ),
+            ),
+            const SizedBox(height: 8),
+            if (_linkedCustomerId != null &&
+                _linkedCustomerId!.trim().isNotEmpty)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: InputChip(
+                  label: Text(
+                    'Šifarnik: ${_linkedCustomerId!.trim()}',
+                  ),
+                  onDeleted: _submitting
+                      ? null
+                      : () => setState(() => _linkedCustomerId = null),
+                ),
+              ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _submitting
+                      ? null
+                      : () async {
+                          final m = await showDevelopmentCustomerPickerSheet(
+                            context,
+                            companyId: _companyId,
+                          );
+                          if (!context.mounted) return;
+                          if (m != null) {
+                            setState(() {
+                              _linkedCustomerId = m.id;
+                              if (m.name.trim().isNotEmpty) {
+                                _customerCtrl.text = m.name.trim();
+                              }
+                            });
+                          }
+                        },
+                  icon: const Icon(Icons.link),
+                  label: const Text('Odaberi kupca iz šifrarnika'),
+                ),
+                if (_linkedCustomerId != null &&
+                    _linkedCustomerId!.trim().isNotEmpty)
+                  TextButton(
+                    onPressed: _submitting
+                        ? null
+                        : () => setState(() => _linkedCustomerId = null),
+                    child: const Text('Ukloni vezu'),
+                  ),
+              ],
             ),
             const SizedBox(height: 16),
             TextFormField(

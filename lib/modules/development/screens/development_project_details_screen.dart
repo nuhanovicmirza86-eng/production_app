@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
+import '../../commercial/partners/screens/partner_customer_requirements_profile_screen.dart';
 import '../models/development_project_model.dart';
 import '../services/development_project_service.dart';
 import '../utils/development_constants.dart';
@@ -235,6 +236,18 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
                   _kv(context, 'Mjesec', p.businessMonth),
                   if (p.isCarriedOver)
                     _kv(context, 'Prijenos', 'Da'),
+                  if ((p.carriedOverFromBusinessYearId ?? '').isNotEmpty)
+                    _kv(
+                      context,
+                      'Prijenos iz godine',
+                      p.carriedOverFromBusinessYearId!,
+                    ),
+                  if ((p.carriedOverToBusinessYearId ?? '').isNotEmpty)
+                    _kv(
+                      context,
+                      'Prijenos u godinu',
+                      p.carriedOverToBusinessYearId!,
+                    ),
                 ],
               ),
               _SectionCard(
@@ -322,7 +335,8 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
                 project: p,
               ),
               if ((p.customerName ?? '').isNotEmpty ||
-                  (p.productName ?? '').isNotEmpty)
+                  (p.productName ?? '').isNotEmpty ||
+                  (p.customerId ?? '').toString().trim().isNotEmpty)
                 _SectionCard(
                   title: 'Kupac / proizvod',
                   children: [
@@ -330,6 +344,31 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
                       _kv(context, 'Kupac', p.customerName!),
                     if ((p.productName ?? '').isNotEmpty)
                       _kv(context, 'Proizvod', p.productName!),
+                    if (p.customerId != null && p.customerId!.trim().isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: FilledButton.tonalIcon(
+                            onPressed: () {
+                              final name = (p.customerName ?? '').trim();
+                              Navigator.of(context).push<void>(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => PartnerCustomerRequirementsProfileScreen(
+                                    companyData: companyData,
+                                    customerId: p.customerId!.trim(),
+                                    customerDisplayName:
+                                        name.isNotEmpty ? name : p.customerId!.trim(),
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.assignment_outlined),
+                            label: const Text('Profil zahtjeva kupca (CSR)'),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               _SectionCard(

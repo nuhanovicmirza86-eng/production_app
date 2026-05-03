@@ -2,6 +2,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
+import '../../commercial/partners/screens/partner_customer_requirements_profile_screen.dart';
 import '../models/development_launch_intelligence_result.dart';
 import '../models/development_project_model.dart';
 import '../services/development_project_service.dart';
@@ -135,7 +136,7 @@ class _DevelopmentLaunchIntelligenceTabState
               ],
               if (data.customerRequirementsProfile != null) ...[
                 const SizedBox(height: 16),
-                _csrSummaryCard(context, data.customerRequirementsProfile!),
+                _csrSummaryCard(context, data.customerRequirementsProfile!, project: widget.project),
               ] else ...[
                 const SizedBox(height: 12),
                 Text(
@@ -145,6 +146,31 @@ class _DevelopmentLaunchIntelligenceTabState
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                 ),
+                if (widget.project.customerId != null &&
+                    widget.project.customerId!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: FilledButton.tonalIcon(
+                      onPressed: () {
+                        final p = widget.project;
+                        final cid = p.customerId!.trim();
+                        final name = (p.customerName ?? '').trim();
+                        Navigator.of(context).push<void>(
+                          MaterialPageRoute<void>(
+                            builder: (_) => PartnerCustomerRequirementsProfileScreen(
+                              companyData: widget.companyData,
+                              customerId: cid,
+                              customerDisplayName: name.isNotEmpty ? name : cid,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Otvori / uredi CSR profil'),
+                    ),
+                  ),
+                ],
               ],
               const SizedBox(height: 16),
               _sectionTitle(
@@ -501,7 +527,11 @@ class _DevelopmentLaunchIntelligenceTabState
     );
   }
 
-  Widget _csrSummaryCard(BuildContext context, Map<String, dynamic> c) {
+  Widget _csrSummaryCard(
+    BuildContext context,
+    Map<String, dynamic> c, {
+    required DevelopmentProjectModel project,
+  }) {
     String s(dynamic k) => (c[k] ?? '').toString();
     final lines = <String>[
       if (s('ppapLevel').isNotEmpty && s('ppapLevel') != 'null') 'PPAP: ${s('ppapLevel')}',
@@ -541,6 +571,29 @@ class _DevelopmentLaunchIntelligenceTabState
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Text(t, style: Theme.of(context).textTheme.bodySmall),
                 )),
+            if (project.customerId != null && project.customerId!.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () {
+                    final cid = project.customerId!.trim();
+                    final name = (project.customerName ?? '').trim();
+                    Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) => PartnerCustomerRequirementsProfileScreen(
+                          companyData: widget.companyData,
+                          customerId: cid,
+                          customerDisplayName: name.isNotEmpty ? name : cid,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text('Puni CSR profil (partner)'),
+                ),
+              ),
+            ],
           ],
         ),
       ),
