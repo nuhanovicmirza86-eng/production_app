@@ -1,6 +1,3 @@
-// DropdownButtonFormField: kontrolirani `value` (Stateful) — i dalje ispravno do sljedeće API stabilizacije.
-// ignore_for_file: deprecated_member_use
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
@@ -9,7 +6,8 @@ import '../utils/development_constants.dart';
 import '../utils/development_display.dart';
 import 'development_project_details_screen.dart';
 
-/// Korak 4 MVP — obavezna poslovna godina i tenant scope Callable validira.
+/// Otvaranje NPI / Stage-Gate projekta — poslovna godina na backendu iz **aktivne** godine šifrarnika
+/// (ili kalendara ako šifrarnik ne postoji); bez ručnog biranja godine u UI.
 class DevelopmentProjectCreateScreen extends StatefulWidget {
   const DevelopmentProjectCreateScreen({
     super.key,
@@ -23,17 +21,40 @@ class DevelopmentProjectCreateScreen extends StatefulWidget {
       _DevelopmentProjectCreateScreenState();
 }
 
+IconData _typeIcon(String code) {
+  switch (code) {
+    case DevelopmentProjectTypes.customerNewProduct:
+      return Icons.rocket_launch_outlined;
+    case DevelopmentProjectTypes.customerChangeProject:
+      return Icons.change_circle_outlined;
+    case DevelopmentProjectTypes.internalProductDevelopment:
+      return Icons.lightbulb_outline;
+    case DevelopmentProjectTypes.internalProcessDevelopment:
+      return Icons.settings_suggest_outlined;
+    case DevelopmentProjectTypes.industrializationProject:
+      return Icons.precision_manufacturing_outlined;
+    case DevelopmentProjectTypes.costReductionProject:
+      return Icons.savings_outlined;
+    case DevelopmentProjectTypes.qualityImprovementProject:
+      return Icons.verified_outlined;
+    case DevelopmentProjectTypes.toolingDevelopment:
+      return Icons.build_circle_outlined;
+    case DevelopmentProjectTypes.digitalizationProject:
+      return Icons.hub_outlined;
+    default:
+      return Icons.folder_special_outlined;
+  }
+}
+
 class _DevelopmentProjectCreateScreenState
     extends State<DevelopmentProjectCreateScreen> {
   final _formKey = GlobalKey<FormState>();
   final _service = DevelopmentProjectService();
   final _nameCtrl = TextEditingController();
-  final _manualYearCtrl = TextEditingController();
   final _customerCtrl = TextEditingController();
 
   String _projectType = DevelopmentProjectTypes.customerNewProduct;
   String _priority = DevelopmentPriorities.medium;
-  String? _selectedFinancialYearId;
   bool _submitting = false;
 
   String get _companyId =>
@@ -50,7 +71,6 @@ class _DevelopmentProjectCreateScreenState
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _manualYearCtrl.dispose();
     _customerCtrl.dispose();
     super.dispose();
   }
@@ -60,17 +80,9 @@ class _DevelopmentProjectCreateScreenState
     if (_companyId.isEmpty || _plantKey.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Nedostaje podatak o organizaciji ili pogonu.'),
-        ),
-      );
-      return;
-    }
-
-    final businessYearId = _effectiveBusinessYearId();
-    if (businessYearId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Odaberite ili unesite poslovnu godinu.'),
+          content: Text(
+            'Nedostaje organizacija ili pogon u sesiji (potreban za zapis projekta).',
+          ),
         ),
       );
       return;
@@ -81,7 +93,6 @@ class _DevelopmentProjectCreateScreenState
       final result = await _service.createProjectViaCallable(
         companyId: _companyId,
         plantKey: _plantKey,
-        businessYearId: businessYearId,
         projectName: _nameCtrl.text.trim(),
         projectType: _projectType,
         priority: _priority,
@@ -108,178 +119,287 @@ class _DevelopmentProjectCreateScreenState
     }
   }
 
-  /// Ako postoje financial_years dokumenti, vrijednost je doc.id; inače ručni unos.
-  String _effectiveBusinessYearId() {
-    return (_selectedFinancialYearId ?? _manualYearCtrl.text.trim()).trim();
-  }
-
   @override
   Widget build(BuildContext context) {
-    final fyRef = FirebaseFirestore.instance
-        .collection('companies')
-        .doc(_companyId)
-        .collection('financial_years');
+    final scheme = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    final priorities = <MapEntry<String, String>>[
+      MapEntry(DevelopmentPriorities.low, 'Nizak'),
+      MapEntry(DevelopmentPriorities.medium, 'Srednji'),
+      MapEntry(DevelopmentPriorities.high, 'Visok'),
+      MapEntry(DevelopmentPriorities.critical, 'Kritičan'),
+    ];
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Novi projekat razvoja'),
+        title: const Text('Novi NPI projekat'),
       ),
       body: Form(
         key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+        child: Column(
           children: [
-            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: fyRef.snapshots(),
-              builder: (context, snap) {
-                if (snap.hasError) {
-                  return Text(
-                    'Poslovne godine trenutno nisu dostupne za učitavanje.',
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
-                  );
-                }
-                final docs = snap.data?.docs ?? [];
-                final usable = docs.where((d) {
-                  final s = (d.data()['status'] ?? '').toString().toLowerCase();
-                  return s == 'active' || s == 'draft';
-                }).toList();
-
-                if (usable.isNotEmpty && _selectedFinancialYearId == null) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) {
-                      setState(() {
-                        _selectedFinancialYearId = usable.first.id;
-                      });
-                    }
-                  });
-                }
-
-                if (usable.isEmpty) {
-                  return Column(
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Card(
+                      elevation: 0,
+                      color: scheme.primaryContainer.withValues(alpha: 0.35),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(
+                          color: scheme.primary.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.auto_awesome, color: scheme.primary),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Projektno upravljanje, ne Excel',
+                                    style: tt.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              'Ovaj zapis otvara životni ciklus u modulu Razvoj: Stage-Gate, tim, '
+                              'rizici, dokumentacija, odobrenja i Launch Intelligence. '
+                              'Poslovna godina se dodjeljuje automatski — aktivna godina u vašem šifrarniku '
+                              '(razdoblje 01.01.–31.12. ili fiscal); sve što kasnije radite na projektu ostaje u tom kontekstu.',
+                              style: tt.bodySmall?.copyWith(
+                                height: 1.45,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.person_pin_outlined,
+                                  size: 20,
+                                  color: scheme.secondary,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _canPickAnotherPm
+                                        ? 'Voditelj projekta (prvi korak): vi kao administrator možete kasnije prebaciti PM kroz tim projekta.'
+                                        : 'Vi postajete voditelj projekta inicijative; tim i ovlasti proširujete u detaljima projekta.',
+                                    style: tt.bodySmall?.copyWith(height: 1.4),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Tip inicijative',
+                      style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Odabir usmjerava predložene kontrole i obrasce u NPI toku.',
+                      style: tt.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    LayoutBuilder(
+                      builder: (context, c) {
+                        final w = c.maxWidth;
+                        final tileW = w > 520 ? (w - 12) / 2 : w;
+                        return Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: DevelopmentProjectTypes.all.map((t) {
+                            final sel = _projectType == t;
+                            return SizedBox(
+                              width: tileW,
+                              child: Material(
+                                color: sel
+                                    ? scheme.primaryContainer
+                                        .withValues(alpha: 0.65)
+                                    : scheme.surfaceContainerHighest
+                                        .withValues(alpha: 0.45),
+                                borderRadius: BorderRadius.circular(14),
+                                clipBehavior: Clip.antiAlias,
+                                child: InkWell(
+                                  onTap: () => setState(() => _projectType = t),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(14),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          _typeIcon(t),
+                                          color: sel
+                                              ? scheme.primary
+                                              : scheme.onSurfaceVariant,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            DevelopmentDisplay.projectTypeLabel(t),
+                                            style: tt.bodyMedium?.copyWith(
+                                              fontWeight: sel
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                        if (sel)
+                                          Icon(
+                                            Icons.check_circle,
+                                            color: scheme.primary,
+                                            size: 22,
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 28),
+                    Text(
+                      'Identitet inicijative',
+                      style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _nameCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Radni naziv projekta',
+                        hintText: 'npr. NPI housings — kupac X / linija Y',
+                        border: const OutlineInputBorder(),
+                        filled: true,
+                        alignLabelWithHint: true,
+                        prefixIcon: const Icon(Icons.insights_outlined),
+                      ),
+                      textCapitalization: TextCapitalization.sentences,
+                      maxLines: 2,
+                      minLines: 1,
+                      validator: (v) =>
+                          (v ?? '').trim().isEmpty ? 'Unesi naziv.' : null,
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Prioritet portfelja',
+                      style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: priorities.map((e) {
+                        final sel = _priority == e.key;
+                        return FilterChip(
+                          label: Text(e.value),
+                          selected: sel,
+                          onSelected: (_) =>
+                              setState(() => _priority = e.key),
+                          selectedColor:
+                              scheme.secondaryContainer.withValues(alpha: 0.9),
+                          checkmarkColor: scheme.onSecondaryContainer,
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Poslovni kontekst (opcionalno)',
+                      style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Kupac ili program — pomaže CSR, Launch Intelligence i trag za IATF.',
+                      style: tt.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _customerCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Kupac / program',
+                        hintText: 'ostavi prazno ako je interna inicijativa',
+                        border: OutlineInputBorder(),
+                        filled: true,
+                        prefixIcon: Icon(Icons.business_outlined),
+                      ),
+                      textCapitalization: TextCapitalization.words,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Material(
+              elevation: 6,
+              color: scheme.surface,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        'Nema definisanih poslovnih godina u šifrarniku — unesi oznaku ručno (Callable prihvaća fallback).',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _manualYearCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Poslovna godina *',
-                          hintText: 'npr. 2026',
-                          border: OutlineInputBorder(),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                        validator: (v) {
-                          if ((v ?? '').trim().isEmpty) {
-                            return 'Obavezno polje.';
-                          }
-                          return null;
-                        },
+                        onPressed: _submitting ? null : _submit,
+                        child: _submitting
+                            ? SizedBox(
+                                height: 22,
+                                width: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: scheme.onPrimary,
+                                ),
+                              )
+                            : Text(
+                                'Otvori NPI projekat',
+                                style: tt.labelLarge?.copyWith(
+                                  color: scheme.onPrimary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Generirat će se šifra projekta i početni Stage-Gate zapisi prema pravilima tenant-a.',
+                        textAlign: TextAlign.center,
+                        style: tt.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          height: 1.35,
+                        ),
                       ),
                     ],
-                  );
-                }
-
-                return DropdownButtonFormField<String>(
-                  value: _selectedFinancialYearId,
-                  decoration: const InputDecoration(
-                    labelText: 'Poslovna godina *',
-                    border: OutlineInputBorder(),
                   ),
-                  items: usable.map((d) {
-                    final m = d.data();
-                    final code = (m['code'] ?? '').toString();
-                    final name = (m['name'] ?? '').toString();
-                    final label = name.isNotEmpty
-                        ? '$code — $name'
-                        : (code.isNotEmpty ? code : d.id);
-                    return DropdownMenuItem<String>(
-                      value: d.id,
-                      child: Text(label),
-                    );
-                  }).toList(),
-                  onChanged: (v) => setState(() => _selectedFinancialYearId = v),
-                  validator: (v) {
-                    if ((v ?? '').isEmpty) {
-                      return 'Odaberi poslovnu godinu.';
-                    }
-                    return null;
-                  },
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Naziv projekta *',
-                border: OutlineInputBorder(),
+                ),
               ),
-              validator: (v) =>
-                  (v ?? '').trim().isEmpty ? 'Obavezno polje.' : null,
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: _projectType,
-              decoration: const InputDecoration(
-                labelText: 'Tip projekta *',
-                border: OutlineInputBorder(),
-              ),
-              items: DevelopmentProjectTypes.all
-                  .map(
-                    (t) => DropdownMenuItem(
-                      value: t,
-                      child: Text(DevelopmentDisplay.projectTypeLabel(t)),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) setState(() => _projectType = v);
-              },
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: _priority,
-              decoration: const InputDecoration(
-                labelText: 'Prioritet',
-                border: OutlineInputBorder(),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'low', child: Text('Nizak')),
-                DropdownMenuItem(value: 'medium', child: Text('Srednji')),
-                DropdownMenuItem(value: 'high', child: Text('Visok')),
-                DropdownMenuItem(value: 'critical', child: Text('Kritičan')),
-              ],
-              onChanged: (v) {
-                if (v != null) setState(() => _priority = v);
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _customerCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Kupac (opcionalno)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            if (_canPickAnotherPm) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Project Manager se podrazumijeva na tebe; drugog PM možeš dodijeliti kasnije kroz Callable za izmjenu profila.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _submitting ? null : _submit,
-              child: _submitting
-                  ? const SizedBox(
-                      height: 22,
-                      width: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Kreiraj projekat'),
             ),
           ],
         ),

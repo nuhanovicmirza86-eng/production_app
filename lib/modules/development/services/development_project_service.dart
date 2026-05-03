@@ -597,10 +597,11 @@ class DevelopmentProjectService {
   }
 
   /// Kreiranje projekta — Callable `createDevelopmentProject`.
+  /// [businessYearId] opcionalno; backend dodjeljuje aktivnu godinu iz šifrarnika ili kalendarsku godinu.
   Future<DevelopmentProjectCreateResult> createProjectViaCallable({
     required String companyId,
     required String plantKey,
-    required String businessYearId,
+    String? businessYearId,
     required String projectName,
     required String projectType,
     String priority = DevelopmentPriorities.medium,
@@ -612,11 +613,14 @@ class DevelopmentProjectService {
     final payload = <String, dynamic>{
       'companyId': companyId,
       'plantKey': plantKey,
-      'businessYearId': businessYearId.trim(),
       'projectName': projectName.trim(),
       'projectType': projectType.trim(),
       'priority': priority.trim(),
     };
+    final by = businessYearId?.trim();
+    if (by != null && by.isNotEmpty) {
+      payload['businessYearId'] = by;
+    }
     final cn = customerName?.trim();
     if (cn != null && cn.isNotEmpty) {
       payload['customerName'] = cn;
