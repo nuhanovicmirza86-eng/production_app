@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/operational_business_year_context.dart';
 import '../../../../core/theme/operonix_production_brand.dart';
 import '../../ooe/screens/ooe_daily_overview_screen.dart';
 import '../../ooe/screens/ooe_dashboard_screen.dart';
@@ -22,6 +23,7 @@ enum _RangePreset {
   d30('30 dana'),
   d90('90 dana'),
   mtd('Mjesec do danas'),
+  operationalFy('Poslovna godina'),
   custom('Prilagođeno…');
 
   final String label;
@@ -58,6 +60,7 @@ class _DowntimeAnalyticsTabState extends State<DowntimeAnalyticsTab> {
   _RangePreset _preset = _RangePreset.d30;
   DateTimeRange? _customRange;
   bool _includeRejected = false;
+  OperationalFyBounds? _operationalFyBounds;
   bool _loading = false;
   Object? _loadError;
   DowntimeAnalyticsReport? _report;
@@ -94,11 +97,15 @@ class _DowntimeAnalyticsTabState extends State<DowntimeAnalyticsTab> {
         end: _dayStart(lastInc),
       );
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        // ignore: discarded_futures
-        _load();
-      }
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final b = await OperationalBusinessYearContext.resolveBoundsForCompany(
+        companyId: _companyId,
+      );
+      if (!mounted) return;
+      setState(() => _operationalFyBounds = b);
+      // ignore: discarded_futures
+      _load();
     });
   }
 
@@ -135,6 +142,18 @@ class _DowntimeAnalyticsTabState extends State<DowntimeAnalyticsTab> {
         return DateTimeRange(
           start: DateTime(now.year, now.month, 1),
           end: tomorrow,
+        );
+      case _RangePreset.operationalFy:
+        final b = _operationalFyBounds;
+        if (b == null) {
+          return DateTimeRange(
+            start: todayStart.subtract(const Duration(days: 29)),
+            end: tomorrow,
+          );
+        }
+        return DateTimeRange(
+          start: _dayStart(b.startLocalInclusive),
+          end: b.endLocalExclusive,
         );
       case _RangePreset.custom:
         final c = _customRange;

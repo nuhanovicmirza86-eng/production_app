@@ -5,6 +5,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:production_app/core/access/production_access_helper.dart';
 import 'package:production_app/core/branding/operonix_ai_branding.dart';
 import 'package:production_app/core/errors/app_error_mapper.dart' show AppErrorMapper;
+import 'package:production_app/core/operational_business_year_context.dart';
 import 'package:production_app/core/saas/production_module_keys.dart';
 import 'package:production_app/core/theme/operonix_production_brand.dart';
 
@@ -32,6 +33,7 @@ enum _RangePreset {
   d7('7 dana'),
   d30('30 dana'),
   d90('90 dana'),
+  operationalFy('Poslovna godina'),
   custom('Prilagođeno…');
 
   final String label;
@@ -58,6 +60,7 @@ class _OperonixAnalyticsDashboardScreenState
   _RangePreset _preset = _RangePreset.d7;
   DateTimeRange? _customRange;
   bool _includeRejected = false;
+  OperationalFyBounds? _operationalFyBounds;
   bool _loading = false;
   Object? _error;
   OperonixAnalyticsSnapshot? _snap;
@@ -180,6 +183,18 @@ class _OperonixAnalyticsDashboardScreenState
           start: todayStart.subtract(const Duration(days: 89)),
           end: tomorrow,
         );
+      case _RangePreset.operationalFy:
+        final b = _operationalFyBounds;
+        if (b == null) {
+          return DateTimeRange(
+            start: todayStart.subtract(const Duration(days: 6)),
+            end: tomorrow,
+          );
+        }
+        return DateTimeRange(
+          start: _dayStart(b.startLocalInclusive),
+          end: b.endLocalExclusive,
+        );
       case _RangePreset.custom:
         final c = _customRange;
         if (c == null) {
@@ -198,8 +213,23 @@ class _OperonixAnalyticsDashboardScreenState
   @override
   void initState() {
     super.initState();
+    // ignore: discarded_futures
+    _primeOperationalFyBounds();
     if (_canView) {
+      // ignore: discarded_futures
       _load();
+    }
+  }
+
+  Future<void> _primeOperationalFyBounds() async {
+    if (_companyId.isEmpty) return;
+    final b = await OperationalBusinessYearContext.resolveBoundsForCompany(
+      companyId: _companyId,
+    );
+    if (!mounted) return;
+    setState(() => _operationalFyBounds = b);
+    if (_preset == _RangePreset.operationalFy && _canView) {
+      await _load();
     }
   }
 

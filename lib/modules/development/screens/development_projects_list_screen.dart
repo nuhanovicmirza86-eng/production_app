@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/company_plant_display_name.dart';
+import '../../../../core/operational_business_year_context.dart';
 import '../models/development_project_model.dart';
 import '../services/development_project_service.dart';
 import '../utils/development_constants.dart';
@@ -67,6 +68,20 @@ class _DevelopmentProjectsListScreenState
     super.initState();
     _loadPlantLabel();
     _loadSelectablePlants();
+    _primeBusinessYearFromCompanyMirror();
+  }
+
+  Future<void> _primeBusinessYearFromCompanyMirror() async {
+    if (_companyId.isEmpty) return;
+    final id = await OperationalBusinessYearContext.resolveFinancialYearIdForCompany(
+      companyId: _companyId,
+    );
+    if (!mounted || _fyUserTouched) return;
+    if (id.isEmpty) return;
+    setState(() {
+      _selectedBusinessYearId = id;
+      _fyHydrated = true;
+    });
   }
 
   Future<void> _loadSelectablePlants() async {
