@@ -17,6 +17,7 @@ import '../widgets/development_project_release_readiness_section.dart';
 import '../widgets/development_project_risks_section.dart';
 import '../widgets/development_project_stages_section.dart';
 import '../widgets/development_project_tasks_section.dart';
+import '../widgets/development_launch_intelligence_tab.dart';
 
 Future<void> _promptCloseDevelopmentProject(
   BuildContext context, {
@@ -111,45 +112,29 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
     return StreamBuilder<DevelopmentProjectModel?>(
       stream: service.watchProject(projectId),
       builder: (context, snap) {
+        if (snap.hasError) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Projekat razvoja')),
+            body: Center(
+              child: Text(
+                'Učitavanje nije uspjelo.',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
+          );
+        }
         final p = snap.data;
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Projekat razvoja'),
-            actions: [
-              if (canEditCore && p != null)
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined),
-                  tooltip: 'Uredi',
-                  onPressed: () async {
-                    await Navigator.of(context).push<bool>(
-                      MaterialPageRoute<bool>(
-                        builder: (_) => DevelopmentProjectEditScreen(
-                          companyData: companyData,
-                          project: p,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-            ],
-          ),
-          body: () {
-            if (snap.hasError) {
-              return Center(
-                child: Text(
-                  'Učitavanje nije uspjelo.',
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              );
-            }
-            if (p == null) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final kpi = p.kpi;
-            final ai = p.ai;
-            return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
+        if (p == null) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Projekat razvoja')),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
+        final kpi = p.kpi;
+        final ai = p.ai;
+        final overviewList = ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
               Text(
                 p.projectName.isEmpty ? 'Projekat' : p.projectName,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -484,8 +469,46 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
                 ],
               ),
             ],
-          );
-          }(),
+        );
+        return DefaultTabController(
+          length: 2,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Projekat razvoja'),
+              bottom: const TabBar(
+                tabs: [
+                  Tab(icon: Icon(Icons.folder_outlined), text: 'Pregled'),
+                  Tab(icon: Icon(Icons.insights_outlined), text: 'Launch Intelligence'),
+                ],
+              ),
+              actions: [
+                if (canEditCore)
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined),
+                    tooltip: 'Uredi',
+                    onPressed: () async {
+                      await Navigator.of(context).push<bool>(
+                        MaterialPageRoute<bool>(
+                          builder: (_) => DevelopmentProjectEditScreen(
+                            companyData: companyData,
+                            project: p,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
+            body: TabBarView(
+              children: [
+                overviewList,
+                DevelopmentLaunchIntelligenceTab(
+                  companyData: companyData,
+                  project: p,
+                ),
+              ],
+            ),
+          ),
         );
       },
     );

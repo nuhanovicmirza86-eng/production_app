@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../models/development_launch_intelligence_result.dart';
 import '../models/development_project_approval_model.dart';
 import '../models/development_project_change_model.dart';
 import '../models/development_project_document_model.dart';
@@ -508,6 +509,24 @@ class DevelopmentProjectService {
       'changeId': changeId,
       'patch': patch,
     });
+  }
+
+  /// Launch Intelligence — Callable [getDevelopmentProjectLaunchIntelligence].
+  Future<DevelopmentLaunchIntelligenceResult> getLaunchIntelligenceViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+    String targetGate = DevelopmentGateCodes.g8,
+  }) async {
+    final callable =
+        _functions().httpsCallable('getDevelopmentProjectLaunchIntelligence');
+    final res = await callable.call(<String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+      'targetGate': targetGate.trim(),
+    });
+    return DevelopmentLaunchIntelligenceResult.parse(res.data);
   }
 
   /// Heuristička provjera prema §10 arhitekture — Callable `checkDevelopmentProjectReleaseReadiness`.

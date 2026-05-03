@@ -237,7 +237,8 @@ class _DevelopmentProjectReleaseReadinessSectionState
             const SizedBox(height: 8),
             Text(
               'Heuristička provjera (rizici, izmjene, faza Gate, čekajuća odobrenja, dokumenti za Gate s odobrenjem). '
-              'Ne zamjenjuje povezivanje na proizvod / nalog.',
+              'Zapis releasea na poslužitelju zahtijeva i Operonix Launch Readiness Score ≥60 te ≥90 osim za tenant admin / super_admin. '
+              'Detaljni pregled u tabu Launch Intelligence.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),

@@ -225,6 +225,14 @@ abstract final class DevelopmentModulePermissionsCatalog {
             )),
       ),
       DevelopmentModulePermissionRow(
+        capability: 'Launch Intelligence (Callable getDevelopmentProjectLaunchIntelligence)',
+        where: 'Detalj projekta — tab Launch Intelligence',
+        allowed: b(() => DevelopmentPermissions.canCheckDevelopmentReleaseReadiness(
+              role: r,
+              companyData: cd,
+            )),
+      ),
+      DevelopmentModulePermissionRow(
         capability: 'Zapis release u proizvodnju',
         where: 'Detalj projekta — spremnost (Callable recordDevelopmentProjectReleaseToProduction)',
         allowed: b(() => DevelopmentPermissions.canRecordDevelopmentReleaseToProduction(
