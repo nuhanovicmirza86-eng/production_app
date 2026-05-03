@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/operational_business_year_context.dart';
 import '../../../../core/ui/company_plant_label_text.dart';
 import '../ooe_help_texts.dart';
 import '../models/teep_summary.dart';
@@ -25,6 +26,7 @@ class _TeepAnalysisScreenState extends State<TeepAnalysisScreen> {
   final _callable = TeepCallableService();
   final _scopeIdCtrl = TextEditingController();
   bool _recomputing = false;
+  OperationalFyBounds? _fyBounds;
 
   String _scopeType = 'plant';
   String _periodType = 'day';
@@ -40,6 +42,22 @@ class _TeepAnalysisScreenState extends State<TeepAnalysisScreen> {
         role: _role,
         card: ProductionDashboardCard.ooe,
       );
+
+  @override
+  void initState() {
+    super.initState();
+    // ignore: discarded_futures
+    _loadFyBounds();
+  }
+
+  Future<void> _loadFyBounds() async {
+    if (_companyId.isEmpty) return;
+    final b = await OperationalBusinessYearContext.resolveBoundsForCompany(
+      companyId: _companyId,
+    );
+    if (!mounted) return;
+    setState(() => _fyBounds = b);
+  }
 
   @override
   void dispose() {
@@ -111,11 +129,20 @@ class _TeepAnalysisScreenState extends State<TeepAnalysisScreen> {
 
   Future<void> _pickDayAndRecompute() async {
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final pb = OperationalBusinessYearContext.materialDatePickerBounds(
+      fy: _fyBounds,
+      referenceDay: today,
+    );
+    var initial = today;
+    if (initial.isBefore(pb.firstDate)) initial = pb.firstDate;
+    if (initial.isAfter(pb.lastDate)) initial = pb.lastDate;
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime(now.year, now.month, now.day),
-      firstDate: DateTime(now.year - 1),
-      lastDate: DateTime(now.year + 1),
+      initialDate: initial,
+      firstDate: pb.firstDate,
+      lastDate: pb.lastDate,
     );
     if (picked != null && mounted) {
       await _recomputeForDay(picked);

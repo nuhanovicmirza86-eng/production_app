@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/operational_business_year_context.dart';
 import '../../../../core/ui/company_plant_label_text.dart';
 import '../../tracking/services/production_tracking_assets_service.dart';
 import '../models/ooe_shift_summary.dart';
@@ -68,6 +69,7 @@ class _FactoryPerformanceDashboardScreenState
 
   String _shiftWindowLabel = '';
   Timer? _debounceShift;
+  OperationalFyBounds? _fyBounds;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -95,6 +97,24 @@ class _FactoryPerformanceDashboardScreenState
       }
       _refreshShiftWindow();
     });
+    // ignore: discarded_futures
+    _primeOperationalFyBounds();
+  }
+
+  Future<void> _primeOperationalFyBounds() async {
+    if (_companyId.isEmpty) return;
+    final b = await OperationalBusinessYearContext.resolveBoundsForCompany(
+      companyId: _companyId,
+    );
+    if (!mounted) return;
+    setState(() {
+      _fyBounds = b;
+      if (b != null) {
+        _calendarDay =
+            OperationalBusinessYearContext.clampLocalCalendarDay(_calendarDay, b);
+      }
+    });
+    await _refreshShiftWindow();
   }
 
   @override
@@ -212,11 +232,23 @@ class _FactoryPerformanceDashboardScreenState
               tooltip: 'Datum smjene',
               icon: const Icon(Icons.calendar_today_outlined),
               onPressed: () async {
+                final pb = OperationalBusinessYearContext.materialDatePickerBounds(
+                  fy: _fyBounds,
+                  referenceDay: _calendarDay,
+                );
+                var initial = DateTime(
+                  _calendarDay.year,
+                  _calendarDay.month,
+                  _calendarDay.day,
+                );
+                if (initial.isBefore(pb.firstDate)) initial = pb.firstDate;
+                if (initial.isAfter(pb.lastDate)) initial = pb.lastDate;
+
                 final p = await showDatePicker(
                   context: context,
-                  initialDate: _calendarDay,
-                  firstDate: DateTime(_calendarDay.year - 2),
-                  lastDate: DateTime(_calendarDay.year + 2),
+                  initialDate: initial,
+                  firstDate: pb.firstDate,
+                  lastDate: pb.lastDate,
                 );
                 if (p != null && mounted) {
                   setState(() {

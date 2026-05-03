@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/operational_business_year_context.dart';
 import '../../../../core/ui/company_plant_label_text.dart';
 import '../../tracking/services/production_tracking_assets_service.dart';
 import '../models/ooe_shift_summary.dart';
@@ -36,6 +37,7 @@ class _OoeDailyOverviewScreenState extends State<OoeDailyOverviewScreen> {
   late DateTime _day;
   late final Future<ProductionPlantAssetsSnapshot> _assetsFuture;
   _DailyScope _scope = _DailyScope.oneMachine;
+  OperationalFyBounds? _fyBounds;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -64,6 +66,22 @@ class _OoeDailyOverviewScreenState extends State<OoeDailyOverviewScreen> {
       plantKey: _plantKey,
       limit: 128,
     );
+    // ignore: discarded_futures
+    _loadOperationalFyBounds();
+  }
+
+  Future<void> _loadOperationalFyBounds() async {
+    if (_companyId.isEmpty) return;
+    final b = await OperationalBusinessYearContext.resolveBoundsForCompany(
+      companyId: _companyId,
+    );
+    if (!mounted) return;
+    setState(() {
+      _fyBounds = b;
+      if (b != null) {
+        _day = OperationalBusinessYearContext.clampLocalCalendarDay(_day, b);
+      }
+    });
   }
 
   @override
@@ -73,15 +91,47 @@ class _OoeDailyOverviewScreenState extends State<OoeDailyOverviewScreen> {
   }
 
   Future<void> _pickDay() async {
+    final pb = OperationalBusinessYearContext.materialDatePickerBounds(
+      fy: _fyBounds,
+      referenceDay: _day,
+    );
+    var initial = DateTime(_day.year, _day.month, _day.day);
+    if (initial.isBefore(pb.firstDate)) initial = pb.firstDate;
+    if (initial.isAfter(pb.lastDate)) initial = pb.lastDate;
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: _day,
-      firstDate: DateTime(_day.year - 2),
-      lastDate: DateTime(_day.year + 2),
+      initialDate: initial,
+      firstDate: pb.firstDate,
+      lastDate: pb.lastDate,
     );
     if (picked != null && mounted) {
       setState(() => _day = DateTime(picked.year, picked.month, picked.day));
     }
+  }
+
+  void _jumpToFyStart() {
+    final b = _fyBounds;
+    if (b == null) return;
+    setState(() => _day = b.startLocalInclusive);
+  }
+
+  void _jumpToFyEnd() {
+    final b = _fyBounds;
+    if (b == null) return;
+    setState(
+      () => _day = OperationalBusinessYearContext.lastLocalDayInclusive(b),
+    );
+  }
+
+  void _jumpToTodayInFy() {
+    final b = _fyBounds;
+    final n = DateTime.now();
+    var t = DateTime(n.year, n.month, n.day);
+    if (b != null) {
+      t = OperationalBusinessYearContext.clampLocalCalendarDay(t, b);
+    }
+    setState(() => _day = t);
   }
 
   static String _formatDay(DateTime d) {
@@ -393,6 +443,36 @@ class _OoeDailyOverviewScreenState extends State<OoeDailyOverviewScreen> {
                           ),
                         ),
                       ),
+                      if (_fyBounds != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Odabir ograničen na aktivnu poslovnu godinu '
+                          '(${_formatDay(_fyBounds!.startLocalInclusive)} — '
+                          '${_formatDay(OperationalBusinessYearContext.lastLocalDayInclusive(_fyBounds!))}).',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            OutlinedButton(
+                              onPressed: _jumpToFyStart,
+                              child: const Text('Početak godine'),
+                            ),
+                            OutlinedButton(
+                              onPressed: _jumpToTodayInFy,
+                              child: const Text('Danas'),
+                            ),
+                            OutlinedButton(
+                              onPressed: _jumpToFyEnd,
+                              child: const Text('Zadnji dan u godini'),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

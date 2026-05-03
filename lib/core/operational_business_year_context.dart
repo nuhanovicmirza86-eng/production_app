@@ -125,4 +125,36 @@ class OperationalBusinessYearContext {
     if (q.docs.isNotEmpty) return q.docs.first.id;
     return '';
   }
+
+  /// Zadnji uključeni kalendarski dan u FY.
+  static DateTime lastLocalDayInclusive(OperationalFyBounds b) {
+    return b.endLocalExclusive.subtract(const Duration(days: 1));
+  }
+
+  /// Ograniči odabrani dan na interval FY (OOE / kalendari).
+  static DateTime clampLocalCalendarDay(DateTime day, OperationalFyBounds b) {
+    final x = DateTime(day.year, day.month, day.day);
+    if (x.isBefore(b.startLocalInclusive)) return b.startLocalInclusive;
+    final last = lastLocalDayInclusive(b);
+    if (x.isAfter(last)) return last;
+    return x;
+  }
+
+  /// Granice za Material [showDatePicker]. Bez FY zadržava širok raspon oko [referenceDay].
+  static ({DateTime firstDate, DateTime lastDate}) materialDatePickerBounds({
+    OperationalFyBounds? fy,
+    required DateTime referenceDay,
+  }) {
+    if (fy != null) {
+      return (
+        firstDate: fy.startLocalInclusive,
+        lastDate: lastLocalDayInclusive(fy),
+      );
+    }
+    final y = referenceDay.year;
+    return (
+      firstDate: DateTime(y - 2, 1, 1),
+      lastDate: DateTime(y + 2, 12, 31),
+    );
+  }
 }
