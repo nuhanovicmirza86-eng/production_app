@@ -54,6 +54,21 @@ abstract final class DevelopmentDisplay {
     }
   }
 
+  static String projectPriorityLabel(String code) {
+    switch (code.trim()) {
+      case DevelopmentPriorities.low:
+        return 'Nizak prioritet';
+      case DevelopmentPriorities.medium:
+        return 'Srednji prioritet';
+      case DevelopmentPriorities.high:
+        return 'Visok prioritet';
+      case DevelopmentPriorities.critical:
+        return 'Kritičan prioritet';
+      default:
+        return code.isEmpty ? '—' : code;
+    }
+  }
+
   static String taskStatusLabel(String code) {
     switch (code.trim()) {
       case DevelopmentTaskStatuses.open:
