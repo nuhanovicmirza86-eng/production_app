@@ -109,6 +109,14 @@ class DevelopmentPermissions {
     return canDecideDevelopmentApproval(role: role, companyData: companyData);
   }
 
+  /// Zatvaranje projekta (formalno) — Callable [closeDevelopmentProject] (admin / super_admin / project_manager).
+  static bool canCloseDevelopmentProject({
+    required String? role,
+    required Map<String, dynamic> companyData,
+  }) {
+    return canCreateDevelopmentProject(role: role, companyData: companyData);
+  }
+
   /// Zapis release u proizvodnju — Callable [recordDevelopmentProjectReleaseToProduction]
   /// (admin / super_admin / voditelj projekta / menadžer proizvodnje).
   static bool canRecordDevelopmentReleaseToProduction({

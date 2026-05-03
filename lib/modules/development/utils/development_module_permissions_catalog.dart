@@ -233,6 +233,14 @@ abstract final class DevelopmentModulePermissionsCatalog {
             )),
       ),
       DevelopmentModulePermissionRow(
+        capability: 'Formalno zatvaranje projekta (status closed)',
+        where: 'Detalj projekta — Callable closeDevelopmentProject',
+        allowed: b(() => DevelopmentPermissions.canCloseDevelopmentProject(
+              role: r,
+              companyData: cd,
+            )),
+      ),
+      DevelopmentModulePermissionRow(
         capability: 'Zamjena tima (admin / SaaS ili voditelj)',
         where: 'Detalj / Tim — Callable replaceDevelopmentProjectTeam',
         allowed: b(() =>

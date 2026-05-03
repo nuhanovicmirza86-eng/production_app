@@ -528,6 +528,20 @@ class DevelopmentProjectService {
     return DevelopmentReleaseReadinessResult.parse(res.data);
   }
 
+  /// Callable [closeDevelopmentProject] — formalno zatvaranje (status `closed`).
+  Future<void> closeProjectViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+  }) async {
+    final callable = _functions().httpsCallable('closeDevelopmentProject');
+    await callable.call(<String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+    });
+  }
+
   /// Callable `recordDevelopmentProjectReleaseToProduction` — zapis na projektu nakon provjere blokada.
   Future<Map<String, dynamic>> recordReleaseToProductionViaCallable({
     required String companyId,

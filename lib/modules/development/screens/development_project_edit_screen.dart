@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/access/production_access_helper.dart';
 import '../models/development_project_model.dart';
 import '../services/development_project_service.dart';
 import '../utils/development_constants.dart';
@@ -55,6 +56,17 @@ class _DevelopmentProjectEditScreenState
       (widget.companyData['companyId'] ?? '').toString().trim();
   String get _plantKey =>
       (widget.companyData['plantKey'] ?? '').toString().trim();
+
+  bool get _pmRestrictedBudget {
+    final r = ProductionAccessHelper.normalizeRole(
+      widget.companyData['role']?.toString(),
+    );
+    if (ProductionAccessHelper.isSuperAdminRole(r) ||
+        ProductionAccessHelper.isAdminRole(r)) {
+      return false;
+    }
+    return r == ProductionAccessHelper.roleProjectManager;
+  }
 
   @override
   void initState() {
@@ -184,6 +196,12 @@ class _DevelopmentProjectEditScreenState
     putNum('budgetActual', _budgetActCtrl.text);
     putNum('estimatedRevenue', _revCtrl.text);
     putNum('estimatedMargin', _marginCtrl.text);
+
+    if (_pmRestrictedBudget) {
+      patch.remove('budgetPlanned');
+      patch.remove('estimatedRevenue');
+      patch.remove('estimatedMargin');
+    }
 
     if (_plannedStart != null) {
       patch['plannedStartDate'] = _plannedStart!.millisecondsSinceEpoch;
@@ -320,6 +338,7 @@ class _DevelopmentProjectEditScreenState
                 border: OutlineInputBorder(),
               ),
               items: DevelopmentProjectStatuses.all
+                  .where((s) => s != DevelopmentProjectStatuses.closed)
                   .map(
                     (s) => DropdownMenuItem(
                       value: s,
@@ -439,15 +458,17 @@ class _DevelopmentProjectEditScreenState
               ),
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _budgetPlanCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Budžet plan',
-                border: OutlineInputBorder(),
+            if (!_pmRestrictedBudget) ...[
+              TextFormField(
+                controller: _budgetPlanCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Budžet plan',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
+            ],
             TextFormField(
               controller: _budgetActCtrl,
               decoration: const InputDecoration(
@@ -456,24 +477,34 @@ class _DevelopmentProjectEditScreenState
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
             ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _revCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Procjena prihoda',
-                border: OutlineInputBorder(),
+            if (!_pmRestrictedBudget) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _revCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Procjena prihoda',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _marginCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Procjena marže',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _marginCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Procjena marže',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            ),
+            ] else ...[
+              const SizedBox(height: 8),
+              Text(
+                'Plan budžeta i prihod/maržu uređuje samo admin ( Callable ) — voditelj može unositi stvarni budžet.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
             const SizedBox(height: 16),
             Row(
               children: [

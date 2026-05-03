@@ -1,9 +1,11 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../models/development_project_model.dart';
 import '../services/development_project_service.dart';
+import '../utils/development_constants.dart';
 import '../utils/development_display.dart';
 import '../utils/development_permissions.dart';
 import 'development_project_edit_screen.dart';
@@ -15,6 +17,77 @@ import '../widgets/development_project_release_readiness_section.dart';
 import '../widgets/development_project_risks_section.dart';
 import '../widgets/development_project_stages_section.dart';
 import '../widgets/development_project_tasks_section.dart';
+
+Future<void> _promptCloseDevelopmentProject(
+  BuildContext context, {
+  required Map<String, dynamic> companyData,
+  required DevelopmentProjectModel project,
+}) async {
+  final companyId = (companyData['companyId'] ?? '').toString().trim();
+  final plantKey = (companyData['plantKey'] ?? '').toString().trim();
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Zatvori projekat'),
+      content: Text(
+        'Formalno zatvaranje (status „zatvoren”). '
+        'Voditelj projekta može zatvoriti tek kad je status aktivnosti „završen”. '
+        'Nastaviti za „${project.projectCode}”?',
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Odustani')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Zatvori')),
+      ],
+    ),
+  );
+  if (ok != true || !context.mounted) return;
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => const AlertDialog(
+      content: Row(
+        children: [
+          CircularProgressIndicator(),
+          SizedBox(width: 16),
+          Expanded(child: Text('Zatvaram projekat…')),
+        ],
+      ),
+    ),
+  );
+  try {
+    final service = DevelopmentProjectService();
+    await service.closeProjectViaCallable(
+      companyId: companyId,
+      plantKey: plantKey,
+      projectId: project.id,
+    );
+    if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Projekat je formalno zatvoren.')),
+      );
+    }
+  } on FirebaseFunctionsException catch (e) {
+    if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+    if (context.mounted) {
+      final m = e.message?.trim();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            (m != null && m.isNotEmpty) ? m : e.toString(),
+          ),
+        ),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Zatvaranje: $e')),
+      );
+    }
+  }
+}
 
 /// Korak 5 MVP — pregled projekta (live stream).
 class DevelopmentProjectDetailsScreen extends StatelessWidget {
@@ -117,6 +190,36 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
                     if ((p.releasedToProductionByName ?? '').trim().isNotEmpty)
                       _kv(context, 'Release (korisnik)', p.releasedToProductionByName!),
                   ],
+                  if (p.closedAt != null) ...[
+                    _kv(
+                      context,
+                      'Formalno zatvoren',
+                      p.closedAt!.toLocal().toString(),
+                    ),
+                    if ((p.closedByName ?? '').trim().isNotEmpty)
+                      _kv(context, 'Zatvorio', p.closedByName!),
+                  ],
+                  if (DevelopmentPermissions.canCloseDevelopmentProject(
+                        role: companyData['role']?.toString(),
+                        companyData: companyData,
+                      ) &&
+                      p.status != DevelopmentProjectStatuses.closed &&
+                      p.status != DevelopmentProjectStatuses.cancelled)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _promptCloseDevelopmentProject(
+                            context,
+                            companyData: companyData,
+                            project: p,
+                          ),
+                          icon: const Icon(Icons.lock_outline),
+                          label: const Text('Formalno zatvori projekat'),
+                        ),
+                      ),
+                    ),
                 ],
               ),
               DevelopmentProjectStagesSection(

@@ -74,6 +74,7 @@ class DevelopmentProjectModel {
 
   final DateTime? closedAt;
   final String? closedBy;
+  final String? closedByName;
 
   final DateTime? releasedToProductionAt;
   final String? releasedToProductionBy;
@@ -130,6 +131,7 @@ class DevelopmentProjectModel {
     required this.updatedBy,
     this.closedAt,
     this.closedBy,
+    this.closedByName,
     this.releasedToProductionAt,
     this.releasedToProductionBy,
     this.releasedToProductionByName,
@@ -264,6 +266,10 @@ class DevelopmentProjectModel {
       updatedBy: _s(data['updatedBy']),
       closedAt: _ts(data['closedAt']),
       closedBy: _s(data['closedBy']).isEmpty ? null : _s(data['closedBy']),
+      closedByName: () {
+        final s = _s(data['closedByName']);
+        return s.isEmpty ? null : s;
+      }(),
       releasedToProductionAt: _ts(data['releasedToProductionAt']),
       releasedToProductionBy: () {
         final s = _s(data['releasedToProductionBy']);

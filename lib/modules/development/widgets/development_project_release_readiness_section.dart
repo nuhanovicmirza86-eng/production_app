@@ -236,7 +236,7 @@ class _DevelopmentProjectReleaseReadinessSectionState
             ),
             const SizedBox(height: 8),
             Text(
-              'Heuristička provjera (rizici, izmjene, faza Gate, čekajuća odobrenja). '
+              'Heuristička provjera (rizici, izmjene, faza Gate, čekajuća odobrenja, dokumenti za Gate s odobrenjem). '
               'Ne zamjenjuje povezivanje na proizvod / nalog.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
