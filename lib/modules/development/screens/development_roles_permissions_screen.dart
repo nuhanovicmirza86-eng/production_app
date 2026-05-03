@@ -14,7 +14,7 @@ class DevelopmentRolesPermissionsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!ProductionAccessHelper.isSuperAdminEffectiveSession(companyData)) {
+    if (!ProductionAccessHelper.isSuperAdminFromCompanySession(companyData)) {
       return Scaffold(
         appBar: AppBar(title: const Text('Razvoj — matrica dozvola')),
         body: const Center(

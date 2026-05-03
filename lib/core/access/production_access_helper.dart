@@ -33,6 +33,18 @@ enum ProductionDashboardCard {
 
 enum ProductionAccessLevel { hidden, view, manage }
 
+/// Pristup samo hubu Razvoj / NPI (sve ostale kartice skrivene).
+Map<ProductionDashboardCard, ProductionAccessLevel> _accessDevelopmentHubOnly(
+  ProductionAccessLevel developmentLevel,
+) {
+  return {
+    for (final c in ProductionDashboardCard.values)
+      c: c == ProductionDashboardCard.developmentGovernance
+          ? developmentLevel
+          : ProductionAccessLevel.hidden,
+  };
+}
+
 /// Pristup ekranima u Production appu.
 ///
 /// **Uloga** = vrijednost `users.role` (string) u Firestoreu. Ispod su **kanonske** uloge koje ovaj helper
@@ -426,27 +438,6 @@ class ProductionAccessHelper {
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
       ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
     },
-    roleQualityControl: {
-      ProductionDashboardCard.products: ProductionAccessLevel.view,
-      ProductionDashboardCard.productionOrders: ProductionAccessLevel.view,
-      ProductionDashboardCard.productionTracking: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.stationPages: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.workCenters: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.productionProcesses: ProductionAccessLevel.view,
-      ProductionDashboardCard.shifts: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.downtime: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.ooe: ProductionAccessLevel.view,
-      ProductionDashboardCard.operonixAnalytics: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.problemReporting: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.processExecution: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.reports: ProductionAccessLevel.view,
-      ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.developmentGovernance: ProductionAccessLevel.view,
-      ProductionDashboardCard.qualityManagement: ProductionAccessLevel.manage,
-      ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
-      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
-    },
   };
 
   /// Uloge koje imaju zapis u [_roleMatrix], stabilnim redom (referentni ekrani).
@@ -497,19 +488,6 @@ class ProductionAccessHelper {
 
   static bool isSuperAdminFromCompanySession(Map<String, dynamic> companyData) {
     return isSuperAdminRole(rawRoleFromCompanySession(companyData));
-  }
-
-  /// Za prikaz SaaS / matričnih ekrana: [role] na korijenu **ili** u [userAppAccess.role]
-  /// (ako se polja povijesno razilaze, super admin i dalje vidi referentni UI).
-  static bool isSuperAdminEffectiveSession(Map<String, dynamic> companyData) {
-    final root = normalizeRole(companyData['role']);
-    if (isSuperAdminRole(root)) return true;
-    final aa = companyData['userAppAccess'];
-    if (aa is Map) {
-      final nested = normalizeRole(aa['role']);
-      if (isSuperAdminRole(nested)) return true;
-    }
-    return isSuperAdminFromCompanySession(companyData);
   }
 
   static bool isMaintenanceManagerRole(String role) {

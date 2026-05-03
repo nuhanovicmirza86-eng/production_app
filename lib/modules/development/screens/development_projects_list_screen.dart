@@ -336,7 +336,7 @@ class _DevelopmentProjectsListScreenState
       );
 
   bool get _isSuperAdmin =>
-      ProductionAccessHelper.isSuperAdminEffectiveSession(
+      ProductionAccessHelper.isSuperAdminFromCompanySession(
         widget.companyData,
       );
 
