@@ -31,8 +31,15 @@ class _DevelopmentProjectsListScreenState
   final DevelopmentProjectService _service = DevelopmentProjectService();
   String? _plantLabel;
 
-  /// `null` = sve poslovne godine (portfelj).
+  /// `null` = sve poslovne godine (portfelj). Inicijalno se postavlja na aktivnu godinu kad stigne stream.
   String? _selectedBusinessYearId;
+  bool _fyHydrated = false;
+  bool _fyUserTouched = false;
+
+  /// Za admin/super_admin portfelj: `null` = svi pogoni; inače filtriraj [plantKey].
+  String? _portfolioPlantKeyFilter;
+
+  List<({String plantKey, String label})> _selectablePlants = [];
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -59,6 +66,53 @@ class _DevelopmentProjectsListScreenState
   void initState() {
     super.initState();
     _loadPlantLabel();
+    _loadSelectablePlants();
+  }
+
+  Future<void> _loadSelectablePlants() async {
+    if (!_portfolioAllPlants || _companyId.isEmpty) return;
+    final list = await CompanyPlantDisplayName.listSelectablePlants(
+      companyId: _companyId,
+    );
+    if (!mounted) return;
+    setState(() => _selectablePlants = list);
+  }
+
+  /// Pogon korišten za Callable mutacije (kreiranje): za admina prvo filtar portfelja, zatim sesijski pogon.
+  String get _plantKeyForMutations {
+    if (_portfolioAllPlants) {
+      final f = (_portfolioPlantKeyFilter ?? '').trim();
+      if (f.isNotEmpty) return f;
+      return _plantKey.trim();
+    }
+    return _plantKey.trim();
+  }
+
+  bool get _needsPlantChoiceForMutations => _plantKeyForMutations.isEmpty;
+
+  void _openCreateProject() {
+    final pk = _plantKeyForMutations;
+    if (_companyId.isEmpty || pk.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _needsPlantChoiceForMutations
+                ? 'Nedostaje pogon u sesiji — odaberite pogon u profilu ili u filtru portfelja.'
+                : 'Nedostaje organizacija ili pogon u sesiji.',
+          ),
+        ),
+      );
+      return;
+    }
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => DevelopmentProjectCreateScreen(
+          companyData: widget.companyData,
+          plantKeyOverride: pk,
+        ),
+      ),
+    );
   }
 
   Future<void> _loadPlantLabel() async {
@@ -205,16 +259,7 @@ class _DevelopmentProjectsListScreenState
               if (_canCreateProject) ...[
                 const SizedBox(height: 28),
                 FilledButton.icon(
-                  onPressed: () {
-                    Navigator.push<void>(
-                      context,
-                      MaterialPageRoute<void>(
-                        builder: (_) => DevelopmentProjectCreateScreen(
-                          companyData: widget.companyData,
-                        ),
-                      ),
-                    );
-                  },
+                  onPressed: _openCreateProject,
                   icon: const Icon(Icons.add),
                   label: const Text('Kreiraj prvi projekat'),
                 ),
@@ -284,9 +329,10 @@ class _DevelopmentProjectsListScreenState
                 content: SingleChildScrollView(
                   child: Text(
                     'Za uloge vezane uz pojedini pogon portfelj je ograničen na taj pogon. '
-                    'Za **Admin** i **Super admin** prikazuju se projekti **svih pogona** u kompaniji '
-                    '(isti tenant; kartice pokazuju pogon).\n\n'
-                    'Filtar poslovne godine sužava listu; „Sve poslovne godine“ uključuje cijeli portfelj u tom opsegu.\n\n'
+                    'Za **Admin** i **Super admin** prikazuju se projekti po odabiru: '
+                    'svi pogoni u kompaniji ili jedan pogon iz filtra — uvijek unutar odabrane poslovne godine.\n\n'
+                    'Zadano je **aktivna poslovna godina** (kalendarska, sinkronizacija na backendu); '
+                    '„Sve poslovne godine“ uključuje cijeli arhiv u tom opsegu.\n\n'
                     'Matrica enterprise prava po ulozi (super admin): kartica ispod ili ikona u traci.',
                     style: TextStyle(height: 1.35, color: scheme.onSurfaceVariant),
                   ),
@@ -304,16 +350,7 @@ class _DevelopmentProjectsListScreenState
       ),
       floatingActionButton: _canCreateProject
           ? FloatingActionButton.extended(
-              onPressed: () {
-                Navigator.push<void>(
-                  context,
-                  MaterialPageRoute<void>(
-                    builder: (_) => DevelopmentProjectCreateScreen(
-                      companyData: widget.companyData,
-                    ),
-                  ),
-                );
-              },
+              onPressed: _openCreateProject,
               icon: const Icon(Icons.add),
               label: const Text('Novi projekat'),
             )
@@ -347,8 +384,8 @@ class _DevelopmentProjectsListScreenState
                 const SizedBox(height: 6),
                 Text(
                   _portfolioAllPlants
-                      ? 'Upravljanje projektima, Gate-ovima i KPI — portfelj obuhvata sve pogone u kompaniji. Filtar poslovne godine sužava listu.'
-                      : 'Upravljanje projektima, ključnim fazama, KPI i rizicima — po poslovnoj godini i odabranom pogonu.',
+                      ? 'Upravljanje projektima, Gate-ovima i KPI — zadano: aktivna poslovna godina i (za admina) filtar pogona ili svi pogoni.'
+                      : 'Upravljanje projektima, ključnim fazama, KPI i rizicima — zadano: aktivna poslovna godina za ovaj pogon.',
                   style: tt.bodyMedium?.copyWith(
                     color: scheme.onSurfaceVariant,
                     height: 1.35,
@@ -368,7 +405,10 @@ class _DevelopmentProjectsListScreenState
                     Expanded(
                       child: Text(
                         _portfolioAllPlants
-                            ? 'Opseg: svi pogoni u kompaniji'
+                            ? (_portfolioPlantKeyFilter != null &&
+                                    _portfolioPlantKeyFilter!.isNotEmpty
+                                ? 'Opseg: jedan pogon (filtar)'
+                                : 'Opseg: svi pogoni u kompaniji')
                             : (_plantLabel != null && _plantLabel!.isNotEmpty
                                 ? 'Pogon: $_plantLabel'
                                 : 'Pogon: ${_plantKey.isEmpty ? '—' : _plantKey}'),
@@ -406,134 +446,228 @@ class _DevelopmentProjectsListScreenState
           if (_companyId.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: fyRef.snapshots(),
-                builder: (context, snap) {
-                  if (snap.hasError) {
-                    return Text(
-                      'Poslovne godine nisu učitane.',
-                      style: TextStyle(color: scheme.error),
-                    );
-                  }
-                  final docs = snap.data?.docs ?? [];
-                  final usable = docs.where((d) {
-                    final s = (d.data()['status'] ?? '').toString().toLowerCase();
-                    return s == 'active' || s == 'draft';
-                  }).toList()
-                    ..sort((a, b) => b.id.compareTo(a.id));
-
-                  final items = <DropdownMenuItem<String?>>[
-                    const DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text('Sve poslovne godine (cijeli portfelj)'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_portfolioAllPlants && _selectablePlants.isNotEmpty) ...[
+                    DropdownButtonFormField<String?>(
+                      key: ValueKey<String?>(
+                        'portfolio-plant-${_portfolioPlantKeyFilter ?? 'all'}',
+                      ),
+                      initialValue: _portfolioPlantKeyFilter,
+                      decoration: InputDecoration(
+                        labelText: 'Pogon — filtar portfelja (kompanija + poslovna godina)',
+                        border: const OutlineInputBorder(),
+                        filled: true,
+                        fillColor:
+                            scheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                        helperText:
+                            'Prazno = svi pogoni. Odabir sužava listu na jedan pogon u odabranoj poslovnoj godini.',
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Svi pogoni u kompaniji'),
+                        ),
+                        ..._selectablePlants.map(
+                          (e) => DropdownMenuItem<String?>(
+                            value: e.plantKey,
+                            child: Text(e.label),
+                          ),
+                        ),
+                      ],
+                      onChanged: (v) => setState(() => _portfolioPlantKeyFilter = v),
                     ),
-                    ...usable.map((d) {
-                      final m = d.data();
-                      final code = (m['code'] ?? '').toString();
-                      final name = (m['name'] ?? '').toString();
-                      final label = name.isNotEmpty
-                          ? '$code — $name'
-                          : (code.isNotEmpty ? code : d.id);
-                      return DropdownMenuItem<String?>(
-                        value: d.id,
-                        child: Text(label),
+                    const SizedBox(height: 12),
+                  ],
+                  StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: fyRef.snapshots(),
+                    builder: (context, snap) {
+                      if (snap.hasError) {
+                        return Text(
+                          'Poslovne godine nisu učitane.',
+                          style: TextStyle(color: scheme.error),
+                        );
+                      }
+                      final docs = snap.data?.docs ?? [];
+                      final usable = List<QueryDocumentSnapshot<Map<String, dynamic>>>.from(docs)
+                        ..sort((a, b) {
+                          final da = a.data()['startDate'];
+                          final db_ = b.data()['startDate'];
+                          if (da is Timestamp && db_ is Timestamp) {
+                            return db_.compareTo(da);
+                          }
+                          return b.id.compareTo(a.id);
+                        });
+
+                      String? activeId;
+                      for (final d in docs) {
+                        final s =
+                            (d.data()['status'] ?? '').toString().toLowerCase();
+                        if (s == 'active') {
+                          activeId = d.id;
+                          break;
+                        }
+                      }
+
+                      if (!_fyHydrated && !_fyUserTouched && snap.hasData) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (!mounted || _fyUserTouched) return;
+                          setState(() {
+                            _selectedBusinessYearId = activeId;
+                            _fyHydrated = true;
+                          });
+                        });
+                      }
+
+                      final items = <DropdownMenuItem<String?>>[
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Sve poslovne godine (arhiva)'),
+                        ),
+                        ...usable.map((d) {
+                          final m = d.data();
+                          final code = (m['code'] ?? '').toString();
+                          final name = (m['name'] ?? '').toString();
+                          final st =
+                              (m['status'] ?? '').toString().toLowerCase();
+                          final stLabel = st == 'closed'
+                              ? ' (zatvoreno)'
+                              : st == 'draft'
+                                  ? ' (nacrt)'
+                                  : st == 'archived'
+                                      ? ' (arhiva)'
+                                      : '';
+                          final label = name.isNotEmpty
+                              ? '$code — $name$stLabel'
+                              : '${code.isNotEmpty ? code : d.id}$stLabel';
+                          return DropdownMenuItem<String?>(
+                            value: d.id,
+                            child: Text(label),
+                          );
+                        }),
+                      ];
+
+                      return DropdownButtonFormField<String?>(
+                        key: ValueKey<String?>(
+                          'fy-${_selectedBusinessYearId ?? 'all'}',
+                        ),
+                        initialValue: _selectedBusinessYearId,
+                        decoration: InputDecoration(
+                          labelText: 'Poslovna godina — glavni filter portfelja',
+                          border: const OutlineInputBorder(),
+                          filled: true,
+                          fillColor:
+                              scheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                          helperText: usable.isEmpty
+                              ? 'Kalendarska godina se automatski osnovava na back-endu (noćni zadatak). '
+                                  'Do tada možete pregledavati sav portfelj („Sve poslovne godine“).'
+                              : (_portfolioAllPlants
+                                  ? 'Zadano: aktivna godina. „Sve“ = arhiva u kompanijskom opsegu i filtru pogona.'
+                                  : 'Zadano: aktivna godina. „Sve“ = arhiva za ovaj pogon.'),
+                        ),
+                        items: items,
+                        onChanged: (v) => setState(() {
+                          _fyUserTouched = true;
+                          _selectedBusinessYearId = v;
+                        }),
                       );
-                    }),
-                  ];
-
-                  return DropdownButtonFormField<String?>(
-                    key: ValueKey<String?>(_selectedBusinessYearId),
-                    initialValue: _selectedBusinessYearId,
-                    decoration: InputDecoration(
-                      labelText: 'Poslovna godina — glavni filter portfelja',
-                      border: const OutlineInputBorder(),
-                      filled: true,
-                      fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                      helperText: usable.isEmpty
-                          ? 'Nema unosa u šifrarniku godina — portfelj pokazuje sve godine; unos godina kod novog projekta ručno u Callable.'
-                          : (_portfolioAllPlants
-                              ? 'Odabir sužava listu kroz sve pogone; „Sve“ = cijeli kompanijski portfelj.'
-                              : 'Odabir sužava listu na ovom pogonu; „Sve“ = svi projekti pogona.'),
-                    ),
-                    items: items,
-                    onChanged: (v) => setState(() => _selectedBusinessYearId = v),
-                  );
-                },
+                    },
+                  ),
+                ],
               ),
             ),
           Expanded(
-            child: _companyId.isEmpty ||
-                    (!_portfolioAllPlants && _plantKey.isEmpty)
-                ? const Center(
+            child: Builder(
+              builder: (context) {
+                final trimmedPortfolioPlant =
+                    (_portfolioPlantKeyFilter ?? '').trim();
+                final allPlantsInCompany = _portfolioAllPlants &&
+                    trimmedPortfolioPlant.isEmpty;
+                final plantForQuery = allPlantsInCompany
+                    ? ''
+                    : (_portfolioAllPlants
+                        ? trimmedPortfolioPlant
+                        : _plantKey.trim());
+                final missingOrg = _companyId.isEmpty ||
+                    (!_portfolioAllPlants && _plantKey.isEmpty);
+                final missingPlantForQuery = _portfolioAllPlants &&
+                    !allPlantsInCompany &&
+                    plantForQuery.isEmpty;
+                if (missingOrg || missingPlantForQuery) {
+                  return const Center(
                     child: Padding(
                       padding: EdgeInsets.all(24),
                       child: Text(
                         'Nedostaje podatak o organizaciji ili pogonu za ovu sesiju.',
                       ),
                     ),
-                  )
-                : StreamBuilder<List<DevelopmentProjectModel>>(
-                    stream: _service.watchProjects(
-                      companyId: _companyId,
-                      plantKey: _plantKey,
-                      allPlantsInCompany: _portfolioAllPlants,
-                      businessYearId: _selectedBusinessYearId,
-                    ),
-                    builder: (context, snap) {
-                      if (snap.hasError) {
-                        return Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Text(
-                              'Podaci trenutno nisu dostupni.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: scheme.error),
-                            ),
-                          ),
-                        );
-                      }
-                      if (!snap.hasData) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      final list = snap.data!;
-                      if (list.isEmpty) {
-                        return _buildEmptyState();
-                      }
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _portfolioSummaryStrip(list),
-                          Expanded(
-                            child: ListView.separated(
-                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 88),
-                              itemCount: list.length,
-                              separatorBuilder: (context, _) =>
-                                  const SizedBox(height: 12),
-                              itemBuilder: (context, i) {
-                                final p = list[i];
-                                return DevelopmentProjectCard(
-                                  project: p,
-                                  showPlantChip: _portfolioAllPlants,
-                                  onTap: () {
-                                    Navigator.push<void>(
-                                      context,
-                                      MaterialPageRoute<void>(
-                                        builder: (_) =>
-                                            DevelopmentProjectDetailsScreen(
-                                          companyData: widget.companyData,
-                                          projectId: p.id,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      );
-                    },
+                  );
+                }
+                return StreamBuilder<List<DevelopmentProjectModel>>(
+                  stream: _service.watchProjects(
+                    companyId: _companyId,
+                    plantKey: plantForQuery,
+                    allPlantsInCompany: allPlantsInCompany,
+                    businessYearId: _selectedBusinessYearId,
                   ),
+                  builder: (context, snap) {
+                    if (snap.hasError) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            'Podaci trenutno nisu dostupni.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: scheme.error),
+                          ),
+                        ),
+                      );
+                    }
+                    if (!snap.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final list = snap.data!;
+                    if (list.isEmpty) {
+                      return _buildEmptyState();
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _portfolioSummaryStrip(list),
+                        Expanded(
+                          child: ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 88),
+                            itemCount: list.length,
+                            separatorBuilder: (context, _) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (context, i) {
+                              final p = list[i];
+                              return DevelopmentProjectCard(
+                                project: p,
+                                showPlantChip: _portfolioAllPlants,
+                                onTap: () {
+                                  Navigator.push<void>(
+                                    context,
+                                    MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          DevelopmentProjectDetailsScreen(
+                                        companyData: widget.companyData,
+                                        projectId: p.id,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),

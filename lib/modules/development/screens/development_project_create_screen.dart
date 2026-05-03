@@ -12,9 +12,12 @@ class DevelopmentProjectCreateScreen extends StatefulWidget {
   const DevelopmentProjectCreateScreen({
     super.key,
     required this.companyData,
+    /// Kada admin gleda cijelu kompaniju, pogon se prosljeđuje iz portfelja (ili sesije).
+    this.plantKeyOverride,
   });
 
   final Map<String, dynamic> companyData;
+  final String? plantKeyOverride;
 
   @override
   State<DevelopmentProjectCreateScreen> createState() =>
@@ -59,8 +62,11 @@ class _DevelopmentProjectCreateScreenState
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
-  String get _plantKey =>
-      (widget.companyData['plantKey'] ?? '').toString().trim();
+  String get _plantKey {
+    final o = (widget.plantKeyOverride ?? '').toString().trim();
+    if (o.isNotEmpty) return o;
+    return (widget.companyData['plantKey'] ?? '').toString().trim();
+  }
   String get _role =>
       ProductionAccessHelper.normalizeRole(widget.companyData['role']);
 
