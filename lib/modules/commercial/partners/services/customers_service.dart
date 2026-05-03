@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../models/customer_requirements_profile_model.dart';
 import '../models/partner_models.dart';
 
 class CustomersService {
@@ -14,6 +15,9 @@ class CustomersService {
 
   CollectionReference<Map<String, dynamic>> get _customers =>
       _firestore.collection('customers');
+
+  CollectionReference<Map<String, dynamic>> get _csrProfiles =>
+      _firestore.collection('customer_requirements_profiles');
 
   static String _s(dynamic v) => (v ?? '').toString().trim();
 
@@ -144,6 +148,58 @@ class CustomersService {
         });
     if (res.data['success'] != true) {
       throw Exception('Ažuriranje kupca nije uspjelo.');
+    }
+  }
+
+  Future<CustomerRequirementsProfileModel?> getCustomerRequirementsProfile({
+    required String companyId,
+    required String customerId,
+  }) async {
+    final cid = companyId.trim();
+    final id = customerId.trim();
+    if (cid.isEmpty || id.isEmpty) return null;
+    final doc = await _csrProfiles.doc(id).get();
+    if (!doc.exists) return null;
+    final m = CustomerRequirementsProfileModel.fromDoc(doc);
+    if (m.companyId != cid) return null;
+    return m;
+  }
+
+  /// Firestore snapshot profila zahtjeva kupca (isti id kao `customers` dokument).
+  Stream<CustomerRequirementsProfileModel?> watchCustomerRequirementsProfile({
+    required String companyId,
+    required String customerId,
+  }) {
+    final cid = companyId.trim();
+    final id = customerId.trim();
+    if (cid.isEmpty || id.isEmpty) {
+      return Stream.value(null);
+    }
+    return _csrProfiles.doc(id).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      final m = CustomerRequirementsProfileModel.fromDoc(doc);
+      if (m.companyId != cid) return null;
+      return m;
+    });
+  }
+
+  Future<void> upsertCustomerRequirementsProfile({
+    required String companyId,
+    required String customerId,
+    required CustomerRequirementsProfileModel profile,
+  }) async {
+    final cid = companyId.trim();
+    final id = customerId.trim();
+    if (cid.isEmpty || id.isEmpty) throw Exception('Missing ids');
+    final res = await _functions
+        .httpsCallable('upsertCustomerRequirementsProfile')
+        .call<Map<String, dynamic>>({
+          'companyId': cid,
+          'customerId': id,
+          'profile': profile.toCallablePatch(),
+        });
+    if (res.data['ok'] != true) {
+      throw Exception('Snimanje CSR profila nije uspjelo.');
     }
   }
 }

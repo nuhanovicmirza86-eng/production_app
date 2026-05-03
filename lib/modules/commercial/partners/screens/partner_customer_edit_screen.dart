@@ -6,6 +6,7 @@ import '../data/activity_sector_visibility.dart';
 import '../models/partner_models.dart';
 import '../services/customers_service.dart';
 import 'activity_sectors_catalog_screen.dart';
+import 'partner_customer_requirements_profile_screen.dart';
 
 class PartnerCustomerEditScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
@@ -599,6 +600,35 @@ class _PartnerCustomerEditScreenState extends State<PartnerCustomerEditScreen> {
                         decoration: _dec('Napomena'),
                         maxLines: 3,
                       ),
+                      if (_isEdit) ...[
+                        const SizedBox(height: 20),
+                        Card(
+                          child: ListTile(
+                            leading: const Icon(Icons.description_outlined),
+                            title: const Text('Profil zahtjeva kupca (CSR)'),
+                            subtitle: const Text(
+                              'PPAP, posebni zahtjevi, tolerancije, kontakti — za Razvoj / IATF.',
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: _saving
+                                ? null
+                                : () {
+                                    final id = widget.customerId!.trim();
+                                    Navigator.of(context).push<void>(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            PartnerCustomerRequirementsProfileScreen(
+                                          companyData: widget.companyData,
+                                          customerId: id,
+                                          customerDisplayName:
+                                              _nameController.text.trim(),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       FilledButton.icon(
                         onPressed: _saving ? null : _save,

@@ -104,6 +104,7 @@ class _DevelopmentLaunchIntelligenceTabState
             await next;
           },
           child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
             children: [
               _scoreHeader(context, data),
@@ -130,6 +131,19 @@ class _DevelopmentLaunchIntelligenceTabState
                       label: const Text('AI Red Team'),
                     ),
                   ],
+                ),
+              ],
+              if (data.customerRequirementsProfile != null) ...[
+                const SizedBox(height: 16),
+                _csrSummaryCard(context, data.customerRequirementsProfile!),
+              ] else ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Nema učitanog CSR profila (provjeri customerId na projektu i Profil zahtjeva kupca kod kupca).',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontStyle: FontStyle.italic,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                 ),
               ],
               const SizedBox(height: 16),
@@ -484,6 +498,52 @@ class _DevelopmentLaunchIntelligenceTabState
         const SizedBox(width: 8),
         Expanded(child: Text(text, style: Theme.of(context).textTheme.bodySmall)),
       ],
+    );
+  }
+
+  Widget _csrSummaryCard(BuildContext context, Map<String, dynamic> c) {
+    String s(dynamic k) => (c[k] ?? '').toString();
+    final lines = <String>[
+      if (s('ppapLevel').isNotEmpty && s('ppapLevel') != 'null') 'PPAP: ${s('ppapLevel')}',
+      if (c['changeNotificationWeeks'] != null) 'Obavještenje promjene: ${c['changeNotificationWeeks']} sedm.',
+      if (s('customerNameSnapshot').isNotEmpty) 'Snimak naziva: ${s('customerNameSnapshot')}',
+      if (s('specialRequirementsPreview').isNotEmpty) 'Posebni zahtjevi: ${s('specialRequirementsPreview')}',
+      if (s('documentationRequirementsPreview').isNotEmpty)
+        'Dokumentacija: ${s('documentationRequirementsPreview')}',
+      if (s('reactionPlanPolicy').isNotEmpty) 'Reakcioni plan: ${s('reactionPlanPolicy')}',
+      if (s('tolerancePolicyPreview').isNotEmpty) 'Tolerancije: ${s('tolerancePolicyPreview')}',
+      if (s('csrDocumentReference').isNotEmpty) 'CSR ref.: ${s('csrDocumentReference')}',
+      if (c['communicationContactCount'] != null) 'Kontakata: ${c['communicationContactCount']}',
+    ];
+    return Card(
+      color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.35),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.assignment_outlined, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Customer requirement profile (CSR)',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ...lines.map((t) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(t, style: Theme.of(context).textTheme.bodySmall),
+                )),
+          ],
+        ),
+      ),
     );
   }
 

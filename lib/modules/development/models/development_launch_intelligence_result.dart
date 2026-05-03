@@ -22,6 +22,7 @@ class DevelopmentLaunchIntelligenceResult {
     required this.noSilentChangeRule,
     required this.openBlockingChanges,
     required this.mesIntegrationNote,
+    this.customerRequirementsProfile,
   });
 
   final String targetGate;
@@ -45,6 +46,7 @@ class DevelopmentLaunchIntelligenceResult {
   final String noSilentChangeRule;
   final int openBlockingChanges;
   final String mesIntegrationNote;
+  final Map<String, dynamic>? customerRequirementsProfile;
 
   static DevelopmentLaunchIntelligenceResult parse(dynamic raw) {
     if (raw is! Map) {
@@ -189,6 +191,11 @@ class DevelopmentLaunchIntelligenceResult {
       noSilentChangeRule: nscRule,
       openBlockingChanges: nscOpen,
       mesIntegrationNote: (m['mesIntegrationNote'] ?? '').toString(),
+      customerRequirementsProfile: () {
+        final c = m['customerRequirementsProfile'];
+        if (c is Map) return Map<String, dynamic>.from(c);
+        return null;
+      }(),
     );
   }
 }
