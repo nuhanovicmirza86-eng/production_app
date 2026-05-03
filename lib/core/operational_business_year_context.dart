@@ -96,6 +96,19 @@ class OperationalBusinessYearContext {
     return _fromActiveFinancialYearSubcollection(fs, cid);
   }
 
+  /// Uvijek ne-null: aktivna FY ako postoji, inače kalendarska godina uređaja (UI standard).
+  static Future<OperationalFyBounds> resolveBoundsForCompanyOrFallback({
+    required String companyId,
+    FirebaseFirestore? firestore,
+  }) async {
+    final r = await resolveBoundsForCompany(
+      companyId: companyId,
+      firestore: firestore,
+    );
+    if (r != null) return r;
+    return OperationalFyBounds.forCalendarYear(DateTime.now().toLocal().year);
+  }
+
   /// `financialYearId` iz ogledala ili aktivnog dokumenta; prazan string ako nema.
   static Future<String> resolveFinancialYearIdForCompany({
     required String companyId,

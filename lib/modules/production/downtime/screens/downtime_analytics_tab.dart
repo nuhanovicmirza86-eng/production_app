@@ -19,11 +19,11 @@ import '../models/downtime_event_model.dart';
 import '../services/downtime_service.dart';
 
 enum _RangePreset {
+  operationalFy('Poslovna godina'),
   d7('7 dana'),
   d30('30 dana'),
   d90('90 dana'),
   mtd('Mjesec do danas'),
-  operationalFy('Poslovna godina'),
   custom('Prilagođeno…');
 
   final String label;
@@ -57,7 +57,7 @@ class _DowntimeAnalyticsTabState extends State<DowntimeAnalyticsTab> {
   final _service = DowntimeService();
   final _budgetCtrl = TextEditingController();
 
-  _RangePreset _preset = _RangePreset.d30;
+  _RangePreset _preset = _RangePreset.operationalFy;
   DateTimeRange? _customRange;
   bool _includeRejected = false;
   OperationalFyBounds? _operationalFyBounds;
@@ -144,13 +144,8 @@ class _DowntimeAnalyticsTabState extends State<DowntimeAnalyticsTab> {
           end: tomorrow,
         );
       case _RangePreset.operationalFy:
-        final b = _operationalFyBounds;
-        if (b == null) {
-          return DateTimeRange(
-            start: todayStart.subtract(const Duration(days: 29)),
-            end: tomorrow,
-          );
-        }
+        final b = _operationalFyBounds ??
+            OperationalFyBounds.forCalendarYear(DateTime.now().toLocal().year);
         return DateTimeRange(
           start: _dayStart(b.startLocalInclusive),
           end: b.endLocalExclusive,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/operational_business_year_context.dart';
 import '../../../../core/theme/operonix_production_brand.dart';
 import '../../work_centers/models/work_center_model.dart';
 import '../../work_centers/services/work_center_service.dart';
@@ -115,21 +116,25 @@ class _DowntimesOperativeTabState extends State<DowntimesOperativeTab> {
 
   Future<void> _loadWorkCenters() async {
     if (_companyId.isEmpty || _plantKey.isEmpty) return;
+    final shouldApplyDefaults = !_appliedInitialFromParent;
     final list = await _wcService.listWorkCentersForPlant(
       companyId: _companyId,
       plantKey: _plantKey,
     );
     if (!mounted) return;
+
+    final hasParentRange = widget.initialEventRangeStart != null &&
+        widget.initialEventRangeEndExclusive != null;
+
     setState(() {
       _workCenters = list;
-      if (!_appliedInitialFromParent) {
+      if (shouldApplyDefaults) {
         _appliedInitialFromParent = true;
         final wk = (widget.initialWorkCenterIdOrCode ?? '').trim();
         if (wk.isNotEmpty && wk != '—') {
           _filterWorkCenterToken = wk;
         }
-        if (widget.initialEventRangeStart != null &&
-            widget.initialEventRangeEndExclusive != null) {
+        if (hasParentRange) {
           _filterEventRangeStart = widget.initialEventRangeStart;
           _filterEventRangeEndExclusive = widget.initialEventRangeEndExclusive;
         }
@@ -138,6 +143,17 @@ class _DowntimesOperativeTabState extends State<DowntimesOperativeTab> {
         }
       }
     });
+
+    if (shouldApplyDefaults && !hasParentRange) {
+      final b = await OperationalBusinessYearContext.resolveBoundsForCompanyOrFallback(
+        companyId: _companyId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _filterEventRangeStart = b.startLocalInclusive;
+        _filterEventRangeEndExclusive = b.endLocalExclusive;
+      });
+    }
   }
 
   Iterable<DowntimeEventModel> _applyFilters(List<DowntimeEventModel> raw) sync* {

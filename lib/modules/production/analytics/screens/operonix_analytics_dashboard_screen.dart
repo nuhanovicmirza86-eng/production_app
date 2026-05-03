@@ -29,11 +29,11 @@ import '../../downtime/screens/downtimes_screen.dart';
 import 'analytics_work_center_details_screen.dart';
 
 enum _RangePreset {
+  operationalFy('Poslovna godina'),
   d0('Danas'),
   d7('7 dana'),
   d30('30 dana'),
   d90('90 dana'),
-  operationalFy('Poslovna godina'),
   custom('Prilagođeno…');
 
   final String label;
@@ -57,7 +57,7 @@ class _OperonixAnalyticsDashboardScreenState
   final _narrator = AiInsightService();
   final _downtimeDailyCallable = AnalyticsDowntimeDailyCallableService();
 
-  _RangePreset _preset = _RangePreset.d7;
+  _RangePreset _preset = _RangePreset.operationalFy;
   DateTimeRange? _customRange;
   bool _includeRejected = false;
   OperationalFyBounds? _operationalFyBounds;
@@ -184,13 +184,8 @@ class _OperonixAnalyticsDashboardScreenState
           end: tomorrow,
         );
       case _RangePreset.operationalFy:
-        final b = _operationalFyBounds;
-        if (b == null) {
-          return DateTimeRange(
-            start: todayStart.subtract(const Duration(days: 6)),
-            end: tomorrow,
-          );
-        }
+        final b = _operationalFyBounds ??
+            OperationalFyBounds.forCalendarYear(DateTime.now().toLocal().year);
         return DateTimeRange(
           start: _dayStart(b.startLocalInclusive),
           end: b.endLocalExclusive,
@@ -214,11 +209,13 @@ class _OperonixAnalyticsDashboardScreenState
   void initState() {
     super.initState();
     // ignore: discarded_futures
-    _primeOperationalFyBounds();
-    if (_canView) {
-      // ignore: discarded_futures
-      _load();
-    }
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    await _primeOperationalFyBounds();
+    if (!mounted || !_canView) return;
+    await _load();
   }
 
   Future<void> _primeOperationalFyBounds() async {
@@ -228,9 +225,6 @@ class _OperonixAnalyticsDashboardScreenState
     );
     if (!mounted) return;
     setState(() => _operationalFyBounds = b);
-    if (_preset == _RangePreset.operationalFy && _canView) {
-      await _load();
-    }
   }
 
   Future<void> _load() async {
