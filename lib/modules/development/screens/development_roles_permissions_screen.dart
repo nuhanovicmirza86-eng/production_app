@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/access/production_access_helper.dart';
 import '../utils/development_module_permissions_catalog.dart';
 
-/// Referentni pregled dozvola modula Razvoj po ulogama — samo [super_admin].
+/// Referentni pregled dozvola modula Razvoj po ulogama (izdvojeni ekran, ograničen pristup).
 class DevelopmentRolesPermissionsScreen extends StatelessWidget {
   const DevelopmentRolesPermissionsScreen({
     super.key,
@@ -14,15 +14,13 @@ class DevelopmentRolesPermissionsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!ProductionAccessHelper.isSuperAdminRole(
-          companyData['role']?.toString() ?? '',
-        )) {
+    if (!ProductionAccessHelper.isSuperAdminEffectiveSession(companyData)) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Razvoj — uloge i dozvole')),
+        appBar: AppBar(title: const Text('Razvoj — matrica dozvola')),
         body: const Center(
           child: Padding(
             padding: EdgeInsets.all(24),
-            child: Text('Ovaj referentni ekran je dostupan samo ulozi super admin.'),
+            child: Text('Ovaj referentni pregled nije dio tvoje trenutačne sesije.'),
           ),
         ),
       );
@@ -32,7 +30,7 @@ class DevelopmentRolesPermissionsScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Razvoj — uloge i dozvole'),
+        title: const Text('Razvoj — matrica dozvola'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),

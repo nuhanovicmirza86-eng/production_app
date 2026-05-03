@@ -615,7 +615,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     const afterHeader = 8.0;
     final tiles = <Widget>[];
 
-    if (ProductionAccessHelper.isSuperAdminFromCompanySession(companyData)) {
+    if (ProductionAccessHelper.isSuperAdminEffectiveSession(companyData)) {
       tiles.add(
         const _ModuleGroupHeader(
           title: 'Super admin',
@@ -1195,7 +1195,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (ProductionAccessHelper.isSuperAdminFromCompanySession(
+                  if (ProductionAccessHelper.isSuperAdminEffectiveSession(
                         cd,
                       )) ...[
                     _DashboardActionTile(
@@ -1509,6 +1509,21 @@ class _ProductionHomePage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Početna'),
         actions: [
+          if (ProductionAccessHelper.isSuperAdminEffectiveSession(companyData))
+            IconButton(
+              tooltip: 'Sve uloge — referentna matrica',
+              icon: const Icon(Icons.hub_outlined),
+              onPressed: () {
+                Navigator.push<void>(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => SuperAdminProjectRolesScreen(
+                      companyData: companyData,
+                    ),
+                  ),
+                );
+              },
+            ),
           if (showQrScanAction && onOpenQrScan != null)
             IconButton(
               tooltip: 'Skeniraj QR — nalog ili naljepnica s proizvodnog poda',

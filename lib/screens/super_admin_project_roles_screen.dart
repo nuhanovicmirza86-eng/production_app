@@ -16,7 +16,7 @@ class SuperAdminProjectRolesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!ProductionAccessHelper.isSuperAdminFromCompanySession(companyData)) {
+    if (!ProductionAccessHelper.isSuperAdminEffectiveSession(companyData)) {
       return Scaffold(
         appBar: AppBar(title: const Text('Uloge u aplikaciji')),
         body: const Center(

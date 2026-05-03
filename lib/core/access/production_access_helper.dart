@@ -70,6 +70,11 @@ class ProductionAccessHelper {
   /// Kanonski kod uloge; legacy aliasi se mapiraju na jednu ulogu (npr. `administrator` → [roleAdmin]).
   static String normalizeRole(dynamic role) {
     var r = (role ?? '').toString().trim().toLowerCase();
+    if (r == 'superadmin' ||
+        r == 'super-admin' ||
+        r == 'super admin') {
+      r = roleSuperAdmin;
+    }
     if (r == 'manager') {
       r = roleMaintenanceManager;
     }
@@ -476,6 +481,35 @@ class ProductionAccessHelper {
 
   static bool isSuperAdminRole(String role) {
     return normalizeRole(role) == roleSuperAdmin;
+  }
+
+  /// [companyData] kao u Production sesiji: `role` na korijenu; inače `userAppAccess.role`.
+  static String rawRoleFromCompanySession(Map<String, dynamic> companyData) {
+    final root = (companyData['role'] ?? '').toString().trim();
+    if (root.isNotEmpty) return root;
+    final aa = companyData['userAppAccess'];
+    if (aa is Map) {
+      final ar = (aa['role'] ?? '').toString().trim();
+      if (ar.isNotEmpty) return ar;
+    }
+    return '';
+  }
+
+  static bool isSuperAdminFromCompanySession(Map<String, dynamic> companyData) {
+    return isSuperAdminRole(rawRoleFromCompanySession(companyData));
+  }
+
+  /// Za prikaz SaaS / matričnih ekrana: [role] na korijenu **ili** u [userAppAccess.role]
+  /// (ako se polja povijesno razilaze, super admin i dalje vidi referentni UI).
+  static bool isSuperAdminEffectiveSession(Map<String, dynamic> companyData) {
+    final root = normalizeRole(companyData['role']);
+    if (isSuperAdminRole(root)) return true;
+    final aa = companyData['userAppAccess'];
+    if (aa is Map) {
+      final nested = normalizeRole(aa['role']);
+      if (isSuperAdminRole(nested)) return true;
+    }
+    return isSuperAdminFromCompanySession(companyData);
   }
 
   static bool isMaintenanceManagerRole(String role) {

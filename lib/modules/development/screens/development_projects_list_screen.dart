@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
@@ -9,13 +10,21 @@ import '../../../../core/operational_business_year_context.dart';
 import '../models/development_project_model.dart';
 import '../services/development_project_service.dart';
 import '../utils/development_constants.dart';
+import '../utils/development_intelligence_glossary.dart';
 import '../utils/development_permissions.dart';
+import '../utils/development_portfolio_stats.dart';
+import '../widgets/development_demo_portfolio_project_card.dart';
+import '../widgets/development_portfolio_ai_assistant_tab.dart';
 import '../widgets/development_portfolio_command_center_tab.dart';
 import '../widgets/development_portfolio_help_tab.dart';
+import '../widgets/development_portfolio_suppliers_tab.dart';
 import '../widgets/development_project_card.dart';
 import 'development_project_create_screen.dart';
+import 'development_project_demo_fullscreen_screen.dart';
 import 'development_project_details_screen.dart';
 import 'development_roles_permissions_screen.dart';
+
+enum _PortfolioLifecycle { all, pipeline, attention, done }
 
 /// Portfelj NPI / Stage-Gate — enterprise prikaz prema arhitekturi modula Razvoj.
 class DevelopmentProjectsListScreen extends StatefulWidget {
@@ -34,7 +43,6 @@ class DevelopmentProjectsListScreen extends StatefulWidget {
 class _DevelopmentProjectsListScreenState
     extends State<DevelopmentProjectsListScreen> {
   final DevelopmentProjectService _service = DevelopmentProjectService();
-  String? _plantLabel;
 
   /// `null` = sve poslovne godine (portfelj). Inicijalno se postavlja na aktivnu godinu kad stigne stream.
   String? _selectedBusinessYearId;
@@ -51,6 +59,272 @@ class _DevelopmentProjectsListScreenState
   /// Kesh za padajući izbor godine (iz streama `financial_years`).
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _fyDocs = [];
 
+  bool _onlyMyProjects = false;
+  _PortfolioLifecycle _lifecycle = _PortfolioLifecycle.all;
+  /// `null` = svi Gate-ovi; inače `currentGate` (točno poklapanje).
+  String? _filterGate;
+  /// `null` = svi kupci; `''` = bez imenovanog kupca; inače puni naziv.
+  String? _customerFilterName;
+
+  /// Kad je `false`, dropdowni su sakriveni (tabovi odmah ispod kratkog sažetka).
+  /// Po želji vlasnika: **[true] = prošireno (filter vidljiv) pri otvaranju ekrana.**
+  bool _portfolioScopeExpanded = true;
+
+  bool get _hasLocalFilters =>
+      _onlyMyProjects ||
+      _lifecycle != _PortfolioLifecycle.all ||
+      (_filterGate != null && _filterGate!.trim().isNotEmpty) ||
+      _customerFilterName != null;
+
+  void _clearLocalFilters() {
+    setState(() {
+      _onlyMyProjects = false;
+      _lifecycle = _PortfolioLifecycle.all;
+      _filterGate = null;
+      _customerFilterName = null;
+    });
+  }
+
+  bool _matchesLifecycle(DevelopmentProjectModel p) {
+    final s = p.status.trim();
+    switch (_lifecycle) {
+      case _PortfolioLifecycle.all:
+        return true;
+      case _PortfolioLifecycle.pipeline:
+        return s == DevelopmentProjectStatuses.active ||
+            s == DevelopmentProjectStatuses.approved ||
+            s == DevelopmentProjectStatuses.proposed ||
+            s == DevelopmentProjectStatuses.draft;
+      case _PortfolioLifecycle.attention:
+        return s == DevelopmentProjectStatuses.atRisk ||
+            s == DevelopmentProjectStatuses.delayed ||
+            s == DevelopmentProjectStatuses.onHold;
+      case _PortfolioLifecycle.done:
+        return s == DevelopmentProjectStatuses.completed ||
+            s == DevelopmentProjectStatuses.closed ||
+            s == DevelopmentProjectStatuses.cancelled;
+    }
+  }
+
+  List<DevelopmentProjectModel> _applyPortfolioFilters(
+    List<DevelopmentProjectModel> source,
+  ) {
+    var out = List<DevelopmentProjectModel>.from(source);
+    final uid = (FirebaseAuth.instance.currentUser?.uid ?? '').trim();
+    if (_onlyMyProjects && uid.isNotEmpty) {
+      out = out
+          .where((p) => DevelopmentPermissions.isUserOnProjectTeam(p, uid))
+          .toList();
+    }
+    if (_lifecycle != _PortfolioLifecycle.all) {
+      out = out.where(_matchesLifecycle).toList();
+    }
+    final g = (_filterGate ?? '').trim();
+    if (g.isNotEmpty) {
+      out = out.where((p) => p.currentGate.trim() == g).toList();
+    }
+    if (_customerFilterName != null) {
+      final want = _customerFilterName!;
+      if (want.isEmpty) {
+        out = out.where((p) => (p.customerName ?? '').trim().isEmpty).toList();
+      } else {
+        out =
+            out.where((p) => (p.customerName ?? '').trim() == want).toList();
+      }
+    }
+    return out;
+  }
+
+  Widget _buildQuickFilterBar(List<DevelopmentProjectModel> scopeList) {
+    final scheme = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final byGate = DevelopmentPortfolioStats.countsByGate(scopeList);
+    final gates = DevelopmentPortfolioStats.gatesSorted(byGate);
+    final custRows = DevelopmentPortfolioStats.rowsByCustomer(scopeList);
+
+    return Material(
+      color: scheme.surfaceContainerHighest.withValues(alpha: 0.32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Brzi pregled i filteri',
+                    style: tt.labelLarge?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                if (_hasLocalFilters)
+                  TextButton(
+                    onPressed: _clearLocalFilters,
+                    child: const Text('Poništi'),
+                  ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                FilterChip(
+                  label: const Text('Samo moji projekti'),
+                  selected: _onlyMyProjects,
+                  onSelected: (v) => setState(() => _onlyMyProjects = v),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  FilterChip(
+                    label: const Text('Svi statusi'),
+                    selected: _lifecycle == _PortfolioLifecycle.all,
+                    onSelected: (v) {
+                      if (v) setState(() => _lifecycle = _PortfolioLifecycle.all);
+                    },
+                  ),
+                  const SizedBox(width: 6),
+                  FilterChip(
+                    label: const Text('Aktivni tok'),
+                    selected: _lifecycle == _PortfolioLifecycle.pipeline,
+                    onSelected: (v) => setState(() {
+                      _lifecycle =
+                          v ? _PortfolioLifecycle.pipeline : _PortfolioLifecycle.all;
+                    }),
+                  ),
+                  const SizedBox(width: 6),
+                  FilterChip(
+                    label: const Text('Treba pažnje'),
+                    selected: _lifecycle == _PortfolioLifecycle.attention,
+                    onSelected: (v) => setState(() {
+                      _lifecycle =
+                          v ? _PortfolioLifecycle.attention : _PortfolioLifecycle.all;
+                    }),
+                  ),
+                  const SizedBox(width: 6),
+                  FilterChip(
+                    label: const Text('Završeno'),
+                    selected: _lifecycle == _PortfolioLifecycle.done,
+                    onSelected: (v) => setState(() {
+                      _lifecycle = v ? _PortfolioLifecycle.done : _PortfolioLifecycle.all;
+                    }),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+            child: Row(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Text(
+                    'Gate:',
+                    style: tt.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                FilterChip(
+                  label: Text('Svi (${scopeList.length})'),
+                  selected: (_filterGate == null || _filterGate!.isEmpty),
+                  onSelected: (_) => setState(() => _filterGate = null),
+                ),
+                const SizedBox(width: 6),
+                ...gates.map((g) {
+                  final label = g == '—' ? 'Bez' : g;
+                  final n = byGate[g] ?? 0;
+                  final selected = _filterGate == g;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: FilterChip(
+                      label: Text('$label · $n'),
+                      selected: selected,
+                      onSelected: (v) => setState(() => _filterGate = v ? g : null),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+          if (custRows.isNotEmpty)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(12, 2, 12, 10),
+              child: Row(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Text(
+                      'Kupac:',
+                      style: tt.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  FilterChip(
+                    label: const Text('Svi'),
+                    selected: _customerFilterName == null,
+                    onSelected: (_) => setState(() => _customerFilterName = null),
+                  ),
+                  const SizedBox(width: 6),
+                  if (custRows.any((r) => r.customerLabel.isEmpty))
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: () {
+                        final noCust =
+                            custRows.where((r) => r.customerLabel.isEmpty).toList();
+                        final n = noCust.isEmpty ? 0 : noCust.first.count;
+                        return FilterChip(
+                          label: Text('Bez kupca · $n'),
+                          selected: (_customerFilterName != null &&
+                              _customerFilterName!.isEmpty),
+                          onSelected: (v) => setState(
+                            () => _customerFilterName = v ? '' : null,
+                          ),
+                        );
+                      }(),
+                    ),
+                  ...custRows
+                      .where((r) => r.customerLabel.isNotEmpty)
+                      .take(10)
+                      .map((r) {
+                    final selected =
+                        _customerFilterName == r.customerLabel;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: FilterChip(
+                        label: Text('${r.customerLabel} · ${r.count}'),
+                        selected: selected,
+                        onSelected: (v) => setState(
+                          () => _customerFilterName =
+                              v ? r.customerLabel : null,
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
   String get _plantKey =>
@@ -61,21 +335,21 @@ class _DevelopmentProjectsListScreenState
         companyData: widget.companyData,
       );
 
-  bool get _isSuperAdmin => ProductionAccessHelper.isSuperAdminRole(
-        widget.companyData['role']?.toString() ?? '',
+  bool get _isSuperAdmin =>
+      ProductionAccessHelper.isSuperAdminEffectiveSession(
+        widget.companyData,
       );
 
   /// Tenant admin i super_admin vide portfelj za **cijelu kompaniju**, ne samo jedan pogon.
   bool get _portfolioAllPlants =>
       ProductionAccessHelper.isAdminRole(
-        widget.companyData['role']?.toString() ?? '',
+        ProductionAccessHelper.rawRoleFromCompanySession(widget.companyData),
       ) ||
       _isSuperAdmin;
 
   @override
   void initState() {
     super.initState();
-    _loadPlantLabel();
     _loadSelectablePlants();
     _primeBusinessYearFromCompanyMirror();
     _attachFinancialYearsStream();
@@ -185,16 +459,6 @@ class _DevelopmentProjectsListScreenState
     );
   }
 
-  Future<void> _loadPlantLabel() async {
-    if (_companyId.isEmpty || _plantKey.isEmpty) return;
-    final label = await CompanyPlantDisplayName.resolve(
-      companyId: _companyId,
-      plantKey: _plantKey,
-    );
-    if (!mounted) return;
-    setState(() => _plantLabel = label);
-  }
-
   void _openMatrix() {
     Navigator.push<void>(
       context,
@@ -206,169 +470,271 @@ class _DevelopmentProjectsListScreenState
     );
   }
 
-  String _compactScopeSubtitle() {
-    final buf = StringBuffer();
-    if (_portfolioAllPlants) {
-      final pf = (_portfolioPlantKeyFilter ?? '').trim();
-      if (pf.isEmpty) {
-        buf.write('Svi pogoni');
-      } else {
-        var label = pf;
-        for (final e in _selectablePlants) {
-          if (e.plantKey == pf) {
-            label = e.label;
-            break;
-          }
-        }
-        buf.write(label);
+  String _portfolioScopeCollapsedSummary() {
+    final plantPart = () {
+      if (!_portfolioAllPlants) {
+        final pk = _plantKey.trim();
+        return pk.isEmpty ? 'Pogon sesije' : 'Pogon: $pk';
       }
-    } else {
-      if (_plantLabel != null && _plantLabel!.trim().isNotEmpty) {
-        buf.write(_plantLabel!.trim());
-      } else if (_plantKey.isNotEmpty) {
-        buf.write(_plantKey);
-      } else {
-        buf.write('Pogon');
+      final f = (_portfolioPlantKeyFilter ?? '').trim();
+      if (f.isEmpty) return 'Svi pogoni u kompaniji';
+      for (final e in _selectablePlants) {
+        if (e.plantKey == f) return e.label;
       }
-    }
-    buf.write(' · ');
-    if (_selectedBusinessYearId == null) {
-      buf.write('sve posl. godine');
-    } else {
-      final id = _selectedBusinessYearId!;
-      var shown = id;
+      return f;
+    }();
+    final yearPart = () {
+      if (_selectedBusinessYearId == null) {
+        return 'Sve poslovne godine (arhiva)';
+      }
       for (final d in _fyDocs) {
-        if (d.id == id) {
+        if (d.id == _selectedBusinessYearId) {
           final m = d.data();
-          final code = (m['code'] ?? '').toString();
-          final name = (m['name'] ?? '').toString();
-          if (name.isNotEmpty) {
-            shown = code.isNotEmpty ? '$code · $name' : name;
-          } else if (code.isNotEmpty) {
-            shown = code;
-          }
-          break;
+          final name = (m['name'] ?? '').toString().trim();
+          final code = (m['code'] ?? '').toString().trim();
+          if (name.isNotEmpty) return name;
+          if (code.isNotEmpty) return code;
+          return d.id;
         }
       }
-      buf.write(shown);
-    }
-    return buf.toString();
+      return _fyDocs.isEmpty ? 'Godina (učitavanje…)' : 'Poslovna godina';
+    }();
+    return '$plantPart · $yearPart';
   }
 
-  Future<void> _openPortfolioFiltersSheet() async {
-    if (_companyId.isEmpty) return;
+  Widget _buildPersistentScopeBar() {
+    final scheme = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) {
-        final scheme = Theme.of(ctx).colorScheme;
-        final tt = Theme.of(ctx).textTheme;
-        return SafeArea(
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 20,
-              right: 20,
-              top: 8,
-              bottom: MediaQuery.viewInsetsOf(ctx).bottom + 16,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Filtri portfelja',
-                    style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Pogon i poslovna godina ne zauzimaju glavni ekran — podešavaju se ovdje '
-                    '(ikona filtera u traci).',
-                    style: tt.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      height: 1.35,
+    if (!_portfolioScopeExpanded) {
+      return Material(
+        elevation: 0.5,
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 6, 2, 6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(Icons.filter_alt_outlined, color: scheme.primary, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Opseg portfelja',
+                      style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (_portfolioAllPlants && _selectablePlants.isNotEmpty) ...[
-                    DropdownButtonFormField<String?>(
-                      value: _portfolioPlantKeyFilter,
-                      decoration: const InputDecoration(
-                        labelText: 'Pogon',
-                        border: OutlineInputBorder(),
+                    Text(
+                      _portfolioScopeCollapsedSummary(),
+                      style: tt.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        height: 1.25,
                       ),
-                      items: [
-                        const DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('Svi pogoni u kompaniji'),
-                        ),
-                        ..._selectablePlants.map(
-                          (e) => DropdownMenuItem<String?>(
-                            value: e.plantKey,
-                            child: Text(e.label),
-                          ),
-                        ),
-                      ],
-                      onChanged: (v) =>
-                          setState(() => _portfolioPlantKeyFilter = v),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 12),
                   ],
-                  DropdownButtonFormField<String?>(
-                    value: _selectedBusinessYearId,
-                    decoration: InputDecoration(
-                      labelText: 'Poslovna godina',
-                      border: const OutlineInputBorder(),
-                      helperText: _fyDocs.isEmpty
-                          ? 'Šifarnik godina se sinkronizira na backendu; do tada koristi „sve godine”.'
-                          : '„Sve godine” uključuje arhiv u trenutnom opsegu pogona.',
-                    ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Prikaži filtre (pogon, godina)',
+                icon: const Icon(Icons.expand_more),
+                onPressed: () =>
+                    setState(() => _portfolioScopeExpanded = true),
+              ),
+              IconButton(
+                tooltip: 'Pragovi Launch Readiness',
+                onPressed: () =>
+                    DevelopmentIntelligenceGlossary.showScoreRulesDialog(context),
+                icon: const Icon(Icons.info_outline),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Material(
+      elevation: 0.5,
+      color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.filter_alt_outlined, color: scheme.primary, size: 22),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Opseg portfelja',
+                    style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Sakrij (više prostora za tabove i sadržaj)',
+                  icon: const Icon(Icons.expand_less),
+                  onPressed: () =>
+                      setState(() => _portfolioScopeExpanded = false),
+                ),
+                IconButton(
+                  tooltip: 'Pragovi Launch Readiness',
+                  onPressed: () =>
+                      DevelopmentIntelligenceGlossary.showScoreRulesDialog(context),
+                  icon: const Icon(Icons.info_outline),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (_portfolioAllPlants && _selectablePlants.isNotEmpty) ...[
+              InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Pogon',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String?>(
+                    value: _portfolioPlantKeyFilter,
+                    isExpanded: true,
+                    isDense: true,
                     items: [
                       const DropdownMenuItem<String?>(
                         value: null,
-                        child: Text('Sve poslovne godine (arhiva)'),
+                        child: Text('Svi pogoni u kompaniji'),
                       ),
-                      ..._fyDocs.map((d) {
-                        final m = d.data();
-                        final code = (m['code'] ?? '').toString();
-                        final name = (m['name'] ?? '').toString();
-                        final st =
-                            (m['status'] ?? '').toString().toLowerCase();
-                        final stLabel = st == 'closed'
-                            ? ' (zatvoreno)'
-                            : st == 'draft'
-                                ? ' (nacrt)'
-                                : st == 'archived'
-                                    ? ' (arhiva)'
-                                    : '';
-                        final label = name.isNotEmpty
-                            ? '$code — $name$stLabel'
-                            : '${code.isNotEmpty ? code : d.id}$stLabel';
-                        return DropdownMenuItem<String?>(
-                          value: d.id,
-                          child: Text(label),
-                        );
-                      }),
+                      ..._selectablePlants.map(
+                        (e) => DropdownMenuItem<String?>(
+                          value: e.plantKey,
+                          child: Text(e.label),
+                        ),
+                      ),
                     ],
-                    onChanged: (v) => setState(() {
-                      _fyUserTouched = true;
-                      _selectedBusinessYearId = v;
-                      _fyHydrated = true;
+                    onChanged: (v) =>
+                        setState(() => _portfolioPlantKeyFilter = v),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            InputDecorator(
+              decoration: InputDecoration(
+                labelText: 'Poslovna godina',
+                border: const OutlineInputBorder(),
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                helperText:
+                    _fyDocs.isEmpty ? 'Šifarnik godina se učitava…' : null,
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String?>(
+                  value: _selectedBusinessYearId,
+                  isExpanded: true,
+                  isDense: true,
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('Sve poslovne godine (arhiva)'),
+                    ),
+                    ..._fyDocs.map((d) {
+                      final m = d.data();
+                      final code = (m['code'] ?? '').toString();
+                      final name = (m['name'] ?? '').toString();
+                      final st =
+                          (m['status'] ?? '').toString().toLowerCase();
+                      final stLabel = st == 'closed'
+                          ? ' (zatvoreno)'
+                          : st == 'draft'
+                              ? ' (nacrt)'
+                              : st == 'archived'
+                                  ? ' (arhiva)'
+                                  : '';
+                      final label = name.isNotEmpty
+                          ? '$code — $name$stLabel'
+                          : '${code.isNotEmpty ? code : d.id}$stLabel';
+                      return DropdownMenuItem<String?>(
+                        value: d.id,
+                        child: Text(label),
+                      );
                     }),
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Gotovo'),
-                  ),
-                ],
+                  ],
+                  onChanged: (v) => setState(() {
+                    _fyUserTouched = true;
+                    _selectedBusinessYearId = v;
+                    _fyHydrated = true;
+                  }),
+                ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openDemoProjectFullscreen() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => DevelopmentProjectDemoFullscreenScreen(
+          companyData: widget.companyData,
+        ),
+      ),
+    );
+  }
+
+  void _showPortfolioInfoDialog() {
+    final scheme = Theme.of(context).colorScheme;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Pomoć — portfelj'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Traka „Opseg portfelja“ određuje učitavanje: poslovna godina (obavezno), zatim po potrebi jedan pogon. '
+                'Strelica gore (sakrij) skuplja tu traku da tabovi i lista dobiju više mjesta; strelica dolje ili „Prikaži filtre“ vraća dropdowne.\n\n'
+                '„Sve poslovne godine (arhiva)“ širi filtar.\n\n'
+                'Ispod: tabovi Projekti (lista i brzi filteri), Analitika (KPI i grafovi), AI asistent i Pomoć.\n\n'
+                '${DevelopmentIntelligenceGlossary.launchIntelligenceSystemPitch}',
+                style: TextStyle(
+                  height: 1.35,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              DevelopmentIntelligenceGlossary.showScoreRulesDialog(context);
+            },
+            child: const Text('Pragovi score-a'),
+          ),
+          if (_isSuperAdmin)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _openMatrix();
+              },
+              child: const Text('Matrica dozvola'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Zatvori'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -448,9 +814,6 @@ class _DevelopmentProjectsListScreenState
   Widget _buildEmptyState() {
     final scheme = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final yearHint = _selectedBusinessYearId != null
-        ? 'Za odabranu poslovnu godinu nema projekata — probaj „Sve poslovne godine“ ili drugu godinu.'
-        : 'Još nema projekata za ovaj pogon u portfelju.';
 
     return Center(
       child: SingleChildScrollView(
@@ -460,78 +823,39 @@ class _DevelopmentProjectsListScreenState
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              DevelopmentDemoPortfolioProjectCard(
+                companyData: widget.companyData,
+                showPlantChip: _portfolioAllPlants,
+              ),
+              const SizedBox(height: 28),
               Icon(
                 Icons.account_tree,
-                size: 72,
-                color: scheme.primary.withValues(alpha: 0.75),
+                size: 56,
+                color: scheme.primary.withValues(alpha: 0.5),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               Text(
-                'Portfelj je prazan',
+                'Još nema stvarnih projekata u ovom opsegu',
                 textAlign: TextAlign.center,
-                style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
-              const SizedBox(height: 12),
-              Text(
-                yearHint,
-                textAlign: TextAlign.center,
-                style: tt.bodyMedium?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                  height: 1.35,
-                ),
+              const SizedBox(height: 16),
+              IconButton.filledTonal(
+                tooltip: 'Pomoć za portfelj',
+                onPressed: _showPortfolioInfoDialog,
+                icon: const Icon(Icons.info_outline),
               ),
-              const SizedBox(height: 20),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Modul pokriva:',
-                  style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                ),
-              ),
-              const SizedBox(height: 8),
-              _bullet(tt, 'Stage-Gate (G0–G9) i operativni portfelj po poslovnoj godini'),
-              _bullet(tt, 'Zadaci, rizici, dokumenti, odobrenja i izmjene (IATF-prijateljski trag)'),
-              _bullet(tt, 'KPI, AI uvidi (pretplata), Launch Intelligence i spremnost za release'),
               if (_canCreateProject) ...[
-                const SizedBox(height: 28),
+                const SizedBox(height: 20),
                 FilledButton.icon(
                   onPressed: _openCreateProject,
                   icon: const Icon(Icons.add),
                   label: const Text('Kreiraj prvi projekat'),
                 ),
-              ] else ...[
-                const SizedBox(height: 20),
-                Text(
-                  'Kreiranje projekata: tenant admin, super admin ili voditelj projekata (project_manager). '
-                  'Za pregled koristi kartice kad se projekti pojave.',
-                  textAlign: TextAlign.center,
-                  style: tt.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    height: 1.35,
-                  ),
-                ),
               ],
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _bullet(TextTheme textTheme, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('• ', style: textTheme.bodyMedium),
-          Expanded(
-            child: Text(
-              text,
-              style: textTheme.bodyMedium?.copyWith(height: 1.35),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -542,29 +866,13 @@ class _DevelopmentProjectsListScreenState
     final tt = Theme.of(context).textTheme;
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Razvoj / NPI / Projekti'),
-            Text(
-              _companyId.isEmpty ? '—' : _compactScopeSubtitle(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: tt.labelMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
+        title: const Text('Razvoj / NPI / Projekti'),
         actions: [
-          if (_companyId.isNotEmpty)
-            IconButton(
-              tooltip: 'Filtri (pogon, poslovna godina)',
-              icon: const Icon(Icons.tune),
-              onPressed: _openPortfolioFiltersSheet,
-            ),
+          IconButton(
+            tooltip: 'Primjer NPI projekta (pun zaslon)',
+            icon: const Icon(Icons.play_circle_outline),
+            onPressed: _openDemoProjectFullscreen,
+          ),
           if (_canCreateProject)
             IconButton(
               tooltip: 'Novi projekat',
@@ -573,37 +881,14 @@ class _DevelopmentProjectsListScreenState
             ),
           if (_isSuperAdmin)
             IconButton(
-              tooltip: 'Matrica uloga (super admin)',
+              tooltip: 'Matrica dozvola (referenca)',
               icon: const Icon(Icons.table_rows_outlined),
               onPressed: _openMatrix,
             ),
           IconButton(
-            tooltip: 'Modul i opseg podataka',
+            tooltip: 'Pomoć — portfelj',
             icon: const Icon(Icons.info_outline),
-            onPressed: () => showDialog<void>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Text('Portfelj razvoja'),
-                content: SingleChildScrollView(
-                  child: Text(
-                    'Za uloge vezane uz pojedini pogon portfelj je ograničen na taj pogon. '
-                    'Za **Admin** i **Super admin** prikazuju se projekti po odabiru: '
-                    'svi pogoni u kompaniji ili jedan pogon iz filtra — uvijek unutar odabrane poslovne godine.\n\n'
-                    'Zadano je **aktivna poslovna godina** (kalendarska, sinkronizacija na backendu); '
-                    '„Sve poslovne godine“ uključuje cijeli arhiv u tom opsegu.\n\n'
-                    'Filtar pogona i godine: ikona šrafa u traci.\n'
-                    'Matrica enterprise prava (super admin): ikona u traci.',
-                    style: TextStyle(height: 1.35, color: scheme.onSurfaceVariant),
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Zatvori'),
-                  ),
-                ],
-              ),
-            ),
+            onPressed: _showPortfolioInfoDialog,
           ),
         ],
       ),
@@ -633,7 +918,12 @@ class _DevelopmentProjectsListScreenState
               ),
             );
           }
-          return StreamBuilder<List<DevelopmentProjectModel>>(
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildPersistentScopeBar(),
+              Expanded(
+                child: StreamBuilder<List<DevelopmentProjectModel>>(
             stream: _service.watchProjects(
               companyId: _companyId,
               plantKey: plantForQuery,
@@ -645,6 +935,11 @@ class _DevelopmentProjectsListScreenState
               final loading = snap.connectionState == ConnectionState.waiting &&
                   !snap.hasData &&
                   !snap.hasError;
+
+              List<DevelopmentProjectModel>? filtered;
+              if (list != null) {
+                filtered = _applyPortfolioFilters(list);
+              }
 
               Widget projectsTab() {
                 if (snap.hasError) {
@@ -698,6 +993,7 @@ class _DevelopmentProjectsListScreenState
                 if (list.isEmpty) {
                   return _buildEmptyState();
                 }
+                final use = filtered ?? list;
                 void openProject(DevelopmentProjectModel p) {
                   Navigator.push<void>(
                     context,
@@ -712,35 +1008,81 @@ class _DevelopmentProjectsListScreenState
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _portfolioSummaryStrip(list),
-                    Expanded(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
-                        itemCount: list.length,
-                        separatorBuilder: (context, _) =>
-                            const SizedBox(height: 12),
-                        itemBuilder: (context, i) {
-                          final p = list[i];
-                          return DevelopmentProjectCard(
-                            project: p,
-                            showPlantChip: _portfolioAllPlants,
-                            onTap: () => openProject(p),
-                          );
-                        },
+                    _buildQuickFilterBar(list),
+                    _portfolioSummaryStrip(use),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: DevelopmentDemoPortfolioProjectCard(
+                        companyData: widget.companyData,
+                        showPlantChip: _portfolioAllPlants,
                       ),
+                    ),
+                    Expanded(
+                      child: use.isEmpty
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(maxWidth: 440),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.filter_alt_off_outlined,
+                                        size: 48,
+                                        color: scheme.primary,
+                                      ),
+                                      const SizedBox(height: 14),
+                                      Text(
+                                        'Nema projekata koji odgovaraju filterima.',
+                                        textAlign: TextAlign.center,
+                                        style: tt.titleSmall?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      IconButton.filledTonal(
+                                        tooltip: 'Kako koristiti filtere',
+                                        onPressed: _showPortfolioInfoDialog,
+                                        icon: const Icon(Icons.info_outline),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      FilledButton.tonal(
+                                        onPressed: _clearLocalFilters,
+                                        child: const Text('Poništi filtere'),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
+                              itemCount: use.length,
+                              separatorBuilder: (context, _) =>
+                                  const SizedBox(height: 12),
+                              itemBuilder: (context, i) {
+                                final p = use[i];
+                                return DevelopmentProjectCard(
+                                  project: p,
+                                  showPlantChip: _portfolioAllPlants,
+                                  onTap: () => openProject(p),
+                                );
+                              },
+                            ),
                     ),
                   ],
                 );
               }
 
               Widget kpiTab() {
-                if (snap.hasError || loading || list == null) {
+                if (snap.hasError || loading || list == null || filtered == null) {
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
                       child: Text(
                         snap.hasError
-                            ? 'KPI portfelja nije učitan zbog greške na prvom tabu.'
+                            ? 'Analitika portfelja nije učitana zbog greške. Otvori tab Projekti za detalje.'
                             : 'Učitavanje portfelja…',
                         textAlign: TextAlign.center,
                         style: tt.bodyMedium?.copyWith(
@@ -764,14 +1106,86 @@ class _DevelopmentProjectsListScreenState
                 }
                 return DevelopmentPortfolioCommandCenterTab(
                   companyData: widget.companyData,
-                  projects: list,
+                  projects: filtered,
+                  onOpenProject: openProject,
+                );
+              }
+
+              Widget suppliersTab() {
+                if (snap.hasError || loading || list == null || filtered == null) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        snap.hasError
+                            ? 'Dobavljači zahtijevaju učitan portfelj.'
+                            : 'Učitavanje portfelja…',
+                        textAlign: TextAlign.center,
+                        style: tt.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                void openProject(DevelopmentProjectModel p) {
+                  Navigator.push<void>(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => DevelopmentProjectDetailsScreen(
+                        companyData: widget.companyData,
+                        projectId: p.id,
+                      ),
+                    ),
+                  );
+                }
+                return DevelopmentPortfolioSuppliersTab(
+                  companyData: widget.companyData,
+                  projects: filtered,
+                  onOpenProject: openProject,
+                );
+              }
+
+              Widget aiTab() {
+                if (snap.hasError || loading || list == null || filtered == null) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        snap.hasError
+                            ? 'AI asistent zahtijeva učitan portfelj.'
+                            : 'Učitavanje portfelja…',
+                        textAlign: TextAlign.center,
+                        style: tt.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                void openProject(DevelopmentProjectModel p) {
+                  Navigator.push<void>(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => DevelopmentProjectDetailsScreen(
+                        companyData: widget.companyData,
+                        projectId: p.id,
+                      ),
+                    ),
+                  );
+                }
+                return DevelopmentPortfolioAiAssistantTab(
+                  companyData: widget.companyData,
+                  projects: filtered,
                   showPlantChip: _portfolioAllPlants,
                   onOpenProject: openProject,
                 );
               }
 
               return DefaultTabController(
-                length: 3,
+                length: 5,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -789,12 +1203,20 @@ class _DevelopmentProjectsListScreenState
                             text: 'Projekti',
                           ),
                           Tab(
-                            icon: Icon(Icons.analytics_outlined, size: 20),
-                            text: 'KPI portfelja',
+                            icon: Icon(Icons.insights_outlined, size: 20),
+                            text: 'Analitika',
+                          ),
+                          Tab(
+                            icon: Icon(Icons.local_shipping_outlined, size: 20),
+                            text: 'Dobavljači',
+                          ),
+                          Tab(
+                            icon: Icon(Icons.auto_awesome_outlined, size: 20),
+                            text: 'AI asistent',
                           ),
                           Tab(
                             icon: Icon(Icons.help_outline, size: 20),
-                            text: 'Pomoć i AI',
+                            text: 'Pomoć',
                           ),
                         ],
                       ),
@@ -804,6 +1226,8 @@ class _DevelopmentProjectsListScreenState
                         children: [
                           projectsTab(),
                           kpiTab(),
+                          suppliersTab(),
+                          aiTab(),
                           const DevelopmentPortfolioHelpTab(),
                         ],
                       ),
@@ -812,6 +1236,9 @@ class _DevelopmentProjectsListScreenState
                 ),
               );
             },
+                ),
+              ),
+            ],
           );
         },
       ),
