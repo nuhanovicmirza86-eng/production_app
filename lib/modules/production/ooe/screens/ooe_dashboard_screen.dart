@@ -64,8 +64,6 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
           ProductionAccessHelper.normalizeRole(_role) ==
               ProductionAccessHelper.roleAdmin ||
           ProductionAccessHelper.normalizeRole(_role) ==
-              ProductionAccessHelper.roleSupervisor ||
-          ProductionAccessHelper.normalizeRole(_role) ==
               ProductionAccessHelper.roleQualityOperator);
 
   bool get _canManageOoe => ProductionAccessHelper.canManage(
@@ -229,12 +227,12 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
     return Scaffold(
       appBar: AppBar(
         title: hint == null || hint.isEmpty
-            ? const Text('Praćenje učinka (uživo)')
+            ? const Text('OOE — praćenje uživo')
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Praćenje učinka (uživo)'),
+                  const Text('OOE — praćenje uživo'),
                   Text(
                     hint,
                     style: TextStyle(
@@ -507,7 +505,7 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
                       segments: const [
                         ButtonSegment(
                           value: _LiveCardSort.ooeDesc,
-                          label: Text('Učinak'),
+                          label: Text('OOE'),
                           icon: Icon(Icons.south),
                         ),
                         ButtonSegment(

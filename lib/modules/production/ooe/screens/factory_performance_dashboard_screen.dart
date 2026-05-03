@@ -204,7 +204,7 @@ class _FactoryPerformanceDashboardScreenState
 
     if (!_canViewOoe) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Učinak pogona')),
+        appBar: AppBar(title: const Text('OOE — učinak pogona')),
         body: const Center(
           child: Text('Nemaš pristup ovom pregledu.'),
         ),
@@ -226,7 +226,7 @@ class _FactoryPerformanceDashboardScreenState
           backgroundColor: FactoryPerformanceTheme.headerBg,
           foregroundColor: FactoryPerformanceTheme.text,
           elevation: 0,
-          title: const Text('Učinak pogona'),
+          title: const Text('OOE — učinak pogona'),
           actions: [
             IconButton(
               tooltip: 'Datum smjene',

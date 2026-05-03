@@ -356,7 +356,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         if (_canViewCard(ProductionDashboardCard.ooe))
           _DashboardActionTile(
             icon: Icons.dashboard_customize_outlined,
-            title: 'Učinak pogona',
+            title: 'OOE — učinak pogona',
             subtitle:
                 'Iskoristivost, gubici, raspoloživost u jednom pregledu (isti raspored, tamna tema).',
             onTap: () => open(
@@ -366,7 +366,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         if (_canViewCard(ProductionDashboardCard.ooe))
           _DashboardActionTile(
             icon: Icons.speed_outlined,
-            title: 'Praćenje učinka (uživo)',
+            title: 'OOE — praćenje uživo',
             subtitle: 'Trenutno stanje, gubici i sažetak smjene iz zabilježenih događaja.',
             onTap: () => open(OoeDashboardScreen(companyData: companyData)),
           ),
@@ -838,6 +838,20 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       );
     }
 
+    if (_hasModule('production') &&
+        _canViewCard(ProductionDashboardCard.productionOrders)) {
+      items.add(
+        _ProdNavItem(
+          builder: (_) => ProductionPlanningHomeScreen(companyData: cd),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.view_timeline_outlined),
+            selectedIcon: Icon(Icons.view_timeline),
+            label: 'Planiranje proizvodnje',
+          ),
+        ),
+      );
+    }
+
     if (_hasModule('production') && _canAccessOrders()) {
       items.add(
         _ProdNavItem(
@@ -1039,7 +1053,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           destination: const NavigationDestination(
             icon: Icon(Icons.speed_outlined),
             selectedIcon: Icon(Icons.speed),
-            label: 'Učinak',
+            label: 'OOE uživo',
           ),
         ),
       );
