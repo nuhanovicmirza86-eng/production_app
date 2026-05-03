@@ -22,7 +22,6 @@ import '../widgets/development_project_card.dart';
 import 'development_project_create_screen.dart';
 import 'development_project_demo_fullscreen_screen.dart';
 import 'development_project_details_screen.dart';
-import 'development_roles_permissions_screen.dart';
 
 enum _PortfolioLifecycle { all, pipeline, attention, done }
 
@@ -335,17 +334,15 @@ class _DevelopmentProjectsListScreenState
         companyData: widget.companyData,
       );
 
-  bool get _isSuperAdmin =>
-      ProductionAccessHelper.isSuperAdminFromCompanySession(
-        widget.companyData,
-      );
-
   /// Tenant admin i super_admin vide portfelj za **cijelu kompaniju**, ne samo jedan pogon.
-  bool get _portfolioAllPlants =>
-      ProductionAccessHelper.isAdminRole(
-        ProductionAccessHelper.rawRoleFromCompanySession(widget.companyData),
-      ) ||
-      _isSuperAdmin;
+  bool get _portfolioAllPlants {
+    final r = ProductionAccessHelper.rawRoleFromCompanySession(
+      widget.companyData,
+    );
+    final n = ProductionAccessHelper.normalizeRole(r);
+    return ProductionAccessHelper.isAdminRole(n) ||
+        ProductionAccessHelper.isSuperAdminRole(n);
+  }
 
   @override
   void initState() {
@@ -454,17 +451,6 @@ class _DevelopmentProjectsListScreenState
         builder: (_) => DevelopmentProjectCreateScreen(
           companyData: widget.companyData,
           plantKeyOverride: pk,
-        ),
-      ),
-    );
-  }
-
-  void _openMatrix() {
-    Navigator.push<void>(
-      context,
-      MaterialPageRoute<void>(
-        builder: (_) => DevelopmentRolesPermissionsScreen(
-          companyData: widget.companyData,
         ),
       ),
     );
@@ -721,14 +707,6 @@ class _DevelopmentProjectsListScreenState
             },
             child: const Text('Pragovi score-a'),
           ),
-          if (_isSuperAdmin)
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _openMatrix();
-              },
-              child: const Text('Matrica dozvola'),
-            ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Zatvori'),
@@ -878,12 +856,6 @@ class _DevelopmentProjectsListScreenState
               tooltip: 'Novi projekat',
               icon: const Icon(Icons.add_circle_outline),
               onPressed: _openCreateProject,
-            ),
-          if (_isSuperAdmin)
-            IconButton(
-              tooltip: 'Matrica dozvola (referenca)',
-              icon: const Icon(Icons.table_rows_outlined),
-              onPressed: _openMatrix,
             ),
           IconButton(
             tooltip: 'Pomoć — portfelj',
