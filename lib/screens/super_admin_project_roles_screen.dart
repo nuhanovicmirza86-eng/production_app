@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../core/access/production_access_helper.dart';
 import '../core/access/production_app_roles_catalog.dart';
-import '../modules/development/screens/development_roles_permissions_screen.dart';
 
-/// Referentni pregled **svih** kanonskih uloga Production aplikacije i matrice kartica.
-/// Samo [super_admin] sesija (isti kriterij kao [DevelopmentRolesPermissionsScreen]).
+/// Jedan **globalni** referentni pregled kanonskih uloga i matrice kartica Production aplikacije.
+/// Nije dio modula Razvoj / NPI — ne miješati s development ekranima.
+/// Dostupno samo u super admin sesiji.
 class SuperAdminProjectRolesScreen extends StatelessWidget {
   const SuperAdminProjectRolesScreen({
     super.key,
@@ -34,29 +34,15 @@ class SuperAdminProjectRolesScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Uloge i matrica aplikacije'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.push<void>(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => DevelopmentRolesPermissionsScreen(
-                    companyData: companyData,
-                  ),
-                ),
-              );
-            },
-            child: const Text('Razvoj — detalj'),
-          ),
-        ],
+        title: const Text('Sve uloge — referentna matrica'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            'Kanonske uloge iz ProductionAccessHelper (ista matrica kao kartice na Početnoj). '
-            'Pretplata kompanije (moduli) i dalje filtrira što korisnik u praksi vidi.',
+            'Jedan centralni pregled svih uloga definiranih u sustavu (ProductionAccessHelper) '
+            'i razine pristupa po karticama aplikacije — neovisno od modula Razvoj / NPI. '
+            'Pretplata tenanta i dalje određuje što se u aplikaciji uopće prikazuje.',
             style: tt.bodySmall?.copyWith(color: scheme.onSurfaceVariant, height: 1.35),
           ),
           const SizedBox(height: 16),

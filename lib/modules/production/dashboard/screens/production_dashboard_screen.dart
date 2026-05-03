@@ -620,7 +620,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         const _ModuleGroupHeader(
           title: 'Super admin',
           subtitle:
-              'Referentni pregled uloga i matrice kartica za cijelu Production aplikaciju.',
+              'Globalni pregled uloga i kartica (cijela aplikacija). Nema veze s modulom Razvoj / NPI.',
           icon: Icons.verified_user_outlined,
         ),
       );
@@ -630,7 +630,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           icon: Icons.hub_outlined,
           title: 'Sve uloge i karakteristike',
           subtitle:
-              'Kanonske uloge, kratki opis i pristup po karticama (pregled / upravljanje / nema).',
+              'Jedan referentni popis uloga u sustavu — matrica kartica, bez NPI ekrana.',
           onTap: () {
             Navigator.push<void>(
               context,
@@ -1202,7 +1202,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                       icon: Icons.hub_outlined,
                       title: 'Sve uloge i karakteristike',
                       subtitle:
-                          'Matrica aplikacije — sve kanonske uloge (super admin)',
+                          'Globalna matrica uloga — nije modul Razvoj.',
                       onTap: () {
                         _shellScaffoldKey.currentState?.closeDrawer();
                         Navigator.push<void>(
