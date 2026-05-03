@@ -41,8 +41,7 @@ class _ProductionTrackingShiftsScreenState
     final r = ProductionAccessHelper.normalizeRole(_role);
     return ProductionAccessHelper.isAdminRole(_role) ||
         ProductionAccessHelper.isSuperAdminRole(_role) ||
-        r == ProductionAccessHelper.roleProductionManager ||
-        r == ProductionAccessHelper.roleSupervisor;
+        r == ProductionAccessHelper.roleProductionManager;
   }
 
   @override
