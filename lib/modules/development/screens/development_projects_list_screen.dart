@@ -8,6 +8,7 @@ import '../models/development_project_model.dart';
 import '../services/development_project_service.dart';
 import '../utils/development_constants.dart';
 import '../utils/development_permissions.dart';
+import '../widgets/development_portfolio_command_center_tab.dart';
 import '../widgets/development_project_card.dart';
 import 'development_project_create_screen.dart';
 import 'development_project_details_screen.dart';
@@ -398,9 +399,8 @@ class _DevelopmentProjectsListScreenState
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  _portfolioAllPlants
-                      ? 'Upravljanje projektima, Gate-ovima i KPI — zadano: aktivna poslovna godina i (za admina) filtar pogona ili svi pogoni.'
-                      : 'Upravljanje projektima, ključnim fazama, KPI i rizicima — zadano: aktivna poslovna godina za ovaj pogon.',
+                  'Tabovi ispod: lista projekata ili Launch Intelligence (Command Center). '
+                  'Puni Operonix Launch Readiness Score i SOP blocker-i otvaraju se u detalju projekta.',
                   style: tt.bodyMedium?.copyWith(
                     color: scheme.onSurfaceVariant,
                     height: 1.35,
@@ -619,67 +619,148 @@ class _DevelopmentProjectsListScreenState
                     ),
                   );
                 }
-                return StreamBuilder<List<DevelopmentProjectModel>>(
-                  stream: _service.watchProjects(
-                    companyId: _companyId,
-                    plantKey: plantForQuery,
-                    allPlantsInCompany: allPlantsInCompany,
-                    businessYearId: _selectedBusinessYearId,
-                  ),
-                  builder: (context, snap) {
-                    if (snap.hasError) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            'Podaci trenutno nisu dostupni.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: scheme.error),
-                          ),
+                return DefaultTabController(
+                  length: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Material(
+                        color: scheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                        child: TabBar(
+                          indicatorColor: scheme.primary,
+                          labelColor: scheme.primary,
+                          unselectedLabelColor: scheme.onSurfaceVariant,
+                          isScrollable: true,
+                          tabs: const [
+                            Tab(
+                              icon: Icon(Icons.folder_open_outlined, size: 20),
+                              text: 'Portfelj',
+                            ),
+                            Tab(
+                              icon: Icon(Icons.insights_outlined, size: 20),
+                              text: 'Launch Intelligence',
+                            ),
+                          ],
                         ),
-                      );
-                    }
-                    if (!snap.hasData) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    final list = snap.data!;
-                    if (list.isEmpty) {
-                      return _buildEmptyState();
-                    }
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _portfolioSummaryStrip(list),
-                        Expanded(
-                          child: ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 88),
-                            itemCount: list.length,
-                            separatorBuilder: (context, _) =>
-                                const SizedBox(height: 12),
-                            itemBuilder: (context, i) {
-                              final p = list[i];
-                              return DevelopmentProjectCard(
-                                project: p,
-                                showPlantChip: _portfolioAllPlants,
-                                onTap: () {
-                                  Navigator.push<void>(
-                                    context,
-                                    MaterialPageRoute<void>(
-                                      builder: (_) =>
-                                          DevelopmentProjectDetailsScreen(
-                                        companyData: widget.companyData,
-                                        projectId: p.id,
-                                      ),
+                      ),
+                      Expanded(
+                        child: StreamBuilder<List<DevelopmentProjectModel>>(
+                          stream: _service.watchProjects(
+                            companyId: _companyId,
+                            plantKey: plantForQuery,
+                            allPlantsInCompany: allPlantsInCompany,
+                            businessYearId: _selectedBusinessYearId,
+                          ),
+                          builder: (context, snap) {
+                            if (snap.hasError) {
+                              return SingleChildScrollView(
+                                padding: const EdgeInsets.all(24),
+                                child: Center(
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(maxWidth: 560),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.cloud_off_outlined,
+                                          size: 48,
+                                          color: scheme.error,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          'Podaci trenutno nisu dostupni.',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: scheme.error,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          'Tehnički detalj (indeks, pravila ili mreža):',
+                                          style: tt.labelMedium?.copyWith(
+                                            color: scheme.onSurfaceVariant,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        SelectableText(
+                                          snap.error.toString(),
+                                          style: tt.bodySmall?.copyWith(
+                                            color: scheme.onSurface,
+                                            fontFamily: 'monospace',
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  );
-                                },
+                                  ),
+                                ),
                               );
-                            },
-                          ),
+                            }
+                            if (!snap.hasData) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+                            final list = snap.data!;
+                            void openProject(DevelopmentProjectModel p) {
+                              Navigator.push<void>(
+                                context,
+                                MaterialPageRoute<void>(
+                                  builder: (_) =>
+                                      DevelopmentProjectDetailsScreen(
+                                    companyData: widget.companyData,
+                                    projectId: p.id,
+                                  ),
+                                ),
+                              );
+                            }
+                            return TabBarView(
+                              children: [
+                                list.isEmpty
+                                    ? _buildEmptyState()
+                                    : Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          _portfolioSummaryStrip(list),
+                                          Expanded(
+                                            child: ListView.separated(
+                                              padding: const EdgeInsets.fromLTRB(
+                                                16,
+                                                4,
+                                                16,
+                                                88,
+                                              ),
+                                              itemCount: list.length,
+                                              separatorBuilder: (context, _) =>
+                                                  const SizedBox(height: 12),
+                                              itemBuilder: (context, i) {
+                                                final p = list[i];
+                                                return DevelopmentProjectCard(
+                                                  project: p,
+                                                  showPlantChip:
+                                                      _portfolioAllPlants,
+                                                  onTap: () => openProject(p),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                DevelopmentPortfolioCommandCenterTab(
+                                  companyData: widget.companyData,
+                                  projects: list,
+                                  showPlantChip: _portfolioAllPlants,
+                                  onOpenProject: openProject,
+                                ),
+                              ],
+                            );
+                          },
                         ),
-                      ],
-                    );
-                  },
+                      ),
+                    ],
+                  ),
                 );
               },
             ),

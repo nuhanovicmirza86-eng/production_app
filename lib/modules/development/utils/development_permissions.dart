@@ -63,7 +63,9 @@ class DevelopmentPermissions {
         r == ProductionAccessHelper.roleQualityOperator ||
         r == ProductionAccessHelper.roleQualityControl ||
         r == ProductionAccessHelper.roleProductionManager ||
-        r == ProductionAccessHelper.roleSupervisor;
+        r == ProductionAccessHelper.roleSupervisor ||
+        r == ProductionAccessHelper.roleLogisticsManager ||
+        r == ProductionAccessHelper.roleMaintenanceManager;
   }
 
   /// Rizici (`risks`) — Callables [createDevelopmentProjectRisk] / [updateDevelopmentProjectRisk]; ista matrica kao zadaci.
