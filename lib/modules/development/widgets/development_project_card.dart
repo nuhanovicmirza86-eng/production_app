@@ -9,10 +9,13 @@ class DevelopmentProjectCard extends StatelessWidget {
   const DevelopmentProjectCard({
     super.key,
     required this.project,
+    this.showPlantChip = false,
     this.onTap,
   });
 
   final DevelopmentProjectModel project;
+  /// Kad portfelj obuhvata sve pogone (admin / super_admin).
+  final bool showPlantChip;
   final VoidCallback? onTap;
 
   Color _statusColor(ColorScheme scheme, String status) {
@@ -129,6 +132,20 @@ class DevelopmentProjectCard extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
+                  if (showPlantChip && project.plantKey.isNotEmpty)
+                    Chip(
+                      avatar: Icon(
+                        Icons.factory_outlined,
+                        size: 18,
+                        color: scheme.outline,
+                      ),
+                      label: Text(
+                        'Pogon: ${project.plantKey}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                   Chip(
                     avatar: Icon(
                       Icons.flag_outlined,

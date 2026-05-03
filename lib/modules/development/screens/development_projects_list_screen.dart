@@ -48,6 +48,13 @@ class _DevelopmentProjectsListScreenState
         widget.companyData['role']?.toString() ?? '',
       );
 
+  /// Tenant admin i super_admin vide portfelj za **cijelu kompaniju**, ne samo jedan pogon.
+  bool get _portfolioAllPlants =>
+      ProductionAccessHelper.isAdminRole(
+        widget.companyData['role']?.toString() ?? '',
+      ) ||
+      _isSuperAdmin;
+
   @override
   void initState() {
     super.initState();
@@ -276,10 +283,11 @@ class _DevelopmentProjectsListScreenState
                 title: const Text('Portfelj razvoja'),
                 content: SingleChildScrollView(
                   child: Text(
-                    'Prikazuju se samo projekti vaše organizacije i odabranog pogona. '
-                    'Filtar poslovne godine sužava portfelj; „Sve poslovne godine“ prikazuje cjelokupan NPI portfelj na pogonu.\n\n'
-                    'Matrica enterprise prava po ulozi (reference za super admin): '
-                    'dostupna iz kartice ispod ili ikone u traci.',
+                    'Za uloge vezane uz pojedini pogon portfelj je ograničen na taj pogon. '
+                    'Za **Admin** i **Super admin** prikazuju se projekti **svih pogona** u kompaniji '
+                    '(isti tenant; kartice pokazuju pogon).\n\n'
+                    'Filtar poslovne godine sužava listu; „Sve poslovne godine“ uključuje cijeli portfelj u tom opsegu.\n\n'
+                    'Matrica enterprise prava po ulozi (super admin): kartica ispod ili ikona u traci.',
                     style: TextStyle(height: 1.35, color: scheme.onSurfaceVariant),
                   ),
                 ),
@@ -338,7 +346,9 @@ class _DevelopmentProjectsListScreenState
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Upravljanje projektima, ključnim fazama, KPI i rizicima — po poslovnoj godini i pogonu.',
+                  _portfolioAllPlants
+                      ? 'Upravljanje projektima, Gate-ovima i KPI — portfelj obuhvata sve pogone u kompaniji. Filtar poslovne godine sužava listu.'
+                      : 'Upravljanje projektima, ključnim fazama, KPI i rizicima — po poslovnoj godini i odabranom pogonu.',
                   style: tt.bodyMedium?.copyWith(
                     color: scheme.onSurfaceVariant,
                     height: 1.35,
@@ -347,13 +357,21 @@ class _DevelopmentProjectsListScreenState
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Icon(Icons.factory_outlined, size: 18, color: scheme.primary),
+                    Icon(
+                      _portfolioAllPlants
+                          ? Icons.apartment_outlined
+                          : Icons.factory_outlined,
+                      size: 18,
+                      color: scheme.primary,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        _plantLabel != null && _plantLabel!.isNotEmpty
-                            ? 'Pogon: $_plantLabel'
-                            : 'Pogon: ${_plantKey.isEmpty ? '—' : _plantKey}',
+                        _portfolioAllPlants
+                            ? 'Opseg: svi pogoni u kompaniji'
+                            : (_plantLabel != null && _plantLabel!.isNotEmpty
+                                ? 'Pogon: $_plantLabel'
+                                : 'Pogon: ${_plantKey.isEmpty ? '—' : _plantKey}'),
                         style: tt.labelLarge?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
@@ -433,7 +451,9 @@ class _DevelopmentProjectsListScreenState
                       fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
                       helperText: usable.isEmpty
                           ? 'Nema unosa u šifrarniku godina — portfelj pokazuje sve godine; unos godina kod novog projekta ručno u Callable.'
-                          : 'Odabir sužava listu; ostavi „Sve“ za potpun portfelj pogona.',
+                          : (_portfolioAllPlants
+                              ? 'Odabir sužava listu kroz sve pogone; „Sve“ = cijeli kompanijski portfelj.'
+                              : 'Odabir sužava listu na ovom pogonu; „Sve“ = svi projekti pogona.'),
                     ),
                     items: items,
                     onChanged: (v) => setState(() => _selectedBusinessYearId = v),
@@ -442,7 +462,8 @@ class _DevelopmentProjectsListScreenState
               ),
             ),
           Expanded(
-            child: _companyId.isEmpty || _plantKey.isEmpty
+            child: _companyId.isEmpty ||
+                    (!_portfolioAllPlants && _plantKey.isEmpty)
                 ? const Center(
                     child: Padding(
                       padding: EdgeInsets.all(24),
@@ -455,6 +476,7 @@ class _DevelopmentProjectsListScreenState
                     stream: _service.watchProjects(
                       companyId: _companyId,
                       plantKey: _plantKey,
+                      allPlantsInCompany: _portfolioAllPlants,
                       businessYearId: _selectedBusinessYearId,
                     ),
                     builder: (context, snap) {
@@ -491,6 +513,7 @@ class _DevelopmentProjectsListScreenState
                                 final p = list[i];
                                 return DevelopmentProjectCard(
                                   project: p,
+                                  showPlantChip: _portfolioAllPlants,
                                   onTap: () {
                                     Navigator.push<void>(
                                       context,

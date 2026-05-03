@@ -149,6 +149,11 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
                     ),
               ),
               const SizedBox(height: 16),
+              _DevelopmentKpiDashboard(
+                kpi: kpi,
+                progressPercent: p.progressPercent,
+              ),
+              const SizedBox(height: 12),
               _SectionCard(
                 title: 'Status i tijek',
                 children: [
@@ -157,8 +162,16 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
                   _kv(context, 'Gate', p.currentGate),
                   _kv(context, 'Faza', p.currentStage),
                   _kv(context, 'Napredak', '${p.progressPercent}%'),
-                  _kv(context, 'Prioritet', p.priority),
-                  _kv(context, 'Rizik', p.riskLevel),
+                  _kv(
+                    context,
+                    'Prioritet',
+                    DevelopmentDisplay.projectPriorityLabel(p.priority),
+                  ),
+                  _kv(
+                    context,
+                    'Rizik (brzi)',
+                    DevelopmentDisplay.riskSeverityLabel(p.riskLevel),
+                  ),
                   if (p.releasedToProductionAt != null) ...[
                     _kv(
                       context,
@@ -327,26 +340,6 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
                     _kv(context, 'Budžet plan', '${p.budgetPlanned}'),
                   if (p.budgetActual != null)
                     _kv(context, 'Budžet stvarno', '${p.budgetActual}'),
-                ],
-              ),
-              _SectionCard(
-                title: 'KPI',
-                children: [
-                  if (kpi.schedulePerformance != null)
-                    _kv(context, 'Schedule perf.', '${kpi.schedulePerformance}'),
-                  if (kpi.costPerformance != null)
-                    _kv(context, 'Cost perf.', '${kpi.costPerformance}'),
-                  if (kpi.qualityReadiness != null)
-                    _kv(context, 'Quality readiness', '${kpi.qualityReadiness}'),
-                  if (kpi.overallHealthScore != null)
-                    _kv(context, 'Health', '${kpi.overallHealthScore}'),
-                  if (kpi.schedulePerformance == null &&
-                      kpi.costPerformance == null &&
-                      kpi.overallHealthScore == null)
-                    Text(
-                      'KPI će se puniti iz izvršenja i agregata.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
                 ],
               ),
               _SectionCard(
@@ -531,6 +524,176 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
           ),
           Expanded(child: Text(v)),
         ],
+      ),
+    );
+  }
+}
+
+/// KPI ploče na vrhu taba **Pregled** (Stage-Gate / NPI — definisani KPI u dokumentu modula).
+class _DevelopmentKpiDashboard extends StatelessWidget {
+  const _DevelopmentKpiDashboard({
+    required this.kpi,
+    required this.progressPercent,
+  });
+
+  final DevelopmentProjectKpi kpi;
+  final int progressPercent;
+
+  static String _fmtNum(double? v) {
+    if (v == null) return '—';
+    if (v == v.roundToDouble()) return v.round().toString();
+    return v.toStringAsFixed(1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final pct = progressPercent.clamp(0, 100);
+
+    Widget tile(String label, String value, {IconData? icon}) {
+      return Card(
+        elevation: 0,
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.65),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.4)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 18, color: scheme.primary),
+                    const SizedBox(width: 6),
+                  ],
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: tt.labelMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                value,
+                style: tt.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final tiles = <Widget>[
+      tile(
+        'Schedule performance',
+        _fmtNum(kpi.schedulePerformance),
+        icon: Icons.schedule,
+      ),
+      tile(
+        'Cost performance',
+        _fmtNum(kpi.costPerformance),
+        icon: Icons.savings_outlined,
+      ),
+      tile(
+        'Quality readiness',
+        _fmtNum(kpi.qualityReadiness),
+        icon: Icons.verified_outlined,
+      ),
+      tile(
+        'Gate pass rate',
+        _fmtNum(kpi.gatePassRate),
+        icon: Icons.flag_outlined,
+      ),
+      tile(
+        'Risk score',
+        _fmtNum(kpi.riskScore),
+        icon: Icons.shield_outlined,
+      ),
+      tile(
+        'Overall health',
+        _fmtNum(kpi.overallHealthScore),
+        icon: Icons.health_and_safety_outlined,
+      ),
+    ];
+
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0.5,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.35)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.analytics_outlined, color: scheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'KPI — pregled projekta',
+                    style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Performans rasporeda i troška, kvaliteta, prolaz Gate-ova i zdravlje — '
+              'iz agregata i izvršenja (nema ručnog zaobilaska odobrenja).',
+              style: tt.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text('Operativni napredak', style: tt.labelLarge),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: pct / 100.0,
+                minHeight: 10,
+                backgroundColor:
+                    scheme.surfaceContainerHighest.withValues(alpha: 0.7),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text('$pct %', style: tt.labelMedium),
+            const SizedBox(height: 16),
+            LayoutBuilder(
+              builder: (context, c) {
+                final w = c.maxWidth;
+                final colW = w > 520 ? (w - 10) / 2 : w;
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: tiles
+                      .map(
+                        (e) => SizedBox(
+                          width: colW,
+                          child: e,
+                        ),
+                      )
+                      .toList(),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -86,16 +86,26 @@ class DevelopmentProjectService {
     });
   }
 
-  /// Stream projekata za tenant + pogon, opcijski filtrirano po poslovnoj godini.
+  /// Stream projekata za tenant; opcijski po jednom pogonu ili cijela kompanija (admin / super_admin).
+  ///
+  /// [allPlantsInCompany] kada je `true`, ne filtrira `plantKey` — svi projekti kompanije u pravilima.
   Stream<List<DevelopmentProjectModel>> watchProjects({
     required String companyId,
-    required String plantKey,
+    String? plantKey,
+    bool allPlantsInCompany = false,
     String? businessYearId,
     int limit = 100,
   }) {
-    Query<Map<String, dynamic>> q = _collection
-        .where('companyId', isEqualTo: companyId)
-        .where('plantKey', isEqualTo: plantKey);
+    Query<Map<String, dynamic>> q =
+        _collection.where('companyId', isEqualTo: companyId);
+
+    if (!allPlantsInCompany) {
+      final pk = (plantKey ?? '').trim();
+      if (pk.isEmpty) {
+        return Stream.value(<DevelopmentProjectModel>[]);
+      }
+      q = q.where('plantKey', isEqualTo: pk);
+    }
 
     if (businessYearId != null && businessYearId.trim().isNotEmpty) {
       q = q.where('businessYearId', isEqualTo: businessYearId.trim());
