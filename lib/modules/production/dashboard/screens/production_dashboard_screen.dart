@@ -431,7 +431,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
 
     final developmentTiles = <Widget>[
       if (ProductionModuleKeys.hasModule(companyData, ProductionModuleKeys.development) &&
-          _canViewCard(ProductionDashboardCard.developmentGovernance))
+          _canViewCard(ProductionDashboardCard.developmentGovernance)) ...[
         _DashboardActionTile(
           icon: Icons.account_tree_outlined,
           title: 'Razvoj / NPI / Projekti',
@@ -440,6 +440,19 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           onTap: () =>
               open(DevelopmentProjectsListScreen(companyData: companyData)),
         ),
+        if (ProductionAccessHelper.isSuperAdminRole(
+              companyData['role']?.toString() ?? '',
+            ))
+          _DashboardActionTile(
+            icon: Icons.assignment_ind_outlined,
+            title: 'Uloge u projektu',
+            subtitle:
+                'Matrica kanonskih uloga i dozvola za modul Razvoj (enterprise).',
+            onTap: () => open(
+              DevelopmentRolesPermissionsScreen(companyData: companyData),
+            ),
+          ),
+      ],
     ];
 
     final commercialTiles = <Widget>[
@@ -691,6 +704,29 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           },
         ),
       );
+      if (ProductionAccessHelper.isSuperAdminRole(
+            companyData['role']?.toString() ?? '',
+          )) {
+        tiles.add(const SizedBox(height: _tileGap));
+        tiles.add(
+          _DashboardActionTile(
+            icon: Icons.assignment_ind_outlined,
+            title: 'Uloge u projektu',
+            subtitle:
+                'Matrica dozvola po ulozi za NPI / Stage-Gate (samo super admin).',
+            onTap: () {
+              Navigator.push<void>(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => DevelopmentRolesPermissionsScreen(
+                    companyData: companyData,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      }
     }
 
     if (tiles.isNotEmpty) {
@@ -1243,8 +1279,8 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                           )) ...[
                         const SizedBox(height: 10),
                         _DashboardActionTile(
-                          icon: Icons.table_rows_outlined,
-                          title: 'Razvoj — uloge i dozvole',
+                          icon: Icons.assignment_ind_outlined,
+                          title: 'Uloge u projektu',
                           subtitle: 'Matrica po ulozi (samo super admin)',
                           onTap: () {
                             _shellScaffoldKey.currentState?.closeDrawer();
