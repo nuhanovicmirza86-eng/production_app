@@ -1,7 +1,9 @@
 import 'dart:math' show max;
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
+import '../../../core/access/production_access_helper.dart';
 import '../../../core/company_plant_display_name.dart';
 import '../../../core/operational_business_year_context.dart';
 import '../models/finance_budget_doc.dart';
@@ -17,7 +19,9 @@ import 'finance_ai_assistant_screen.dart';
 import 'finance_controlling_dashboard_tab.dart';
 import 'finance_controlling_operative_tab_widgets.dart';
 
-/// Hub **Finance & Controlling**: obavezni filter poslovne godine + modulski tabovi i ERP sloj.
+/// Hub **Finance & Controlling**: aktivna poslovna godina i tekuće razdoblje su zadani;
+/// promjena FY/razdoblja je u suženom dijelu zaglavlja. Za [admin]/[super_admin] agregat
+/// je po cijeloj kompaniji (bez filtra pogona s profila).
 class FinanceControllingHubScreen extends StatefulWidget {
   const FinanceControllingHubScreen({
     super.key,
@@ -52,6 +56,16 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
 
   String get _plantKey =>
       (widget.companyData['plantKey'] ?? '').toString().trim();
+
+  /// Pogon s profila, osim globalnih administratora — oni vide financije za cijelu tvrtku.
+  String get _financePlantKey {
+    final r = ProductionAccessHelper.normalizeRole(_role);
+    if (ProductionAccessHelper.isAdminRole(r) ||
+        ProductionAccessHelper.isSuperAdminRole(r)) {
+      return '';
+    }
+    return _plantKey;
+  }
 
   @override
   void initState() {
@@ -157,7 +171,7 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
         children: [
           _PeriodHeader(
             companyId: _companyId,
-            plantKey: _plantKey,
+            plantKey: _financePlantKey,
             yearsStream: _yearsSvc.watchYears(_companyId),
             businessYearId: _businessYearId,
             periodYear: _periodYear,
@@ -246,7 +260,7 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text(
-                            'Odaberite poslovnu godinu u zaglavlju.',
+                            'Pričekajte učitavanje poslovne godine ili je odaberite pod „Razdoblje i poslovna godina“.',
                           ),
                         ),
                       );
@@ -260,7 +274,7 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
                           businessYearId: _businessYearId,
                           periodYear: _periodYear,
                           periodMonth: _periodMonth,
-                          plantKey: _plantKey,
+                          plantKey: _financePlantKey,
                           debugUnlockModule: widget.debugUnlockModule,
                         ),
                       ),
@@ -311,222 +325,260 @@ class _PeriodHeaderState extends State<_PeriodHeader> {
     return List<int>.generate(11, (i) => y - 5 + i);
   }
 
-  Widget _plantCaption(BuildContext context) {
+  static String _fyLabel(List<FinancialYearListItem> years, String? fyId) {
+    if (fyId == null || fyId.isEmpty) return '';
+    for (final y in years) {
+      if (y.id == fyId) return y.displayLabel;
+    }
+    return fyId;
+  }
+
+  Widget _plantScopeLine(BuildContext context) {
     final pk = widget.plantKey.trim();
     final theme = Theme.of(context);
+    final muted = theme.textTheme.labelSmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
     if (pk.isEmpty) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Text(
-              'Pogon: svi pogoni',
-              style: theme.textTheme.labelMedium,
-            ),
-          ),
-          FinanceScreenContextInfo(
-            title: 'Više o pogledu',
-            body:
-                'Za financijske agregate u odabranom periodu, odaberite pogon u profilu '
-                'ili kroz administratorske postavke. Ovaj prikaz objedinjuje cijelu kompaniju.',
-          ),
-        ],
+      return Text(
+        'Doseg podataka: cijela kompanija (svi pogoni)',
+        style: muted,
       );
     }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: FutureBuilder<String>(
-            key: ValueKey<String>('fin-plant-$pk'),
-            future: CompanyPlantDisplayName.resolve(
-              companyId: widget.companyId,
-              plantKey: pk,
-            ),
-            builder: (context, snap) {
-              final label = snap.connectionState == ConnectionState.waiting
-                  ? '…'
-                  : (snap.data ?? pk);
-              return Text(
-                'Pogon: $label',
-                style: theme.textTheme.labelMedium,
-              );
-            },
-          ),
-        ),
-      ],
+    return FutureBuilder<String>(
+      key: ValueKey<String>('fin-plant-$pk'),
+      future: CompanyPlantDisplayName.resolve(
+        companyId: widget.companyId,
+        plantKey: pk,
+      ),
+      builder: (context, snap) {
+        final label = snap.connectionState == ConnectionState.waiting
+            ? '…'
+            : (snap.data ?? pk);
+        return Text(
+          'Doseg podataka: pogon $label',
+          style: muted,
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
     return Material(
-      color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-        child: StreamBuilder<List<FinancialYearListItem>>(
-          stream: widget.yearsStream,
-          builder: (context, snap) {
-            final years = snap.data ?? [];
-            if (years.isNotEmpty &&
-                widget.businessYearId.isEmpty &&
-                snap.connectionState == ConnectionState.active &&
-                !_didSuggestFinancialYear) {
-              _didSuggestFinancialYear = true;
-              FinancialYearListItem? active;
-              for (final y in years) {
-                if (y.status == 'active') {
-                  active = y;
-                  break;
-                }
+      color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+      child: StreamBuilder<List<FinancialYearListItem>>(
+        stream: widget.yearsStream,
+        builder: (context, snap) {
+          final years = snap.data ?? [];
+          if (years.isNotEmpty &&
+              widget.businessYearId.isEmpty &&
+              snap.connectionState == ConnectionState.active &&
+              !_didSuggestFinancialYear) {
+            _didSuggestFinancialYear = true;
+            FinancialYearListItem? active;
+            for (final y in years) {
+              if (y.status == 'active') {
+                active = y;
+                break;
               }
-              active ??= years.first;
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (!context.mounted) return;
-                widget.onAutoSelectFirstYear(active!.id);
-              });
             }
+            active ??= years.first;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!context.mounted) return;
+              widget.onAutoSelectFirstYear(active!.id);
+            });
+          }
 
-            if (widget.companyId.isEmpty) {
-              return Text(
+          if (widget.companyId.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
                 'Prijava nije uredna. Odjavite se i pokušajte ponovo.',
                 style: TextStyle(color: cs.error),
-              );
-            }
+              ),
+            );
+          }
 
-            final items = years
-                .map(
-                  (y) => DropdownMenuItem(
-                    value: y.id,
-                    child: Text(y.displayLabel),
-                  ),
-                )
-                .toList();
-            if (widget.businessYearId.isNotEmpty &&
-                !years.any((y) => y.id == widget.businessYearId)) {
-              items.insert(
-                0,
-                DropdownMenuItem(
-                  value: widget.businessYearId,
-                  child: const Text('Trenutni izbor (provjerite šifrarnik)'),
+          final items = years
+              .map(
+                (y) => DropdownMenuItem(
+                  value: y.id,
+                  child: Text(y.displayLabel),
                 ),
-              );
-            }
+              )
+              .toList();
+          if (widget.businessYearId.isNotEmpty &&
+              !years.any((y) => y.id == widget.businessYearId)) {
+            items.insert(
+              0,
+              DropdownMenuItem(
+                value: widget.businessYearId,
+                child: const Text('Trenutni izbor (provjerite šifrarnik)'),
+              ),
+            );
+          }
 
-            final fyValue = widget.businessYearId.isEmpty
-                ? null
-                : widget.businessYearId;
+          final fyValue = widget.businessYearId.isEmpty
+              ? null
+              : widget.businessYearId;
 
-            if (items.isEmpty) {
-              return Column(
+          if (items.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _plantCaption(context),
+                  _plantScopeLine(context),
                   const SizedBox(height: 8),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Još nema definiranih poslovnih godina.',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ),
-                      FinanceScreenContextInfo(
-                        title: 'Kako unijeti godine',
-                        body:
-                            'Administrator kompanije u postavkama dodaje dokumente '
-                            'poslovnih godina za ovu organizaciju. Bez toga financijski '
-                            'modul nema referentni period.',
-                      ),
-                    ],
+                  Text(
+                    'Još nema definiranih poslovnih godina.',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Administrator dodaje poslovne godine u šifrarniku kompanije.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
-              );
-            }
+              ),
+            );
+          }
 
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _plantCaption(context),
-                const SizedBox(height: 6),
-                DropdownButtonFormField<String>(
-                  key: ValueKey<String?>(
-                    'fy-$fyValue-${items.length}',
-                  ),
-                  decoration: const InputDecoration(
-                    labelText: 'Poslovna godina',
-                    isDense: true,
-                  ),
-                  initialValue: fyValue,
-                  isExpanded: true,
-                  items: items,
-                  onChanged: (v) {
-                    if (v != null) widget.onYearChanged(v);
-                  },
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          final locale = Localizations.localeOf(context).toString();
+          final monthYear = DateFormat.yMMMM(locale).format(
+            DateTime(widget.periodYear, widget.periodMonth),
+          );
+          final fyLine = _fyLabel(years, fyValue);
+
+          return ExpansionTile(
+            maintainState: true,
+            initiallyExpanded: false,
+            shape: const Border(),
+            collapsedShape: const Border(),
+            tilePadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+            childrenPadding: EdgeInsets.zero,
+            leading: Icon(
+              Icons.date_range_outlined,
+              size: 22,
+              color: cs.onSurfaceVariant,
+            ),
+            title: Text(
+              monthYear,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            subtitle: Text(
+              'Zadano je aktivna poslovna godina i tekuće razdoblje. '
+              'Dotaknite za promjenu.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(
-                      child: DropdownButtonFormField<int>(
-                        key: ValueKey<int>(
-                          widget.periodYear,
-                        ),
-                        decoration: const InputDecoration(
-                          labelText: 'Godina',
-                          isDense: true,
-                        ),
-                        initialValue:
-                            _yearChoices().contains(widget.periodYear)
-                            ? widget.periodYear
-                            : _yearChoices().first,
-                        isExpanded: true,
-                        items: _yearChoices()
-                            .map(
-                              (y) => DropdownMenuItem(
-                                value: y,
-                                child: Text('$y'),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) widget.onPeriodYearChanged(v);
-                        },
+                    _plantScopeLine(context),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Poslovna godina: ${fyLine.isEmpty ? '—' : fyLine}',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: DropdownButtonFormField<int>(
-                        key: ValueKey<int>(
-                          widget.periodMonth,
-                        ),
-                        decoration: const InputDecoration(
-                          labelText: 'Mjesec',
-                          isDense: true,
-                        ),
-                        initialValue: widget.periodMonth,
-                        isExpanded: true,
-                        items: List.generate(12, (i) {
-                          final m = i + 1;
-                          return DropdownMenuItem(
-                            value: m,
-                            child: Text('$m'),
-                          );
-                        }),
-                        onChanged: (v) {
-                          if (v != null) widget.onMonthChanged(v);
-                        },
+                    const SizedBox(height: 8),
+                    Text(
+                      'Razdoblje i poslovna godina',
+                      style: theme.textTheme.labelLarge,
+                    ),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      key: ValueKey<String?>(
+                        'fy-$fyValue-${items.length}',
                       ),
+                      decoration: const InputDecoration(
+                        labelText: 'Poslovna godina',
+                        isDense: true,
+                      ),
+                      initialValue: fyValue,
+                      isExpanded: true,
+                      items: items,
+                      onChanged: (v) {
+                        if (v != null) widget.onYearChanged(v);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            key: ValueKey<int>(
+                              widget.periodYear,
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'Godina (kalendarska)',
+                              isDense: true,
+                            ),
+                            initialValue:
+                                _yearChoices().contains(widget.periodYear)
+                                ? widget.periodYear
+                                : _yearChoices().first,
+                            isExpanded: true,
+                            items: _yearChoices()
+                                .map(
+                                  (y) => DropdownMenuItem(
+                                    value: y,
+                                    child: Text('$y'),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) {
+                              if (v != null) widget.onPeriodYearChanged(v);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            key: ValueKey<int>(
+                              widget.periodMonth,
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'Mjesec',
+                              isDense: true,
+                            ),
+                            initialValue: widget.periodMonth,
+                            isExpanded: true,
+                            items: List.generate(12, (i) {
+                              final m = i + 1;
+                              return DropdownMenuItem(
+                                value: m,
+                                child: Text('$m'),
+                              );
+                            }),
+                            onChanged: (v) {
+                              if (v != null) widget.onMonthChanged(v);
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            );
-          },
-        ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
