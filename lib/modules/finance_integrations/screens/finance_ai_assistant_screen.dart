@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/company_plant_display_name.dart';
 import '../models/finance_ai_company_memory_doc.dart';
 import '../models/finance_ai_insight_doc.dart';
 import '../models/finance_kpi_snapshot_model.dart';
@@ -10,6 +11,7 @@ import '../services/finance_ai_company_memory_service.dart';
 import '../services/finance_ai_insight_service.dart';
 import '../services/finance_ai_insights_list_service.dart';
 import '../services/finance_kpi_snapshot_service.dart';
+import '../utils/finance_load_error_presenter.dart';
 import '../utils/finance_permissions.dart';
 import '../widgets/finance_screen_context_info.dart';
 
@@ -301,7 +303,7 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
     if (s == null) {
       return const [
         _FinanceSignalChip(
-          'Nema KPI snimka za ovaj period i pogled — pokrenite preračun na kartici Pregled.',
+          'Za ovaj period još nema KPI snimka. Otvorite karticu Pregled u istom modulu i pokrenite preračun.',
           Icons.info_outline,
         ),
       ];
@@ -399,23 +401,39 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
         title: const Text('Finance AI asistent'),
         actions: [
           FinanceScreenContextInfo(
-            title: 'Kako „uči“ asistent',
+            title: 'Kako asistent koristi kontekst',
             body:
-                'Operonix pamti tekstualni kontekst koje administrator unese ovdje — '
-                'on se učitava na serveru pri svakom AI pozivu. Povijest uvida ostaje u '
-                'Firestoreu (`finance_ai_insights`). Model ne trenira na vašim podacima '
-                'izvan ovog zaključanog toka; kontinuitet je ograničen na sažetke koje '
-                'sami generirate i sačuvani kontekst.',
+                'Tekst koji ovdje unese administrator dodaje se svakom Finance AI '
+                'pozivu na poslužitelju. Povijest generiranih uvida čuva se sigurno '
+                'uz vašu kompaniju. Vanjski model ne uči na vašim podacima izvan '
+                'ovog toka — koriste se samo sažeci koje Vi generirate i spremljeni '
+                'kontekst.',
           ),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text(
-            '${periodFmt.format(DateTime(widget.periodYear, widget.periodMonth))} · '
-            '${widget.plantKey.trim().isEmpty ? 'rollup / svi pogoni' : 'pogon: ${widget.plantKey}'}',
-            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          FutureBuilder<String>(
+            future: widget.plantKey.trim().isEmpty
+                ? Future<String>.value('')
+                : CompanyPlantDisplayName.resolve(
+                    companyId: _companyId,
+                    plantKey: widget.plantKey.trim(),
+                  ),
+            builder: (context, plantSnap) {
+              final pk = widget.plantKey.trim();
+              final plantLine = pk.isEmpty
+                  ? 'rollup / svi pogoni'
+                  : 'pogon: ${plantSnap.connectionState == ConnectionState.waiting ? '…' : (plantSnap.data != null && plantSnap.data!.isNotEmpty ? plantSnap.data! : pk)}';
+              return Text(
+                '${periodFmt.format(DateTime(widget.periodYear, widget.periodMonth))} · '
+                '$plantLine',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              );
+            },
           ),
           const SizedBox(height: 12),
           StreamBuilder<FinanceAiCompanyMemoryDoc?>(
@@ -583,9 +601,25 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
             ),
             builder: (context, hist) {
               if (hist.hasError) {
-                return Text(
-                  'Povijest se ne može učitati.',
-                  style: theme.textTheme.bodySmall?.copyWith(color: cs.error),
+                final msg = financeUserFacingLoadError(hist.error);
+                final raw = '${hist.error}'.trim();
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        msg,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.error,
+                        ),
+                      ),
+                    ),
+                    if (raw.isNotEmpty)
+                      FinanceTechnicalInfoIcon(
+                        detail: raw,
+                        dialogTitle: 'Tehnički detalj',
+                      ),
+                  ],
                 );
               }
               final list = hist.data;

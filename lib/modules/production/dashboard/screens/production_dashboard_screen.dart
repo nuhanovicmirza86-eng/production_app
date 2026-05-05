@@ -827,6 +827,22 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       ),
     );
 
+    if (_canAccessFinanceIntegrations()) {
+      items.add(
+        _ProdNavItem(
+          builder: (_) => FinanceControllingHubScreen(
+            companyData: cd,
+            debugUnlockModule: kDebugMode,
+          ),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.account_balance_outlined),
+            selectedIcon: Icon(Icons.account_balance),
+            label: 'Financije',
+          ),
+        ),
+      );
+    }
+
     if (_hasModule('production') &&
         _hasAiProductionAiHubAccess() &&
         _canViewCard(ProductionDashboardCard.aiAssistant)) {
@@ -920,22 +936,6 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             icon: Icon(Icons.account_tree_outlined),
             selectedIcon: Icon(Icons.account_tree),
             label: 'Razvoj',
-          ),
-        ),
-      );
-    }
-
-    if (_canAccessFinanceIntegrations()) {
-      items.add(
-        _ProdNavItem(
-          builder: (_) => FinanceControllingHubScreen(
-            companyData: cd,
-            debugUnlockModule: kDebugMode,
-          ),
-          destination: const NavigationDestination(
-            icon: Icon(Icons.account_balance_outlined),
-            selectedIcon: Icon(Icons.account_balance),
-            label: 'Financije',
           ),
         ),
       );

@@ -4,7 +4,11 @@ import 'package:flutter/material.dart';
 String financeUserFacingLoadError(Object? error) {
   final s = (error ?? '').toString();
   if (s.contains('permission-denied')) {
-    return 'Nemate ovlaštenje za ove podatke ili pretplata ne uključuje ovaj dio financija.';
+    return 'Pristup ovim podacima u oblaku trenutno nije dozvoljen. '
+        'Često to znači da Firebase pravila još nisu ažurirana ili da modul '
+        '„financije“ nije u pretplati kompanije. Administrator može provjeriti '
+        'pretplatu i deploy pravila; ako ste sigurni da imate pristup, pokušajte '
+        'kasnije ponovo.';
   }
   if (s.contains('PERMISSION_DENIED') || s.contains('403')) {
     return 'Pristup je odbijen. Obratite se administratoru.';

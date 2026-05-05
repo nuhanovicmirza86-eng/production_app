@@ -112,11 +112,12 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
                       ),
                     ),
                     FinanceScreenContextInfo(
-                      title: 'Tehnički kontekst',
+                      title: 'Zašto vidim samo ERP',
                       body:
-                          'Modul u pretplati: finance_controlling. Savjet: administrator '
-                          'kompanije provjerava SaaS module i uloge. Klijent ne piše '
-                          'direktno u ERP.',
+                          'Potpuni prikaz troškova i KPI zahtijeva pretplatu na financijski '
+                          'nadzor za vašu organizaciju. Administrator kompanije provjerava '
+                          'uključene module; povezivanje s ERP-om ostaje kroz zaštićene '
+                          'server funkcije.',
                     ),
                   ],
                 ),
