@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../screens/finance_connection_edit_screen.dart';
+import '../screens/finance_control_dashboard_screen.dart';
 import '../screens/finance_csv_export_capabilities_screen.dart';
+import '../screens/finance_document_links_screen.dart';
+import '../screens/finance_error_resolution_screen.dart';
+import '../screens/finance_integration_dashboard_screen.dart';
 import '../screens/finance_mapping_rules_screen.dart';
 import '../screens/finance_sync_jobs_screen.dart';
 import '../screens/finance_sync_logs_screen.dart';
@@ -112,6 +116,62 @@ class FinanceErpHubTabBody extends StatelessWidget {
           style: Theme.of(context).textTheme.titleSmall,
         ),
         const SizedBox(height: 4),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.dashboard_customize_outlined),
+          title: const Text('Pregled integracije'),
+          subtitle: const Text('Konektori i sažetak stanja'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _push(
+            context,
+            FinanceIntegrationDashboardScreen(
+              companyData: companyData,
+              debugUnlockModule: debugUnlockModule,
+            ),
+          ),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.hub_outlined),
+          title: const Text('Veze dokumenata'),
+          subtitle: const Text('Operonix entiteti ↔ ERP'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _push(
+            context,
+            FinanceDocumentLinksScreen(
+              companyData: companyData,
+              debugUnlockModule: debugUnlockModule,
+            ),
+          ),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.fact_check_outlined),
+          title: const Text('Kontrolni snimci'),
+          subtitle: const Text('Reconciliacija / kontroling'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _push(
+            context,
+            FinanceControlDashboardScreen(
+              companyData: companyData,
+              debugUnlockModule: debugUnlockModule,
+            ),
+          ),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.build_circle_outlined),
+          title: const Text('Rješavanje grešaka sinkronizacije'),
+          subtitle: const Text('Ponovi ili otkaži poslove'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _push(
+            context,
+            FinanceErrorResolutionScreen(
+              companyData: companyData,
+              debugUnlockModule: debugUnlockModule,
+            ),
+          ),
+        ),
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.sync_alt_outlined),

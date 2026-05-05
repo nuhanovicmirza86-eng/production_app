@@ -10,6 +10,17 @@ class FinanceSyncJobsService {
 
   static const int _limit = 80;
 
+  /// Poslovi koji zahtijevaju pažnju (sinkronizacija).
+  Stream<List<FinanceSyncJobModel>> watchProblemJobs(String companyId) {
+    return watchJobs(companyId).map((list) {
+      const bad = {'failed', 'requires_manual_review', 'retry_pending'};
+      return list
+          .where((j) => bad.contains(j.status.trim().toLowerCase()))
+          .take(40)
+          .toList();
+    });
+  }
+
   Stream<List<FinanceSyncJobModel>> watchJobs(String companyId) {
     final cid = companyId.trim();
     if (cid.isEmpty) {

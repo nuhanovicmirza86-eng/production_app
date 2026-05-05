@@ -16,6 +16,9 @@ class FinanceConnectionModel {
   final Map<String, String>? masterDataPolicy;
   final DateTime? lastSuccessfulSyncAt;
   final DateTime? lastConnectionTestAt;
+  final bool? lastConnectionTestOk;
+  final int? lastConnectionTestHttpStatus;
+  final String? lastConnectionTestDetail;
   final DateTime? updatedAt;
 
   const FinanceConnectionModel({
@@ -33,6 +36,9 @@ class FinanceConnectionModel {
     this.masterDataPolicy,
     this.lastSuccessfulSyncAt,
     this.lastConnectionTestAt,
+    this.lastConnectionTestOk,
+    this.lastConnectionTestHttpStatus,
+    this.lastConnectionTestDetail,
     this.updatedAt,
   });
 
@@ -55,8 +61,20 @@ class FinanceConnectionModel {
       masterDataPolicy: _policyMap(data['masterDataPolicy']),
       lastSuccessfulSyncAt: _ts(data['lastSuccessfulSyncAt']),
       lastConnectionTestAt: _ts(data['lastConnectionTestAt']),
+      lastConnectionTestOk: data['lastConnectionTestOk'] is bool
+          ? data['lastConnectionTestOk'] as bool
+          : null,
+      lastConnectionTestHttpStatus: _iOpt(data['lastConnectionTestHttpStatus']),
+      lastConnectionTestDetail: _optString(data['lastConnectionTestDetail']),
       updatedAt: _ts(data['updatedAt']),
     );
+  }
+
+  static int? _iOpt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v.toString());
   }
 
   static List<String> _stringList(dynamic v) {
