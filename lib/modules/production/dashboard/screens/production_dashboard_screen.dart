@@ -46,6 +46,7 @@ import '../../qr/production_qr_scan_flow.dart';
 import '../../../quality/screens/execute_inspection_screen.dart';
 import '../../../development/screens/development_projects_list_screen.dart';
 import '../../../finance_integrations/screens/finance_controlling_hub_screen.dart';
+import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../../../quality/screens/quality_hub_screen.dart';
 
 class _ProdNavItem {
@@ -132,16 +133,14 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     return ProductionModuleKeys.hasModule(companyData, ProductionModuleKeys.personal);
   }
 
-  /// Finance & Controlling — [ProductionModuleKeys.hasFinanceSuite]; u [kDebugMode] hub i bez SaaS unosa.
+  /// Finance & Controlling — pretplata [ProductionModuleKeys.hasFinanceSuite];
+  /// tenant [admin]/[super_admin] uvijek vide ulaz; u [kDebugMode] kao i ostali hub putovi.
   bool _canAccessFinanceIntegrations() {
-    if (!ProductionAccessHelper.canView(
+    return FinancePermissions.canAccessModule(
+      companyData: companyData,
       role: _role,
-      card: ProductionDashboardCard.financeControlling,
-    )) {
-      return false;
-    }
-    if (kDebugMode) return true;
-    return ProductionModuleKeys.hasFinanceSuite(companyData);
+      debugUnlockModule: kDebugMode,
+    );
   }
 
   /// Izvještaji praćenja proizvodnje dostupni su ulozi koja ima pristup izvještajima
@@ -385,9 +384,9 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         if (_canViewCard(ProductionDashboardCard.ooe))
           _DashboardActionTile(
             icon: Icons.percent_outlined,
-            title: 'Puni kapacitet i kalendar',
+            title: 'TEEP i kapacitet',
             subtitle:
-                'Kalendar, iskorištenost opreme, dan / tjedan / mjesec (pogon ili stroj).',
+                'Kalendar, iskorištenje, TEEP (dan / tjedan / mjesec, pogon ili stroj).',
             onTap: () => open(TeepAnalysisScreen(companyData: companyData)),
           ),
         if (_canViewCard(ProductionDashboardCard.operonixAnalytics))

@@ -10,13 +10,20 @@ class FinancePermissions {
     required String role,
     bool debugUnlockModule = false,
   }) {
+    final r = ProductionAccessHelper.normalizeRole(role);
     if (!ProductionAccessHelper.canView(
-      role: ProductionAccessHelper.normalizeRole(role),
+      role: r,
       card: ProductionDashboardCard.financeControlling,
     )) {
       return false;
     }
     if (debugUnlockModule) return true;
+    // Tenant admini vide ulaz u hub (konfiguracija / uvodenje modula); ostale
+    // uloge samo uz aktivnu pretplatu u companies.*Modules.
+    if (ProductionAccessHelper.isAdminRole(r) ||
+        ProductionAccessHelper.isSuperAdminRole(r)) {
+      return true;
+    }
     return ProductionModuleKeys.hasFinanceSuite(companyData);
   }
 
