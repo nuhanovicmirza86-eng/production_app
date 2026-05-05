@@ -31,8 +31,8 @@ class FinanceSyncLogsScreen extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  'Nema log linija. Trace zapisi (`finance_sync_logs`) '
-                  'ispunjava backend po sync poslu.',
+                  'Još nema zapisa. '
+                  'Pojavit će se nakon što pozadinska sinkronizacija pokrene posao.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),

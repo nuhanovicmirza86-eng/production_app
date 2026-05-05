@@ -15,7 +15,7 @@ import '../utils/finance_load_error_presenter.dart';
 import '../utils/finance_permissions.dart';
 import '../widgets/finance_screen_context_info.dart';
 
-/// Finance & Controlling — centralni AI asistent (upozorenja, analiza, memorija tenanta).
+/// Finance & Controlling — centralni AI asistent (upozorenja, analiza, kontekst kompanije).
 class FinanceAiAssistantScreen extends StatefulWidget {
   const FinanceAiAssistantScreen({
     super.key,
@@ -372,8 +372,8 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
-              'Nemate pretplatu ili ulogu za Finance AI. Potreban je modul '
-              'finance_controlling i AI paket (npr. ai_reports).',
+              'Nemate pretplatu ili ulogu za Finance AI. Potrebna je opcija '
+              'Kontroling financija s AI pristupom u vašoj pretplati.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: cs.onSurfaceVariant,

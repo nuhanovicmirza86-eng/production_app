@@ -34,8 +34,8 @@ class FinanceSyncJobsScreen extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  'Nema sync poslova za ovaj tenant. '
-                  'Kad backend enqueue-a poslove (`finance_sync_jobs`), pojavit će se ovdje.',
+                  'Nema pozadinskih poslova sinkronizacije za vašu kompaniju. '
+                  'Pojavit će se kada sustav pokrene sljedeću sinkronizaciju.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),

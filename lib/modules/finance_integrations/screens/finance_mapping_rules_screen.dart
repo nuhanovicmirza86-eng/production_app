@@ -32,7 +32,7 @@ class FinanceMappingRulesScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(24),
                 child: Text(
                   'Nema pravila mapiranja. '
-                  'Backend i Callables dodaju zapise u `finance_mapping_rules` kada se konfigurira konektor.',
+                  'Pojavljuju se kada administrator konfigurira ERP vezu u postavkama.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),

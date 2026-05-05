@@ -20,7 +20,7 @@ import '../utils/finance_permissions.dart';
 import '../widgets/finance_screen_context_info.dart';
 import 'finance_ai_assistant_screen.dart';
 
-/// KPI kartice za root kolekciju [finance_kpi_snapshots] (pun controlling pretplata).
+/// KPI kartice na pregledu kontrolinga (pun controlling).
 class FinanceControllingDashboardTab extends StatefulWidget {
   const FinanceControllingDashboardTab({
     super.key,
@@ -296,7 +296,7 @@ class _FinanceControllingDashboardTabState
         return StatefulBuilder(
           builder: (ctx, setLocal) {
             return AlertDialog(
-              title: const Text('Financijske postavke tenanta'),
+              title: const Text('Financijske postavke kompanije'),
               content: SingleChildScrollView(
                 child: Form(
                   key: formKey,
@@ -470,8 +470,8 @@ class _FinanceControllingDashboardTabState
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Izmjena ide u Firestore preko zaštićenog Callabla. '
-                        'Zatim ponovo preračunajte KPI da snimak dobije novu satnicu.',
+                        'Izmjene se spremaju na poslužitelju uz provjeru pristupa. '
+                        'Zatim ponovo preračunajte KPI da sažetak dobije novu satnicu.',
                         style: Theme.of(ctx).textTheme.bodySmall,
                       ),
                     ],
@@ -640,8 +640,8 @@ class _FinanceControllingDashboardTabState
             ),
             const SizedBox(height: 6),
             Text(
-              'Baza (iznosi u engineu / Firestore): ${def.baseCurrency} · '
-              'Prikaz: ${def.displayCurrency}',
+              'Valuta proračuna: ${def.baseCurrency} · '
+              'prikaz u aplikaciji: ${def.displayCurrency}',
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 4),
@@ -649,7 +649,7 @@ class _FinanceControllingDashboardTabState
             const SizedBox(height: 6),
             Text(
               mhrBase == null
-                  ? 'Satnica mašine u bazi: — (postavite za monetarni gubitak zastoja).'
+                  ? 'Satnica mašine: — (postavite za novčani iznos zastoja).'
                   : 'Satnica: ${mhrBase.toStringAsFixed(2)} ${def.baseCurrency}/h'
                       '${mhrDisplay != null && def.baseCurrency != def.displayCurrency ? '  ·  ${mhrDisplay.toStringAsFixed(2)} ${def.displayCurrency}/h (samo prikaz)' : ''}',
               style: theme.textTheme.bodySmall,
@@ -681,8 +681,8 @@ class _FinanceControllingDashboardTabState
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  'Samo tenant admin, super_admin ili accounting_manager '
-                  'može mijenjati ove postavke.',
+                  'Samo administrator kompanije, SaaS administrator ili '
+                  'ovlašteno računovodstvo može mijenjati ove postavke.',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: cs.outline,
                   ),
@@ -1018,10 +1018,10 @@ class _FinanceControllingDashboardTabState
 
                   final displayShort = snapBase == def.displayCurrency
                       ? 'Iznosi u valuti $snapBase.'
-                      : 'Baza: $snapBase · prikaz: ${def.displayCurrency}.';
+                      : 'Valuta proračuna: $snapBase · prikaz: ${def.displayCurrency}.';
                   final displayDetail = snapBase == def.displayCurrency
                       ? 'Svi iznosi u ovom sažetku čitaju se u istoj valuti.'
-                      : 'Snimak se sprema u baznoj valuti tenant-a; aplikacija pretvara u valutu prikaza '
+                      : 'Sažetak se interno vodi u baznoj valuti; aplikacija pretvara u valutu prikaza '
                           'prema postavkama i dostupnim tečajevima.';
 
                   return ListView(

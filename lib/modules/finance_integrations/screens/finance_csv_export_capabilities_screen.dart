@@ -46,8 +46,8 @@ class FinanceCsvExportCapabilitiesScreen extends StatelessWidget {
               FinanceScreenContextInfo(
                 title: 'CSV / Excel izvoz',
                 body:
-                    'Oznaka na vezi znači da adapter podržava generički izvoz. Stvarni '
-                    'izvoz pokreće pozadinski sustav kada je konektor aktiviran i odobren.',
+                    'Oznaka na vezi znači da je izvoz u tablicu podržan. Datoteke se '
+                    'stvare na poslužitelju kad je veza aktivna i odobrena.',
               ),
             ],
           ),
@@ -88,8 +88,8 @@ class FinanceCsvExportCapabilitiesScreen extends StatelessWidget {
                     child: Text(
                       rows.isEmpty
                           ? 'Nema definiranih ERP veza. Dodajte vezu na kartici ERP veze.'
-                          : 'Nijedna veza trenutno nema uključen tip „${FinanceEnabledSyncTypes.displayLabel(FinanceEnabledSyncTypes.csvExport)}”. '
-                                'Uredi vezu i omogući taj tip synca kada bude dostupan u konektoru.',
+                          : 'Nijedna veza trenutno nema uključenu opciju „${FinanceEnabledSyncTypes.displayLabel(FinanceEnabledSyncTypes.csvExport)}”. '
+                                'Uredi vezu i uključi izvoz kad bude dostupan za vaš ERP.',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ),

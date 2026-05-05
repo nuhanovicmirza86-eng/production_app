@@ -762,10 +762,9 @@ class _BudgetTabBodyState extends State<_BudgetTabBody> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Nema zapisa u '
-                '`companies/$_companyId/finance_budgets` za '
-                'FY ${widget.businessYearId}, '
-                '${widget.periodYear}-${widget.periodMonth.toString().padLeft(2, '0')}.',
+                'Nema unesenih budžeta za poslovnu godinu '
+                '${widget.businessYearId}, '
+                'mjesec ${widget.periodYear}-${widget.periodMonth.toString().padLeft(2, '0')}.',
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: 16),

@@ -300,7 +300,7 @@ class _FinanceControllingProductionTabBodyState
                     final loc = Localizations.localeOf(context).toString();
                     final fmt = NumberFormat.decimalPattern(loc);
                     final parts = <String>[
-                      'Količina ${fmt.format(r.quantityProduced)} · JNT ${_fmt(r.costPerUnit, def)} / kom',
+                      'Količina ${fmt.format(r.quantityProduced)} · jed. trošak ${_fmt(r.costPerUnit, def)} / kom',
                       if (r.materialCost > 0.0001) 'Mat ${_fmt(r.materialCost, def)}',
                       if (r.logisticsToCustomerCost > 0.0001) 'Log ${_fmt(r.logisticsToCustomerCost, def)}',
                       if (r.machineCost > 0.0001) 'Ruta ${_fmt(r.machineCost, def)}',
@@ -640,7 +640,7 @@ class _FinanceControllingProcurementTabBodyState
                   dense: true,
                   title: Text(label),
                   subtitle: Text(
-                    'Količina ${NumberFormat.decimalPattern(loc).format(r.quantityProduced)} · JNT ${_fmt(r.costPerUnit, def)} / kom',
+                    'Količina ${NumberFormat.decimalPattern(loc).format(r.quantityProduced)} · jed. trošak ${_fmt(r.costPerUnit, def)} / kom',
                   ),
                   trailing: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -781,7 +781,7 @@ class FinanceControllingDowntimeKpiTabBody extends StatelessWidget {
   }
 }
 
-/// Tab **Kvalitet**: redovi iz `finance_quality_costs`.
+/// Tab **Kvalitet**: sažeci troška slabog kvaliteta (COPQ).
 class FinanceControllingQualityAggregatesTabBody extends StatefulWidget {
   const FinanceControllingQualityAggregatesTabBody({
     super.key,
@@ -942,7 +942,7 @@ class _FinanceControllingQualityAggregatesTabBodyState
   }
 }
 
-/// Tab **Održavanje**: radni centri / zastoj + održavanje (`finance_machine_costs`).
+/// Tab **Održavanje**: trošak po radnom centru (zastoj i održavanje).
 class FinanceControllingMaintenanceAggregatesTabBody extends StatefulWidget {
   const FinanceControllingMaintenanceAggregatesTabBody({
     super.key,
