@@ -1,7 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:production_app/services/fcm_token_service.dart';
+
+import '../firebase_auth_sign_in_errors.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -11,11 +14,19 @@ class AuthService {
   );
 
   Future<User?> signIn(String email, String password) async {
-    final cred = await _auth.signInWithEmailAndPassword(
-      email: email.trim(),
-      password: password,
-    );
-    return cred.user;
+    try {
+      final cred = await _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      return cred.user;
+    } on FirebaseAuthException catch (e) {
+      if (kDebugMode) {
+        debugPrint('FirebaseAuth signIn: code=${e.code} message=${e.message}');
+      }
+      final m = firebaseAuthSignInErrorMessages(e);
+      throw LocalizedSignInFailure(messageBs: m.$1, messageEn: m.$2);
+    }
   }
 
   Future<void> signOut() async {

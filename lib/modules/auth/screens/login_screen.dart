@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/station_launch_preference.dart';
 import '../register/screens/register_screen.dart';
+import '../shared/firebase_auth_sign_in_errors.dart';
 import '../shared/services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -34,7 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscure = true;
   bool _rememberEmail = true;
   bool _prefsLoaded = false;
-  String? _error;
+  (String bs, String en)? _loginError;
 
   @override
   void initState() {
@@ -92,7 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     setState(() {
       _loading = true;
-      _error = null;
+      _loginError = null;
     });
 
     final email = _emailCtrl.text.trim();
@@ -101,7 +102,10 @@ class _LoginScreenState extends State<LoginScreen> {
     if (email.isEmpty || password.isEmpty) {
       setState(() {
         _loading = false;
-        _error = 'Unesi email i lozinku.';
+        _loginError = (
+          'Unesi email i lozinku.',
+          'Enter your email and password.',
+        );
       });
       return;
     }
@@ -136,17 +140,15 @@ class _LoginScreenState extends State<LoginScreen> {
       if (widget.onLoginSuccess != null) {
         await widget.onLoginSuccess!();
       }
-    } on FirebaseAuthException catch (e) {
+    } on LocalizedSignInFailure catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.message?.trim().isNotEmpty == true
-            ? e.message
-            : 'Greška prijave: ${e.code}';
+        _loginError = (e.messageBs, e.messageEn);
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _loginError = unexpectedSignInErrorMessages();
       });
     } finally {
       if (mounted) {
@@ -273,11 +275,24 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         subtitle: const Text('Lozinka se nikad ne sprema.'),
                       ),
-                      if (_error != null) ...[
+                      if (_loginError != null) ...[
                         const SizedBox(height: 8),
                         Text(
-                          _error!,
-                          style: const TextStyle(color: Colors.red),
+                          _loginError!.$1,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _loginError!.$2,
+                          style: TextStyle(
+                            color: Colors.red.withValues(alpha: 0.88),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w400,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ],
