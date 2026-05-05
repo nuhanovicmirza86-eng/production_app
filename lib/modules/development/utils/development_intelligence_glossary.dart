@@ -1,11 +1,17 @@
 /// Kratka objašnjenja za Launch Intelligence (tooltips / info ikone).
+library;
+
+import 'package:flutter/material.dart';
+
+import 'development_launch_readiness_canonical.dart';
+
 class DevelopmentIntelligenceGlossary {
   DevelopmentIntelligenceGlossary._();
 
   static const launchReadinessScore = 'Operonix Launch Readiness Score (0–100): '
       'agregat spremnosti za serijsku proizvodnju iz APQP faza, PPAP dokaza, PFMEA rizika, '
       'Control Plana, probne serije (G5), KPI kapabilnosti, alata/mašine, dobavljača i lekcija (G9). '
-      'Pragovi: ≥90 može SOP; 75–89 uslovno (admin može release u sustavu); 60–74 blokada rizika; '
+      'Pragovi: ≥90 može SOP; 75–89 uslovno (uz odobrenje menadžmenta u Operonixu); 60–74 blokada rizika; '
       '<60 nije spremno.';
 
   static const sopBlockers =
@@ -37,6 +43,47 @@ class DevelopmentIntelligenceGlossary {
       'No silent change: bitne promjene (BOM, routing, alat, dobavljač, mašina, kontrola) '
       'evidenciraju se u modulu kao `changes` i ne bi smjele ući u seriju bez odobrenja.';
 
+  /// Bez spomena konkurencije (traženo); ostatak kao izvorni produktni opis.
+  static const launchIntelligenceSystemPitch =
+      'Operonix Launch Intelligence ne pakuje samo dokumente: kombinira Stage-Gate, rizike, '
+      'odobrenja, probu, CSR i (prema politici) MES podatke da prije SOP-a pokaže '
+      'što nedostaje i što blokira seriju. Ovdje su dokaz, prag i (gdje je implementirano) predikcija.';
+
+  static const mesOperationalLink =
+      'Nakon puštanja u proizvodnju pun se trag (OEE/OOE, smjene, alat, škart, reklamacije) '
+      'povezuje na isti proizvod — to je nadogradnja iznad „samo APQP PDF”.';
+
+  static const sopSimulationRoadmap =
+      'Simulacija SOP-a prije odobrenja (kapacitet, ciklus, alat, škart probe, ciljevi OEE) '
+      'planirana je kao proširenje nakon što su probni i MES podaci pouzdano u kontekstu projekta; '
+      'do tada koristi Launch Readiness score i blokere u Command Centeru.';
+
+  static Future<void> showInfoSheet(
+    BuildContext context, {
+    required String title,
+    required String body,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: SingleChildScrollView(
+          child: Text(
+            body,
+            style: TextStyle(height: 1.4, color: scheme.onSurfaceVariant),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Zatvori'),
+          ),
+        ],
+      ),
+    );
+  }
+
   static String? forSegmentId(String id) {
     switch (id) {
       case 'apqp_phases':
@@ -62,5 +109,43 @@ class DevelopmentIntelligenceGlossary {
       default:
         return null;
     }
+  }
+
+  static Future<void> showScoreRulesDialog(BuildContext context) {
+    final b = StringBuffer()
+      ..writeln(launchReadinessScore)
+      ..writeln()
+      ..writeln('Pragovi u sustavu:');
+    for (final r in DevelopmentLaunchReadinessCanonical.scoreRules) {
+      b.writeln('• ${r.range}: ${r.systemBehavior}');
+    }
+    return showInfoSheet(
+      context,
+      title: 'Operonix Launch Readiness — pragovi',
+      body: b.toString(),
+    );
+  }
+
+  static Future<void> showSegmentWeightsDialog(BuildContext context) {
+    final b = StringBuffer()
+      ..writeln('Zbir težina = 100 %. Isti model kao u Cloud Function.')
+      ..writeln();
+    for (final s in DevelopmentLaunchReadinessCanonical.segmentWeights) {
+      b.writeln('${s.weightPercent}% — ${s.label}');
+    }
+    return showInfoSheet(
+      context,
+      title: 'Težine segmenata score-a',
+      body: b.toString(),
+    );
+  }
+
+  static Future<void> showPortfolioScopeExplainer(BuildContext context) {
+    return showInfoSheet(
+      context,
+      title: 'Zašto Launch Intelligence System',
+      body:
+          '$launchIntelligenceSystemPitch\n\n$mesOperationalLink\n\n$sopSimulationRoadmap',
+    );
   }
 }

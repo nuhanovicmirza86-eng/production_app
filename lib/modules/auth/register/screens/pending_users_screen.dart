@@ -49,6 +49,12 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
     'logistics_manager',
     'shift_lead',
     'production_manager',
+    ProductionAccessHelper.roleProjectManager,
+    ProductionAccessHelper.roleDevelopmentEngineer,
+    ProductionAccessHelper.roleManagementViewer,
+    ProductionAccessHelper.roleQualityControl,
+    ProductionAccessHelper.roleAccountingManager,
+    ProductionAccessHelper.roleAccountingClerk,
   ];
 
   static const List<String> _userStatusFilters = <String>[
@@ -62,7 +68,12 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
     ProductionAccessHelper.roleSuperAdmin,
     ProductionAccessHelper.roleAdmin,
     ProductionAccessHelper.roleProductionManager,
-    ProductionAccessHelper.roleSupervisor,
+    ProductionAccessHelper.roleProjectManager,
+    ProductionAccessHelper.roleDevelopmentEngineer,
+    ProductionAccessHelper.roleManagementViewer,
+    ProductionAccessHelper.roleQualityControl,
+    ProductionAccessHelper.roleAccountingManager,
+    ProductionAccessHelper.roleAccountingClerk,
     ProductionAccessHelper.roleLogisticsManager,
     'shift_lead',
     'quality_operator',

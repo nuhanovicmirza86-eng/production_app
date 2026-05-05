@@ -6,8 +6,10 @@ import '../../commercial/partners/screens/partner_customer_requirements_profile_
 import '../models/development_launch_intelligence_result.dart';
 import '../models/development_project_model.dart';
 import '../services/development_project_service.dart';
+import '../utils/development_help_texts.dart';
 import '../utils/development_intelligence_glossary.dart';
 import '../utils/development_permissions.dart';
+import '../../production/ooe/widgets/ooe_info_icon.dart';
 
 /// Command Center tab: Launch Readiness, blockeri, change impact, lekcije, CP, heatmap.
 class DevelopmentLaunchIntelligenceTab extends StatefulWidget {
@@ -29,6 +31,12 @@ class _DevelopmentLaunchIntelligenceTabState
     extends State<DevelopmentLaunchIntelligenceTab> {
   late Future<DevelopmentLaunchIntelligenceResult> _future;
 
+  String _plantKeyForProject() {
+    final p = widget.project.plantKey.trim();
+    if (p.isNotEmpty) return p;
+    return (widget.companyData['plantKey'] ?? '').toString().trim();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -37,7 +45,7 @@ class _DevelopmentLaunchIntelligenceTabState
 
   void _reload() {
     final cid = (widget.companyData['companyId'] ?? '').toString().trim();
-    final pk = (widget.companyData['plantKey'] ?? '').toString().trim();
+    final pk = _plantKeyForProject();
     _future = DevelopmentProjectService().getLaunchIntelligenceViaCallable(
       companyId: cid,
       plantKey: pk,
@@ -95,13 +103,14 @@ class _DevelopmentLaunchIntelligenceTabState
         return RefreshIndicator(
           onRefresh: () async {
             final cid = (widget.companyData['companyId'] ?? '').toString().trim();
-            final pk = (widget.companyData['plantKey'] ?? '').toString().trim();
             final next = DevelopmentProjectService().getLaunchIntelligenceViaCallable(
               companyId: cid,
-              plantKey: pk,
+              plantKey: _plantKeyForProject(),
               projectId: widget.project.id,
             );
-            setState(() => _future = next);
+            setState(() {
+              _future = next;
+            });
             await next;
           },
           child: ListView(
@@ -245,6 +254,16 @@ class _DevelopmentLaunchIntelligenceTabState
                 )
               else
                 ...data.predictiveRisks.map(_predictiveLine),
+              if (data.mesProductSignals != null) ...[
+                const SizedBox(height: 16),
+                _sectionTitle(
+                  context,
+                  'MES agregat (proizvodni nalozi)',
+                  DevelopmentHelpTexts.mesAggregateBody,
+                  tooltip: DevelopmentHelpTexts.mesAggregateTooltip,
+                ),
+                _mesSignalsCard(context, data.mesProductSignals!),
+              ],
               const SizedBox(height: 16),
               _sectionTitle(
                 context,
@@ -314,7 +333,6 @@ class _DevelopmentLaunchIntelligenceTabState
   Future<void> _runAi(BuildContext context, {required bool redTeam}) async {
     final nav = Navigator.of(context, rootNavigator: true);
     final cid = (widget.companyData['companyId'] ?? '').toString().trim();
-    final pk = (widget.companyData['plantKey'] ?? '').toString().trim();
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -333,7 +351,7 @@ class _DevelopmentLaunchIntelligenceTabState
     try {
       final md = await DevelopmentProjectService().runDevelopmentProjectAiAnalysis(
         companyId: cid,
-        plantKey: pk,
+        plantKey: _plantKeyForProject(),
         projectId: widget.project.id,
         analysisFocus: redTeam ? 'red_team_pre_sop' : 'launch_intelligence_summary',
       );
@@ -391,15 +409,17 @@ class _DevelopmentLaunchIntelligenceTabState
               children: [
                 Expanded(
                   child: Text(
-                    'Operonix Launch Readiness',
+                    'Operonix Launch Readiness Score',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                   ),
                 ),
-                Tooltip(
-                  message: DevelopmentIntelligenceGlossary.launchReadinessScore,
-                  child: Icon(Icons.info_outline, size: 22, color: c.primary),
+                OoeInfoIcon(
+                  tooltip: DevelopmentIntelligenceGlossary.launchReadinessScore,
+                  dialogTitle: 'Launch Readiness Score',
+                  dialogBody: DevelopmentIntelligenceGlossary.launchReadinessScore,
+                  iconSize: 22,
                 ),
               ],
             ),
@@ -422,11 +442,24 @@ class _DevelopmentLaunchIntelligenceTabState
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
-            Text(
-              'Referentni Gate: ${d.targetGate}',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: c.onSurfaceVariant,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Referentni Gate: ${d.targetGate}',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: c.onSurfaceVariant,
+                        ),
                   ),
+                ),
+                OoeInfoIcon(
+                  tooltip: DevelopmentHelpTexts.referentniGateTooltip,
+                  dialogTitle: DevelopmentHelpTexts.referentniGateTitle,
+                  dialogBody: DevelopmentHelpTexts.referentniGateBody,
+                  iconSize: 18,
+                ),
+              ],
             ),
           ],
         ),
@@ -464,13 +497,11 @@ class _DevelopmentLaunchIntelligenceTabState
                             ),
                           ),
                           if (gloss != null)
-                            Tooltip(
-                              message: gloss,
-                              child: Icon(
-                                Icons.help_outline,
-                                size: 18,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
+                            OoeInfoIcon(
+                              tooltip: gloss,
+                              dialogTitle: s.label,
+                              dialogBody: gloss,
+                              iconSize: 18,
                             ),
                         ],
                       ),
@@ -493,7 +524,13 @@ class _DevelopmentLaunchIntelligenceTabState
     );
   }
 
-  Widget _sectionTitle(BuildContext context, String title, String tooltip) {
+  Widget _sectionTitle(
+    BuildContext context,
+    String title,
+    String dialogBody, {
+    String? tooltip,
+  }) {
+    final tip = tooltip == null || tooltip.isEmpty ? title : tooltip;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -505,9 +542,11 @@ class _DevelopmentLaunchIntelligenceTabState
                 ),
           ),
         ),
-        Tooltip(
-          message: tooltip,
-          child: Icon(Icons.info_outline, size: 20, color: Theme.of(context).colorScheme.primary),
+        OoeInfoIcon(
+          tooltip: tip,
+          dialogTitle: title,
+          dialogBody: dialogBody,
+          iconSize: 20,
         ),
       ],
     );
@@ -535,7 +574,8 @@ class _DevelopmentLaunchIntelligenceTabState
     String s(dynamic k) => (c[k] ?? '').toString();
     final lines = <String>[
       if (s('ppapLevel').isNotEmpty && s('ppapLevel') != 'null') 'PPAP: ${s('ppapLevel')}',
-      if (c['changeNotificationWeeks'] != null) 'Obavještenje promjene: ${c['changeNotificationWeeks']} sedm.',
+      if (c['changeNotificationWeeks'] != null)
+        'Obavještavanje o promjeni: ${c['changeNotificationWeeks']} sedmica unaprijed',
       if (s('customerNameSnapshot').isNotEmpty) 'Snimak naziva: ${s('customerNameSnapshot')}',
       if (s('specialRequirementsPreview').isNotEmpty) 'Posebni zahtjevi: ${s('specialRequirementsPreview')}',
       if (s('documentationRequirementsPreview').isNotEmpty)
@@ -563,6 +603,12 @@ class _DevelopmentLaunchIntelligenceTabState
                           fontWeight: FontWeight.w700,
                         ),
                   ),
+                ),
+                OoeInfoIcon(
+                  tooltip: DevelopmentHelpTexts.csrProfileTooltip,
+                  dialogTitle: DevelopmentHelpTexts.csrProfileTitle,
+                  dialogBody: DevelopmentHelpTexts.csrProfileBody,
+                  iconSize: 20,
                 ),
               ],
             ),
@@ -656,6 +702,105 @@ class _DevelopmentLaunchIntelligenceTabState
       leading: const Icon(Icons.tune),
       title: Text((x['trigger'] ?? '').toString()),
       subtitle: Text((x['suggestion'] ?? '').toString()),
+    );
+  }
+
+  Widget _mesSignalsCard(BuildContext context, Map<String, dynamic> mes) {
+    final skipped = mes['skippedReason']?.toString() ?? '';
+    if (skipped == 'missing_plantKey') {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 8),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            'Za MES agregat potreban je plantKey na projektu.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ),
+      );
+    }
+    final hasData = mes['hasMesData'] == true;
+    if (!hasData) {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 8),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            'Za ovaj productId u odabranom pogonu još nema proizvodnih naloga u MES-u (provjeri vezu NPI↔MES).',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+      );
+    }
+
+    double asD(dynamic v) {
+      if (v is num) return v.toDouble();
+      return double.tryParse(v?.toString() ?? '') ?? 0;
+    }
+
+    int asI(dynamic v) {
+      if (v is int) return v;
+      if (v is num) return v.round();
+      return int.tryParse(v?.toString() ?? '') ?? 0;
+    }
+
+    final n = asI(mes['orderCount']);
+    final good = asD(mes['totalGoodQty']);
+    final scrap = asD(mes['totalScrapQty']);
+    final planned = asD(mes['totalPlannedQty']);
+    final sr = mes['scrapRatePercent'];
+    final srStr = sr is num ? '${sr.toString()} %' : (sr?.toString() ?? '—');
+    final wc = asI(mes['distinctWorkCenterCount']);
+    final sb = mes['statusBreakdown'];
+    final samples = mes['sampleOrderCodes'];
+
+    final statusBits = <String>[];
+    if (sb is Map) {
+      sb.forEach((k, v) {
+        statusBits.add('${k.toString()}: ${asI(v)}');
+      });
+    }
+    final sampleList = <String>[];
+    if (samples is List) {
+      for (final x in samples) {
+        sampleList.add(x.toString());
+      }
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Uzorak do $n naloga · radnih centara: $wc',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Dobro: ${good.toStringAsFixed(0)} · Škart: ${scrap.toStringAsFixed(0)} · '
+              'Plan: ${planned.toStringAsFixed(0)} · Udio škarta: $srStr',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            if (statusBits.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Statusi: ${statusBits.join(', ')}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            if (sampleList.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Primjeri šifri: ${sampleList.join(', ')}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 

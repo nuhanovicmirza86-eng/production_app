@@ -5,6 +5,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/user_display_label.dart';
+import '../../../../core/access/production_access_helper.dart';
 import '../../execution/screens/production_execution_screen.dart';
 import '../../execution/services/production_execution_service.dart';
 import '../../ooe/ooe_help_texts.dart';
@@ -65,20 +66,24 @@ class _ProductionOrderDetailsScreenState
       UserDisplayLabel.fromSessionMap(widget.companyData);
 
   String get _role =>
-      (widget.companyData['role'] ?? '').toString().toLowerCase();
+      ProductionAccessHelper.normalizeRole(widget.companyData['role']);
 
-  bool get _canEdit => _role == 'admin' || _role == 'production_manager';
+  bool get _canEdit =>
+      _role == ProductionAccessHelper.roleAdmin ||
+      _role == ProductionAccessHelper.roleProductionManager;
 
-  bool get _canRelease => _role == 'admin' || _role == 'production_manager';
+  bool get _canRelease =>
+      _role == ProductionAccessHelper.roleAdmin ||
+      _role == ProductionAccessHelper.roleProductionManager;
 
   bool get _canManageLifecycle =>
-      _role == 'admin' || _role == 'production_manager';
+      _role == ProductionAccessHelper.roleAdmin ||
+      _role == ProductionAccessHelper.roleProductionManager;
 
   bool get _canExecute =>
-      _role == 'production_operator' ||
-      _role == 'supervisor' ||
-      _role == 'production_manager' ||
-      _role == 'admin';
+      _role == ProductionAccessHelper.roleProductionOperator ||
+      _role == ProductionAccessHelper.roleProductionManager ||
+      _role == ProductionAccessHelper.roleAdmin;
 
   static const String _defaultStepId = 'STEP_1';
   static const String _defaultStepName = 'Glavni proces';

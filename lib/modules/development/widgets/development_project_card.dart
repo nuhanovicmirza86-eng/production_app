@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../models/development_project_model.dart';
 import '../utils/development_constants.dart';
 import '../utils/development_display.dart';
+import '../utils/development_help_texts.dart';
+import '../../production/ooe/widgets/ooe_info_icon.dart';
 
 /// Kartica projekta u portfelju — Stage-Gate, KPI, vlasništvo (enterprise prikaz).
 class DevelopmentProjectCard extends StatelessWidget {
@@ -78,7 +80,17 @@ class DevelopmentProjectCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 4),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: OoeInfoIcon(
+                      tooltip: DevelopmentHelpTexts.stageGateConceptTooltip,
+                      dialogTitle: DevelopmentHelpTexts.stageGateConceptTitle,
+                      dialogBody: DevelopmentHelpTexts.stageGateConceptBody,
+                      iconSize: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -273,6 +285,26 @@ class DevelopmentProjectCard extends StatelessWidget {
                   ],
                 ),
               ],
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(
+                    Icons.description_outlined,
+                    size: 18,
+                    color: scheme.outline,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Dokumenti, zahtjevi i odobrenja: potpuni trag u detalju projekta.',
+                      style: tt.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),

@@ -6,7 +6,9 @@ import 'package:flutter/material.dart';
 import '../models/development_project_model.dart';
 import '../services/development_project_service.dart';
 import '../utils/development_constants.dart';
+import '../utils/development_help_texts.dart';
 import '../utils/development_permissions.dart';
+import '../../production/ooe/widgets/ooe_info_icon.dart';
 
 /// Heuristička provjera spremnosti za release (arhitektura modula Razvoj — bez povezivanja na proizvod).
 class DevelopmentProjectReleaseReadinessSection extends StatefulWidget {
@@ -228,16 +230,29 @@ class _DevelopmentProjectReleaseReadinessSectionState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Spremnost za release',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Spremnost za release',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
+                ),
+                OoeInfoIcon(
+                  tooltip: DevelopmentHelpTexts.releaseReadinessTooltip,
+                  dialogTitle: DevelopmentHelpTexts.releaseReadinessTitle,
+                  dialogBody: DevelopmentHelpTexts.releaseReadinessBody,
+                  iconSize: 20,
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             Text(
               'Heuristička provjera (rizici, izmjene, faza Gate, čekajuća odobrenja, dokumenti za Gate s odobrenjem). '
-              'Zapis releasea na poslužitelju zahtijeva i Operonix Launch Readiness Score ≥60 te ≥90 osim za tenant admin / super_admin. '
+              'Zapis releasea na poslužitelju traži i score u skladu s pravilima sustava (npr. pragovi Launch Readiness). '
               'Detaljni pregled u tabu Launch Intelligence.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -279,6 +294,7 @@ class _DevelopmentProjectReleaseReadinessSectionState
             ],
             const SizedBox(height: 12),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
@@ -298,7 +314,16 @@ class _DevelopmentProjectReleaseReadinessSectionState
                     },
                   ),
                 ),
-                const SizedBox(width: 12),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10, left: 4),
+                  child: OoeInfoIcon(
+                    tooltip: DevelopmentHelpTexts.referentniGateTooltip,
+                    dialogTitle: DevelopmentHelpTexts.referentniGateTitle,
+                    dialogBody: DevelopmentHelpTexts.referentniGateBody,
+                    iconSize: 20,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 if (_canRun)
                   FilledButton.tonal(
                     onPressed: _runCheck,

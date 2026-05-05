@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/access/production_access_helper.dart';
 import '../../ooe/models/ooe_loss_reason.dart';
 import '../../ooe/services/ooe_loss_reason_service.dart';
 import '../services/production_execution_service.dart';
@@ -65,13 +66,12 @@ class _ProductionExecutionScreenState extends State<ProductionExecutionScreen> {
   }
 
   String get _role =>
-      (widget.companyData['role'] ?? '').toString().toLowerCase();
+      ProductionAccessHelper.normalizeRole(widget.companyData['role']);
 
   bool get _canMutateExecution =>
-      _role == 'production_operator' ||
-      _role == 'supervisor' ||
-      _role == 'production_manager' ||
-      _role == 'admin';
+      _role == ProductionAccessHelper.roleProductionOperator ||
+      _role == ProductionAccessHelper.roleProductionManager ||
+      _role == ProductionAccessHelper.roleAdmin;
 
   Map<String, dynamic> get _order => widget.orderData;
 

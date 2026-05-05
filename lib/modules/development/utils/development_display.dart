@@ -1,4 +1,5 @@
 import 'development_constants.dart';
+import '../models/development_project_supplier_model.dart';
 
 /// Lokalizirani prikazi za module keys (ne prikazivati sirove kodove iz Firestorea).
 abstract final class DevelopmentDisplay {
@@ -289,5 +290,72 @@ abstract final class DevelopmentDisplay {
       default:
         return code.isEmpty ? '—' : code;
     }
+  }
+
+  static String supplierCategoryLabel(String code) {
+    switch (code.trim()) {
+      case DevelopmentSupplierCategories.toolAndDie:
+        return 'Alatnica / kalup';
+      case DevelopmentSupplierCategories.material:
+        return 'Materijal / komponenta';
+      case DevelopmentSupplierCategories.service:
+        return 'Usluga';
+      case DevelopmentSupplierCategories.other:
+        return 'Ostalo';
+      default:
+        return code.isEmpty ? '—' : code;
+    }
+  }
+
+  static String supplierApprovalLabel(String code) {
+    switch (code.trim()) {
+      case DevelopmentSupplierApprovalStatuses.draft:
+        return 'Nacrt';
+      case DevelopmentSupplierApprovalStatuses.pendingApproval:
+        return 'Čeka odobrenje';
+      case DevelopmentSupplierApprovalStatuses.approved:
+        return 'Odobreno';
+      case DevelopmentSupplierApprovalStatuses.rejected:
+        return 'Odbijeno';
+      case DevelopmentSupplierApprovalStatuses.conditional:
+        return 'Uz uvjete';
+      default:
+        return code.isEmpty ? '—' : code;
+    }
+  }
+
+  static String supplierExternalRiskLabel(String code) {
+    switch (code.trim()) {
+      case DevelopmentRiskLevels.low:
+        return 'Nizak (vanjski)';
+      case DevelopmentRiskLevels.medium:
+        return 'Srednji';
+      case DevelopmentRiskLevels.high:
+        return 'Visok';
+      default:
+        return code.isEmpty ? '—' : code;
+    }
+  }
+
+  /// Opseg, dijelovi i zadaci — što dobavljač radi / isporučuje na tom projektu.
+  static String supplierDeliveryDescription(
+    DevelopmentProjectSupplierModel s, {
+    bool singleLine = false,
+    bool showPlaceholder = true,
+  }) {
+    final lines = <String>[];
+    final scope = (s.scopeSummary ?? '').trim();
+    if (scope.isNotEmpty) lines.add('Opseg rada: $scope');
+    if (s.assignedPartLabels.isNotEmpty) {
+      lines.add('Dijelovi / artikli: ${s.assignedPartLabels.join(', ')}');
+    }
+    if (s.assignedTaskIds.isNotEmpty) {
+      lines.add('Zadaci (ID): ${s.assignedTaskIds.join(', ')}');
+    }
+    if (lines.isEmpty) {
+      if (!showPlaceholder) return '';
+      return 'Nema upisanog što se isporučuje — otvori uređivanje i popuni Opseg, Dijelovi ili Zadaci.';
+    }
+    return singleLine ? lines.join(' · ') : lines.join('\n');
   }
 }

@@ -8,6 +8,7 @@ import '../models/development_project_document_model.dart';
 import '../models/development_project_model.dart';
 import '../models/development_project_risk_model.dart';
 import '../models/development_project_stage_model.dart';
+import '../models/development_project_supplier_model.dart';
 import '../models/development_project_task_model.dart';
 import '../utils/development_constants.dart';
 
@@ -144,7 +145,8 @@ class DevelopmentProjectService {
   CollectionReference<Map<String, dynamic>> _documentsCol(String projectId) =>
       _collection.doc(projectId).collection('documents');
 
-  /// Zadaci projekta (podkolekcija `tasks`).
+  CollectionReference<Map<String, dynamic>> _suppliersCol(String projectId) =>
+      _collection.doc(projectId).collection('suppliers');
   Stream<List<DevelopmentProjectTaskModel>> watchTasks(
     String projectId, {
     int limit = 200,
@@ -232,6 +234,36 @@ class DevelopmentProjectService {
         .map(
           (snap) => snap.docs
               .map(DevelopmentProjectDocumentModel.fromDoc)
+              .toList(growable: false),
+        );
+  }
+
+  /// Jednokratno učitavanje liste (portfelj / agregati).
+  Future<List<DevelopmentProjectSupplierModel>> fetchSuppliersSnapshot(
+    String projectId, {
+    int limit = 120,
+  }) async {
+    final snap = await _suppliersCol(projectId)
+        .orderBy('updatedAt', descending: true)
+        .limit(limit)
+        .get();
+    return snap.docs
+        .map(DevelopmentProjectSupplierModel.fromDoc)
+        .toList(growable: false);
+  }
+
+  /// Vanjski dobavljači (`suppliers`) — alatnice, materijali, usluge (IATF 8.4 trag u AI kontekstu).
+  Stream<List<DevelopmentProjectSupplierModel>> watchSuppliers(
+    String projectId, {
+    int limit = 80,
+  }) {
+    return _suppliersCol(projectId)
+        .orderBy('updatedAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map(DevelopmentProjectSupplierModel.fromDoc)
               .toList(growable: false),
         );
   }
@@ -746,6 +778,78 @@ class DevelopmentProjectService {
       'projectId': projectId,
       'stageId': stageId,
       'patch': patch,
+    });
+  }
+
+  /// Novi ili ažuriran dobavljač — Callable `upsertDevelopmentProjectSupplier`.
+  Future<String> upsertSupplierViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+    String? supplierId,
+    required String displayName,
+    String category = DevelopmentSupplierCategories.other,
+    String approvalStatus = DevelopmentSupplierApprovalStatuses.draft,
+    String externalRiskLevel = DevelopmentRiskLevels.medium,
+    String? scopeSummary,
+    String? iatfControlNote,
+    String? evaluationNote,
+    List<String> assignedTaskIds = const [],
+    List<String> assignedPartLabels = const [],
+    int? qualityRating,
+    int? deliveryRating,
+    int? priceRating,
+    DateTime? dueDate,
+  }) async {
+    final callable =
+        _functions().httpsCallable('upsertDevelopmentProjectSupplier');
+    final payload = <String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+      'displayName': displayName.trim(),
+      'category': category.trim(),
+      'approvalStatus': approvalStatus.trim(),
+      'externalRiskLevel': externalRiskLevel.trim(),
+      'assignedTaskIds': assignedTaskIds,
+      'assignedPartLabels': assignedPartLabels,
+    };
+    final sid = supplierId?.trim();
+    if (sid != null && sid.isNotEmpty) payload['supplierId'] = sid;
+    final ss = scopeSummary?.trim();
+    if (ss != null && ss.isNotEmpty) payload['scopeSummary'] = ss;
+    final iatf = iatfControlNote?.trim();
+    if (iatf != null && iatf.isNotEmpty) payload['iatfControlNote'] = iatf;
+    final ev = evaluationNote?.trim();
+    if (ev != null && ev.isNotEmpty) payload['evaluationNote'] = ev;
+    if (qualityRating != null) payload['qualityRating'] = qualityRating;
+    if (deliveryRating != null) payload['deliveryRating'] = deliveryRating;
+    if (priceRating != null) payload['priceRating'] = priceRating;
+    if (dueDate != null) payload['dueDate'] = dueDate.toIso8601String();
+
+    final res = await callable.call(payload);
+    final raw = res.data;
+    if (raw is! Map) {
+      throw Exception('Očekivan odgovor s poslužitelja nije stigao.');
+    }
+    final id = Map<String, dynamic>.from(raw)['supplierId']?.toString() ?? '';
+    if (id.isEmpty) throw Exception('Nije vraćen supplierId.');
+    return id;
+  }
+
+  Future<void> deleteSupplierViaCallable({
+    required String companyId,
+    required String plantKey,
+    required String projectId,
+    required String supplierId,
+  }) async {
+    final callable =
+        _functions().httpsCallable('deleteDevelopmentProjectSupplier');
+    await callable.call(<String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'projectId': projectId,
+      'supplierId': supplierId.trim(),
     });
   }
 }

@@ -7,6 +7,8 @@ import 'package:production_app/modules/development/screens/development_project_d
 import 'package:production_app/modules/production/ooe/screens/ooe_dashboard_screen.dart';
 import 'package:production_app/modules/production/ooe/screens/ooe_shift_summary_screen.dart';
 import 'package:production_app/modules/production/production_orders/screens/production_order_details_screen.dart';
+import 'package:production_app/modules/finance_integrations/screens/finance_ai_assistant_screen.dart';
+import 'package:production_app/modules/finance_integrations/screens/finance_controlling_hub_screen.dart';
 import 'package:production_app/modules/quality/screens/quality_hub_screen.dart';
 
 import 'mes_notification_preferences_screen.dart';
@@ -36,12 +38,63 @@ class MesInboxScreen extends StatelessWidget {
     return id;
   }
 
+  int _intFromExtra(dynamic v) {
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(_s(v)) ?? 0;
+  }
+
+  Future<void> _openFinanceAiAssistant(
+    BuildContext context,
+    Map<String, dynamic> cd,
+    Map<String, dynamic> data,
+  ) async {
+    final ex = data['extra'];
+    var by = '';
+    var py = 0;
+    var pm = 0;
+    var pk = '';
+    if (ex is Map) {
+      by = _s(ex['businessYearId']);
+      py = _intFromExtra(ex['periodYear']);
+      pm = _intFromExtra(ex['periodMonth']);
+      pk = _s(ex['plantKey']);
+    }
+    if (!context.mounted) return;
+    if (by.isEmpty || py < 2000 || pm < 1 || pm > 12) {
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => FinanceControllingHubScreen(companyData: cd),
+        ),
+      );
+      return;
+    }
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => FinanceAiAssistantScreen(
+          companyData: cd,
+          businessYearId: by,
+          periodYear: py,
+          periodMonth: pm,
+          plantKey: pk,
+        ),
+      ),
+    );
+  }
+
   Future<void> _openDeepLink(
     BuildContext context,
     Map<String, dynamic> data,
   ) async {
     final route = _s(data['deepLinkRoute']);
     final cd = companyData;
+
+    if (_s(data['eventCode']) == 'FINANCE_AI_NIGHTLY_DIGEST') {
+      await _openFinanceAiAssistant(context, cd, data);
+      return;
+    }
 
     switch (route) {
       case 'production_order':
@@ -119,6 +172,9 @@ class MesInboxScreen extends StatelessWidget {
         }
         break;
       case 'mes_inbox':
+        break;
+      case 'finance_ai_assistant':
+        await _openFinanceAiAssistant(context, cd, data);
         break;
       default:
         break;

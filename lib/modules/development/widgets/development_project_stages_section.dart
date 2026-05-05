@@ -6,7 +6,9 @@ import '../models/development_project_stage_model.dart';
 import '../services/development_project_service.dart';
 import '../utils/development_constants.dart';
 import '../utils/development_display.dart';
+import '../utils/development_help_texts.dart';
 import '../utils/development_permissions.dart';
+import '../../production/ooe/widgets/ooe_info_icon.dart';
 
 /// Stage-Gate lista + seed za stare projekte + Callable update.
 class DevelopmentProjectStagesSection extends StatelessWidget {
@@ -166,6 +168,12 @@ class DevelopmentProjectStagesSection extends StatelessWidget {
 
     return _SectionCard(
       title: 'Stage-Gate (G0–G9)',
+      titleTrailing: OoeInfoIcon(
+        tooltip: DevelopmentHelpTexts.stageGateConceptTooltip,
+        dialogTitle: DevelopmentHelpTexts.stageGateConceptTitle,
+        dialogBody: DevelopmentHelpTexts.stageGateConceptBody,
+        iconSize: 20,
+      ),
       children: [
         StreamBuilder<List<DevelopmentProjectStageModel>>(
           stream: service.watchStages(project.id),
@@ -242,10 +250,12 @@ class _SectionCard extends StatelessWidget {
   const _SectionCard({
     required this.title,
     required this.children,
+    this.titleTrailing,
   });
 
   final String title;
   final List<Widget> children;
+  final Widget? titleTrailing;
 
   @override
   Widget build(BuildContext context) {
@@ -256,11 +266,19 @@ class _SectionCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
+                ),
+                ?titleTrailing,
+              ],
             ),
             const SizedBox(height: 12),
             ...children,

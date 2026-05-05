@@ -1,6 +1,8 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:production_app/modules/auth/register/screens/pending_users_screen.dart';
+import 'package:production_app/modules/finance_integrations/screens/finance_ai_assistant_screen.dart';
+import 'package:production_app/modules/finance_integrations/screens/finance_controlling_hub_screen.dart';
 import 'package:production_app/modules/production/notifications/mes_inbox_screen.dart';
 import 'package:production_app/modules/production/ooe/screens/ooe_dashboard_screen.dart';
 import 'package:production_app/modules/production/ooe/screens/ooe_shift_summary_screen.dart';
@@ -28,6 +30,33 @@ class MesPushNavigation {
     if (cd == null) return;
 
     if (!nav.mounted) return;
+
+    if (_ps(data['eventCode']) == 'FINANCE_AI_NIGHTLY_DIGEST') {
+      final by = _ps(data['businessYearId']);
+      final py = int.tryParse(_ps(data['periodYear'])) ?? 0;
+      final pm = int.tryParse(_ps(data['periodMonth'])) ?? 0;
+      final fpk = _ps(data['plantKey']);
+      if (by.isEmpty || py < 2000 || pm < 1 || pm > 12) {
+        await nav.push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => FinanceControllingHubScreen(companyData: cd),
+          ),
+        );
+      } else {
+        await nav.push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => FinanceAiAssistantScreen(
+              companyData: cd,
+              businessYearId: by,
+              periodYear: py,
+              periodMonth: pm,
+              plantKey: fpk,
+            ),
+          ),
+        );
+      }
+      return;
+    }
 
     final route = _ps(data['deepLinkRoute']);
     final entityType = _ps(data['entityType']);
@@ -93,6 +122,31 @@ class MesPushNavigation {
             builder: (_) => MesInboxScreen(companyData: cd),
           ),
         );
+        break;
+      case 'finance_ai_assistant':
+        final by = _ps(data['businessYearId']);
+        final py = int.tryParse(_ps(data['periodYear'])) ?? 0;
+        final pm = int.tryParse(_ps(data['periodMonth'])) ?? 0;
+        final fpk = _ps(data['plantKey']);
+        if (by.isEmpty || py < 2000 || pm < 1 || pm > 12) {
+          await nav.push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => FinanceControllingHubScreen(companyData: cd),
+            ),
+          );
+        } else {
+          await nav.push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => FinanceAiAssistantScreen(
+                companyData: cd,
+                businessYearId: by,
+                periodYear: py,
+                periodMonth: pm,
+                plantKey: fpk,
+              ),
+            ),
+          );
+        }
         break;
       default:
         await nav.push<void>(

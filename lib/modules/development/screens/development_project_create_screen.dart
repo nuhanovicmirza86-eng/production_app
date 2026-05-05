@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
+import '../../production/ooe/widgets/ooe_info_icon.dart';
 import '../services/development_project_service.dart';
 import '../utils/development_constants.dart';
 import '../utils/development_display.dart';
+import '../utils/development_help_texts.dart';
 import 'development_project_details_screen.dart';
 import '../widgets/development_customer_picker_sheet.dart';
+import 'development_project_demo_fullscreen_screen.dart';
+import '../utils/development_intelligence_glossary.dart';
 
 /// Otvaranje NPI / Stage-Gate projekta — poslovna godina na backendu iz **aktivne** godine šifrarnika
 /// (ili kalendara ako šifrarnik ne postoji); bez ručnog biranja godine u UI.
@@ -145,6 +149,53 @@ class _DevelopmentProjectCreateScreenState
     return Scaffold(
       appBar: AppBar(
         title: const Text('Novi NPI projekat'),
+        actions: [
+          IconButton(
+            tooltip: 'Primjer NPI projekta (pun zaslon)',
+            icon: const Icon(Icons.play_circle_outline),
+            onPressed: () {
+              Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(
+                  builder: (_) => DevelopmentProjectDemoFullscreenScreen(
+                    companyData: widget.companyData,
+                  ),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            tooltip: 'O kreiranju projekta',
+            icon: const Icon(Icons.info_outline),
+            onPressed: () {
+              final scheme = Theme.of(context).colorScheme;
+              showDialog<void>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Novi projekat'),
+                  content: SingleChildScrollView(
+                    child: Text(
+                      'Zapis otvara životni ciklus u modulu Razvoj: Stage-Gate, tim, '
+                      'rizici, dokumentacija, odobrenja i Launch Intelligence. '
+                      'Poslovna godina se dodjeljuje automatski (aktivna u šifrarniku).\n\n'
+                      '${_canPickAnotherPm ? 'Voditelja kasnije mijenjaš u timu projekta.' : 'Ti si početni voditelj; tim proširuješ u detaljima projekta.'}\n\n'
+                      '${DevelopmentIntelligenceGlossary.launchIntelligenceSystemPitch}',
+                      style: TextStyle(
+                        height: 1.4,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Zatvori'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: Form(
         key: _formKey,
@@ -156,73 +207,22 @@ class _DevelopmentProjectCreateScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Card(
-                      elevation: 0,
-                      color: scheme.primaryContainer.withValues(alpha: 0.35),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(
-                          color: scheme.primary.withValues(alpha: 0.2),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Tip inicijative',
+                            style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                          ),
                         ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(18),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.auto_awesome, color: scheme.primary),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    'Projektno upravljanje, ne Excel',
-                                    style: tt.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              'Ovaj zapis otvara životni ciklus u modulu Razvoj: Stage-Gate, tim, '
-                              'rizici, dokumentacija, odobrenja i Launch Intelligence. '
-                              'Poslovna godina se dodjeljuje automatski — aktivna godina u vašem šifrarniku '
-                              '(razdoblje 01.01.–31.12. ili fiscal); sve što kasnije radite na projektu ostaje u tom kontekstu.',
-                              style: tt.bodySmall?.copyWith(
-                                height: 1.45,
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(
-                                  Icons.person_pin_outlined,
-                                  size: 20,
-                                  color: scheme.secondary,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _canPickAnotherPm
-                                        ? 'Voditelj projekta (prvi korak): vi kao administrator možete kasnije prebaciti PM kroz tim projekta.'
-                                        : 'Vi postajete voditelj projekta inicijative; tim i ovlasti proširujete u detaljima projekta.',
-                                    style: tt.bodySmall?.copyWith(height: 1.4),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                        OoeInfoIcon(
+                          tooltip: DevelopmentHelpTexts.createInitiativeTypeTooltip,
+                          dialogTitle: DevelopmentHelpTexts.createInitiativeTypeTitle,
+                          dialogBody: DevelopmentHelpTexts.createInitiativeTypeBody,
+                          iconSize: 20,
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Tip inicijative',
-                      style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                      ],
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -298,6 +298,7 @@ class _DevelopmentProjectCreateScreenState
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _nameCtrl,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
                       decoration: InputDecoration(
                         labelText: 'Radni naziv projekta',
                         hintText: 'npr. NPI housings — kupac X / linija Y',
@@ -309,8 +310,8 @@ class _DevelopmentProjectCreateScreenState
                       textCapitalization: TextCapitalization.sentences,
                       maxLines: 2,
                       minLines: 1,
-                      validator: (v) =>
-                          (v ?? '').trim().isEmpty ? 'Unesi naziv.' : null,
+                      validator: (_) =>
+                          _nameCtrl.text.trim().isEmpty ? 'Unesi naziv.' : null,
                     ),
                     const SizedBox(height: 20),
                     Text(
@@ -335,9 +336,22 @@ class _DevelopmentProjectCreateScreenState
                       }).toList(),
                     ),
                     const SizedBox(height: 24),
-                    Text(
-                      'Poslovni kontekst (opcionalno)',
-                      style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Poslovni kontekst (opcionalno)',
+                            style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        OoeInfoIcon(
+                          tooltip: DevelopmentHelpTexts.createBusinessContextTooltip,
+                          dialogTitle: DevelopmentHelpTexts.createBusinessContextTitle,
+                          dialogBody: DevelopmentHelpTexts.createBusinessContextBody,
+                          iconSize: 20,
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -449,13 +463,30 @@ class _DevelopmentProjectCreateScreenState
                               ),
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        'Generirat će se šifra projekta i početni Stage-Gate zapisi prema pravilima tenant-a.',
-                        textAlign: TextAlign.center,
-                        style: tt.labelSmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          height: 1.35,
-                        ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              'Generirat će se šifra projekta i početni Stage-Gate zapisi prema pravilima tenant-a.',
+                              textAlign: TextAlign.center,
+                              style: tt.labelSmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 4, top: 2),
+                            child: OoeInfoIcon(
+                              tooltip: DevelopmentHelpTexts.stageGateConceptTooltip,
+                              dialogTitle: DevelopmentHelpTexts.stageGateConceptTitle,
+                              dialogBody: DevelopmentHelpTexts.stageGateConceptBody,
+                              iconSize: 18,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

@@ -23,6 +23,7 @@ class DevelopmentLaunchIntelligenceResult {
     required this.openBlockingChanges,
     required this.mesIntegrationNote,
     this.customerRequirementsProfile,
+    this.mesProductSignals,
   });
 
   final String targetGate;
@@ -47,6 +48,7 @@ class DevelopmentLaunchIntelligenceResult {
   final int openBlockingChanges;
   final String mesIntegrationNote;
   final Map<String, dynamic>? customerRequirementsProfile;
+  final Map<String, dynamic>? mesProductSignals;
 
   static DevelopmentLaunchIntelligenceResult parse(dynamic raw) {
     if (raw is! Map) {
@@ -195,6 +197,11 @@ class DevelopmentLaunchIntelligenceResult {
         final c = m['customerRequirementsProfile'];
         if (c is Map) return Map<String, dynamic>.from(c);
         return null;
+      }(),
+      mesProductSignals: () {
+        final s = m['mesProductSignals'];
+        if (s is! Map) return null;
+        return Map<String, dynamic>.from(s);
       }(),
     );
   }

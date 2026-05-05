@@ -12,8 +12,12 @@ class WorkTimeAccess {
     );
   }
 
-  /// Pravila, uređaji, dodjela managerima, payroll export, audit (IATF) — [matrica: samo Admin].
+  /// Pravila po pogonu, uređaji, dodjela managerima, izvoz za plaće, audit — u matrici samo
+  /// [ProductionDashboardCard.personalWorkTime] s [ProductionAccessLevel.manage] (menadžer proizvodnje).
   static bool canOpenTenantAdminScreens(String role) {
-    return ProductionAccessHelper.isAdminRole(role);
+    return ProductionAccessHelper.canManage(
+      role: ProductionAccessHelper.normalizeRole(role),
+      card: ProductionDashboardCard.personalWorkTime,
+    );
   }
 }

@@ -6,7 +6,9 @@ import '../models/development_project_model.dart';
 import '../services/development_project_service.dart';
 import '../utils/development_constants.dart';
 import '../utils/development_display.dart';
+import '../utils/development_help_texts.dart';
 import '../utils/development_permissions.dart';
+import '../../production/ooe/widgets/ooe_info_icon.dart';
 
 /// Lista dokumenata (metadata) + Callable create/update.
 class DevelopmentProjectDocumentsSection extends StatelessWidget {
@@ -111,25 +113,41 @@ class DevelopmentProjectDocumentsSection extends StatelessWidget {
                   },
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String?>(
-                  value: linkedGate,
-                  decoration: const InputDecoration(
-                    labelText: 'Povezani Gate (opc.)',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: [
-                    const DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text('—'),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String?>(
+                        value: linkedGate,
+                        decoration: const InputDecoration(
+                          labelText: 'Povezani Gate (opc.)',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: [
+                          const DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text('—'),
+                          ),
+                          ...DevelopmentGateCodes.ordered.map(
+                            (g) => DropdownMenuItem(
+                              value: g,
+                              child: Text(g),
+                            ),
+                          ),
+                        ],
+                        onChanged: (v) => setDialog(() => linkedGate = v),
+                      ),
                     ),
-                    ...DevelopmentGateCodes.ordered.map(
-                      (g) => DropdownMenuItem(
-                        value: g,
-                        child: Text(g),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12, left: 4),
+                      child: OoeInfoIcon(
+                        tooltip: DevelopmentHelpTexts.linkedDocumentGateTooltip,
+                        dialogTitle: DevelopmentHelpTexts.linkedDocumentGateTitle,
+                        dialogBody: DevelopmentHelpTexts.linkedDocumentGateBody,
+                        iconSize: 20,
                       ),
                     ),
                   ],
-                  onChanged: (v) => setDialog(() => linkedGate = v),
                 ),
                 const SizedBox(height: 12),
                 TextField(

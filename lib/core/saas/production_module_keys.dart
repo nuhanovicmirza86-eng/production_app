@@ -28,6 +28,22 @@ abstract final class ProductionModuleKeys {
   /// Personal / obračun radnog vremena (LAN/gateway, tri sloja agregata). U [enabledModules] tenant/SaaS.
   static const String personal = 'personal';
 
+  /// Finance & Controlling (operativna finansijska istina + ERP sync).
+  static const String financeControlling = 'finance_controlling';
+
+  /// Integracija s ERP-om (uža pretplata; često u paketu s [financeControlling]).
+  static const String financeIntegrations = 'finance_integrations';
+
+  static bool hasFinanceSuite(Map<String, dynamic> companyData) {
+    return hasModule(companyData, financeControlling) ||
+        hasModule(companyData, financeIntegrations);
+  }
+
+  /// Pun controlling (troškovi, KPI, budžeti — ne samo ERP veza).
+  static bool hasFinanceControllingCore(Map<String, dynamic> companyData) {
+    return hasModule(companyData, financeControlling);
+  }
+
   /// Normalizirane liste modula (isti smisao kao tanki rules: generic modul u entitlementu).
   static Set<String> _moduleKeySet(dynamic raw) {
     if (raw is! List) return {};

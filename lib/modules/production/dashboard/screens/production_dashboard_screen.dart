@@ -45,6 +45,7 @@ import '../../execution/screens/process_execution_hub_screen.dart';
 import '../../qr/production_qr_scan_flow.dart';
 import '../../../quality/screens/execute_inspection_screen.dart';
 import '../../../development/screens/development_projects_list_screen.dart';
+import '../../../finance_integrations/screens/finance_controlling_hub_screen.dart';
 import '../../../quality/screens/quality_hub_screen.dart';
 
 class _ProdNavItem {
@@ -129,6 +130,18 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     }
     if (kDebugMode) return true;
     return ProductionModuleKeys.hasModule(companyData, ProductionModuleKeys.personal);
+  }
+
+  /// Finance & Controlling — [ProductionModuleKeys.hasFinanceSuite]; u [kDebugMode] hub i bez SaaS unosa.
+  bool _canAccessFinanceIntegrations() {
+    if (!ProductionAccessHelper.canView(
+      role: _role,
+      card: ProductionDashboardCard.financeControlling,
+    )) {
+      return false;
+    }
+    if (kDebugMode) return true;
+    return ProductionModuleKeys.hasFinanceSuite(companyData);
   }
 
   /// Izvještaji praćenja proizvodnje dostupni su ulozi koja ima pristup izvještajima
@@ -441,6 +454,22 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         ),
     ];
 
+    final financeIntegrationTiles = <Widget>[
+      if (_canAccessFinanceIntegrations())
+        _DashboardActionTile(
+          icon: Icons.account_balance_outlined,
+          title: 'Financije · ERP integracije',
+          subtitle:
+              'Operativna finansijska istina, KPI, troškovi i ERP sync (pretplata Finance & Controlling).',
+          onTap: () => open(
+            FinanceControllingHubScreen(
+              companyData: companyData,
+              debugUnlockModule: kDebugMode,
+            ),
+          ),
+        ),
+    ];
+
     final commercialTiles = <Widget>[
       if (_canAccessOrders())
         _DashboardActionTile(
@@ -546,6 +575,13 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           'SaaS modul „development“: NPI, Stage-Gate, portfolio po poslovnoj godini i pogonu.',
       icon: Icons.account_tree_outlined,
       tiles: developmentTiles,
+    );
+    addModuleSection(
+      title: 'Finance & Controlling',
+      subtitle:
+          'Modul „finance_controlling“ / „finance_integrations“: troškovi, KPI, budžeti, ERP.',
+      icon: Icons.account_balance_outlined,
+      tiles: financeIntegrationTiles,
     );
     addModuleSection(
       title: 'Komercijalno',
@@ -685,6 +721,39 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
               MaterialPageRoute<void>(
                 builder: (_) =>
                     DevelopmentProjectsListScreen(companyData: companyData),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    if (_canAccessFinanceIntegrations()) {
+      if (tiles.isNotEmpty) {
+        tiles.add(const SizedBox(height: sectionGap));
+      }
+      tiles.add(
+        const _ModuleGroupHeader(
+          title: 'Financije i ERP',
+          subtitle:
+              'Finance & Controlling — poslovna godina, KPI, troškovi, ERP.',
+          icon: Icons.account_balance_outlined,
+        ),
+      );
+      tiles.add(const SizedBox(height: afterHeader));
+      tiles.add(
+        _DashboardActionTile(
+          icon: Icons.hub_outlined,
+          title: 'Financije · integracije',
+          subtitle: 'ERP veze, sync poslovi, mapiranja.',
+          onTap: () {
+            Navigator.push<void>(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => FinanceControllingHubScreen(
+                  companyData: companyData,
+                  debugUnlockModule: kDebugMode,
+                ),
               ),
             );
           },
@@ -856,6 +925,22 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       );
     }
 
+    if (_canAccessFinanceIntegrations()) {
+      items.add(
+        _ProdNavItem(
+          builder: (_) => FinanceControllingHubScreen(
+            companyData: cd,
+            debugUnlockModule: kDebugMode,
+          ),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.account_balance_outlined),
+            selectedIcon: Icon(Icons.account_balance),
+            label: 'Financije',
+          ),
+        ),
+      );
+    }
+
     if (_hasModule('production') && _canAccessPartners()) {
       items.add(
         _ProdNavItem(
@@ -989,7 +1074,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           destination: const NavigationDestination(
             icon: Icon(Icons.access_time_outlined),
             selectedIcon: Icon(Icons.access_time_filled),
-            label: 'Vrijeme',
+            label: 'Radno vrijeme',
           ),
         ),
       );
@@ -1247,6 +1332,26 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                             MaterialPageRoute<void>(
                               builder: (_) =>
                                   DevelopmentProjectsListScreen(companyData: cd),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                    if (_canAccessFinanceIntegrations()) ...[
+                      const SizedBox(height: 10),
+                      _DashboardActionTile(
+                        icon: Icons.account_balance_outlined,
+                        title: 'Financije · integracije',
+                        subtitle: 'ERP veze i sync',
+                        onTap: () {
+                          _shellScaffoldKey.currentState?.closeDrawer();
+                          Navigator.push<void>(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (_) => FinanceControllingHubScreen(
+                                companyData: cd,
+                                debugUnlockModule: kDebugMode,
+                              ),
                             ),
                           );
                         },

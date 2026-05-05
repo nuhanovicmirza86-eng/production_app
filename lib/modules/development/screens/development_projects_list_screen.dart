@@ -7,9 +7,11 @@ import 'package:flutter/material.dart';
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/operational_business_year_context.dart';
+import '../../production/ooe/widgets/ooe_info_icon.dart';
 import '../models/development_project_model.dart';
 import '../services/development_project_service.dart';
 import '../utils/development_constants.dart';
+import '../utils/development_help_texts.dart';
 import '../utils/development_intelligence_glossary.dart';
 import '../utils/development_permissions.dart';
 import '../utils/development_portfolio_stats.dart';
@@ -66,8 +68,8 @@ class _DevelopmentProjectsListScreenState
   String? _customerFilterName;
 
   /// Kad je `false`, dropdowni su sakriveni (tabovi odmah ispod kratkog sažetka).
-  /// Po želji vlasnika: **[true] = prošireno (filter vidljiv) pri otvaranju ekrana.**
-  bool _portfolioScopeExpanded = true;
+  /// Kad je `false`, prikazuje se samo sažetak (pogon · godina); puni filteri po tapu.
+  bool _portfolioScopeExpanded = false;
 
   bool get _hasLocalFilters =>
       _onlyMyProjects ||
@@ -227,15 +229,26 @@ class _DevelopmentProjectsListScreenState
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
             child: Row(
               children: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: Text(
-                    'Gate:',
-                    style: tt.labelSmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Text(
+                        'Gate:',
+                        style: tt.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
-                  ),
+                    OoeInfoIcon(
+                      tooltip: DevelopmentHelpTexts.portfolioGateFilterTooltip,
+                      dialogTitle: DevelopmentHelpTexts.portfolioGateFilterTitle,
+                      dialogBody: DevelopmentHelpTexts.portfolioGateFilterBody,
+                      iconSize: 18,
+                    ),
+                  ],
                 ),
                 FilterChip(
                   label: Text('Svi (${scopeList.length})'),
@@ -687,7 +700,7 @@ class _DevelopmentProjectsListScreenState
             children: [
               Text(
                 'Traka „Opseg portfelja“ određuje učitavanje: poslovna godina (obavezno), zatim po potrebi jedan pogon. '
-                'Strelica gore (sakrij) skuplja tu traku da tabovi i lista dobiju više mjesta; strelica dolje ili „Prikaži filtre“ vraća dropdowne.\n\n'
+                'Strelica gore (sakrij) skuplja tu traku da tabovi i lista dobiju više mjesta; strelica dolje ili „Prikaži filtre“ vraća padajuće liste.\n\n'
                 '„Sve poslovne godine (arhiva)“ širi filtar.\n\n'
                 'Ispod: tabovi Projekti (lista i brzi filteri), Analitika (KPI i grafovi), AI asistent i Pomoć.\n\n'
                 '${DevelopmentIntelligenceGlossary.launchIntelligenceSystemPitch}',

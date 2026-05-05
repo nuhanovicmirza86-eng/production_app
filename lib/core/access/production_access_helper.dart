@@ -29,19 +29,54 @@ enum ProductionDashboardCard {
 
   /// Personal: obračun radnog vremena (LAN/gateway → events → daily → monthly) — ne miješati s MES/OOE.
   personalWorkTime,
+
+  /// SaaS modul Finance & Controlling (`finance_controlling` / `finance_integrations`): troškovi, KPI, ERP sync.
+  financeControlling,
 }
 
 enum ProductionAccessLevel { hidden, view, manage }
 
-/// Pristup samo hubu Razvoj / NPI (sve ostale kartice skrivene).
-Map<ProductionDashboardCard, ProductionAccessLevel> _accessDevelopmentHubOnly(
+/// Hub bez serijske proizvodnje: Razvoj/NPI, Finance (pregled), AI Asistent.
+///
+/// [developmentLevel]: [ProductionAccessLevel.manage] za voditelja projekta (portfelj, FAB);
+/// [ProductionAccessLevel.view] za inženjera razvoja (`development_engineer`).
+Map<ProductionDashboardCard, ProductionAccessLevel> _accessNpiEngineeringHub(
   ProductionAccessLevel developmentLevel,
 ) {
   return {
     for (final c in ProductionDashboardCard.values)
       c: c == ProductionDashboardCard.developmentGovernance
           ? developmentLevel
-          : ProductionAccessLevel.hidden,
+          : c == ProductionDashboardCard.financeControlling ||
+                  c == ProductionDashboardCard.aiAssistant
+              ? ProductionAccessLevel.view
+              : ProductionAccessLevel.hidden,
+  };
+}
+
+/// Quality manager (`quality_control`): uvid u proizvodnju, analitiku/energiju (održavanje), Razvoj, Finance i pun QMS hub.
+Map<ProductionDashboardCard, ProductionAccessLevel> _accessQualityManagerHub() {
+  return {
+    ProductionDashboardCard.products: ProductionAccessLevel.view,
+    ProductionDashboardCard.productionOrders: ProductionAccessLevel.view,
+    ProductionDashboardCard.productionTracking: ProductionAccessLevel.view,
+    ProductionDashboardCard.stationPages: ProductionAccessLevel.view,
+    ProductionDashboardCard.workCenters: ProductionAccessLevel.view,
+    ProductionDashboardCard.productionProcesses: ProductionAccessLevel.view,
+    ProductionDashboardCard.shifts: ProductionAccessLevel.view,
+    ProductionDashboardCard.downtime: ProductionAccessLevel.view,
+    ProductionDashboardCard.ooe: ProductionAccessLevel.view,
+    ProductionDashboardCard.operonixAnalytics: ProductionAccessLevel.view,
+    ProductionDashboardCard.problemReporting: ProductionAccessLevel.view,
+    ProductionDashboardCard.processExecution: ProductionAccessLevel.view,
+    ProductionDashboardCard.reports: ProductionAccessLevel.view,
+    ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
+    ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.view,
+    ProductionDashboardCard.developmentGovernance: ProductionAccessLevel.view,
+    ProductionDashboardCard.qualityManagement: ProductionAccessLevel.manage,
+    ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
+    ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
+    ProductionDashboardCard.financeControlling: ProductionAccessLevel.view,
   };
 }
 
@@ -56,6 +91,9 @@ class ProductionAccessHelper {
 
   static const String roleProductionOperator = 'production_operator';
   static const String roleProductionManager = 'production_manager';
+
+  /// Vođa smjene / linije — operativni nadzor (ispod menadžera proizvodnje). Kanonski `users.role`: `shift_lead`.
+  static const String roleShiftLead = 'shift_lead';
 
   /// Voditelj projekta (NPI / Stage-Gate) — **nije** isto što i menadžer proizvodnje.
   static const String roleProjectManager = 'project_manager';
@@ -72,11 +110,17 @@ class ProductionAccessHelper {
   /// [quality_operator] — QMS ekrani.
   static const String roleQualityOperator = 'quality_operator';
 
-  /// Kontrola kvaliteta / reviewer u NPI toku — u bazi može i `quality_engineer` (mapira se u [normalizeRole]).
+  /// Quality manager (NPI / reviewer) — kanonski string u bazi: `quality_control`; legacy `quality_engineer` → [normalizeRole].
   static const String roleQualityControl = 'quality_control';
 
   /// Vlasnik projekta (SaaS) — izvan scopea pojedine kompanije u smislu `admin`.
   static const String roleSuperAdmin = 'super_admin';
+
+  /// Modul Finance & Controlling (`finance_controlling` / `finance_integrations`).
+  static const String roleAccountingManager = 'accounting_manager';
+
+  /// Referent računovodstva — unos/provjera (Finance & Controlling).
+  static const String roleAccountingClerk = 'accounting_clerk';
 
   /// Kanonski kod uloge; legacy aliasi se mapiraju na jednu ulogu (npr. `administrator` → [roleAdmin]).
   static String normalizeRole(dynamic role) {
@@ -100,6 +144,9 @@ class ProductionAccessHelper {
     // Povijesni string u `users.role` (zastarjelo) — kanonski kod je [roleProductionManager].
     if (r == 'supervisor') {
       r = roleProductionManager;
+    }
+    if (r == 'shift-lead' || r == 'shift lead') {
+      r = roleShiftLead;
     }
     return r;
   }
@@ -127,6 +174,8 @@ class ProductionAccessHelper {
         return 'Super admin';
       case roleProductionManager:
         return 'Menadžer proizvodnje';
+      case roleShiftLead:
+        return 'Vođa smjene / linije';
       case roleLogisticsManager:
         return 'Menadžer logistike';
       case roleProductionOperator:
@@ -134,7 +183,7 @@ class ProductionAccessHelper {
       case roleQualityOperator:
         return 'Operater kvaliteta';
       case roleQualityControl:
-        return 'Kontrola kvaliteta';
+        return 'Quality manager';
       case roleMaintenanceManager:
         return 'Menadžer održavanja';
       case roleProjectManager:
@@ -143,6 +192,10 @@ class ProductionAccessHelper {
         return 'Inženjer razvoja';
       case roleManagementViewer:
         return 'Menadžment (pregled)';
+      case roleAccountingManager:
+        return 'Šef računovodstva';
+      case roleAccountingClerk:
+        return 'Referent računovodstva';
       default:
         return r.isEmpty ? '-' : r;
     }
@@ -225,6 +278,31 @@ class ProductionAccessHelper {
       ProductionDashboardCard.qualityManagement: ProductionAccessLevel.hidden,
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
       ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.financeControlling: ProductionAccessLevel.hidden,
+    },
+    roleShiftLead: {
+      /// Pregled linije/smjene: bez QMS/Personal modula u Productionu (to ostaje PM, kvaliteta).
+      /// AI: osnovni sloj; bez Operonix Analytics / izvještaja.
+      ProductionDashboardCard.products: ProductionAccessLevel.view,
+      ProductionDashboardCard.productionOrders: ProductionAccessLevel.view,
+      ProductionDashboardCard.productionTracking: ProductionAccessLevel.view,
+      ProductionDashboardCard.stationPages: ProductionAccessLevel.view,
+      ProductionDashboardCard.workCenters: ProductionAccessLevel.view,
+      ProductionDashboardCard.productionProcesses: ProductionAccessLevel.view,
+      ProductionDashboardCard.shifts: ProductionAccessLevel.manage,
+      ProductionDashboardCard.downtime: ProductionAccessLevel.manage,
+      ProductionDashboardCard.ooe: ProductionAccessLevel.view,
+      ProductionDashboardCard.operonixAnalytics: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.problemReporting: ProductionAccessLevel.manage,
+      ProductionDashboardCard.processExecution: ProductionAccessLevel.view,
+      ProductionDashboardCard.reports: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.developmentGovernance: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.qualityManagement: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
+      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.financeControlling: ProductionAccessLevel.hidden,
     },
     roleProductionManager: {
       ProductionDashboardCard.products: ProductionAccessLevel.manage,
@@ -245,50 +323,13 @@ class ProductionAccessHelper {
       ProductionDashboardCard.developmentGovernance: ProductionAccessLevel.view,
       ProductionDashboardCard.qualityManagement: ProductionAccessLevel.manage,
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.manage,
-      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.view,
+      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.manage,
+      ProductionDashboardCard.financeControlling: ProductionAccessLevel.view,
     },
-    roleProjectManager: {
-      ProductionDashboardCard.products: ProductionAccessLevel.view,
-      ProductionDashboardCard.productionOrders: ProductionAccessLevel.manage,
-      ProductionDashboardCard.productionTracking: ProductionAccessLevel.manage,
-      ProductionDashboardCard.stationPages: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.workCenters: ProductionAccessLevel.view,
-      ProductionDashboardCard.productionProcesses: ProductionAccessLevel.view,
-      ProductionDashboardCard.shifts: ProductionAccessLevel.manage,
-      ProductionDashboardCard.downtime: ProductionAccessLevel.manage,
-      ProductionDashboardCard.ooe: ProductionAccessLevel.manage,
-      ProductionDashboardCard.operonixAnalytics: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.problemReporting: ProductionAccessLevel.manage,
-      ProductionDashboardCard.processExecution: ProductionAccessLevel.manage,
-      ProductionDashboardCard.reports: ProductionAccessLevel.view,
-      ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.developmentGovernance: ProductionAccessLevel.manage,
-      ProductionDashboardCard.qualityManagement: ProductionAccessLevel.view,
-      ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
-      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
-    },
-    roleDevelopmentEngineer: {
-      ProductionDashboardCard.products: ProductionAccessLevel.view,
-      ProductionDashboardCard.productionOrders: ProductionAccessLevel.manage,
-      ProductionDashboardCard.productionTracking: ProductionAccessLevel.manage,
-      ProductionDashboardCard.stationPages: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.workCenters: ProductionAccessLevel.view,
-      ProductionDashboardCard.productionProcesses: ProductionAccessLevel.view,
-      ProductionDashboardCard.shifts: ProductionAccessLevel.manage,
-      ProductionDashboardCard.downtime: ProductionAccessLevel.manage,
-      ProductionDashboardCard.ooe: ProductionAccessLevel.manage,
-      ProductionDashboardCard.operonixAnalytics: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.problemReporting: ProductionAccessLevel.manage,
-      ProductionDashboardCard.processExecution: ProductionAccessLevel.manage,
-      ProductionDashboardCard.reports: ProductionAccessLevel.view,
-      ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.developmentGovernance: ProductionAccessLevel.view,
-      ProductionDashboardCard.qualityManagement: ProductionAccessLevel.view,
-      ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
-      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
-    },
+    roleProjectManager:
+        _accessNpiEngineeringHub(ProductionAccessLevel.manage),
+    roleDevelopmentEngineer:
+        _accessNpiEngineeringHub(ProductionAccessLevel.view),
     roleManagementViewer: {
       ProductionDashboardCard.products: ProductionAccessLevel.hidden,
       ProductionDashboardCard.productionOrders: ProductionAccessLevel.hidden,
@@ -309,6 +350,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.qualityManagement: ProductionAccessLevel.hidden,
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
       ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.financeControlling: ProductionAccessLevel.view,
     },
     roleLogisticsManager: {
       ProductionDashboardCard.products: ProductionAccessLevel.hidden,
@@ -330,7 +372,8 @@ class ProductionAccessHelper {
       ProductionDashboardCard.qualityManagement: ProductionAccessLevel.view,
       /// OperonixAI (narudžbe, rokovi) — usklađeno s Callable [productionTrackingAssistant].
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
-      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.view,
+      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.financeControlling: ProductionAccessLevel.view,
     },
     roleAdmin: {
       ProductionDashboardCard.products: ProductionAccessLevel.manage,
@@ -351,7 +394,8 @@ class ProductionAccessHelper {
       ProductionDashboardCard.developmentGovernance: ProductionAccessLevel.manage,
       ProductionDashboardCard.qualityManagement: ProductionAccessLevel.manage,
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.manage,
-      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.manage,
+      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.financeControlling: ProductionAccessLevel.manage,
     },
     roleSuperAdmin: {
       ProductionDashboardCard.products: ProductionAccessLevel.manage,
@@ -372,7 +416,8 @@ class ProductionAccessHelper {
       ProductionDashboardCard.developmentGovernance: ProductionAccessLevel.manage,
       ProductionDashboardCard.qualityManagement: ProductionAccessLevel.manage,
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.manage,
-      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.view,
+      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.financeControlling: ProductionAccessLevel.manage,
     },
     roleMaintenanceManager: {
       ProductionDashboardCard.products: ProductionAccessLevel.hidden,
@@ -394,7 +439,8 @@ class ProductionAccessHelper {
       ProductionDashboardCard.qualityManagement: ProductionAccessLevel.hidden,
       /// Kontekst proizvodnje (bez RN kvarova — oni su u Maintenance app).
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
-      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.view,
+      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.financeControlling: ProductionAccessLevel.view,
     },
     roleQualityOperator: {
       ProductionDashboardCard.products: ProductionAccessLevel.view,
@@ -412,13 +458,57 @@ class ProductionAccessHelper {
       ProductionDashboardCard.reports: ProductionAccessLevel.view,
       ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.developmentGovernance: ProductionAccessLevel.view,
+      ProductionDashboardCard.developmentGovernance: ProductionAccessLevel.hidden,
       ProductionDashboardCard.qualityManagement: ProductionAccessLevel.manage,
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
       ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.financeControlling: ProductionAccessLevel.hidden,
     },
-    roleQualityControl:
-        _accessDevelopmentHubOnly(ProductionAccessLevel.view),
+    roleAccountingManager: {
+      ProductionDashboardCard.products: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionOrders: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionTracking: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.stationPages: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.workCenters: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionProcesses: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.shifts: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.downtime: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.ooe: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.operonixAnalytics: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.problemReporting: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.processExecution: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.reports: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.developmentGovernance: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.qualityManagement: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.aiAssistant: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.financeControlling: ProductionAccessLevel.manage,
+    },
+    roleAccountingClerk: {
+      ProductionDashboardCard.products: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionOrders: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionTracking: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.stationPages: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.workCenters: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionProcesses: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.shifts: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.downtime: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.ooe: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.operonixAnalytics: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.problemReporting: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.processExecution: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.reports: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.developmentGovernance: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.qualityManagement: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.aiAssistant: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.financeControlling: ProductionAccessLevel.view,
+    },
+    roleQualityControl: _accessQualityManagerHub(),
   };
 
   /// Uloge koje imaju zapis u [_roleMatrix], stabilnim redom (referentni ekrani).
@@ -426,9 +516,13 @@ class ProductionAccessHelper {
     const priority = <String>[
       roleSuperAdmin,
       roleAdmin,
+      roleAccountingManager,
+      roleAccountingClerk,
       roleProjectManager,
-      roleProductionManager,
       roleDevelopmentEngineer,
+      roleManagementViewer,
+      roleProductionManager,
+      roleShiftLead,
       roleProductionOperator,
       roleQualityOperator,
       roleQualityControl,
@@ -452,6 +546,21 @@ class ProductionAccessHelper {
 
   static bool isSuperAdminRole(String role) {
     return normalizeRole(role) == roleSuperAdmin;
+  }
+
+  /// Usklađeno s backend [canUseProductionAssistant] (`production_callable_helpers.js`).
+  ///
+  /// Vođa smjene nema Callable operativnog asistenta nad podacima praćenja; u hubu ostaje
+  /// samo osnovni AI razgovor (kad je pretplata dopušta).
+  static bool canUseOperationalProductionAssistant(dynamic roleRaw) {
+    final r = normalizeRole(roleRaw);
+    return isAdminRole(r) ||
+        r == roleSuperAdmin ||
+        r == roleProductionManager ||
+        r == 'supervisor' ||
+        r == roleProductionOperator ||
+        r == roleLogisticsManager ||
+        r == roleMaintenanceManager;
   }
 
   /// [companyData] kao u Production sesiji: `role` na korijenu; inače `userAppAccess.role`.

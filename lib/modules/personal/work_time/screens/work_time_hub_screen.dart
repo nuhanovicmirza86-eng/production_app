@@ -51,16 +51,6 @@ class WorkTimeHubScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           const WorkTimeDemoBanner(),
-          if (!admin) ...[
-            const SizedBox(height: 10),
-            Text(
-              'Kao menadžer vidiš pregled, dnevnu i mjesečnu evidenciju te korekcije. '
-              'Pravila, uređaji, izvoz za plaće i dnevnik promjena — samo administrator tvrtke.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          ],
           const SizedBox(height: 8),
           _tile(
             context,
@@ -127,7 +117,7 @@ class WorkTimeHubScreen extends StatelessWidget {
               context,
               icon: Icons.tune,
               title: 'Pravila obračuna',
-              subtitle: 'Norme, smjene, godišnji — samo administrator tvrtke',
+              subtitle: 'Norme, smjene, godišnji — menadžer proizvodnje (pogon)',
               onTap: () => _open(
                 context,
                 WorkTimeRulesScreen(companyData: companyData),

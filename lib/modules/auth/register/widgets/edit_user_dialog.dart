@@ -31,6 +31,12 @@ class _EditUserDialogState extends State<EditUserDialog> {
     'logistics_manager',
     'shift_lead',
     'production_manager',
+    ProductionAccessHelper.roleProjectManager,
+    ProductionAccessHelper.roleDevelopmentEngineer,
+    ProductionAccessHelper.roleManagementViewer,
+    ProductionAccessHelper.roleQualityControl,
+    ProductionAccessHelper.roleAccountingManager,
+    ProductionAccessHelper.roleAccountingClerk,
   ];
 
   static const List<String> _allowedStatuses = <String>['active', 'inactive'];
@@ -60,27 +66,7 @@ class _EditUserDialogState extends State<EditUserDialog> {
     _loadInitialState();
   }
 
-  String _roleLabel(String role) {
-    final r = ProductionAccessHelper.normalizeRole(role);
-    switch (r) {
-      case 'admin':
-        return 'Admin';
-      case 'production_operator':
-        return 'Operater proizvodnje';
-      case 'quality_operator':
-        return 'Operater kvaliteta';
-      case 'logistics_operator':
-        return 'Operater logistike';
-      case 'logistics_manager':
-        return 'Menadžer logistike';
-      case 'shift_lead':
-        return 'Vođa smjene';
-      case 'production_manager':
-        return 'Menadžer proizvodnje';
-      default:
-        return role;
-    }
-  }
+  String _roleLabel(String role) => ProductionAccessHelper.displayRoleLabel(role);
 
   String _statusLabel(String status) {
     switch (status) {

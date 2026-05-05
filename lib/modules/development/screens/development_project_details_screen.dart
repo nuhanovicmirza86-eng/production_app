@@ -8,7 +8,9 @@ import '../models/development_project_model.dart';
 import '../services/development_project_service.dart';
 import '../utils/development_constants.dart';
 import '../utils/development_display.dart';
+import '../utils/development_help_texts.dart';
 import '../utils/development_permissions.dart';
+import '../../production/ooe/widgets/ooe_info_icon.dart';
 import 'development_project_edit_screen.dart';
 import 'development_project_team_screen.dart';
 import '../widgets/development_project_documents_section.dart';
@@ -17,8 +19,10 @@ import '../widgets/development_project_changes_section.dart';
 import '../widgets/development_project_release_readiness_section.dart';
 import '../widgets/development_project_risks_section.dart';
 import '../widgets/development_project_stages_section.dart';
+import '../widgets/development_project_suppliers_tab.dart';
 import '../widgets/development_project_tasks_section.dart';
 import '../widgets/development_launch_intelligence_tab.dart';
+import '../widgets/development_project_kpi_dashboard.dart';
 
 Future<void> _promptCloseDevelopmentProject(
   BuildContext context, {
@@ -97,10 +101,13 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
     super.key,
     required this.companyData,
     required this.projectId,
+    this.initialTabIndex = 0,
   });
 
   final Map<String, dynamic> companyData;
   final String projectId;
+  /// 0 = Pregled, 1 = Dobavljači, 2 = Launch Intelligence
+  final int initialTabIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -150,7 +157,7 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
                     ),
               ),
               const SizedBox(height: 16),
-              _DevelopmentKpiDashboard(
+              DevelopmentProjectKpiDashboard(
                 kpi: kpi,
                 progressPercent: p.progressPercent,
               ),
@@ -160,7 +167,7 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
                 children: [
                   _kv(context, 'Status', DevelopmentDisplay.projectStatusLabel(p.status)),
                   _kv(context, 'Tip', DevelopmentDisplay.projectTypeLabel(p.projectType)),
-                  _kv(context, 'Gate', p.currentGate),
+                  _kvGate(context, p.currentGate),
                   _kv(context, 'Faza', p.currentStage),
                   _kv(context, 'Napredak', '${p.progressPercent}%'),
                   _kv(
@@ -339,6 +346,12 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
                   (p.customerId ?? '').toString().trim().isNotEmpty)
                 _SectionCard(
                   title: 'Kupac / proizvod',
+                  titleTrailing: OoeInfoIcon(
+                    tooltip: DevelopmentHelpTexts.csrProfileTooltip,
+                    dialogTitle: DevelopmentHelpTexts.csrProfileTitle,
+                    dialogBody: DevelopmentHelpTexts.csrProfileBody,
+                    iconSize: 20,
+                  ),
                   children: [
                     if ((p.customerName ?? '').isNotEmpty)
                       _kv(context, 'Kupac', p.customerName!),
@@ -503,13 +516,15 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
             ],
         );
         return DefaultTabController(
-          length: 2,
+          length: 3,
+          initialIndex: initialTabIndex.clamp(0, 2),
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Projekat razvoja'),
               bottom: const TabBar(
                 tabs: [
                   Tab(icon: Icon(Icons.folder_outlined), text: 'Pregled'),
+                  Tab(icon: Icon(Icons.local_shipping_outlined), text: 'Dobavljači'),
                   Tab(icon: Icon(Icons.insights_outlined), text: 'Launch Intelligence'),
                 ],
               ),
@@ -534,6 +549,10 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
             body: TabBarView(
               children: [
                 overviewList,
+                DevelopmentProjectSuppliersTab(
+                  companyData: companyData,
+                  project: p,
+                ),
                 DevelopmentLaunchIntelligenceTab(
                   companyData: companyData,
                   project: p,
@@ -543,6 +562,34 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  static Widget _kvGate(BuildContext context, String gate) {
+    final v = gate.trim().isEmpty ? '—' : gate;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 140,
+            child: Text(
+              'Gate',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ),
+          Expanded(child: Text(v)),
+          OoeInfoIcon(
+            tooltip: DevelopmentHelpTexts.stageGateConceptTooltip,
+            dialogTitle: DevelopmentHelpTexts.stageGateConceptTitle,
+            dialogBody: DevelopmentHelpTexts.stageGateConceptBody,
+            iconSize: 18,
+          ),
+        ],
+      ),
     );
   }
 
@@ -568,184 +615,16 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
   }
 }
 
-/// KPI ploče na vrhu taba **Pregled** (Stage-Gate / NPI — definisani KPI u dokumentu modula).
-class _DevelopmentKpiDashboard extends StatelessWidget {
-  const _DevelopmentKpiDashboard({
-    required this.kpi,
-    required this.progressPercent,
-  });
-
-  final DevelopmentProjectKpi kpi;
-  final int progressPercent;
-
-  static String _fmtNum(double? v) {
-    if (v == null) return '—';
-    if (v == v.roundToDouble()) return v.round().toString();
-    return v.toStringAsFixed(1);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    final pct = progressPercent.clamp(0, 100);
-
-    Widget tile(String label, String value, {IconData? icon}) {
-      return Card(
-        elevation: 0,
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.65),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.4)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  if (icon != null) ...[
-                    Icon(icon, size: 18, color: scheme.primary),
-                    const SizedBox(width: 6),
-                  ],
-                  Expanded(
-                    child: Text(
-                      label,
-                      style: tt.labelMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                value,
-                style: tt.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final tiles = <Widget>[
-      tile(
-        'Schedule performance',
-        _fmtNum(kpi.schedulePerformance),
-        icon: Icons.schedule,
-      ),
-      tile(
-        'Cost performance',
-        _fmtNum(kpi.costPerformance),
-        icon: Icons.savings_outlined,
-      ),
-      tile(
-        'Quality readiness',
-        _fmtNum(kpi.qualityReadiness),
-        icon: Icons.verified_outlined,
-      ),
-      tile(
-        'Gate pass rate',
-        _fmtNum(kpi.gatePassRate),
-        icon: Icons.flag_outlined,
-      ),
-      tile(
-        'Risk score',
-        _fmtNum(kpi.riskScore),
-        icon: Icons.shield_outlined,
-      ),
-      tile(
-        'Overall health',
-        _fmtNum(kpi.overallHealthScore),
-        icon: Icons.health_and_safety_outlined,
-      ),
-    ];
-
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0.5,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.35)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.analytics_outlined, color: scheme.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'KPI — pregled projekta',
-                    style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Performans rasporeda i troška, kvaliteta, prolaz Gate-ova i zdravlje — '
-              'iz agregata i izvršenja (nema ručnog zaobilaska odobrenja).',
-              style: tt.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-                height: 1.35,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text('Operativni napredak', style: tt.labelLarge),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(
-                value: pct / 100.0,
-                minHeight: 10,
-                backgroundColor:
-                    scheme.surfaceContainerHighest.withValues(alpha: 0.7),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text('$pct %', style: tt.labelMedium),
-            const SizedBox(height: 16),
-            LayoutBuilder(
-              builder: (context, c) {
-                final w = c.maxWidth;
-                final colW = w > 520 ? (w - 10) / 2 : w;
-                return Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: tiles
-                      .map(
-                        (e) => SizedBox(
-                          width: colW,
-                          child: e,
-                        ),
-                      )
-                      .toList(),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _SectionCard extends StatelessWidget {
   const _SectionCard({
     required this.title,
     required this.children,
+    this.titleTrailing,
   });
 
   final String title;
   final List<Widget> children;
+  final Widget? titleTrailing;
 
   @override
   Widget build(BuildContext context) {
@@ -756,11 +635,19 @@ class _SectionCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
+                ),
+                ?titleTrailing,
+              ],
             ),
             const SizedBox(height: 12),
             ...children,

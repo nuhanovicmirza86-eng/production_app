@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/branding/operonix_ai_branding.dart';
 import '../../../../core/saas/production_module_keys.dart';
 import '../../ai_analysis/screens/ai_analysis_screen.dart'
@@ -57,6 +58,8 @@ class ProductionAiHubScreen extends StatelessWidget {
     }
 
     final role = companyData['role'];
+    final operationalAssistantOn = analyticsOn &&
+        ProductionAccessHelper.canUseOperationalProductionAssistant(role);
     final showAnalyticsSection =
         analyticsOn && aiStructuredAnalysisVisibleForRole(role);
     final showReportTile =
@@ -91,7 +94,7 @@ class ProductionAiHubScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
           ],
-          if (analyticsOn) ...[
+          if (operationalAssistantOn) ...[
             Card(
               child: ListTile(
                 leading: const Icon(Icons.psychology_outlined),
@@ -108,7 +111,9 @@ class ProductionAiHubScreen extends StatelessWidget {
           ] else if (chatOn) ...[
             const SizedBox(height: 4),
             Text(
-              'Operativni asistent i dublja analitika u punoj snazi zahtijevaju prošireni OperonixAI paket. Pitajte administratora pretplate.',
+              analyticsOn
+                  ? 'Za vašu ulogu ovdje je dostupan samo osnovni razgovor s asistentom, bez operativnog pomoćnika nad podacima iz aplikacije.'
+                  : 'Operativni asistent i dublja analitika u punoj snazi zahtijevaju prošireni OperonixAI paket. Pitajte administratora pretplate.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),

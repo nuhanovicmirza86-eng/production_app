@@ -49,8 +49,7 @@ class _ProductionPlanDetailsScreenState extends State<ProductionPlanDetailsScree
   bool get _canAdvancePlanStatus {
     final r = ProductionAccessHelper.normalizeRole(widget.companyData['role']);
     return r == ProductionAccessHelper.roleAdmin ||
-        r == ProductionAccessHelper.roleProductionManager ||
-        r == ProductionAccessHelper.roleSupervisor;
+        r == ProductionAccessHelper.roleProductionManager;
   }
 
   @override

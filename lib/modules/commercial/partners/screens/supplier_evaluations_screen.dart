@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/access/production_access_helper.dart';
 import '../models/partner_models.dart';
 import '../services/supplier_evaluations_service.dart';
 
@@ -38,14 +39,14 @@ class _SupplierEvaluationsScreenState extends State<SupplierEvaluationsScreen> {
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
 
-  String get _role =>
-      (widget.companyData['role'] ?? '').toString().trim().toLowerCase();
+  String get _role => ProductionAccessHelper.normalizeRole(
+        widget.companyData['role'],
+      );
 
   bool get _canEvaluate =>
-      _role == 'admin' ||
-      _role == 'production_manager' ||
-      _role == 'purchasing' ||
-      _role == 'supervisor';
+      _role == ProductionAccessHelper.roleAdmin ||
+      _role == ProductionAccessHelper.roleProductionManager ||
+      _role == 'purchasing';
 
   @override
   void initState() {

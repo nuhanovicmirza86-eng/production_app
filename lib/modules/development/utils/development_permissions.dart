@@ -60,10 +60,8 @@ class DevelopmentPermissions {
     }
     return r == ProductionAccessHelper.roleProjectManager ||
         r == ProductionAccessHelper.roleDevelopmentEngineer ||
-        r == ProductionAccessHelper.roleQualityOperator ||
         r == ProductionAccessHelper.roleQualityControl ||
         r == ProductionAccessHelper.roleProductionManager ||
-        r == ProductionAccessHelper.roleSupervisor ||
         r == ProductionAccessHelper.roleLogisticsManager ||
         r == ProductionAccessHelper.roleMaintenanceManager;
   }
@@ -151,7 +149,6 @@ class DevelopmentPermissions {
       return true;
     }
     return r == ProductionAccessHelper.roleProjectManager ||
-        r == ProductionAccessHelper.roleQualityOperator ||
         r == ProductionAccessHelper.roleQualityControl ||
         r == ProductionAccessHelper.roleProductionManager;
   }
@@ -230,10 +227,8 @@ class DevelopmentPermissions {
     }
     return r == ProductionAccessHelper.roleProjectManager ||
         r == ProductionAccessHelper.roleDevelopmentEngineer ||
-        r == ProductionAccessHelper.roleQualityOperator ||
         r == ProductionAccessHelper.roleQualityControl ||
         r == ProductionAccessHelper.roleProductionManager ||
-        r == ProductionAccessHelper.roleSupervisor ||
         r == ProductionAccessHelper.roleProductionOperator ||
         r == ProductionAccessHelper.roleManagementViewer ||
         r == ProductionAccessHelper.roleMaintenanceManager ||

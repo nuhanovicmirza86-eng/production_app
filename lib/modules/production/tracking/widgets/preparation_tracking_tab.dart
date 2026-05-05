@@ -898,8 +898,7 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
   bool _canEditCompanyDefectNames() {
     final r = ProductionAccessHelper.normalizeRole(widget.companyData['role']);
     return r == ProductionAccessHelper.roleAdmin ||
-        r == ProductionAccessHelper.roleProductionManager ||
-        r == ProductionAccessHelper.roleSupervisor;
+        r == ProductionAccessHelper.roleProductionManager;
   }
 
   Future<void> _openDefectLabelsEditor() async {

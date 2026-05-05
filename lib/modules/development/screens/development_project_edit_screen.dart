@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/access/production_access_helper.dart';
+import '../../production/ooe/widgets/ooe_info_icon.dart';
 import '../models/development_project_model.dart';
 import '../services/development_project_service.dart';
 import '../utils/development_constants.dart';
 import '../utils/development_display.dart';
+import '../utils/development_help_texts.dart';
 import '../widgets/development_customer_picker_sheet.dart';
 
 /// Uređivanje osnovnih polja — Callable `updateDevelopmentProject`.
@@ -395,23 +397,39 @@ class _DevelopmentProjectEditScreenState
               },
             ),
             const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: _currentGate,
-              decoration: const InputDecoration(
-                labelText: 'Gate',
-                border: OutlineInputBorder(),
-              ),
-              items: DevelopmentGateCodes.ordered
-                  .map(
-                    (g) => DropdownMenuItem(
-                      value: g,
-                      child: Text(g),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _currentGate,
+                    decoration: const InputDecoration(
+                      labelText: 'Gate',
+                      border: OutlineInputBorder(),
                     ),
-                  )
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) setState(() => _currentGate = v);
-              },
+                    items: DevelopmentGateCodes.ordered
+                        .map(
+                          (g) => DropdownMenuItem(
+                            value: g,
+                            child: Text(g),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) setState(() => _currentGate = v);
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12, left: 4),
+                  child: OoeInfoIcon(
+                    tooltip: DevelopmentHelpTexts.stageGateConceptTooltip,
+                    dialogTitle: DevelopmentHelpTexts.stageGateConceptTitle,
+                    dialogBody: DevelopmentHelpTexts.stageGateConceptBody,
+                    iconSize: 20,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             TextFormField(
