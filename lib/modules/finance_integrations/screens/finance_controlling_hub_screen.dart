@@ -151,6 +151,42 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
     return Scaffold(
       appBar: AppBar(
         title: const Text('Finance & Controlling'),
+        actions: [
+          if (FinancePermissions.canRunFinanceControllingAiInsight(
+            companyData: widget.companyData,
+            role: _role,
+            debugUnlockModule: widget.debugUnlockModule,
+          ))
+            IconButton(
+              tooltip: 'AI asistent',
+              icon: const Icon(Icons.smart_toy_outlined),
+              onPressed: () {
+                if (_businessYearId.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Pričekajte učitavanje poslovne godine ili je odaberite pod „Razdoblje i poslovna godina“.',
+                      ),
+                    ),
+                  );
+                  return;
+                }
+                Navigator.push<void>(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => FinanceAiAssistantScreen(
+                      companyData: widget.companyData,
+                      businessYearId: _businessYearId,
+                      periodYear: _periodYear,
+                      periodMonth: _periodMonth,
+                      plantKey: _financePlantKey,
+                      debugUnlockModule: widget.debugUnlockModule,
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
@@ -194,7 +230,7 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
                   businessYearId: _businessYearId,
                   periodYear: _periodYear,
                   periodMonth: _periodMonth,
-                  plantKey: _plantKey,
+                  plantKey: _financePlantKey,
                   debugUnlockModule: widget.debugUnlockModule,
                 ),
                 FinanceControllingProductionTabBody(
@@ -202,35 +238,35 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
                   businessYearId: _businessYearId,
                   periodYear: _periodYear,
                   periodMonth: _periodMonth,
-                  plantKey: _plantKey,
+                  plantKey: _financePlantKey,
                 ),
                 FinanceControllingDowntimeKpiTabBody(
                   companyData: widget.companyData,
                   businessYearId: _businessYearId,
                   periodYear: _periodYear,
                   periodMonth: _periodMonth,
-                  plantKey: _plantKey,
+                  plantKey: _financePlantKey,
                 ),
                 FinanceControllingQualityAggregatesTabBody(
                   companyData: widget.companyData,
                   businessYearId: _businessYearId,
                   periodYear: _periodYear,
                   periodMonth: _periodMonth,
-                  plantKey: _plantKey,
+                  plantKey: _financePlantKey,
                 ),
                 FinanceControllingMaintenanceAggregatesTabBody(
                   companyData: widget.companyData,
                   businessYearId: _businessYearId,
                   periodYear: _periodYear,
                   periodMonth: _periodMonth,
-                  plantKey: _plantKey,
+                  plantKey: _financePlantKey,
                 ),
                 FinanceControllingProcurementTabBody(
                   companyData: widget.companyData,
                   businessYearId: _businessYearId,
                   periodYear: _periodYear,
                   periodMonth: _periodMonth,
-                  plantKey: _plantKey,
+                  plantKey: _financePlantKey,
                 ),
                 _BudgetTabBody(
                   role: _role,
@@ -248,42 +284,6 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
           ),
         ],
       ),
-      floatingActionButton:
-          FinancePermissions.canRunFinanceControllingAiInsight(
-            companyData: widget.companyData,
-            role: _role,
-            debugUnlockModule: widget.debugUnlockModule,
-          )
-              ? FloatingActionButton.extended(
-                  onPressed: () {
-                    if (_businessYearId.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Pričekajte učitavanje poslovne godine ili je odaberite pod „Razdoblje i poslovna godina“.',
-                          ),
-                        ),
-                      );
-                      return;
-                    }
-                    Navigator.push<void>(
-                      context,
-                      MaterialPageRoute<void>(
-                        builder: (_) => FinanceAiAssistantScreen(
-                          companyData: widget.companyData,
-                          businessYearId: _businessYearId,
-                          periodYear: _periodYear,
-                          periodMonth: _periodMonth,
-                          plantKey: _financePlantKey,
-                          debugUnlockModule: widget.debugUnlockModule,
-                        ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.smart_toy_outlined),
-                  label: const Text('AI asistent'),
-                )
-              : null,
     );
   }
 }
