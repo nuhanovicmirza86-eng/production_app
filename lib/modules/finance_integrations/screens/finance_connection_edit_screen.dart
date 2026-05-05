@@ -449,7 +449,7 @@ class _FinanceConnectionEditScreenState extends State<FinanceConnectionEditScree
                 controller: _plantCtrl,
                 decoration: const InputDecoration(
                   labelText:
-                      'Pogon (plantKey, opcionalno — prazno = cijela kompanija)',
+                      'Pogon (opcionalno; prazno = cijela kompanija)',
                   border: OutlineInputBorder(),
                 ),
                 enabled: _canSave,

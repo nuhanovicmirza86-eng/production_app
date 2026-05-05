@@ -303,7 +303,7 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
     if (s == null) {
       return const [
         _FinanceSignalChip(
-          'Za ovaj period još nema KPI snimka. Otvorite karticu Pregled u istom modulu i pokrenite preračun.',
+          'Za ovaj period još nema spremljenog sažetka. Otvorite karticu Pregled u istom modulu i pokrenite preračun.',
           Icons.info_outline,
         ),
       ];
@@ -350,7 +350,7 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
     if (out.isEmpty) {
       out.add(
         const _FinanceSignalChip(
-          'Nema izraženih numeričkih crvenih linija u KPI snimku — ipak koristite AI watchlist.',
+          'Nema izraženih numeričkih upozorenja u sažetku — ipak pokrenite listu za praćenje.',
           Icons.check_circle_outline,
         ),
       );
@@ -424,7 +424,7 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
             builder: (context, plantSnap) {
               final pk = widget.plantKey.trim();
               final plantLine = pk.isEmpty
-                  ? 'rollup / svi pogoni'
+                  ? 'svi pogoni (zbroj)'
                   : 'pogon: ${plantSnap.connectionState == ConnectionState.waiting ? '…' : (plantSnap.data != null && plantSnap.data!.isNotEmpty ? plantSnap.data! : pk)}';
               return Text(
                 '${periodFmt.format(DateTime(widget.periodYear, widget.periodMonth))} · '
@@ -513,7 +513,7 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'Brzi numerički signali (iz KPI snimka)',
+                        'Brzi numerički signali (iz sažetka)',
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
@@ -566,7 +566,7 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
                     ),
                   )
                 : const Icon(Icons.shield_moon_outlined),
-            label: Text(_runningWatch ? 'Signalni pregled…' : 'Signalni pregled (watchlist)'),
+            label: Text(_runningWatch ? 'Signalni pregled…' : 'Signalni pregled (brza lista)'),
           ),
           const SizedBox(height: 8),
           FilledButton.tonalIcon(
@@ -642,7 +642,7 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
                       : '—';
                   final kindLabel =
                       e.insightKind == FinanceAiInsightService.insightKindWatchlist
-                          ? 'Watchlist'
+                          ? 'Lista za praćenje'
                           : 'Analiza';
                   final sched =
                       e.sourceTrigger == 'scheduled_nightly' ? ' · noćni' : '';

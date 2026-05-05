@@ -5,10 +5,10 @@ String financeUserFacingLoadError(Object? error) {
   final s = (error ?? '').toString();
   if (s.contains('permission-denied')) {
     return 'Pristup ovim podacima u oblaku trenutno nije dozvoljen. '
-        'Često to znači da Firebase pravila još nisu ažurirana ili da modul '
-        '„financije“ nije u pretplati kompanije. Administrator može provjeriti '
-        'pretplatu i deploy pravila; ako ste sigurni da imate pristup, pokušajte '
-        'kasnije ponovo.';
+        'Često to znači da postavke pristupa na poslužitelju još nisu ažurirane '
+        'ili da modul financija nije u pretplati kompanije. Administrator može '
+        'provjeriti pretplatu i usklađivanje pristupa; ako ste sigurni da imate '
+        'pravo pristupa, pokušajte kasnije ponovo.';
   }
   if (s.contains('PERMISSION_DENIED') || s.contains('403')) {
     return 'Pristup je odbijen. Obratite se administratoru.';

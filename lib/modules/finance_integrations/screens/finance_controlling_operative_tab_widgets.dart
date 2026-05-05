@@ -667,7 +667,7 @@ class _FinanceControllingProcurementTabBodyState
   }
 }
 
-/// Tab **Zastoji**: sažetak iz KPI snimka (novčani gubitak OEE zastoja).
+/// Tab **Zastoji**: novčani učinak zastoja iz istog sažetka kao na Pregledu.
 class FinanceControllingDowntimeKpiTabBody extends StatelessWidget {
   const FinanceControllingDowntimeKpiTabBody({
     super.key,
@@ -756,7 +756,8 @@ class FinanceControllingDowntimeKpiTabBody extends StatelessWidget {
                   title: 'Kako se računa',
                   body:
                       'Procjena temelji na minutama OEE zastoja i postavljenoj satnici u '
-                      'postavkama kompanije. Valuta slijedi bazu snimka; aplikacija može '
+                      'postavkama kompanije. Valuta u sažetku je bazna valuta proračuna; '
+                      'aplikacija može '
                       'prikazati drugu valutu prema postavkama.',
                 ),
               ],

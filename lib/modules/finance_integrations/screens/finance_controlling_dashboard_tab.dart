@@ -905,7 +905,7 @@ class _FinanceControllingDashboardTabState
                                       style: theme.textTheme.bodyMedium,
                                     ),
                                     subtitle: Text(
-                                      '${e.insightKind == FinanceAiInsightService.insightKindWatchlist ? 'Watchlist' : 'Analiza'}'
+                                      '${e.insightKind == FinanceAiInsightService.insightKindWatchlist ? 'Lista za praćenje' : 'Analiza'}'
                                       '${e.sourceTrigger == 'scheduled_nightly' ? ' · noćni' : ''} · '
                                       '${e.analysisFocus ?? 'Opći uvid (bez dodatnog fokusa)'}',
                                       maxLines: 2,
