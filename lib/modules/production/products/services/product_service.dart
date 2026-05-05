@@ -121,6 +121,7 @@ class ProductService {
     String? secondaryClassificationCode,
     String? secondaryClassificationDescription,
     double? standardUnitPrice,
+    double? standardUnitCostInBase,
     String? currency,
     bool isActive = true,
     bool? lotTrackingRequired,
@@ -230,6 +231,9 @@ class ProductService {
     if (standardUnitPrice != null && standardUnitPrice > 0) {
       payload['standardUnitPrice'] = standardUnitPrice;
     }
+    if (standardUnitCostInBase != null && standardUnitCostInBase > 0) {
+      payload['standardUnitCostInBase'] = standardUnitCostInBase;
+    }
     if (cur.isNotEmpty) {
       payload['currency'] = cur;
     }
@@ -273,6 +277,7 @@ class ProductService {
     String? secondaryClassificationCode,
     String? secondaryClassificationDescription,
     double? standardUnitPrice,
+    double? standardUnitCostInBase,
     String? currency,
     bool isActive = true,
     bool? lotTrackingRequired,
@@ -343,6 +348,7 @@ class ProductService {
       secondaryClassificationCode: secondaryClassificationCode,
       secondaryClassificationDescription: secondaryClassificationDescription,
       standardUnitPrice: standardUnitPrice,
+      standardUnitCostInBase: standardUnitCostInBase,
       currency: currency,
       isActive: isActive,
       lotTrackingRequired: lotTrackingRequired,
@@ -378,6 +384,7 @@ class ProductService {
     String? secondaryClassificationCode,
     String? secondaryClassificationDescription,
     double? standardUnitPrice,
+    double? standardUnitCostInBase,
     String? currency,
     bool? isActive,
     bool? lotTrackingRequired,
@@ -613,6 +620,14 @@ class ProductService {
       }
     }
 
+    if (standardUnitCostInBase != null) {
+      if (standardUnitCostInBase <= 0) {
+        updates['standardUnitCostInBase'] = FieldValue.delete();
+      } else {
+        updates['standardUnitCostInBase'] = standardUnitCostInBase;
+      }
+    }
+
     if (currency != null) {
       final value = currency.trim();
       if (value.isEmpty) {
@@ -668,6 +683,7 @@ class ProductService {
     final currentSecCode = _s(current['secondaryClassificationCode']);
     final currentSecDesc = _s(current['secondaryClassificationDescription']);
     final currentStdPrice = _readDouble(current['standardUnitPrice']);
+    final currentStdCostBase = _readDouble(current['standardUnitCostInBase']);
     final currentCurrency = _s(current['currency']);
     final currentStatus = _s(current['status']).toLowerCase();
     final currentIsActive = (current['isActive'] as bool?) ?? true;
@@ -715,6 +731,8 @@ class ProductService {
             _s(secondaryClassificationDescription) == currentSecDesc) &&
         (standardUnitPrice == null ||
             _almostEqualDouble(currentStdPrice, standardUnitPrice)) &&
+        (standardUnitCostInBase == null ||
+            _almostEqualDouble(currentStdCostBase, standardUnitCostInBase)) &&
         (currency == null || _s(currency) == currentCurrency) &&
         (lotTrackingRequired == null || lotTrackingRequired == currentLotTr) &&
         (shelfLifeDays == null ||

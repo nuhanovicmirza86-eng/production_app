@@ -8,6 +8,7 @@ class FinanceControllingDefaultsView {
     this.copqReworkUnitCostInBase,
     this.copqClosedNcrEstimateInBase,
     this.maintenanceCostPerClosedFaultInBase,
+    this.plantEnergyCostBudgetMonthlyInBase = const {},
   });
 
   /// Valuta u kojoj engine i Firestore agregati drže iznose (mora biti jedna).
@@ -31,6 +32,15 @@ class FinanceControllingDefaultsView {
   /// Procjena intervencije po zatvorenom kvaru (`faults`, bazna valuta).
   final double? maintenanceCostPerClosedFaultInBase;
 
+  /// Mjesečni budžet / trošak energije po pogonu (`plantKey` → iznos u baznoj valuti).
+  final Map<String, double> plantEnergyCostBudgetMonthlyInBase;
+
+  double? plantEnergyBudgetMonthlyFor(String plantKey) {
+    final k = plantKey.trim();
+    if (k.isEmpty) return null;
+    return plantEnergyCostBudgetMonthlyInBase[k];
+  }
+
   static FinanceControllingDefaultsView fromCompanyData(
     Map<String, dynamic>? companyData,
   ) {
@@ -43,7 +53,10 @@ class FinanceControllingDefaultsView {
     }
     final m = Map<String, dynamic>.from(raw);
     var base =
-        (m['baseCurrency'] ?? m['currency'] ?? 'EUR').toString().trim().toUpperCase();
+        (m['baseCurrency'] ?? m['currency'] ?? 'EUR')
+            .toString()
+            .trim()
+            .toUpperCase();
     if (base.isEmpty) base = 'EUR';
     var disp = (m['displayCurrency'] ?? base).toString().trim().toUpperCase();
     if (disp.isEmpty) disp = base;
@@ -61,6 +74,21 @@ class FinanceControllingDefaultsView {
       }
       return null;
     }
+
+    final plantEnergy = <String, double>{};
+    final rawPe = m['plantEnergyCostBudgetMonthlyInBase'];
+    if (rawPe is Map) {
+      for (final e in rawPe.entries) {
+        final key = e.key.toString().trim();
+        if (key.isEmpty) continue;
+        final rv = e.value;
+        if (rv is num) {
+          final v = rv.toDouble();
+          if (v.isFinite && v > 0 && v <= 10000000) plantEnergy[key] = v;
+        }
+      }
+    }
+
     return FinanceControllingDefaultsView(
       baseCurrency: base,
       displayCurrency: disp,
@@ -70,6 +98,7 @@ class FinanceControllingDefaultsView {
       copqClosedNcrEstimateInBase: optCost('copqClosedNcrEstimateInBase'),
       maintenanceCostPerClosedFaultInBase:
           optCost('maintenanceCostPerClosedFaultInBase'),
+      plantEnergyCostBudgetMonthlyInBase: plantEnergy,
     );
   }
 }

@@ -7,6 +7,7 @@ import '../models/finance_machine_cost_doc.dart';
 import '../models/finance_order_profitability_doc.dart';
 import '../models/finance_product_cost_doc.dart';
 import '../models/finance_quality_cost_doc.dart';
+import '../models/finance_routing_operation_cost_doc.dart';
 import '../services/finance_derived_aggregates_service.dart';
 import '../services/finance_exchange_rate_service.dart';
 import '../services/finance_kpi_snapshot_service.dart';
@@ -197,7 +198,20 @@ class _FinanceControllingProductionTabBodyState
                       title: Text(
                         r.orderCode.isNotEmpty ? r.orderCode : r.productionOrderId,
                       ),
-                      subtitle: Text('PN ${r.productionOrderId}'),
+                      subtitle: Text(() {
+                        final loc = Localizations.localeOf(context).toString();
+                        final fmt = NumberFormat.decimalPattern(loc);
+                        final parts = <String>[
+                          if (r.materialCost > 0.0001) 'Mat ${fmt.format(r.materialCost)}',
+                          if (r.logisticsToCustomerCost > 0.0001) 'Log ${fmt.format(r.logisticsToCustomerCost)}',
+                          if (r.routingMachineCost > 0.0001) 'Proc ${fmt.format(r.routingMachineCost)}',
+                          if (r.copqOrderCost > 0.0001) 'COPQ ${fmt.format(r.copqOrderCost)}',
+                          if (r.pooledOverheadCost > 0.0001) 'Pool ${fmt.format(r.pooledOverheadCost)}',
+                        ];
+                        return parts.isEmpty
+                            ? 'PN ${r.productionOrderId}'
+                            : '${parts.join(' · ')} · PN ${r.productionOrderId}';
+                      }()),
                       trailing: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.end,
@@ -282,9 +296,18 @@ class _FinanceControllingProductionTabBodyState
                 return ListTile(
                   dense: true,
                   title: Text(label),
-                  subtitle: Text(
-                    'Količina ${NumberFormat.decimalPattern(Localizations.localeOf(context).toString()).format(r.quantityProduced)} · JNT ${_fmt(r.costPerUnit, def)} / kom',
-                  ),
+                  subtitle: Text(() {
+                    final loc = Localizations.localeOf(context).toString();
+                    final fmt = NumberFormat.decimalPattern(loc);
+                    final parts = <String>[
+                      'Količina ${fmt.format(r.quantityProduced)} · JNT ${_fmt(r.costPerUnit, def)} / kom',
+                      if (r.materialCost > 0.0001) 'Mat ${_fmt(r.materialCost, def)}',
+                      if (r.logisticsToCustomerCost > 0.0001) 'Log ${_fmt(r.logisticsToCustomerCost, def)}',
+                      if (r.machineCost > 0.0001) 'Ruta ${_fmt(r.machineCost, def)}',
+                      if (r.overheadCost > 0.0001) 'Pool ${_fmt(r.overheadCost, def)}',
+                    ];
+                    return parts.join(' · ');
+                  }()),
                   trailing: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -302,6 +325,77 @@ class _FinanceControllingProductionTabBodyState
                   ),
                 );
               }).toList(),
+            );
+          },
+        ),
+        const Divider(height: 32),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                'Trošak po operaciji rute (zbirno)',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            FinanceScreenContextInfo(
+              title: 'Model',
+              body:
+                  'Standardni setup i vrijeme po jedinici na ruti, pomnoženo s '
+                  'dobrom količinom naloga u periodu i satnicom iz controllinga.',
+            ),
+          ],
+        ),
+        StreamBuilder<List<FinanceRoutingOperationCostDoc>>(
+          stream: _derived.watchRoutingRollups(
+            companyId: _companyId,
+            businessYearId: widget.businessYearId.trim(),
+            periodYear: widget.periodYear,
+            periodMonth: widget.periodMonth,
+            plantKey: pk,
+          ),
+          builder: (context, snap) {
+            if (snap.hasError) {
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(financeUserFacingLoadError(snap.error)),
+              );
+            }
+            if (!snap.hasData) {
+              return const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            final rRows = snap.data!;
+            if (rRows.isEmpty) {
+              return const ListTile(
+                title: Text('Nema zbirnih operacija za ovaj odabir'),
+                subtitle: Text('Ažurirajte KPI nakon izmjena ruta ili naloga.'),
+              );
+            }
+            return Column(
+              children: rRows
+                  .map(
+                    (r) => ListTile(
+                      dense: true,
+                      title: Text(
+                        r.operationCode.isNotEmpty
+                            ? '${r.operationCode} (korak ${r.stepOrder})'
+                            : (r.operationName.isNotEmpty
+                                  ? '${r.operationName} (korak ${r.stepOrder})'
+                                  : 'Korak ${r.stepOrder}'),
+                      ),
+                      subtitle: Text(
+                        'Ruta ${r.routingId} · ${NumberFormat.decimalPattern(Localizations.localeOf(context).toString()).format(r.standardMinutesInPeriod)} min u periodu',
+                      ),
+                      trailing: Text(
+                        _fmt(r.routingMachineCost, def),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  )
+                  .toList(),
             );
           },
         ),

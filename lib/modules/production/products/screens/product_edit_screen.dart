@@ -40,6 +40,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
   late final TextEditingController _secondaryClassDescController;
   late final TextEditingController _packagingQtyController;
   late final TextEditingController _standardUnitPriceController;
+  late final TextEditingController _standardUnitCostInBaseController;
   late final TextEditingController _currencyController;
   late final TextEditingController _shelfLifeDaysController;
   late final TextEditingController _minStockQtyController;
@@ -135,6 +136,9 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     );
     _standardUnitPriceController = TextEditingController(
       text: _formatNumForField(widget.productData['standardUnitPrice']),
+    );
+    _standardUnitCostInBaseController = TextEditingController(
+      text: _formatNumForField(widget.productData['standardUnitCostInBase']),
     );
     _currencyController = TextEditingController(
       text: _s(widget.productData['currency']).isEmpty
@@ -249,6 +253,12 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     );
     if (priceUp == null) return;
 
+    final stdCostBaseUp = parseUpdateDouble(
+      _standardUnitCostInBaseController.text,
+      label: 'Standardni trošak (baza)',
+    );
+    if (stdCostBaseUp == null) return;
+
     final packUp = parseUpdateDouble(
       _packagingQtyController.text,
       label: 'Količina pakovanja',
@@ -321,6 +331,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
         secondaryClassificationDescription: _secondaryClassDescController.text
             .trim(),
         standardUnitPrice: priceUp,
+        standardUnitCostInBase: stdCostBaseUp,
         currency: _currencyController.text.trim(),
         isActive: _isActive,
         lotTrackingRequired: _lotTrackingRequired,
@@ -433,6 +444,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     _secondaryClassDescController.dispose();
     _packagingQtyController.dispose();
     _standardUnitPriceController.dispose();
+    _standardUnitCostInBaseController.dispose();
     _currencyController.dispose();
     _shelfLifeDaysController.dispose();
     _minStockQtyController.dispose();
@@ -600,6 +612,17 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                     decimal: true,
                   ),
                   decoration: _dec('Jedinična cijena', hint: 'Prazno = ukloni'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _standardUnitCostInBaseController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: _dec(
+                    'Standardni trošak · bazna valuta (Finance)',
+                    hint: 'Prazno = ukloni',
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(

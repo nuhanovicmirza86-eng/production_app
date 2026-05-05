@@ -251,6 +251,7 @@ class _FinanceControllingDashboardTabState
     BuildContext context, {
     required FinanceControllingDefaultsView def,
     required String companyId,
+    required String plantKeyForEnergy,
   }) async {
     final baseCtrl = TextEditingController(text: def.baseCurrency);
     final dispCtrl = TextEditingController(text: def.displayCurrency);
@@ -276,6 +277,14 @@ class _FinanceControllingDashboardTabState
       text: def.maintenanceCostPerClosedFaultInBase != null
           ? def.maintenanceCostPerClosedFaultInBase!.toString()
           : '',
+    );
+    final energyCtrl = TextEditingController(
+      text: (() {
+        final pk = plantKeyForEnergy.trim();
+        if (pk.isEmpty) return '';
+        final v = def.plantEnergyBudgetMonthlyFor(pk);
+        return v != null ? v.toString() : '';
+      })(),
     );
     final formKey = GlobalKey<FormState>();
     final svc = FinanceCompanyOperationalConfigService();
@@ -431,6 +440,34 @@ class _FinanceControllingDashboardTabState
                           return null;
                         },
                       ),
+                      TextFormField(
+                        controller: energyCtrl,
+                        decoration: InputDecoration(
+                          labelText:
+                              plantKeyForEnergy.trim().isEmpty
+                                  ? 'Energija: odaberi pogon u zaglavlju'
+                                  : 'Mjesečni budžet energije · '
+                                        '${plantKeyForEnergy.trim()} '
+                                        '(${def.baseCurrency})',
+                          hintText: 'Prazno = ukloni za ovaj pogon',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        validator: (v) {
+                          if (plantKeyForEnergy.trim().isEmpty) return null;
+                          final s = (v ?? '').trim();
+                          if (s.isEmpty) return null;
+                          final n = double.tryParse(s.replaceAll(',', '.'));
+                          if (n == null ||
+                              !n.isFinite ||
+                              n < 0 ||
+                              n > 10000000) {
+                            return 'Broj 0–10000000 ili prazno.';
+                          }
+                          return null;
+                        },
+                      ),
                       const SizedBox(height: 8),
                       Text(
                         'Izmjena ide u Firestore preko zaštićenog Callabla. '
@@ -461,6 +498,18 @@ class _FinanceControllingDashboardTabState
                               return double.tryParse(t);
                             }
 
+                            Map<String, dynamic>? energyPatch;
+                            final pkEn = plantKeyForEnergy.trim();
+                            if (pkEn.isNotEmpty) {
+                              final te = energyCtrl.text.trim();
+                              if (te.isEmpty) {
+                                energyPatch = {pkEn: null};
+                              } else {
+                                final n = double.parse(te.replaceAll(',', '.'));
+                                energyPatch = {pkEn: n};
+                              }
+                            }
+
                             await svc.updateFinanceControllingDefaults(
                               companyId: companyId,
                               baseCurrency: baseCtrl.text,
@@ -472,6 +521,8 @@ class _FinanceControllingDashboardTabState
                               copqClosedNcrEstimateInBase: opt(copqNcrCtrl.text),
                               maintenanceCostPerClosedFaultInBase:
                                   opt(maintFaultCtrl.text),
+                              plantEnergyCostBudgetMonthlyInBasePatch:
+                                  energyPatch,
                             );
                             if (!ctx.mounted) return;
                             Navigator.of(ctx).pop();
@@ -529,6 +580,7 @@ class _FinanceControllingDashboardTabState
     copqRwCtrl.dispose();
     copqNcrCtrl.dispose();
     maintFaultCtrl.dispose();
+    energyCtrl.dispose();
   }
 
   Widget _financeDefaultsCard({
@@ -536,6 +588,7 @@ class _FinanceControllingDashboardTabState
     required FinanceControllingDefaultsView def,
     required ThemeData theme,
     required ColorScheme cs,
+    required String selectedPlantKey,
   }) {
     final canEdit = FinancePermissions.canEditFinanceControllingDefaults(
       _role,
@@ -578,6 +631,7 @@ class _FinanceControllingDashboardTabState
                       context,
                       def: def,
                       companyId: _companyId,
+                      plantKeyForEnergy: selectedPlantKey,
                     ),
                     icon: const Icon(Icons.edit_outlined, size: 18),
                     label: const Text('Uredi'),
@@ -600,6 +654,14 @@ class _FinanceControllingDashboardTabState
                       '${mhrDisplay != null && def.baseCurrency != def.displayCurrency ? '  ·  ${mhrDisplay.toStringAsFixed(2)} ${def.displayCurrency}/h (samo prikaz)' : ''}',
               style: theme.textTheme.bodySmall,
             ),
+            if (selectedPlantKey.trim().isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Energija (mjesečno, ${def.baseCurrency}): '
+                '${def.plantEnergyBudgetMonthlyFor(selectedPlantKey)?.toStringAsFixed(2) ?? '—'}',
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
             if (def.copqScrapUnitCostInBase != null ||
                 def.copqReworkUnitCostInBase != null ||
                 def.copqClosedNcrEstimateInBase != null ||
@@ -913,6 +975,7 @@ class _FinanceControllingDashboardTabState
                           def: def,
                           theme: theme,
                           cs: cs,
+                          selectedPlantKey: widget.plantKey.trim(),
                         ),
                         const SizedBox(height: 12),
                         Card(
@@ -969,6 +1032,7 @@ class _FinanceControllingDashboardTabState
                         def: def,
                         theme: theme,
                         cs: cs,
+                        selectedPlantKey: widget.plantKey.trim(),
                       ),
                       const SizedBox(height: 12),
                       Row(

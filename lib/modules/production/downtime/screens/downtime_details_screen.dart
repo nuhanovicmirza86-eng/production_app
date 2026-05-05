@@ -1,10 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/theme/operonix_production_brand.dart';
+import '../../../finance_integrations/models/finance_downtime_event_cost_doc.dart';
+import '../../../finance_integrations/services/finance_derived_aggregates_service.dart';
+import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../../production_orders/screens/production_order_details_screen.dart';
 import '../models/downtime_event_model.dart';
 import '../services/downtime_service.dart';
@@ -27,6 +31,7 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   final _downtimeService = DowntimeService();
+  final _derivedFinance = FinanceDerivedAggregatesService();
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -409,6 +414,122 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
                             ),
                           ),
                         ),
+                        if (FinancePermissions.canViewControllingAnalytics(
+                          companyData: widget.companyData,
+                          role: _role,
+                        )) ...[
+                          const SizedBox(height: 12),
+                          StreamBuilder<List<FinanceDowntimeEventCostDoc>>(
+                            stream: _derivedFinance.watchDowntimeEventCosts(
+                              companyId: _companyId,
+                              downtimeEventId: m.id,
+                            ),
+                            builder: (context, costSnap) {
+                              if (costSnap.hasError) {
+                                return Card(
+                                  shape: operonixProductionCardShape(),
+                                  child: ListTile(
+                                    title: const Text(
+                                      'Procjena troška (controlling)',
+                                    ),
+                                    subtitle: Text(
+                                      AppErrorMapper.toMessage(
+                                        costSnap.error!,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                              if (!costSnap.hasData) {
+                                return Card(
+                                  shape: operonixProductionCardShape(),
+                                  child: const ListTile(
+                                    title: Text(
+                                      'Procjena troška (controlling)',
+                                    ),
+                                    subtitle: Text('Učitavanje…'),
+                                  ),
+                                );
+                              }
+                              final costs = costSnap.data!;
+                              if (costs.isEmpty) {
+                                return Card(
+                                  shape: operonixProductionCardShape(),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Procjena troška (controlling)',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Još nema agregata za ovaj zastoj. '
+                                          'Nakon preračuna financijskog KPI-ja za '
+                                          'odgovarajući mjesec pojavit će se procjena '
+                                          '(OEE minute u periodu × satnica).',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }
+                              final loc =
+                                  Localizations.localeOf(context).toString();
+                              final fmt = NumberFormat.decimalPattern(loc);
+                              return Card(
+                                shape: operonixProductionCardShape(),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Procjena troška (controlling)',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      ...costs.map(
+                                        (d) => Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 8,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  '${d.periodYear}-${d.periodMonth.toString().padLeft(2, '0')} · '
+                                                  '${d.oeeMinutesInPeriod} OEE min · ${d.businessYearId}',
+                                                ),
+                                              ),
+                                              Text(
+                                                '${fmt.format(d.estimatedDowntimeCost)} ${d.baseCurrency}',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ],
                     ),
                     ListView(

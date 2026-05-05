@@ -282,8 +282,10 @@ class OrdersService {
     String? customsDeclarationRef,
     String? cmrNumber,
     String? awbNumber,
+    bool customerLogisticsInBaseExplicit = false,
+    double? logisticsToCustomerCostInBase,
   }) async {
-    final data = await _callUpdateCommercialOrder({
+    final data = <String, dynamic>{
       'companyId': companyId,
       'op': 'header',
       'orderId': orderId,
@@ -301,8 +303,12 @@ class OrdersService {
       'customsDeclarationRef': customsDeclarationRef,
       'cmrNumber': cmrNumber,
       'awbNumber': awbNumber,
-    });
-    if (data['success'] != true) {
+    };
+    if (customerLogisticsInBaseExplicit) {
+      data['logisticsToCustomerCostInBase'] = logisticsToCustomerCostInBase;
+    }
+    final res = await _callUpdateCommercialOrder(data);
+    if (res['success'] != true) {
       throw Exception('Ažuriranje zaglavlja nije uspjelo.');
     }
   }

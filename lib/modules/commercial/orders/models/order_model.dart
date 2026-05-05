@@ -64,6 +64,9 @@ class OrderModel {
   final String? cmrNumber;
   final String? awbNumber;
 
+  /// Logistika do kupca u baznoj valuti (Finance KPI / landed cost).
+  final double? logisticsToCustomerCostInBase;
+
   const OrderModel({
     required this.id,
     required this.companyId,
@@ -98,6 +101,7 @@ class OrderModel {
     this.customsDeclarationRef,
     this.cmrNumber,
     this.awbNumber,
+    this.logisticsToCustomerCostInBase,
   });
 
   OrderModel copyWith({
@@ -124,6 +128,7 @@ class OrderModel {
     String? customsDeclarationRef,
     String? cmrNumber,
     String? awbNumber,
+    double? logisticsToCustomerCostInBase,
   }) {
     return OrderModel(
       id: id,
@@ -161,6 +166,8 @@ class OrderModel {
       customsDeclarationRef: customsDeclarationRef ?? this.customsDeclarationRef,
       cmrNumber: cmrNumber ?? this.cmrNumber,
       awbNumber: awbNumber ?? this.awbNumber,
+      logisticsToCustomerCostInBase: logisticsToCustomerCostInBase ??
+          this.logisticsToCustomerCostInBase,
     );
   }
 
@@ -211,6 +218,8 @@ class OrderModel {
       customsDeclarationRef: _nullableString(map['customsDeclarationRef']),
       cmrNumber: _nullableString(map['cmrNumber']),
       awbNumber: _nullableString(map['awbNumber']),
+      logisticsToCustomerCostInBase:
+          _optionalDouble(map['logisticsToCustomerCostInBase']),
     );
   }
 
@@ -242,6 +251,16 @@ class OrderModel {
   static double _d(dynamic v) {
     if (v is num) return v.toDouble();
     return double.tryParse(_s(v)) ?? 0;
+  }
+
+  static double? _optionalDouble(dynamic v) {
+    if (v == null) return null;
+    if (v is num) {
+      final d = v.toDouble();
+      return d.isFinite ? d : null;
+    }
+    final p = double.tryParse(_s(v).replaceAll(',', '.'));
+    return p;
   }
 
   static DateTime? _toDate(dynamic v) {

@@ -14,6 +14,11 @@ class FinanceOrderProfitabilityDoc {
     required this.margin,
     required this.currency,
     required this.baseCurrency,
+    this.materialCost = 0,
+    this.logisticsToCustomerCost = 0,
+    this.routingMachineCost = 0,
+    this.copqOrderCost = 0,
+    this.pooledOverheadCost = 0,
     this.sourceModule = '',
   });
 
@@ -30,6 +35,11 @@ class FinanceOrderProfitabilityDoc {
   final double margin;
   final String currency;
   final String baseCurrency;
+  final double materialCost;
+  final double logisticsToCustomerCost;
+  final double routingMachineCost;
+  final double copqOrderCost;
+  final double pooledOverheadCost;
   final String sourceModule;
 
   factory FinanceOrderProfitabilityDoc.fromFirestore(
@@ -50,6 +60,17 @@ class FinanceOrderProfitabilityDoc {
       margin: _d(data['margin'] ?? data['grossMargin']),
       currency: (data['currency'] ?? 'EUR').toString(),
       baseCurrency: (data['baseCurrency'] ?? data['currency'] ?? 'EUR').toString(),
+      materialCost: _d(data['materialCost'] ?? data['material_cost']),
+      logisticsToCustomerCost: _d(
+        data['logisticsToCustomerCost'] ?? data['logistics_to_customer_cost'],
+      ),
+      routingMachineCost: _d(
+        data['routingMachineCost'] ?? data['routing_machine_cost'],
+      ),
+      copqOrderCost: _d(data['copqOrderCost'] ?? data['copq_order_cost']),
+      pooledOverheadCost: _d(
+        data['pooledOverheadCost'] ?? data['pooled_overhead_cost'],
+      ),
       sourceModule: (data['sourceModule'] ?? '').toString(),
     );
   }

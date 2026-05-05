@@ -54,6 +54,8 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
   final _cmrNumberController = TextEditingController();
   final _awbNumberController = TextEditingController();
 
+  final _logisticsToCustomerCostBaseController = TextEditingController();
+
   late bool _isExport;
 
   late DateTime _orderDate;
@@ -68,6 +70,9 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
       (widget.companyData['companyId'] ?? '').toString().trim();
 
   String get _userId => (widget.companyData['userId'] ?? '').toString().trim();
+
+  String _formatLogisticsBase(double v) =>
+      v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(4);
 
   bool _lineQtyEditable(OrderItemModel it) {
     if (it.linkedProductionOrderCodes.isNotEmpty) return false;
@@ -91,6 +96,10 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
         (o.customsDeclarationRef ?? '').trim();
     _cmrNumberController.text = (o.cmrNumber ?? '').trim();
     _awbNumberController.text = (o.awbNumber ?? '').trim();
+    _logisticsToCustomerCostBaseController.text =
+        o.logisticsToCustomerCostInBase != null
+            ? _formatLogisticsBase(o.logisticsToCustomerCostInBase!)
+            : '';
     _orderDate = o.orderDate ?? o.createdAt ?? DateTime.now();
     _requestedDeliveryDate = o.requestedDeliveryDate;
     _confirmedDeliveryDate = o.confirmedDeliveryDate;
@@ -127,6 +136,7 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
     _customsDeclarationRefController.dispose();
     _cmrNumberController.dispose();
     _awbNumberController.dispose();
+    _logisticsToCustomerCostBaseController.dispose();
     for (final l in _lines) {
       l.qtyController.dispose();
       l.unitPriceController.dispose();
@@ -214,6 +224,27 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
       }
     }
 
+    double? logisticsToCustomerCostInBase;
+    if (widget.order.orderType == OrderType.customer) {
+      final t = _logisticsToCustomerCostBaseController.text.trim();
+      if (t.isEmpty) {
+        logisticsToCustomerCostInBase = null;
+      } else {
+        final v = double.tryParse(t.replaceAll(',', '.'));
+        if (v == null || !v.isFinite || v < 0 || v > 10000000) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Logistika (baza): unesi broj 0–10000000 ili ostavi prazno za brisanje.',
+              ),
+            ),
+          );
+          return;
+        }
+        logisticsToCustomerCostInBase = v;
+      }
+    }
+
     setState(() => _submitting = true);
     try {
       await _ordersService.updateOrderHeader(
@@ -256,6 +287,9 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
         awbNumber: widget.order.orderType == OrderType.customer
             ? _awbNumberController.text.trim()
             : null,
+        customerLogisticsInBaseExplicit:
+            widget.order.orderType == OrderType.customer,
+        logisticsToCustomerCostInBase: logisticsToCustomerCostInBase,
       );
 
       for (final le in _lines) {
@@ -462,6 +496,20 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
                 labelText: 'Valuta (opcionalno)',
               ),
             ),
+            if (widget.order.orderType == OrderType.customer) ...[
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _logisticsToCustomerCostBaseController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText:
+                      'Logistika do kupca (bazna valuta / procjena)',
+                  hintText: 'Prazno = ukloni; koristi baznu valutu iz Finance postavki',
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             TextFormField(
               controller: _notesController,

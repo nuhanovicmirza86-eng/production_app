@@ -17,6 +17,7 @@ class FinanceCompanyOperationalConfigService {
     double? copqReworkUnitCostInBase,
     double? copqClosedNcrEstimateInBase,
     double? maintenanceCostPerClosedFaultInBase,
+    Map<String, dynamic>? plantEnergyCostBudgetMonthlyInBasePatch,
   }) async {
     final fd = <String, dynamic>{
       'baseCurrency': baseCurrency.trim().toUpperCase(),
@@ -35,6 +36,11 @@ class FinanceCompanyOperationalConfigService {
     if (maintenanceCostPerClosedFaultInBase != null) {
       fd['maintenanceCostPerClosedFaultInBase'] =
           maintenanceCostPerClosedFaultInBase;
+    }
+    if (plantEnergyCostBudgetMonthlyInBasePatch != null &&
+        plantEnergyCostBudgetMonthlyInBasePatch.isNotEmpty) {
+      fd['plantEnergyCostBudgetMonthlyInBase'] =
+          plantEnergyCostBudgetMonthlyInBasePatch;
     }
     final res = await _functions
         .httpsCallable('updateCompanyOperationalConfig')
