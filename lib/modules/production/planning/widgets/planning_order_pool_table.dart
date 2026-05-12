@@ -7,10 +7,11 @@ import '../planning_order_pool_view_mode.dart';
 import '../planning_session_controller.dart';
 import '../services/planning_engine_service.dart';
 import '../services/planning_pool_view_prefs.dart';
+import 'planning_help_icon.dart';
 import 'planning_order_card.dart';
 import 'planning_order_display_helpers.dart';
 
-/// Panel order poola: pretraga, gumbi odabira, prikaz **tablica** ili **kartice**.
+/// Panel liste naloga za planiranje: pretraga, gumbi odabira, prikaz tablice ili kartica.
 class PlanningOrderPoolTable extends StatefulWidget {
   const PlanningOrderPoolTable({super.key, required this.session});
 
@@ -46,97 +47,136 @@ class _PlanningOrderPoolTableState extends State<PlanningOrderPoolTable> {
 
   @override
   Widget build(BuildContext context) {
+    final t = Theme.of(context);
     return Card(
       margin: const EdgeInsets.all(4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-            child: Row(
-              children: [
-                Text(
-                  'Order pool',
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const Spacer(),
-                SegmentedButton<PlanningOrderPoolViewMode>(
-                  showSelectedIcon: false,
-                  segments: const [
-                    ButtonSegment(
-                      value: PlanningOrderPoolViewMode.table,
-                      label: Text('Tablica'),
-                      icon: Icon(Icons.table_rows, size: 18),
+      child: ListenableBuilder(
+        listenable: session,
+        builder: (context, _) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Nalozi za planiranje',
+                                  style: t.textTheme.titleSmall,
+                                ),
+                              ),
+                              PlanningHelpIcon(
+                                title: PlanningHelpTexts.ordersPanelTitle,
+                                message: PlanningHelpTexts.ordersPanelMessage,
+                                size: 18,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Označite naloge za plan. Zatim „Generiši plan” ili „Preračunaj” — raspored je na tabu Raspored. '
+                            'Desno su filtri i parametri motora; kontekst i spremanje u bočnoj traci (ikonica ili široki prikaz).',
+                            style: t.textTheme.bodySmall?.copyWith(
+                              color: t.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    ButtonSegment(
-                      value: PlanningOrderPoolViewMode.cards,
-                      label: Text('Kartice'),
-                      icon: Icon(Icons.view_agenda_outlined, size: 18),
+                    const SizedBox(width: 8),
+                    SegmentedButton<PlanningOrderPoolViewMode>(
+                      showSelectedIcon: false,
+                      segments: const [
+                        ButtonSegment(
+                          value: PlanningOrderPoolViewMode.table,
+                          label: Text('Tablica'),
+                          icon: Icon(Icons.table_rows, size: 18),
+                        ),
+                        ButtonSegment(
+                          value: PlanningOrderPoolViewMode.cards,
+                          label: Text('Kartice'),
+                          icon: Icon(Icons.view_agenda_outlined, size: 18),
+                        ),
+                      ],
+                      selected: {_view},
+                      onSelectionChanged: (s) async {
+                        if (s.isEmpty) return;
+                        final next = s.first;
+                        setState(() => _view = next);
+                        await _persistView(next);
+                      },
                     ),
                   ],
-                  selected: {_view},
-                  onSelectionChanged: (s) async {
-                    if (s.isEmpty) return;
-                    final next = s.first;
-                    setState(() => _view = next);
-                    await _persistView(next);
-                  },
                 ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: TextField(
-              decoration: const InputDecoration(
-                labelText: 'Pretraga (šifra, proizvod…)',
               ),
-              onChanged: session.setSearchQuery,
-            ),
-          ),
-          Wrap(
-            spacing: 4,
-            children: [
-              TextButton(
-                onPressed: session.isLocked ? null : session.selectAllInPool,
-                child: const Text('Sve'),
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'Pretraga (šifra, proizvod…)',
+                  ),
+                  onChanged: session.setSearchQuery,
+                ),
               ),
-              TextButton(
-                onPressed:
-                    session.isLocked || session.searchQuery.trim().isEmpty
-                    ? null
-                    : session.selectFiltered,
-                child: const Text('+ filtrirane'),
+              Wrap(
+                spacing: 4,
+                children: [
+                  TextButton(
+                    onPressed:
+                        session.isLocked ? null : session.selectAllInPool,
+                    child: const Text('Sve'),
+                  ),
+                  TextButton(
+                    onPressed:
+                        session.isLocked || session.searchQuery.trim().isEmpty
+                        ? null
+                        : session.selectFiltered,
+                    child: const Text('+ filtrirane'),
+                  ),
+                  TextButton(
+                    onPressed:
+                        session.isLocked || session.searchQuery.trim().isEmpty
+                        ? null
+                        : session.clearFilteredFromSelection,
+                    child: const Text('− filtrirane'),
+                  ),
+                  TextButton(
+                    onPressed: session.isLocked ? null : session.clearSelection,
+                    child: const Text('Očisti odabir'),
+                  ),
+                ],
               ),
-              TextButton(
-                onPressed:
-                    session.isLocked || session.searchQuery.trim().isEmpty
-                    ? null
-                    : session.clearFilteredFromSelection,
-                child: const Text('− filtrirane'),
+              Text(
+                'Maks. ${PlanningEngineService.maxOrdersPerRun} naloga; isključeni ne ulaze u odabir.',
+                style: t.textTheme.labelSmall,
               ),
-              TextButton(
-                onPressed: session.isLocked ? null : session.clearSelection,
-                child: const Text('Očisti odabir'),
+              Expanded(
+                child: session.loadingPool
+                    ? const Center(child: CircularProgressIndicator())
+                    : session.poolError != null
+                    ? Center(child: Text(session.poolError!))
+                    : session.pool.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Nema naloga u statusima „Pušten” i „U toku” za ovaj pogon.',
+                        ),
+                      )
+                    : _view == PlanningOrderPoolViewMode.table
+                    ? _OrderDataTable(session: session)
+                    : _OrderCardList(session: session),
               ),
             ],
-          ),
-          Text(
-            'Maks. ${PlanningEngineService.maxOrdersPerRun} naloga; isključeni ne ulaze u odabir.',
-            style: Theme.of(context).textTheme.labelSmall,
-          ),
-          Expanded(
-            child: session.loadingPool
-                ? const Center(child: CircularProgressIndicator())
-                : session.poolError != null
-                ? Center(child: Text(session.poolError!))
-                : session.pool.isEmpty
-                ? const Center(child: Text('Nema naloga (pušten / u toku).'))
-                : _view == PlanningOrderPoolViewMode.table
-                ? _OrderDataTable(session: session)
-                : _OrderCardList(session: session),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../tracking/screens/production_operator_tracking_screen.dart';
 import '../planning_workflow_scope.dart';
+import '../widgets/planning_help_icon.dart';
 import '../widgets/planning_execution_shift_board.dart';
 import '../widgets/planning_variance_panel.dart';
 
@@ -21,7 +22,16 @@ class ProductionPlanExecutionScreen extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        Text('KPI (iz plana / MES)', style: t.textTheme.titleSmall),
+        Row(
+          children: [
+            Text('KPI (iz plana / MES)', style: t.textTheme.titleSmall),
+            PlanningHelpIcon(
+              title: PlanningHelpTexts.executionTabTitle,
+              message: PlanningHelpTexts.executionTabMessage,
+              size: 18,
+            ),
+          ],
+        ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,

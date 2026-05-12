@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'firebase_options.dart';
+import 'package:production_app/core/firebase_firestore_emulator.dart';
 import 'package:production_app/core/theme/operonix_production_brand.dart';
 import 'package:production_app/modules/auth/session/screens/auth_wrapper.dart';
 import 'package:production_app/services/fcm_token_service.dart';
@@ -229,6 +230,7 @@ Future<void> main() async {
   }
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  configureFirestoreEmulatorFromEnvironment();
 
   await _initProductionPushStack();
 

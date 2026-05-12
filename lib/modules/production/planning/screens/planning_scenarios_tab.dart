@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/planning_scenario_record.dart';
 import '../planning_session_controller.dart';
 import '../services/planning_scenario_service.dart';
+import '../widgets/planning_help_icon.dart';
 
 /// F4.1 — scenariji (baseline / what-if), vez na opcionalno spremljeni plan.
 class PlanningScenariosTab extends StatefulWidget {
@@ -235,7 +236,21 @@ class _PlanningScenariosTabState extends State<PlanningScenariosTab> {
             padding: const EdgeInsets.all(8),
             children: [
               ListTile(
-                title: const Text('Scenariji planiranja (F4)'),
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Scenariji planiranja (F4)',
+                        style: t.textTheme.titleMedium,
+                      ),
+                    ),
+                    PlanningHelpIcon(
+                      title: PlanningHelpTexts.scenariosTabTitle,
+                      message: PlanningHelpTexts.scenariosTabMessage,
+                      size: 18,
+                    ),
+                  ],
+                ),
                 subtitle: const Text(
                   'Baseline / what-if, opcionalno vezan nacrt plana. Pisanje: Callable u pozadini.',
                 ),

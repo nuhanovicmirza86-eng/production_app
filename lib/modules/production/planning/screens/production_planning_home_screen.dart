@@ -4,6 +4,7 @@ import '../../../../core/ui/company_plant_label_text.dart';
 import '../planning_session_controller.dart';
 import '../planning_workflow_scope.dart';
 import '../widgets/planning_context_sidebar.dart';
+import '../widgets/planning_help_icon.dart';
 import '../widgets/planning_kpi_strip.dart';
 import 'planning_schedule_tab.dart';
 import 'production_capacity_overview_screen.dart';
@@ -159,6 +160,11 @@ class _ProductionPlanningHomeScreenState extends State<ProductionPlanningHomeScr
                 appBar: AppBar(
                   title: const Text('Planiranje proizvodnje'),
                   actions: [
+                    PlanningHelpIcon(
+                      title: PlanningHelpTexts.workflowTitle,
+                      message: PlanningHelpTexts.workflowMessage,
+                      tooltip: PlanningHelpTexts.workflowTitle,
+                    ),
                     IconButton(
                       tooltip: 'Spremljeni planovi',
                       onPressed: _session.isLocked
@@ -174,9 +180,15 @@ class _ProductionPlanningHomeScreenState extends State<ProductionPlanningHomeScr
                       icon: const Icon(Icons.view_list_outlined),
                     ),
                     IconButton(
-                      tooltip: 'Osvježi pool naloga',
+                      tooltip: 'Osvježi listu naloga',
                       onPressed: _session.isLocked || _session.loadingPool ? null : _session.loadPool,
                       icon: const Icon(Icons.refresh),
+                    ),
+                    PlanningHelpIcon(
+                      icon: Icons.help_outline,
+                      title: PlanningHelpTexts.appBarShortcutsTitle,
+                      message: PlanningHelpTexts.appBarShortcutsMessage,
+                      tooltip: 'Značenje ikona u traci',
                     ),
                     if (!showSidebar)
                       IconButton(
@@ -211,12 +223,82 @@ class _ProductionPlanningHomeScreenState extends State<ProductionPlanningHomeScr
                                     controller: _tab,
                                     isScrollable: true,
                                     tabAlignment: TabAlignment.start,
-                                    tabs: const [
-                                      Tab(text: 'Nalozi', icon: Icon(Icons.checklist_outlined)),
-                                      Tab(text: 'Raspored', icon: Icon(Icons.view_timeline_outlined)),
-                                      Tab(text: 'Provedba', icon: Icon(Icons.fact_check_outlined)),
-                                      Tab(text: 'Kapacitet', icon: Icon(Icons.speed_outlined)),
-                                      Tab(text: 'Scenariji', icon: Icon(Icons.hub_outlined)),
+                                    tabs: [
+                                      Tab(
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.checklist_outlined, size: 18),
+                                            const SizedBox(width: 6),
+                                            const Text('Nalozi'),
+                                            PlanningHelpIcon(
+                                              title: PlanningHelpTexts.ordersPanelTitle,
+                                              message: PlanningHelpTexts.ordersPanelMessage,
+                                              dense: true,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Tab(
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.view_timeline_outlined, size: 18),
+                                            const SizedBox(width: 6),
+                                            const Text('Raspored'),
+                                            PlanningHelpIcon(
+                                              title: PlanningHelpTexts.scheduleTabTitle,
+                                              message: PlanningHelpTexts.scheduleTabMessage,
+                                              dense: true,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Tab(
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.fact_check_outlined, size: 18),
+                                            const SizedBox(width: 6),
+                                            const Text('Provedba'),
+                                            PlanningHelpIcon(
+                                              title: PlanningHelpTexts.executionTabTitle,
+                                              message: PlanningHelpTexts.executionTabMessage,
+                                              dense: true,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Tab(
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.speed_outlined, size: 18),
+                                            const SizedBox(width: 6),
+                                            const Text('Kapacitet'),
+                                            PlanningHelpIcon(
+                                              title: PlanningHelpTexts.capacityTabTitle,
+                                              message: PlanningHelpTexts.capacityTabMessage,
+                                              dense: true,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Tab(
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.hub_outlined, size: 18),
+                                            const SizedBox(width: 6),
+                                            const Text('Scenariji'),
+                                            PlanningHelpIcon(
+                                              title: PlanningHelpTexts.scenariosTabTitle,
+                                              message: PlanningHelpTexts.scenariosTabMessage,
+                                              dense: true,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -282,6 +364,11 @@ class _ProductionPlanningHomeScreenState extends State<ProductionPlanningHomeScr
                 ),
                 const Text('·'),
                 Text('Horizont (d):', style: Theme.of(context).textTheme.labelMedium),
+                PlanningHelpIcon(
+                  title: PlanningHelpTexts.horizonTitle,
+                  message: PlanningHelpTexts.horizonMessage,
+                  size: 18,
+                ),
                 for (final d in const [1, 3, 7, 14, 30, 60])
                   FilterChip(
                     label: Text('$d'),
@@ -295,6 +382,11 @@ class _ProductionPlanningHomeScreenState extends State<ProductionPlanningHomeScr
                   ),
                 const Text('·'),
                 Text('Prikaz vremena:', style: Theme.of(context).textTheme.labelMedium),
+                PlanningHelpIcon(
+                  title: PlanningHelpTexts.timeScopeTitle,
+                  message: PlanningHelpTexts.timeScopeMessage,
+                  size: 18,
+                ),
                 SegmentedButton<int>(
                   showSelectedIcon: false,
                   segments: const [
@@ -311,6 +403,11 @@ class _ProductionPlanningHomeScreenState extends State<ProductionPlanningHomeScr
                 ),
                 const Text('·'),
                 Text('Scenarij:', style: Theme.of(context).textTheme.labelMedium),
+                PlanningHelpIcon(
+                  title: PlanningHelpTexts.scenarioTitle,
+                  message: PlanningHelpTexts.scenarioMessage,
+                  size: 18,
+                ),
                 for (var i = 0; i < PlanningSessionController.scenarioOptions.length; i++) ...[
                   if (PlanningSessionController.scenarioOptions[i].enabled)
                     FilterChip(
@@ -361,6 +458,11 @@ class _ProductionPlanningHomeScreenState extends State<ProductionPlanningHomeScr
                 FilledButton.tonal(
                   onPressed: _session.saving || _session.lastSavedPlanId == null ? null : _openRelease,
                   child: const Text('Otpusti plan (detalji)'),
+                ),
+                PlanningHelpIcon(
+                  title: PlanningHelpTexts.headerActionsTitle,
+                  message: PlanningHelpTexts.headerActionsMessage,
+                  size: 18,
                 ),
               ],
             ),

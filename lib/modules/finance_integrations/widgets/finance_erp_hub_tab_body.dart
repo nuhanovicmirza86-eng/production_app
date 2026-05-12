@@ -80,7 +80,7 @@ class FinanceErpHubTabBody extends StatelessWidget {
                   'Cilj je jedinstvena financijska slika: troškovi i rashodi kroz cijeli '
                   'proces — od ulaza sirovine, kroz sve faze proizvodnje i logistiku, '
                   'do isporuke kupcu. To uključuje razinu procesa, proizvoda, zastoja '
-                  'i kvalitete, uz usklađenost s ERP-om. Kontroling u aplikaciji i '
+                  'i kvalitete, uz usklađenost s ERP-om. Kontroling u modulu Financije i ERP '
                   'integracija nadopunjavaju se u fazama: prvo operativni KPI i agregati, '
                   'zatim proširenje u dublje procesne i logističke troškove prema vašem '
                   'ERP-u i pravilima mapiranja.',

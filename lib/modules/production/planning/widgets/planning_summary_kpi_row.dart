@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../planning_session_controller.dart';
+import 'planning_help_icon.dart';
 
 class PlanningSummaryKpiRow extends StatelessWidget {
   const PlanningSummaryKpiRow({super.key, required this.session});
@@ -17,6 +18,11 @@ class PlanningSummaryKpiRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
       child: Row(
         children: [
+          PlanningHelpIcon(
+            title: PlanningHelpTexts.kpiRowTitle,
+            message: PlanningHelpTexts.kpiRowMessage,
+            size: 18,
+          ),
           _chip(context, 'Odabrano', '${session.selectedOrderIds.length}'),
           _chip(context, 'Mogući (motor)', k != null ? '${k.feasibleOrders}' : '—'),
           _chip(context, 'Rizik (rok)', '${session.countRiskOrders()}'),

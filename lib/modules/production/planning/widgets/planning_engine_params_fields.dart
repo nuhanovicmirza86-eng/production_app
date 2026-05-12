@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../models/planning_schedule_strategy.dart';
 import '../planning_session_controller.dart';
+import 'planning_help_icon.dart';
 
 /// Polja parametra FCS motora: performansa, setup, ciklus.
 class PlanningEngineParamsFields extends StatelessWidget {
@@ -18,9 +19,18 @@ class PlanningEngineParamsFields extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'Parametri motora',
-              style: Theme.of(context).textTheme.labelLarge,
+            Row(
+              children: [
+                Text(
+                  'Parametri motora',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                PlanningHelpIcon(
+                  title: PlanningHelpTexts.motorParamsTitle,
+                  message: PlanningHelpTexts.motorParamsMessage,
+                  size: 18,
+                ),
+              ],
             ),
             const SizedBox(height: 6),
             Text(

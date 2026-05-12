@@ -18,5 +18,10 @@ class PlanningWorkflowScope extends InheritedWidget {
   }
 
   @override
-  bool updateShouldNotify(PlanningWorkflowScope oldWidget) => session != oldWidget.session;
+  bool updateShouldNotify(PlanningWorkflowScope oldWidget) {
+    // [PlanningSessionController] se ne zamjenjuje referencom — mutira u mjestu.
+    // Kad roditelj (npr. [ListenableBuilder]) obnovi scope nakon notifyListeners,
+    // ovisnici moraju dobiti svjež context; inače tabovi (pool, filteri) ostaju na zastarjelom frameu.
+    return true;
+  }
 }

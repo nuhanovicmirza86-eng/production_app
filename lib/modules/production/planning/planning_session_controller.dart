@@ -1,4 +1,4 @@
-import 'dart:async';
+import 'dart:async' show TimeoutException, unawaited;
 
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:flutter/material.dart';
@@ -802,7 +802,14 @@ class PlanningSessionController extends ChangeNotifier {
     poolError = null;
     notifyListeners();
     try {
-      final all = await _orderService.getOrders(companyId: companyId, plantKey: plantKey);
+      final all = await _orderService
+          .getOrders(companyId: companyId, plantKey: plantKey)
+          .timeout(
+            const Duration(seconds: 45),
+            onTimeout: () {
+              throw TimeoutException('production_orders.get');
+            },
+          );
       var list = all.where((o) {
         final s = o.status.toLowerCase();
         return s == 'released' || s == 'in_progress';
@@ -830,6 +837,14 @@ class PlanningSessionController extends ChangeNotifier {
       selectedOrder = list.isNotEmpty ? list.first : null;
       loadingPool = false;
       unawaited(_rebuildPoolMachineLabels());
+    } on TimeoutException catch (_) {
+      loadingPool = false;
+      pool = [];
+      _poolMachineIdLabels = {};
+      selectedOrderIds.clear();
+      poolError =
+          'Učitavanje naloga predugo traje (mreža ili baza). Pokušajte „Osvježi listu naloga”.';
+      selectedOrder = null;
     } catch (_) {
       loadingPool = false;
       pool = [];

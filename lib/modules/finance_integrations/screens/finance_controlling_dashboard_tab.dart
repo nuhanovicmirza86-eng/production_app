@@ -10,6 +10,7 @@ import '../models/finance_kpi_snapshot_model.dart';
 import '../services/finance_ai_insight_service.dart';
 import '../services/finance_ai_insights_list_service.dart';
 import '../services/finance_company_operational_config_service.dart';
+import '../services/finance_controlling_period_read_service.dart';
 import '../services/finance_exchange_rate_service.dart';
 import '../services/finance_kpi_recompute_service.dart';
 import '../services/finance_kpi_snapshot_service.dart';
@@ -87,6 +88,13 @@ class _FinanceControllingDashboardTabState
         plantKey: widget.plantKey.trim(),
       );
       if (!context.mounted) return;
+      FinanceControllingPeriodReadService.invalidatePeriod(
+        companyId: _companyId,
+        businessYearId: widget.businessYearId.trim(),
+        periodYear: widget.periodYear,
+        periodMonth: widget.periodMonth,
+        plantKey: widget.plantKey.trim(),
+      );
       await _refreshRates();
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -286,6 +294,15 @@ class _FinanceControllingDashboardTabState
         return v != null ? v.toString() : '';
       })(),
     );
+    var energyPlantLabel = '';
+    final pkEnergy = plantKeyForEnergy.trim();
+    if (pkEnergy.isNotEmpty) {
+      energyPlantLabel = await CompanyPlantDisplayName.resolve(
+        companyId: companyId,
+        plantKey: pkEnergy,
+      );
+    }
+    if (!context.mounted) return;
     final formKey = GlobalKey<FormState>();
     final svc = FinanceCompanyOperationalConfigService();
     var saving = false;
@@ -444,10 +461,10 @@ class _FinanceControllingDashboardTabState
                         controller: energyCtrl,
                         decoration: InputDecoration(
                           labelText:
-                              plantKeyForEnergy.trim().isEmpty
+                              pkEnergy.isEmpty
                                   ? 'Energija: odaberi pogon u zaglavlju'
                                   : 'Mjesečni budžet energije · '
-                                        '${plantKeyForEnergy.trim()} '
+                                        '$energyPlantLabel '
                                         '(${def.baseCurrency})',
                           hintText: 'Prazno = ukloni za ovaj pogon',
                         ),
@@ -455,7 +472,7 @@ class _FinanceControllingDashboardTabState
                           decimal: true,
                         ),
                         validator: (v) {
-                          if (plantKeyForEnergy.trim().isEmpty) return null;
+                          if (pkEnergy.isEmpty) return null;
                           final s = (v ?? '').trim();
                           if (s.isEmpty) return null;
                           final n = double.tryParse(s.replaceAll(',', '.'));
@@ -641,7 +658,7 @@ class _FinanceControllingDashboardTabState
             const SizedBox(height: 6),
             Text(
               'Valuta proračuna: ${def.baseCurrency} · '
-              'prikaz u aplikaciji: ${def.displayCurrency}',
+              'valuta prikaza: ${def.displayCurrency}',
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 4),
@@ -656,10 +673,22 @@ class _FinanceControllingDashboardTabState
             ),
             if (selectedPlantKey.trim().isNotEmpty) ...[
               const SizedBox(height: 6),
-              Text(
-                'Energija (mjesečno, ${def.baseCurrency}): '
-                '${def.plantEnergyBudgetMonthlyFor(selectedPlantKey)?.toStringAsFixed(2) ?? '—'}',
-                style: theme.textTheme.bodySmall,
+              FutureBuilder<String>(
+                future: CompanyPlantDisplayName.resolve(
+                  companyId: _companyId,
+                  plantKey: selectedPlantKey.trim(),
+                ),
+                builder: (context, plantSnap) {
+                  final lab = plantSnap.connectionState ==
+                          ConnectionState.waiting
+                      ? selectedPlantKey.trim()
+                      : (plantSnap.data ?? selectedPlantKey.trim());
+                  return Text(
+                    'Energija ($lab, mjesečno, ${def.baseCurrency}): '
+                    '${def.plantEnergyBudgetMonthlyFor(selectedPlantKey)?.toStringAsFixed(2) ?? '—'}',
+                    style: theme.textTheme.bodySmall,
+                  );
+                },
               ),
             ],
             if (def.copqScrapUnitCostInBase != null ||
@@ -1014,14 +1043,14 @@ class _FinanceControllingDashboardTabState
                       ? 'U postavkama kompanije uneste satnicu radnog sata u baznoj valuti. '
                           'Bez toga novčani iznos gubitka zastoja ostaje nula; minute se i dalje prikazuju.'
                       : 'Procjena temelji se na OEE minutama zastoja i postavljenoj satnici. '
-                          'Prikaz u aplikaciji koristi odabranu prikaznu valutu i tečajeve ako su dostupni.';
+                          'Za prikaz u drugoj valuti koriste se postavljene vrijednosti tečaja kad su dostupne.';
 
                   final displayShort = snapBase == def.displayCurrency
                       ? 'Iznosi u valuti $snapBase.'
                       : 'Valuta proračuna: $snapBase · prikaz: ${def.displayCurrency}.';
                   final displayDetail = snapBase == def.displayCurrency
                       ? 'Svi iznosi u ovom sažetku čitaju se u istoj valuti.'
-                      : 'Sažetak se interno vodi u baznoj valuti; aplikacija pretvara u valutu prikaza '
+                      : 'Sažetak se interno vodi u baznoj valuti; na ekranu se iznosi mogu pokazati u valuti prikaza '
                           'prema postavkama i dostupnim tečajevima.';
 
                   return ListView(

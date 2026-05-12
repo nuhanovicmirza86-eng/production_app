@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../planning_workflow_scope.dart';
 import '../widgets/planning_fcs_reoptimize.dart';
+import '../widgets/planning_help_icon.dart';
 import 'production_plan_gantt_screen.dart';
 
 /// Tab **Raspored**: Gantt iz zadnjeg rezultata + poveznica na puni ekran.
@@ -44,6 +45,11 @@ class PlanningScheduleTab extends StatelessWidget {
             runSpacing: 6,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
+              PlanningHelpIcon(
+                title: PlanningHelpTexts.scheduleTabTitle,
+                message: PlanningHelpTexts.scheduleTabMessage,
+                size: 18,
+              ),
               FilterChip(
                 label: const Text('Stvarno (MES)'),
                 selected: session.showMesGanttOverlay,

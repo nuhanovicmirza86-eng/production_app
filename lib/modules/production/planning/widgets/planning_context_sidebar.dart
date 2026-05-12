@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../planning_session_controller.dart';
 import '../planning_ui_formatters.dart';
+import 'planning_help_icon.dart';
 import 'planning_kpi_strip.dart';
 
 /// Zajednički desni stupac: odabrani nalog, sažetak upozorenja, placeholder za AI uvid.
@@ -29,9 +30,21 @@ class PlanningContextSidebar extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.all(10),
           children: [
-            Text(
-              'Kontekst / detalj',
-              style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Kontekst / detalj',
+                    style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                PlanningHelpIcon(
+                  title: PlanningHelpTexts.contextSidebarTitle,
+                  message: PlanningHelpTexts.contextSidebarMessage,
+                  size: 18,
+                ),
+              ],
             ),
             const SizedBox(height: 6),
             if (session.selectedOrder == null)

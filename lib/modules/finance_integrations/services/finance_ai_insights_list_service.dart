@@ -1,13 +1,12 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 import '../models/finance_ai_insight_doc.dart';
+import 'finance_controlling_period_read_service.dart';
 
-/// Čitanje povijesti `finance_ai_insights` za isti period kao KPI snimak.
+/// Povijest `finance_ai_insights` za period — isti Callable paket kao KPI/izvedeni agregati.
 class FinanceAiInsightsListService {
-  FinanceAiInsightsListService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+  FinanceAiInsightsListService();
 
-  final FirebaseFirestore _db;
+  final FinanceControllingPeriodReadService _reads =
+      FinanceControllingPeriodReadService();
 
   Stream<List<FinanceAiInsightDoc>> watchRecentForPeriod({
     required String companyId,
@@ -24,20 +23,17 @@ class FinanceAiInsightsListService {
     }
     final pk = plantKey.trim();
     final lim = limit.clamp(1, 50);
-    Query<Map<String, dynamic>> q = _db
-        .collection('finance_ai_insights')
-        .where('companyId', isEqualTo: cid)
-        .where('businessYearId', isEqualTo: by)
-        .where('periodYear', isEqualTo: periodYear)
-        .where('periodMonth', isEqualTo: periodMonth)
-        .where('plantKey', isEqualTo: pk)
-        .orderBy('createdAt', descending: true)
-        .limit(lim);
-
-    return q.snapshots().map(
-          (snap) => snap.docs
-              .map((d) => FinanceAiInsightDoc.fromFirestore(d.id, d.data()))
-              .toList(),
-        );
+    return Stream.fromFuture(
+      _reads
+          .load(
+            companyId: cid,
+            businessYearId: by,
+            periodYear: periodYear,
+            periodMonth: periodMonth,
+            plantKey: pk,
+            aiInsightsLimit: lim,
+          )
+          .then((b) => b.aiInsights),
+    );
   }
 }

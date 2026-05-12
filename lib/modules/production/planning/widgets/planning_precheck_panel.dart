@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../planning_session_controller.dart';
 import '../planning_ui_formatters.dart';
+import 'planning_help_icon.dart';
 
 /// Provjere prije generiranja + konflikti nakon motora.
 class PlanningPrecheckPanel extends StatelessWidget {
@@ -66,7 +67,16 @@ class PlanningPrecheckPanel extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(8),
       children: [
-        Text('Pre-check (stalno)', style: t.textTheme.titleSmall),
+        Row(
+          children: [
+            Text('Pre-check (stalno)', style: t.textTheme.titleSmall),
+            PlanningHelpIcon(
+              title: PlanningHelpTexts.precheckTitle,
+              message: PlanningHelpTexts.precheckMessage,
+              size: 18,
+            ),
+          ],
+        ),
         const SizedBox(height: 6),
         if (pre.isEmpty)
           Text(
@@ -80,7 +90,16 @@ class PlanningPrecheckPanel extends StatelessWidget {
               )),
         if (pre.length > 18) Text('… +${pre.length - 18}', style: t.textTheme.labelSmall),
         const Divider(height: 20),
-        Text('Motor (nakon generiranja)', style: t.textTheme.titleSmall),
+        Row(
+          children: [
+            Text('Motor (nakon generiranja)', style: t.textTheme.titleSmall),
+            PlanningHelpIcon(
+              title: PlanningHelpTexts.engineAfterRunTitle,
+              message: PlanningHelpTexts.engineAfterRunMessage,
+              size: 18,
+            ),
+          ],
+        ),
         const SizedBox(height: 6),
         if (result == null)
           Text(

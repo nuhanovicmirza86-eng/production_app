@@ -152,6 +152,9 @@ class FinanceKpiSnapshotModel {
   static DateTime? _ts(dynamic v) {
     if (v is Timestamp) return v.toDate();
     if (v is DateTime) return v;
+    if (v is int) {
+      return DateTime.fromMillisecondsSinceEpoch(v, isUtc: true).toLocal();
+    }
     return null;
   }
 }

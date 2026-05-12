@@ -1,9 +1,18 @@
 import 'package:flutter/material.dart';
 
-/// Kratke poruke za korisnika; tehnički detalj samo kroz [showFinanceTechnicalDetailDialog].
+bool financeLoadErrorHideTechnicalDetail(Object? error) {
+  final s = (error ?? '').toString();
+  return s.contains('permission-denied') ||
+      s.contains('PERMISSION_DENIED') ||
+      s.contains('[cloud_firestore/permission-denied]') ||
+      s.contains('Missing or insufficient permissions');
+}
+
+/// Korisnički tekst za grešku učitavanja; tehnički detalj samo kroz [showFinanceTechnicalDetailDialog].
 String financeUserFacingLoadError(Object? error) {
   final s = (error ?? '').toString();
-  if (s.contains('permission-denied')) {
+  if (s.contains('permission-denied') ||
+      s.contains('[cloud_firestore/permission-denied]')) {
     return 'Pristup ovim podacima u oblaku trenutno nije dozvoljen. '
         'Često to znači da postavke pristupa na poslužitelju još nisu ažurirane '
         'ili da modul financija nije u pretplati kompanije. Administrator može '
@@ -61,7 +70,9 @@ class FinanceTechnicalInfoIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final d = detail.trim();
-    if (d.isEmpty) return const SizedBox.shrink();
+    if (d.isEmpty || financeLoadErrorHideTechnicalDetail(d)) {
+      return const SizedBox.shrink();
+    }
     return IconButton(
       tooltip: 'Više informacija',
       icon: Icon(

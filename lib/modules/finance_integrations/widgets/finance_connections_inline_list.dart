@@ -84,6 +84,7 @@ class FinanceConnectionsInlineList extends StatelessWidget {
       stream: svc.watchConnections(_companyId),
       builder: (context, snap) {
         if (snap.hasError) {
+          final err = snap.error;
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
@@ -91,11 +92,11 @@ class FinanceConnectionsInlineList extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    financeUserFacingLoadError(snap.error),
+                    financeUserFacingLoadError(err),
                     style: TextStyle(color: Theme.of(context).colorScheme.error),
                   ),
                 ),
-                FinanceTechnicalInfoIcon(detail: '${snap.error}'),
+                FinanceTechnicalInfoIcon(detail: '$err'),
               ],
             ),
           );

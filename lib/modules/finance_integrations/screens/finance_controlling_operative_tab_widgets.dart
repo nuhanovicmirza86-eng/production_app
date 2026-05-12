@@ -533,7 +533,7 @@ class _FinanceControllingProcurementTabBodyState
                 ),
               );
             }
-            if (!snap.hasData) {
+            if (snap.connectionState == ConnectionState.waiting) {
               return const Padding(
                 padding: EdgeInsets.all(16),
                 child: Center(child: CircularProgressIndicator()),
@@ -723,7 +723,7 @@ class FinanceControllingDowntimeKpiTabBody extends StatelessWidget {
             ),
           );
         }
-        if (!snap.hasData) {
+        if (snap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
         final m = snap.data;
@@ -757,8 +757,7 @@ class FinanceControllingDowntimeKpiTabBody extends StatelessWidget {
                   body:
                       'Procjena temelji na minutama OEE zastoja i postavljenoj satnici u '
                       'postavkama kompanije. Valuta u sažetku je bazna valuta proračuna; '
-                      'aplikacija može '
-                      'prikazati drugu valutu prema postavkama.',
+                      'pri prikazu se može koristiti druga valuta prema postavkama.',
                 ),
               ],
             ),

@@ -85,6 +85,28 @@ class FinancePermissions {
     return canEditFinanceControllingDefaults(role);
   }
 
+  /// Globalni ili profil bez pogona: u hubu se može odabrati jedan pogon ili „svi pogoni“.
+  static bool shouldUseHubPlantScopeSelector({
+    required String role,
+    required String profilePlantKey,
+  }) {
+    final r = ProductionAccessHelper.normalizeRole(role);
+    final pk = profilePlantKey.trim();
+    if (ProductionAccessHelper.isAdminRole(r) ||
+        ProductionAccessHelper.isSuperAdminRole(r)) {
+      return true;
+    }
+    if (pk.isNotEmpty) return false;
+    const scope = <String>{
+      ProductionAccessHelper.roleAccountingManager,
+      ProductionAccessHelper.roleAccountingClerk,
+      ProductionAccessHelper.roleProjectManager,
+      ProductionAccessHelper.roleDevelopmentEngineer,
+      ProductionAccessHelper.roleManagementViewer,
+    };
+    return scope.contains(r);
+  }
+
   /// Budžeti / zaključavanje FY — šef računovodstva, referent, admin, PM (čitanje budžeta projekta).
   static bool canViewBudgetWorkspace({
     required String role,

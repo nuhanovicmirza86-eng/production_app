@@ -79,12 +79,14 @@ abstract final class FinanceCurrencyDisplay {
       exchangeRatesDoc: exchangeRatesDoc,
     );
     if (fromDoc) {
-      return 'Tečaj: 1 $b = ${fx.toStringAsFixed(5)} $d (dokument exchange_rates za današnji datum).';
+      return 'Tečaj: 1 $b = ${fx.toStringAsFixed(5)} $d (današnji službeni zapis '
+          'u postavkama Operonixa).';
     }
     if (b == 'EUR' && d == 'BAM') {
-      return 'Tečaj: 1 $b = ${fx.toStringAsFixed(5)} $d (fallback u aplikaciji dok nema exchange_rates).';
+      return 'Tečaj: 1 $b = ${fx.toStringAsFixed(5)} $d (podrazumijevana vrijednost '
+          'dok ne učitamo dnevni tečaj iz postavki).';
     }
-    return 'Tečaj: 1 $b = ${fx.toStringAsFixed(5)} $d (provjerite dokument exchange_rates / par valuta).';
+    return 'Tečaj: 1 $b = ${fx.toStringAsFixed(5)} $d (provjerite postavke tečaja i par valuta).';
   }
 
   static double toDisplayAmount(

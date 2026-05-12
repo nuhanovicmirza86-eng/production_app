@@ -4,6 +4,7 @@ import '../../ooe/screens/capacity_overview_screen.dart';
 import '../../ooe/screens/teep_analysis_screen.dart';
 import '../../ooe/widgets/oee_ooe_teep_hierarchy_card.dart';
 import '../planning_workflow_scope.dart';
+import '../widgets/planning_help_icon.dart';
 
 /// Tab **Kapacitet**: opterećenje, bottleneck, OEE / OOE / TEEP — jasno odvojeno.
 class ProductionCapacityOverviewScreen extends StatelessWidget {
@@ -18,7 +19,16 @@ class ProductionCapacityOverviewScreen extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        Text('Poveznica s planom', style: t.textTheme.titleSmall),
+        Row(
+          children: [
+            Text('Poveznica s planom', style: t.textTheme.titleSmall),
+            PlanningHelpIcon(
+              title: PlanningHelpTexts.capacityTabTitle,
+              message: PlanningHelpTexts.capacityTabMessage,
+              size: 18,
+            ),
+          ],
+        ),
         const SizedBox(height: 6),
         Text(
           'Zadnji plan: ${session.result?.plan.planCode ?? "—"} · operacija u horizontu: '

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../planning_session_controller.dart';
+import 'planning_help_icon.dart';
 
-/// Brzi filteri poola: chipovi + rok (segment), stroj i segment procesa (dropdown).
+/// Brzi filtri liste naloga: chipovi + rok (segment), stroj i segment procesa (dropdown).
 class PlanningFiltersBar extends StatelessWidget {
   const PlanningFiltersBar({super.key, required this.session});
 
@@ -55,7 +56,12 @@ class PlanningFiltersBar extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text('Filteri poola', style: t.textTheme.titleSmall),
+            Text('Filtri liste naloga', style: t.textTheme.titleSmall),
+            PlanningHelpIcon(
+              title: PlanningHelpTexts.filtersTitle,
+              message: PlanningHelpTexts.filtersMessage,
+              size: 18,
+            ),
             const Spacer(),
             if (anyFilter)
               TextButton(
@@ -154,7 +160,9 @@ class PlanningFiltersBar extends StatelessWidget {
                       opNames.contains(s.poolFilterOperationName)
                   ? s.poolFilterOperationName
                   : null,
-              hint: Text(opNames.isEmpty ? 'Nema podataka u poolu' : 'Svi segmenti'),
+              hint: Text(
+                opNames.isEmpty ? 'Nema podataka u učitanoj listi' : 'Svi segmenti',
+              ),
               items: [
                 const DropdownMenuItem<String?>(
                   value: null,
@@ -188,7 +196,7 @@ class PlanningFiltersBar extends StatelessWidget {
               value: s.poolFilterLineId != null && lineOpts.any((e) => e.id == s.poolFilterLineId)
                   ? s.poolFilterLineId
                   : null,
-              hint: Text(lineOpts.isEmpty ? 'Nema lineId u poolu' : 'Sve linije'),
+              hint: Text(lineOpts.isEmpty ? 'Nema lineId u listi' : 'Sve linije'),
               items: [
                 const DropdownMenuItem<String?>(value: null, child: Text('Sve linije')),
                 ...lineOpts.map(
@@ -218,7 +226,9 @@ class PlanningFiltersBar extends StatelessWidget {
                       customers.contains(s.poolFilterCustomerName)
                   ? s.poolFilterCustomerName
                   : null,
-              hint: Text(customers.isEmpty ? 'Nema kupca u poolu' : 'Svi kupci'),
+              hint: Text(
+                customers.isEmpty ? 'Nema kupca u učitanoj listi' : 'Svi kupci',
+              ),
               items: [
                 const DropdownMenuItem<String?>(value: null, child: Text('Svi kupci')),
                 ...customers.map(
@@ -234,7 +244,7 @@ class PlanningFiltersBar extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Alat / work-centar: kad budu u modelu naloga (ili routingu), ovdje se mogu proširiti; segment i stroj već slijede nalog u poolu.',
+          'Alat / work-centar: kad budu u modelu naloga (ili routingu), ovdje se mogu proširiti; segment i stroj već slijede podatke s naloga.',
           style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
         ),
       ],

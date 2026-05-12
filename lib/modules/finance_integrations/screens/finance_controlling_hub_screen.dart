@@ -3,7 +3,6 @@ import 'dart:math' show max;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/access/production_access_helper.dart';
 import '../../../core/company_plant_display_name.dart';
 import '../../../core/operational_business_year_context.dart';
 import '../models/finance_budget_doc.dart';
@@ -11,6 +10,7 @@ import '../models/finance_controlling_defaults_view.dart';
 import '../services/company_financial_years_service.dart';
 import '../services/finance_budgets_service.dart';
 import '../services/finance_exchange_rate_service.dart';
+import '../utils/finance_controlling_plant_scope_preference.dart';
 import '../utils/finance_currency_display.dart';
 import '../utils/finance_permissions.dart';
 import '../widgets/finance_erp_hub_tab_body.dart';
@@ -20,8 +20,8 @@ import 'finance_controlling_dashboard_tab.dart';
 import 'finance_controlling_operative_tab_widgets.dart';
 
 /// Hub **Finance & Controlling**: aktivna poslovna godina i tekuće razdoblje su zadani;
-/// promjena FY/razdoblja je u suženom dijelu zaglavlja. Za [admin]/[super_admin] agregat
-/// je po cijeloj kompaniji (bez filtra pogona s profila).
+/// promjena FY/razdoblja je u suženom dijelu zaglavlja. Admin i financijske/projektne uloge
+/// bez pogona u profilu mogu odabrati doseg „svi pogoni” ili jedan pogon.
 class FinanceControllingHubScreen extends StatefulWidget {
   const FinanceControllingHubScreen({
     super.key,
@@ -47,6 +47,8 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
   int _periodYear = 0;
   int _periodMonth = 1;
   bool _didAutoSelectFy = false;
+  /// Samo kad [FinancePermissions.shouldUseHubPlantScopeSelector]: prazan = svi pogoni.
+  String _financeHubPlantScope = '';
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -57,15 +59,15 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
   String get _plantKey =>
       (widget.companyData['plantKey'] ?? '').toString().trim();
 
-  /// Pogon s profila, osim globalnih administratora — oni vide financije za cijelu tvrtku.
-  String get _financePlantKey {
-    final r = ProductionAccessHelper.normalizeRole(_role);
-    if (ProductionAccessHelper.isAdminRole(r) ||
-        ProductionAccessHelper.isSuperAdminRole(r)) {
-      return '';
-    }
-    return _plantKey;
-  }
+  bool get _useHubPlantScopePicker =>
+      FinancePermissions.shouldUseHubPlantScopeSelector(
+        role: _role,
+        profilePlantKey: _plantKey,
+      );
+
+  String get _effectiveFinancePlantKey => _useHubPlantScopePicker
+      ? _financeHubPlantScope.trim()
+      : _plantKey.trim();
 
   @override
   void initState() {
@@ -83,6 +85,23 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
     _periodYear = now.year;
     _periodMonth = now.month;
     _bootstrapPeriod();
+    _loadFinanceHubPlantScopeIfNeeded();
+  }
+
+  Future<void> _loadFinanceHubPlantScopeIfNeeded() async {
+    if (!_useHubPlantScopePicker) return;
+    final v =
+        await FinanceControllingPlantScopePreference.load(_companyId);
+    if (!mounted) return;
+    setState(() => _financeHubPlantScope = v.trim());
+  }
+
+  Future<void> _onFinanceHubPlantScopeChanged(String plantKey) async {
+    setState(() => _financeHubPlantScope = plantKey.trim());
+    await FinanceControllingPlantScopePreference.save(
+      _companyId,
+      plantKey,
+    );
   }
 
   Future<void> _bootstrapPeriod() async {
@@ -179,7 +198,7 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
                       businessYearId: _businessYearId,
                       periodYear: _periodYear,
                       periodMonth: _periodMonth,
-                      plantKey: _financePlantKey,
+                      plantKey: _effectiveFinancePlantKey,
                       debugUnlockModule: widget.debugUnlockModule,
                     ),
                   ),
@@ -207,7 +226,11 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
         children: [
           _PeriodHeader(
             companyId: _companyId,
-            plantKey: _financePlantKey,
+            profilePlantKey: _plantKey,
+            showPlantScopePicker: _useHubPlantScopePicker,
+            hubPlantScopeKey: _financeHubPlantScope,
+            onHubPlantScopeChanged: _onFinanceHubPlantScopeChanged,
+            effectivePlantKey: _effectiveFinancePlantKey,
             yearsStream: _yearsSvc.watchYears(_companyId),
             businessYearId: _businessYearId,
             periodYear: _periodYear,
@@ -230,7 +253,7 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
                   businessYearId: _businessYearId,
                   periodYear: _periodYear,
                   periodMonth: _periodMonth,
-                  plantKey: _financePlantKey,
+                  plantKey: _effectiveFinancePlantKey,
                   debugUnlockModule: widget.debugUnlockModule,
                 ),
                 FinanceControllingProductionTabBody(
@@ -238,35 +261,35 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
                   businessYearId: _businessYearId,
                   periodYear: _periodYear,
                   periodMonth: _periodMonth,
-                  plantKey: _financePlantKey,
+                  plantKey: _effectiveFinancePlantKey,
                 ),
                 FinanceControllingDowntimeKpiTabBody(
                   companyData: widget.companyData,
                   businessYearId: _businessYearId,
                   periodYear: _periodYear,
                   periodMonth: _periodMonth,
-                  plantKey: _financePlantKey,
+                  plantKey: _effectiveFinancePlantKey,
                 ),
                 FinanceControllingQualityAggregatesTabBody(
                   companyData: widget.companyData,
                   businessYearId: _businessYearId,
                   periodYear: _periodYear,
                   periodMonth: _periodMonth,
-                  plantKey: _financePlantKey,
+                  plantKey: _effectiveFinancePlantKey,
                 ),
                 FinanceControllingMaintenanceAggregatesTabBody(
                   companyData: widget.companyData,
                   businessYearId: _businessYearId,
                   periodYear: _periodYear,
                   periodMonth: _periodMonth,
-                  plantKey: _financePlantKey,
+                  plantKey: _effectiveFinancePlantKey,
                 ),
                 FinanceControllingProcurementTabBody(
                   companyData: widget.companyData,
                   businessYearId: _businessYearId,
                   periodYear: _periodYear,
                   periodMonth: _periodMonth,
-                  plantKey: _financePlantKey,
+                  plantKey: _effectiveFinancePlantKey,
                 ),
                 _BudgetTabBody(
                   role: _role,
@@ -291,7 +314,11 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
 class _PeriodHeader extends StatefulWidget {
   const _PeriodHeader({
     required this.companyId,
-    required this.plantKey,
+    required this.profilePlantKey,
+    required this.showPlantScopePicker,
+    required this.hubPlantScopeKey,
+    required this.onHubPlantScopeChanged,
+    required this.effectivePlantKey,
     required this.yearsStream,
     required this.businessYearId,
     required this.periodYear,
@@ -303,7 +330,11 @@ class _PeriodHeader extends StatefulWidget {
   });
 
   final String companyId;
-  final String plantKey;
+  final String profilePlantKey;
+  final bool showPlantScopePicker;
+  final String hubPlantScopeKey;
+  final ValueChanged<String> onHubPlantScopeChanged;
+  final String effectivePlantKey;
   final Stream<List<FinancialYearListItem>> yearsStream;
   final String businessYearId;
   final int periodYear;
@@ -319,6 +350,7 @@ class _PeriodHeader extends StatefulWidget {
 
 class _PeriodHeaderState extends State<_PeriodHeader> {
   bool _didSuggestFinancialYear = false;
+  bool _showFyPickerOverride = false;
 
   static List<int> _yearChoices() {
     final y = DateTime.now().toLocal().year;
@@ -333,31 +365,130 @@ class _PeriodHeaderState extends State<_PeriodHeader> {
     return fyId;
   }
 
-  Widget _plantScopeLine(BuildContext context) {
-    final pk = widget.plantKey.trim();
+  static String? _resolvedActiveFinancialYearId(
+    List<FinancialYearListItem> years,
+  ) {
+    for (final y in years) {
+      if (y.status == 'active') return y.id;
+    }
+    return null;
+  }
+
+  bool _hideFyDropdown(
+    List<FinancialYearListItem> years,
+    String? fyVal,
+  ) {
+    if (_showFyPickerOverride) return false;
+    if (fyVal == null || fyVal.isEmpty) return false;
+    final activeId = _resolvedActiveFinancialYearId(years);
+    if (activeId == null || fyVal != activeId) return false;
+    return true;
+  }
+
+  Widget _plantScopeBlock(BuildContext context) {
     final theme = Theme.of(context);
     final muted = theme.textTheme.labelSmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
-    if (pk.isEmpty) {
-      return Text(
-        'Doseg podataka: cijela kompanija (svi pogoni)',
-        style: muted,
+    if (!widget.showPlantScopePicker) {
+      final pk = widget.effectivePlantKey.trim();
+      final prof = widget.profilePlantKey.trim();
+      if (pk.isEmpty && prof.isEmpty) {
+        return Text(
+          'Doseg podataka: treba odabrati jedan pogon '
+          '(zaglavlje ili profil / administrator).',
+          style: muted,
+        );
+      }
+      if (pk.isEmpty) {
+        return Text(
+          'Doseg podataka: cijela kompanija (svi pogoni)',
+          style: muted,
+        );
+      }
+      return FutureBuilder<String>(
+        key: ValueKey<String>('fin-plant-$pk'),
+        future: CompanyPlantDisplayName.resolve(
+          companyId: widget.companyId,
+          plantKey: pk,
+        ),
+        builder: (context, snap) {
+          final label = snap.connectionState == ConnectionState.waiting
+              ? '…'
+              : (snap.data ?? pk);
+          return Text(
+            'Doseg podataka: pogon $label',
+            style: muted,
+          );
+        },
       );
     }
-    return FutureBuilder<String>(
-      key: ValueKey<String>('fin-plant-$pk'),
-      future: CompanyPlantDisplayName.resolve(
+
+    final selected = widget.hubPlantScopeKey.trim();
+    return FutureBuilder<List<({String plantKey, String label})>>(
+      key: ValueKey<String>('fin-plants-${widget.companyId}'),
+      future: CompanyPlantDisplayName.listSelectablePlants(
         companyId: widget.companyId,
-        plantKey: pk,
       ),
       builder: (context, snap) {
-        final label = snap.connectionState == ConnectionState.waiting
-            ? '…'
-            : (snap.data ?? pk);
-        return Text(
-          'Doseg podataka: pogon $label',
-          style: muted,
+        if (snap.connectionState == ConnectionState.waiting) {
+          return Text(
+            'Doseg podataka: učitavanje pogona…',
+            style: muted,
+          );
+        }
+        final plants = snap.data ?? [];
+        final items = <DropdownMenuItem<String>>[
+          const DropdownMenuItem(
+            value: '',
+            child: Text('Svi pogoni (cijela tvrtka)'),
+          ),
+          ...plants.map(
+            (p) => DropdownMenuItem(
+              value: p.plantKey,
+              child: Text(p.label),
+            ),
+          ),
+        ];
+        var value = selected;
+        final known = items.any((e) => e.value == value);
+        if (!known && value.isNotEmpty) {
+          items.insert(
+            1,
+            DropdownMenuItem(
+              value: value,
+              child: const Text('Odabrani pogon (provjerite šifarnik)'),
+            ),
+          );
+        }
+        if (!items.any((e) => e.value == value)) {
+          value = '';
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Doseg pogona',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 6),
+            DropdownButtonFormField<String>(
+              key: ValueKey<String>('fin-scope-$value-${items.length}'),
+              decoration: const InputDecoration(
+                isDense: true,
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              initialValue: value,
+              isExpanded: true,
+              items: items,
+              onChanged: (v) {
+                if (v != null) widget.onHubPlantScopeChanged(v);
+              },
+            ),
+          ],
         );
       },
     );
@@ -431,7 +562,7 @@ class _PeriodHeaderState extends State<_PeriodHeader> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _plantScopeLine(context),
+                  _plantScopeBlock(context),
                   const SizedBox(height: 8),
                   Text(
                     'Još nema definiranih poslovnih godina.',
@@ -487,36 +618,67 @@ class _PeriodHeaderState extends State<_PeriodHeader> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _plantScopeLine(context),
+                    _plantScopeBlock(context),
                     const SizedBox(height: 12),
-                    Text(
-                      'Poslovna godina: ${fyLine.isEmpty ? '—' : fyLine}',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
                     Text(
                       'Razdoblje i poslovna godina',
                       style: theme.textTheme.labelLarge,
                     ),
                     const SizedBox(height: 6),
-                    DropdownButtonFormField<String>(
-                      key: ValueKey<String?>(
-                        'fy-$fyValue-${items.length}',
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Poslovna godina',
-                        isDense: true,
-                      ),
-                      initialValue: fyValue,
-                      isExpanded: true,
-                      items: items,
-                      onChanged: (v) {
-                        if (v != null) widget.onYearChanged(v);
-                      },
-                    ),
-                    const SizedBox(height: 8),
+                    ...(() {
+                      final hideFyDropdown = _hideFyDropdown(years, fyValue);
+                      if (!hideFyDropdown) {
+                        return [
+                          DropdownButtonFormField<String>(
+                            key: ValueKey<String?>(
+                              'fy-$fyValue-${items.length}',
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'Poslovna godina',
+                              isDense: true,
+                            ),
+                            initialValue: fyValue,
+                            isExpanded: true,
+                            items: items,
+                            onChanged: (v) {
+                              if (v == null) return;
+                              widget.onYearChanged(v);
+                              final activeId =
+                                  _resolvedActiveFinancialYearId(years);
+                              setState(() {
+                                if (activeId != null && v == activeId) {
+                                  _showFyPickerOverride = false;
+                                }
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 8),
+                        ];
+                      }
+                      return [
+                        Text(
+                          'Poslovna godina: ${fyLine.isEmpty ? '—' : fyLine}',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (years.length > 1) ...[
+                          const SizedBox(height: 4),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton(
+                              onPressed: () => setState(
+                                () => _showFyPickerOverride = true,
+                              ),
+                              child: const Text(
+                                'Odabir druge poslovne godine…',
+                              ),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                      ];
+                    })(),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -790,7 +952,8 @@ class _BudgetTabBodyState extends State<_BudgetTabBody> {
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Text(
-                'Učitavanje budžeta nije uspjelo (pravila ili indeks).',
+                'Lista budžeta se trenutno ne može učitati. Pokušajte ponovo za trenutak; '
+                'ako problem traje, administrator provjerava pristup i pretplatu modula financija.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: theme.colorScheme.error),
               ),
@@ -948,12 +1111,6 @@ class _BudgetTabBodyState extends State<_BudgetTabBody> {
                   : (b.costCenterId.isNotEmpty
                       ? b.costCenterId
                       : b.id);
-              final sub = <String>[
-                if (b.plantKey.isNotEmpty) 'Pogon: ${b.plantKey}',
-                if (b.costCenterId.isNotEmpty && b.name.isNotEmpty)
-                  'Cost center: ${b.costCenterId}',
-              ].join(' · ');
-
               final pct = _variancePercentLabel(b);
               final varColor = b.effectiveVariance == null
                   ? null
@@ -977,10 +1134,36 @@ class _BudgetTabBodyState extends State<_BudgetTabBody> {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            if (sub.isNotEmpty) ...[
+                            if (b.plantKey.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              FutureBuilder<String>(
+                                future: CompanyPlantDisplayName.resolve(
+                                  companyId: _companyId,
+                                  plantKey: b.plantKey,
+                                ),
+                                builder: (context, plantSnap) {
+                                  final plantLabel =
+                                      plantSnap.connectionState ==
+                                              ConnectionState.waiting
+                                          ? b.plantKey
+                                          : (plantSnap.data ?? b.plantKey);
+                                  final parts = <String>[
+                                    'Pogon: $plantLabel',
+                                    if (b.costCenterId.isNotEmpty &&
+                                        b.name.isNotEmpty)
+                                      'Cost center: ${b.costCenterId}',
+                                  ];
+                                  return Text(
+                                    parts.join(' · '),
+                                    style: theme.textTheme.bodySmall,
+                                  );
+                                },
+                              ),
+                            ] else if (b.costCenterId.isNotEmpty &&
+                                b.name.isNotEmpty) ...[
                               const SizedBox(height: 4),
                               Text(
-                                sub,
+                                'Cost center: ${b.costCenterId}',
                                 style: theme.textTheme.bodySmall,
                               ),
                             ],

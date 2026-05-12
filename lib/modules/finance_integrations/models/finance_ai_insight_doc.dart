@@ -37,7 +37,11 @@ class FinanceAiInsightDoc {
   static FinanceAiInsightDoc fromFirestore(String id, Map<String, dynamic> data) {
     DateTime? created;
     final ca = data['createdAt'];
-    if (ca is Timestamp) created = ca.toDate();
+    if (ca is Timestamp) {
+      created = ca.toDate();
+    } else if (ca is int) {
+      created = DateTime.fromMillisecondsSinceEpoch(ca, isUtc: true).toLocal();
+    }
 
     return FinanceAiInsightDoc(
       id: id,
