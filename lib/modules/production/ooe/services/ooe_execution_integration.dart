@@ -1,4 +1,5 @@
 import '../models/machine_state_event.dart';
+import 'machine_state_callable_service.dart';
 import 'machine_state_service.dart';
 import 'ooe_live_service.dart';
 import 'production_count_service.dart';
@@ -10,10 +11,41 @@ class OoeExecutionIntegration {
   OoeExecutionIntegration._();
 
   static final MachineStateService _machine = MachineStateService();
+  static final MachineStateCallableService _machineCallable =
+      MachineStateCallableService();
   static final ProductionCountService _counts = ProductionCountService();
   static final OoeLiveService _live = OoeLiveService();
 
   static String _s(dynamic v) => (v ?? '').toString().trim();
+
+  /// Segment u ključu kad nema naloga — izbjegava dvostruke `::`.
+  static String _orderKeySegment(String orderId) =>
+      orderId.isEmpty ? '-' : orderId;
+
+  static String _idempotencyKey({
+    required String companyId,
+    required String plantKey,
+    required String machineId,
+    required String orderId,
+    required String handler,
+    required DateTime effectiveAt,
+  }) {
+    final ts = effectiveAt.toUtc().toIso8601String();
+    return 'machineState:${_s(companyId)}:${_s(plantKey)}:${_s(machineId)}:'
+        '${_orderKeySegment(_s(orderId))}:$handler:$ts';
+  }
+
+  static String _productionCountIdempotencyKey({
+    required String companyId,
+    required String plantKey,
+    required String machineId,
+    required String orderId,
+    required DateTime timestamp,
+  }) {
+    final ts = timestamp.toUtc().toIso8601String();
+    return 'productionCount:${_s(companyId)}:${_s(plantKey)}:${_s(machineId)}:'
+        '${_orderKeySegment(_s(orderId))}:completed:$ts';
+  }
 
   static Future<void> onExecutionStarted({
     required Map<String, dynamic> companyScope,
@@ -28,7 +60,6 @@ class OoeExecutionIntegration {
       final orderId = _s(executionPayload['productionOrderId']);
       final productId = _s(executionPayload['productId']);
       final shiftId = _s(executionPayload['shiftCode']);
-      final operatorId = _s(executionPayload['operatorId']);
       final now = DateTime.now();
 
       final open = await _machine.getLatestOpenEventForMachine(
@@ -36,29 +67,26 @@ class OoeExecutionIntegration {
         plantKey: plantKey,
         machineId: machineId,
       );
-      if (open != null) {
-        await _machine.closeState(
-          eventId: open.id,
-          companyId: companyId,
-          plantKey: plantKey,
-          endedAt: now,
-        );
-      }
 
-      await _machine.openState(
+      await _machineCallable.transitionState(
         companyId: companyId,
         plantKey: plantKey,
         machineId: machineId,
-        state: MachineStateEvent.stateRunning,
-        startedAt: now,
-        source: 'execution',
-        lineId: _nullable(executionPayload['lineId']),
-        workCenterId: _nullable(executionPayload['workCenterId']),
+        toState: MachineStateEvent.stateRunning,
+        effectiveTimestamp: now,
+        source: MachineStateCallableService.defaultSource,
+        idempotencyKey: _idempotencyKey(
+          companyId: companyId,
+          plantKey: plantKey,
+          machineId: machineId,
+          orderId: orderId,
+          handler: 'started',
+          effectiveAt: now,
+        ),
+        fromState: open?.state,
         orderId: orderId.isEmpty ? null : orderId,
         productId: productId.isEmpty ? null : productId,
         shiftId: shiftId.isEmpty ? null : shiftId,
-        shiftDate: DateTime(now.year, now.month, now.day),
-        createdBy: operatorId.isEmpty ? null : operatorId,
       );
 
       await _live.refreshLiveKpiForMachine(
@@ -88,7 +116,6 @@ class OoeExecutionIntegration {
       final orderId = _s(executionPayload['productionOrderId']);
       final productId = _s(executionPayload['productId']);
       final shiftId = _s(executionPayload['shiftCode']);
-      final operatorId = _s(executionPayload['operatorId']);
       final now = DateTime.now();
 
       final open = await _machine.getLatestOpenEventForMachine(
@@ -96,31 +123,31 @@ class OoeExecutionIntegration {
         plantKey: plantKey,
         machineId: machineId,
       );
-      if (open != null) {
-        await _machine.closeState(
-          eventId: open.id,
-          companyId: companyId,
-          plantKey: plantKey,
-          endedAt: now,
-        );
-      }
 
       final pauseCode = _s(executionPayload['ooePauseReasonCode']);
-      await _machine.openState(
+      final toStopped = pauseCode.isNotEmpty;
+      await _machineCallable.transitionState(
         companyId: companyId,
         plantKey: plantKey,
         machineId: machineId,
-        state: MachineStateEvent.stateStopped,
-        startedAt: now,
-        source: 'execution',
-        lineId: _nullable(executionPayload['lineId']),
-        workCenterId: _nullable(executionPayload['workCenterId']),
+        toState: toStopped
+            ? MachineStateEvent.stateStopped
+            : MachineStateEvent.stateIdle,
+        effectiveTimestamp: now,
+        source: MachineStateCallableService.defaultSource,
+        idempotencyKey: _idempotencyKey(
+          companyId: companyId,
+          plantKey: plantKey,
+          machineId: machineId,
+          orderId: orderId,
+          handler: 'paused',
+          effectiveAt: now,
+        ),
+        fromState: open?.state,
         orderId: orderId.isEmpty ? null : orderId,
         productId: productId.isEmpty ? null : productId,
         shiftId: shiftId.isEmpty ? null : shiftId,
-        shiftDate: DateTime(now.year, now.month, now.day),
-        reasonCode: pauseCode.isEmpty ? null : pauseCode,
-        createdBy: operatorId.isEmpty ? null : operatorId,
+        reasonCode: toStopped ? pauseCode : null,
       );
 
       await _live.refreshLiveKpiForMachine(
@@ -148,7 +175,6 @@ class OoeExecutionIntegration {
       final orderId = _s(executionPayload['productionOrderId']);
       final productId = _s(executionPayload['productId']);
       final shiftId = _s(executionPayload['shiftCode']);
-      final operatorId = _s(executionPayload['operatorId']);
       final now = DateTime.now();
 
       final open = await _machine.getLatestOpenEventForMachine(
@@ -156,29 +182,26 @@ class OoeExecutionIntegration {
         plantKey: plantKey,
         machineId: machineId,
       );
-      if (open != null) {
-        await _machine.closeState(
-          eventId: open.id,
-          companyId: companyId,
-          plantKey: plantKey,
-          endedAt: now,
-        );
-      }
 
-      await _machine.openState(
+      await _machineCallable.transitionState(
         companyId: companyId,
         plantKey: plantKey,
         machineId: machineId,
-        state: MachineStateEvent.stateRunning,
-        startedAt: now,
-        source: 'execution',
-        lineId: _nullable(executionPayload['lineId']),
-        workCenterId: _nullable(executionPayload['workCenterId']),
+        toState: MachineStateEvent.stateRunning,
+        effectiveTimestamp: now,
+        source: MachineStateCallableService.defaultSource,
+        idempotencyKey: _idempotencyKey(
+          companyId: companyId,
+          plantKey: plantKey,
+          machineId: machineId,
+          orderId: orderId,
+          handler: 'resumed',
+          effectiveAt: now,
+        ),
+        fromState: open?.state,
         orderId: orderId.isEmpty ? null : orderId,
         productId: productId.isEmpty ? null : productId,
         shiftId: shiftId.isEmpty ? null : shiftId,
-        shiftDate: DateTime(now.year, now.month, now.day),
-        createdBy: operatorId.isEmpty ? null : operatorId,
       );
 
       await _live.refreshLiveKpiForMachine(
@@ -208,9 +231,6 @@ class OoeExecutionIntegration {
       final orderId = _s(executionAfterPayload['productionOrderId']);
       final productId = _s(executionAfterPayload['productId']);
       final shiftId = _s(executionAfterPayload['shiftCode']);
-      final operatorId = _s(
-        executionAfterPayload['updatedBy'] ?? executionAfterPayload['operatorId'],
-      );
 
       final good = _d(executionAfterPayload['goodQty']);
       final scrap = _d(executionAfterPayload['scrapQty']);
@@ -222,29 +242,26 @@ class OoeExecutionIntegration {
         plantKey: plantKey,
         machineId: machineId,
       );
-      if (open != null) {
-        await _machine.closeState(
-          eventId: open.id,
-          companyId: companyId,
-          plantKey: plantKey,
-          endedAt: now,
-        );
-      }
 
-      await _machine.openState(
+      await _machineCallable.transitionState(
         companyId: companyId,
         plantKey: plantKey,
         machineId: machineId,
-        state: MachineStateEvent.stateIdle,
-        startedAt: now,
-        source: 'execution',
-        lineId: _nullable(executionAfterPayload['lineId']),
-        workCenterId: _nullable(executionAfterPayload['workCenterId']),
+        toState: MachineStateEvent.stateIdle,
+        effectiveTimestamp: now,
+        source: MachineStateCallableService.defaultSource,
+        idempotencyKey: _idempotencyKey(
+          companyId: companyId,
+          plantKey: plantKey,
+          machineId: machineId,
+          orderId: orderId,
+          handler: 'completed',
+          effectiveAt: now,
+        ),
+        fromState: open?.state,
         orderId: orderId.isEmpty ? null : orderId,
         productId: productId.isEmpty ? null : productId,
         shiftId: shiftId.isEmpty ? null : shiftId,
-        shiftDate: DateTime(now.year, now.month, now.day),
-        createdBy: operatorId.isEmpty ? null : operatorId,
       );
 
       await _counts.appendIncrement(
@@ -256,11 +273,17 @@ class OoeExecutionIntegration {
         goodCountIncrement: good,
         scrapCountIncrement: scrap,
         source: 'execution',
+        idempotencyKey: _productionCountIdempotencyKey(
+          companyId: companyId,
+          plantKey: plantKey,
+          machineId: machineId,
+          orderId: orderId,
+          timestamp: now,
+        ),
         lineId: _nullable(executionAfterPayload['lineId']),
         orderId: orderId.isEmpty ? null : orderId,
         productId: productId.isEmpty ? null : productId,
         shiftId: shiftId.isEmpty ? null : shiftId,
-        createdBy: operatorId.isEmpty ? null : operatorId,
       );
 
       await _live.refreshLiveKpiForMachine(

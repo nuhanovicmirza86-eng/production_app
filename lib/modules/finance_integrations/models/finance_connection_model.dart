@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Veza na ERP (`finance_connections/{connectionId}`) — tanak read model za UI.
+///
+/// **enabledModules**: kanonska lista opcija za sync (Firestore + Callable). Ako dokument nema vrijednosno polje s tim ključem ili je `null`, [fromFirestore] pada na legacy **`enabledSyncTypes`** iz Firestore dokumenta.
 class FinanceConnectionModel {
   final String id;
   final String companyId;
@@ -12,7 +14,8 @@ class FinanceConnectionModel {
   final String? baseUrl;
   final String? syncDirection;
   final String? plantKey;
-  final List<String> enabledSyncTypes;
+  /// Uključeni moduli / sync opcije za ovu vezu (isto značenje kao legacy `enabledSyncTypes` na dokumentu).
+  final List<String> enabledModules;
   final Map<String, String>? masterDataPolicy;
   final DateTime? lastSuccessfulSyncAt;
   final DateTime? lastConnectionTestAt;
@@ -32,7 +35,7 @@ class FinanceConnectionModel {
     this.baseUrl,
     this.syncDirection,
     this.plantKey,
-    this.enabledSyncTypes = const [],
+    this.enabledModules = const [],
     this.masterDataPolicy,
     this.lastSuccessfulSyncAt,
     this.lastConnectionTestAt,
@@ -57,7 +60,7 @@ class FinanceConnectionModel {
       baseUrl: _optString(data['baseUrl']),
       syncDirection: _optString(data['syncDirection']),
       plantKey: _optString(data['plantKey']),
-      enabledSyncTypes: _stringList(data['enabledSyncTypes']),
+      enabledModules: _readEnabledModulesList(data),
       masterDataPolicy: _policyMap(data['masterDataPolicy']),
       lastSuccessfulSyncAt: _ts(data['lastSuccessfulSyncAt']),
       lastConnectionTestAt: _ts(data['lastConnectionTestAt']),
@@ -68,6 +71,26 @@ class FinanceConnectionModel {
       lastConnectionTestDetail: _optString(data['lastConnectionTestDetail']),
       updatedAt: _ts(data['updatedAt']),
     );
+  }
+
+  /// Isto kao [fromFirestore] — za Dart `Map`/JSON kartice bez `Timestamp` obrade (polja koja model zna obrađuju se istom logikom).
+  factory FinanceConnectionModel.fromMap(
+    String id,
+    Map<String, dynamic> data,
+  ) {
+    return FinanceConnectionModel.fromFirestore(id, data);
+  }
+
+  /// Za **`upsertFinanceConnection`**: map koja sadrži isključivo **`enabledModules`** (bez legacy `enabledSyncTypes`).
+  Map<String, dynamic> toMap() =>
+      {'enabledModules': List<String>.from(enabledModules)};
+
+  static List<String> _readEnabledModulesList(Map<String, dynamic> data) {
+    final em = data['enabledModules'];
+    if (em != null) {
+      return _stringList(em);
+    }
+    return _stringList(data['enabledSyncTypes']);
   }
 
   static int? _iOpt(dynamic v) {

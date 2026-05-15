@@ -1,13 +1,14 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
+import '../../../../core/company_operational_config_service.dart';
 import '../config/operator_tracking_column_labels.dart';
 
-/// Snimanje [operatorTrackingColumnLabelsKey] i [operatorTrackingColumnUiKey] na `companies/{id}`.
+/// Snimanje [operatorTrackingColumnLabelsKey] i [operatorTrackingColumnUiKey] preko Callabla
+/// [updateCompanyOperationalConfig] — bez direktnog Firestore SDK write-a na root `companies`.
 class CompanyOperatorTrackingColumnLabelsService {
-  CompanyOperatorTrackingColumnLabelsService({FirebaseFirestore? firestore})
-    : _db = firestore ?? FirebaseFirestore.instance;
+  CompanyOperatorTrackingColumnLabelsService({
+    CompanyOperationalConfigService? operationalConfig,
+  }) : _ops = operationalConfig ?? CompanyOperationalConfigService();
 
-  final FirebaseFirestore _db;
+  final CompanyOperationalConfigService _ops;
 
   static const Set<String> _allowedKeys = {
     OperatorTrackingColumnKeys.rowIndex,
@@ -44,9 +45,10 @@ class CompanyOperatorTrackingColumnLabelsService {
       if (!_allowedKeys.contains(k) || v.isEmpty) continue;
       clean[k] = v;
     }
-    await _db.collection('companies').doc(cid).update({
-      operatorTrackingColumnLabelsKey: clean,
-      operatorTrackingColumnUiKey: {
+    await _ops.updateOperationalConfig(<String, dynamic>{
+      'companyId': cid,
+      'operatorTrackingColumnLabels': clean,
+      'operatorTrackingColumnUi': <String, dynamic>{
         'showSystemHeaders': showSystemHeaders,
       },
     });

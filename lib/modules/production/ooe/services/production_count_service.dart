@@ -1,13 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/production_count_event.dart';
+import 'production_count_callable_service.dart';
 
 /// Inkrementi količina — služe za sabiranje u summary / OOE performance kvalitetu.
 class ProductionCountService {
-  final FirebaseFirestore _firestore;
+  ProductionCountService({
+    FirebaseFirestore? firestore,
+    ProductionCountCallableService? countCallable,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _callable = countCallable ?? ProductionCountCallableService();
 
-  ProductionCountService({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore;
+  final ProductionCountCallableService _callable;
 
   CollectionReference<Map<String, dynamic>> get _col =>
       _firestore.collection('production_count_events');
@@ -110,7 +115,9 @@ class ProductionCountService {
     return e;
   }
 
-  /// Dodaje jedan inkrement (iz ručnog unosa, execution ili kasnije SCADA).
+  /// Dodaje jedan inkrement preko Callablea [appendProductionCountEvent] (isti kanonski dokument u Firestoreu).
+  ///
+  /// [idempotencyKey] mora biti deterministički po poslovnom događaju (npr. execution completed).
   Future<String> appendIncrement({
     required String companyId,
     required String plantKey,
@@ -120,41 +127,40 @@ class ProductionCountService {
     required double goodCountIncrement,
     required double scrapCountIncrement,
     required String source,
+    required String idempotencyKey,
     String? lineId,
     String? orderId,
     String? productId,
     String? shiftId,
-    String? createdBy,
   }) async {
     _assertTenant(companyId: companyId, plantKey: plantKey);
     if (_s(machineId).isEmpty) throw Exception('machineId je obavezan.');
+    final iKey = _s(idempotencyKey);
+    if (iKey.isEmpty) throw ArgumentError('idempotencyKey je obavezan.');
 
-    final now = DateTime.now();
-    final docRef = _col.doc();
-    final event = ProductionCountEvent(
-      id: docRef.id,
-      companyId: _s(companyId),
-      plantKey: _s(plantKey),
-      machineId: _s(machineId),
-      lineId: _nullable(lineId),
-      orderId: _nullable(orderId),
-      productId: _nullable(productId),
-      shiftId: _nullable(shiftId),
+    final res = await _callable.appendProductionCountEvent(
+      companyId: companyId,
+      plantKey: plantKey,
+      machineId: machineId,
       timestamp: timestamp,
       totalCountIncrement: totalCountIncrement,
       goodCountIncrement: goodCountIncrement,
       scrapCountIncrement: scrapCountIncrement,
       source: _s(source).isEmpty ? 'manual' : _s(source),
-      createdBy: _nullable(createdBy),
-      createdAt: now,
+      idempotencyKey: iKey,
+      lineId: lineId,
+      orderId: orderId,
+      productId: productId,
+      shiftId: shiftId,
     );
 
-    await docRef.set(event.toMap());
-    return docRef.id;
-  }
-
-  String? _nullable(String? v) {
-    final t = _s(v);
-    return t.isEmpty ? null : t;
+    if (!res.success) {
+      throw Exception('appendProductionCountEvent nije uspio.');
+    }
+    final id = res.eventId;
+    if (id == null || id.isEmpty) {
+      throw Exception('appendProductionCountEvent: nedostaje eventId.');
+    }
+    return id;
   }
 }

@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Jedan red u `companies/{companyId}/finance_budgets`.
+///
+/// Kanonski plan puni **`finance_integrations`** / ERP sync (vidi FINANCE_CONTROLLING normativ — polja
+/// **`sourceSystem`**, **`sourceRecordId`**, **`syncRunId`**, **`lastSyncedAt`** za audit i troubleshooting).
 class FinanceBudgetDoc {
   FinanceBudgetDoc({
     required this.id,
@@ -11,6 +14,10 @@ class FinanceBudgetDoc {
     required this.plannedAmount,
     required this.actualAmount,
     required this.variance,
+    this.sourceSystem = '',
+    this.sourceRecordId = '',
+    this.syncRunId = '',
+    this.lastSyncedAt,
   });
 
   final String id;
@@ -21,6 +28,18 @@ class FinanceBudgetDoc {
   final double? plannedAmount;
   final double? actualAmount;
   final double? variance;
+
+  /// ERP ili drugi kanonski izvor (npr. `pantheon`).
+  final String sourceSystem;
+
+  /// Stabilni identifikator retka u izvornom sustavu za retry / paralelisanje audit traila.
+  final String sourceRecordId;
+
+  /// Identifikacija batcha/sync runa koja je dokument zadnji put uskladila.
+  final String syncRunId;
+
+  /// Kad je dokument zadnji put sinkroniziran iz izvora (Firestore `Timestamp` u dokumentu).
+  final DateTime? lastSyncedAt;
 
   static FinanceBudgetDoc fromSnapshot(
     DocumentSnapshot<Map<String, dynamic>> d,
@@ -35,7 +54,17 @@ class FinanceBudgetDoc {
       plannedAmount: _readDouble(m['plannedAmount']),
       actualAmount: _readDouble(m['actualAmount']),
       variance: _readDouble(m['variance']),
+      sourceSystem: (m['sourceSystem'] ?? '').toString().trim(),
+      sourceRecordId: (m['sourceRecordId'] ?? '').toString().trim(),
+      syncRunId: (m['syncRunId'] ?? '').toString().trim(),
+      lastSyncedAt: _readFirestoreDate(m['lastSyncedAt']),
     );
+  }
+
+  static DateTime? _readFirestoreDate(dynamic v) {
+    if (v == null) return null;
+    if (v is Timestamp) return v.toDate();
+    return null;
   }
 
   static double? _readDouble(dynamic v) {

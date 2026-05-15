@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../core/access/production_access_helper.dart';
 import '../models/finance_connection_model.dart';
 import '../services/finance_connection_callable_service.dart';
+import '../services/finance_integration_dry_run_service.dart';
 import '../utils/finance_permissions.dart';
 import '../utils/finance_provider_constants.dart';
 import '../utils/finance_sync_constants.dart';
@@ -53,6 +54,9 @@ class _FinanceConnectionEditScreenState extends State<FinanceConnectionEditScree
   bool _saving = false;
 
   final _callable = FinanceConnectionCallableService();
+  final _dryRun = FinanceIntegrationDryRunService();
+
+  bool _dryRunBusy = false;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -93,7 +97,7 @@ class _FinanceConnectionEditScreenState extends State<FinanceConnectionEditScree
     _status = (ex?.status ?? 'draft').trim().toLowerCase();
     _syncDirection =
         (ex?.syncDirection ?? 'bidirectional').trim().toLowerCase();
-    _selectedSync = {...?ex?.enabledSyncTypes};
+    _selectedSync = {...?ex?.enabledModules};
 
     for (final k in _masterKeys) {
       final v = ex?.masterDataPolicy?[k];
@@ -151,7 +155,7 @@ class _FinanceConnectionEditScreenState extends State<FinanceConnectionEditScree
         'connectionType': _connectionType,
         'status': _status,
         'syncDirection': _syncDirection,
-        'enabledSyncTypes': _selectedSync.toList(),
+        'enabledModules': _selectedSync.toList(),
         'masterDataPolicy': Map<String, String>.from(_masterChoice),
       };
       if (_environment.isNotEmpty) {
@@ -189,6 +193,46 @@ class _FinanceConnectionEditScreenState extends State<FinanceConnectionEditScree
     } finally {
       if (mounted) {
         setState(() => _saving = false);
+      }
+    }
+  }
+
+  /// Privremeno: dokaz end-to-end lanca (Callable → syncRun → audit → veza).
+  Future<void> _runDryRun() async {
+    if (!_canSave || widget.existing == null) return;
+    setState(() => _dryRunBusy = true);
+    try {
+      final r = await _dryRun.runFinanceIntegrationSyncDryRun(
+        companyId: _companyId,
+        connectionId: widget.existing!.id,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Dry run OK: ${r.syncRunId} (${r.status}; '
+            'obradeno=${r.recordsProcessed}, grešaka=${r.recordsFailed})',
+          ),
+        ),
+      );
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+      final msg = (e.message ?? '').trim();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            msg.isNotEmpty ? msg : 'Dry-run nije uspio.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Greška: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _dryRunBusy = false);
       }
     }
   }
@@ -466,6 +510,22 @@ class _FinanceConnectionEditScreenState extends State<FinanceConnectionEditScree
                 ),
               ),
             ),
+            if (widget.existing != null && _canSave) ...[
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton(
+                  onPressed: _dryRunBusy ? null : _runDryRun,
+                  child: _dryRunBusy
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Pokreni Dry Run'),
+                ),
+              ),
+            ],
           ],
         ),
       ),

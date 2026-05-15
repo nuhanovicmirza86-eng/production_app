@@ -75,7 +75,7 @@ class FinanceCsvExportCapabilitiesScreen extends StatelessWidget {
               }
               final rows = snap.data!;
               final withCsv = rows.where((c) {
-                return c.enabledSyncTypes.any(
+                return c.enabledModules.any(
                   (t) =>
                       t.toLowerCase() ==
                       FinanceEnabledSyncTypes.csvExport.toLowerCase(),

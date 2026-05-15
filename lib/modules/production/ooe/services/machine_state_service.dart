@@ -1,21 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/machine_state_event.dart';
-import 'ooe_loss_reason_service.dart';
 
-/// Upis i čitanje `machine_state_events` — promjene stanja mašine / linije.
+/// Čitanje `machine_state_events` — segmenti stanja mašine / linije (upis: Callable).
 class MachineStateService {
-  final FirebaseFirestore _firestore;
-  final OoeLossReasonService _ooeLossReasons;
+  MachineStateService({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  MachineStateService({
-    FirebaseFirestore? firestore,
-    OoeLossReasonService? ooeLossReasonService,
-  })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _ooeLossReasons = ooeLossReasonService ??
-            OoeLossReasonService(
-              firestore: firestore ?? FirebaseFirestore.instance,
-            );
+  final FirebaseFirestore _firestore;
 
   CollectionReference<Map<String, dynamic>> get _col =>
       _firestore.collection('machine_state_events');
@@ -28,40 +20,6 @@ class MachineStateService {
   }) {
     if (_s(companyId).isEmpty || _s(plantKey).isEmpty) {
       throw Exception('companyId i plantKey su obavezni.');
-    }
-  }
-
-  static const Set<String> _allowedStates = {
-    MachineStateEvent.stateRunning,
-    MachineStateEvent.stateStopped,
-    MachineStateEvent.stateSetup,
-    MachineStateEvent.stateWaitingMaterial,
-    MachineStateEvent.stateWaitingOperator,
-    MachineStateEvent.stateMaintenance,
-    MachineStateEvent.stateQualityHold,
-    MachineStateEvent.statePlannedBreak,
-    MachineStateEvent.stateIdle,
-  };
-
-  void _validateState(String state) {
-    if (!_allowedStates.contains(state)) {
-      throw Exception('Nepoznato machine state: $state');
-    }
-  }
-
-  Future<void> _assertDocTenant({
-    required DocumentReference<Map<String, dynamic>> ref,
-    required String companyId,
-    required String plantKey,
-  }) async {
-    final snap = await ref.get();
-    if (!snap.exists) {
-      throw Exception('Machine state događaj ne postoji.');
-    }
-    final data = snap.data();
-    if (data == null) throw Exception('Događaj nema podataka.');
-    if (_s(data['companyId']) != companyId || _s(data['plantKey']) != plantKey) {
-      throw Exception('Nemaš pristup ovom događaju.');
     }
   }
 
@@ -120,79 +78,7 @@ class MachineStateService {
     return e;
   }
 
-  /// Otvara novi segment stanja (npr. nakon start execution ili PLC signala).
-  Future<String> openState({
-    required String companyId,
-    required String plantKey,
-    required String machineId,
-    required String state,
-    required DateTime startedAt,
-    required String source,
-    String? lineId,
-    String? workCenterId,
-    String? orderId,
-    String? productId,
-    String? shiftId,
-    DateTime? shiftDate,
-    String? reasonCode,
-    String? reasonCategory,
-    String? tpmLossKey,
-    String? createdBy,
-    String? notes,
-  }) async {
-    _assertTenant(companyId: companyId, plantKey: plantKey);
-    final st = _s(state);
-    _validateState(st);
-    if (_s(machineId).isEmpty) throw Exception('machineId je obavezan.');
-
-    var resolvedTpm = _nullable(tpmLossKey);
-    if (resolvedTpm == null) {
-      final rc = _nullable(reasonCode);
-      if (rc != null) {
-        try {
-          resolvedTpm = await _ooeLossReasons.resolveEffectiveTpmKeyForReasonCode(
-            companyId: _s(companyId),
-            plantKey: _s(plantKey),
-            reasonCode: rc,
-          );
-        } catch (_) {
-          resolvedTpm = null;
-        }
-      }
-    }
-
-    final now = DateTime.now();
-    final docRef = _col.doc();
-    final event = MachineStateEvent(
-      id: docRef.id,
-      companyId: _s(companyId),
-      plantKey: _s(plantKey),
-      machineId: _s(machineId),
-      lineId: _nullable(lineId),
-      workCenterId: _nullable(workCenterId),
-      orderId: _nullable(orderId),
-      productId: _nullable(productId),
-      shiftId: _nullable(shiftId),
-      shiftDate: shiftDate,
-      state: st,
-      reasonCode: _nullable(reasonCode),
-      reasonCategory: _nullable(reasonCategory),
-      tpmLossKey: _nullable(resolvedTpm),
-      startedAt: startedAt,
-      endedAt: null,
-      durationSeconds: null,
-      source: _s(source).isEmpty ? 'manual' : _s(source),
-      createdBy: _nullable(createdBy),
-      createdAt: now,
-      notes: _nullable(notes),
-    );
-
-    await docRef.set(event.toMap());
-    return docRef.id;
-  }
-
-  /// Zatvara segment (postavlja [endedAt] i [durationSeconds] u sekundama).
-  /// Posljednji otvoreni segment (bez [endedAt]) za mašinu — za integraciju execution / SCADA.
+  /// Posljednji otvoreni segment (bez [endedAt]) za mašinu — za integraciju execution / očitavanje stanja.
   Future<MachineStateEvent?> getLatestOpenEventForMachine({
     required String companyId,
     required String plantKey,
@@ -249,37 +135,5 @@ class MachineStateService {
     }
     list.sort((a, b) => a.startedAt.compareTo(b.startedAt));
     return list;
-  }
-
-  Future<void> closeState({
-    required String eventId,
-    required String companyId,
-    required String plantKey,
-    required DateTime endedAt,
-  }) async {
-    _assertTenant(companyId: companyId, plantKey: plantKey);
-    final ref = _col.doc(eventId);
-    await _assertDocTenant(ref: ref, companyId: companyId, plantKey: plantKey);
-
-    final snap = await ref.get();
-    final ev = MachineStateEvent.fromDoc(snap);
-    if (ev.endedAt != null) {
-      throw Exception('Događaj je već zatvoren.');
-    }
-    if (endedAt.isBefore(ev.startedAt)) {
-      throw Exception('endedAt mora biti nakon ili jednak startedAt.');
-    }
-
-    final durationSeconds = endedAt.difference(ev.startedAt).inSeconds;
-
-    await ref.update({
-      'endedAt': endedAt,
-      'durationSeconds': durationSeconds,
-    });
-  }
-
-  String? _nullable(String? v) {
-    final t = _s(v);
-    return t.isEmpty ? null : t;
   }
 }
