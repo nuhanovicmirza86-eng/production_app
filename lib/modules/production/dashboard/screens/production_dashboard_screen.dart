@@ -34,7 +34,6 @@ import '../../ai/screens/production_ai_hub_screen.dart';
 import '../../tracking/screens/production_reports_hub_screen.dart';
 import '../../issues/screens/production_problem_reporting_screen.dart';
 import '../../../workforce/screens/workforce_dashboard_screen.dart';
-import '../../../personal/screens/personal_employees_list_screen.dart';
 import '../../../personal/work_time/screens/work_time_hub_screen.dart';
 import '../../ooe/screens/factory_performance_dashboard_screen.dart';
 import '../../ooe/screens/ooe_dashboard_screen.dart';
@@ -356,13 +355,6 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             subtitle:
                 'Prisutnost, dnevna i mjesečna slaganja, korekcije (modul Osobno).',
             onTap: () => open(WorkTimeHubScreen(companyData: companyData)),
-          ),
-        if (_canAccessPersonalWorkTime())
-          _DashboardActionTile(
-            icon: Icons.badge_outlined,
-            title: 'Zaposlenici',
-            subtitle: 'Personal — pregled zaposlenika (read).',
-            onTap: () => open(PersonalEmployeesListScreen(companyData: companyData)),
           ),
         if (_canViewCard(ProductionDashboardCard.downtime))
           _DashboardActionTile(
