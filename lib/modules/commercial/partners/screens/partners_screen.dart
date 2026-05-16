@@ -16,6 +16,7 @@ import 'partner_customer_edit_screen.dart';
 import '../../assessment/screens/unified_assessment_run_screen.dart';
 import 'partner_supplier_edit_screen.dart';
 import 'supplier_evaluations_screen.dart';
+import 'supplier_selection_screen.dart';
 
 class PartnersScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
@@ -76,6 +77,14 @@ class _PartnersScreenState extends State<PartnersScreen>
       _role == 'production_manager' ||
       _role == 'purchasing' ||
       _role == 'logistics_manager';
+
+  /// Callable Supplier Selection v1 — isti skup kao `canCreateSupplierEvaluation`.
+  bool get _canRunSupplierSelection =>
+      _role == 'admin' ||
+      _role == 'purchasing' ||
+      _role == 'production_manager' ||
+      _role == 'supervisor' ||
+      _role == 'super_admin';
 
   /// Usklađeno s `assertCallableActor` u `refreshSupplierOperationalSignals`.
   bool get _canRefreshSupplierOperational =>
@@ -581,12 +590,29 @@ class _PartnersScreenState extends State<PartnersScreen>
   }
 
   Widget _supplierFilterBar() {
-    if (_suppliers.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (_canRunSupplierSelection)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => SupplierSelectionScreen(
+                        companyData: _companyDataForPartners,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.sort),
+                label: const Text('Odabir dobavljača'),
+              ),
+            ),
+          if (_suppliers.isEmpty) const SizedBox.shrink() else ...[
           Text(
             'Filter: kategorija (ABC)',
             style: Theme.of(context).textTheme.labelLarge,
@@ -655,6 +681,7 @@ class _PartnersScreenState extends State<PartnersScreen>
             ],
             onChanged: (v) => setState(() => _supplierActivityFilter = v),
           ),
+        ],
         ],
       ),
     );
@@ -750,7 +777,13 @@ class _PartnersScreenState extends State<PartnersScreen>
 
   Widget _buildSuppliersTab() {
     if (_suppliers.isEmpty && !_loading && _error == null) {
-      return _empty('Nema dobavljača.');
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _supplierFilterBar(),
+          Expanded(child: _empty('Nema dobavljača.')),
+        ],
+      );
     }
     final visible = _visibleSuppliers;
     if (_suppliers.isNotEmpty &&
