@@ -548,14 +548,34 @@ class ProductionAccessHelper {
     return normalizeRole(role) == roleSuperAdmin;
   }
 
+  /// Tenant / modul uloge koje po defaultu rade na nivou **kompanije** (admin, financije, NPI/razvoj,
+  /// voditelj kvaliteta/QMS),
+  /// ne na jednom pogonu: [plantKey] u profilu i u Callable payloadu **nije obavezan** osim kad je
+  /// eksplicitno potreban pogon (npr. ORV fokus). Ako se [plantKey] pošalje, kontekst se filtrira na pogon.
+  ///
+  /// Kanonski kodovi: [roleAdmin] (uključujući legacy `company_admin` → normalizacija), [roleSuperAdmin],
+  /// [roleAccountingManager], [roleAccountingClerk], [roleProjectManager], [roleDevelopmentEngineer],
+  /// [roleQualityControl].
+  ///
+  /// Usklađeno s backend [isCompanyWideContextRole] (`production_callable_helpers.js`).
+  static bool isCompanyWideContextRole(dynamic roleRaw) {
+    final r = normalizeRole(roleRaw);
+    if (r == roleSuperAdmin) return true;
+    if (isAdminRole(r)) return true;
+    return r == roleAccountingManager ||
+        r == roleAccountingClerk ||
+        r == roleProjectManager ||
+        r == roleDevelopmentEngineer ||
+        r == roleQualityControl;
+  }
+
   /// Usklađeno s backend [canUseProductionAssistant] (`production_callable_helpers.js`).
   ///
   /// Vođa smjene nema Callable operativnog asistenta nad podacima praćenja; u hubu ostaje
   /// samo osnovni AI razgovor (kad je pretplata dopušta).
   static bool canUseOperationalProductionAssistant(dynamic roleRaw) {
     final r = normalizeRole(roleRaw);
-    return isAdminRole(r) ||
-        r == roleSuperAdmin ||
+    return isCompanyWideContextRole(r) ||
         r == roleProductionManager ||
         r == 'supervisor' ||
         r == roleProductionOperator ||

@@ -1,9 +1,12 @@
+import 'dart:async' show unawaited;
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../../../../core/ai/production_ai_context_scope.dart';
 import '../../../../core/access/production_access_helper.dart';
+import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/saas/production_module_keys.dart';
 import '../services/production_ai_report_service.dart';
 
@@ -30,8 +33,40 @@ class _ProductionAiReportScreenState extends State<ProductionAiReportScreen> {
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
-  String get _plantKey =>
+  String get _sessionPlantKey =>
       (widget.companyData['plantKey'] ?? '').toString().trim();
+
+  String? _reportPlantScopeKey;
+  List<({String plantKey, String label})> _plantChoices = [];
+  bool _plantChoicesLoaded = false;
+
+  bool get _isCompanyWideContextUser =>
+      ProductionAccessHelper.isCompanyWideContextRole(
+        ProductionAccessHelper.rawRoleFromCompanySession(widget.companyData),
+      );
+
+  bool get _showPlantScopeSelector => _isCompanyWideContextUser;
+
+  String? get _dropdownReportPlantValue {
+    final s = _reportPlantScopeKey;
+    if (s == null || s.trim().isEmpty) return null;
+    final t = s.trim();
+    if (_plantChoices.any((e) => e.plantKey == t)) return t;
+    return null;
+  }
+
+  /// Izvještaj uvijek zahtijeva jedan pogon u Callableu.
+  String? get _resolvedPlantKeyForReport {
+    if (_isCompanyWideContextUser) {
+      final scoped = (_reportPlantScopeKey ?? '').trim();
+      if (scoped.isNotEmpty) return scoped;
+      final sess = _sessionPlantKey;
+      if (sess.isNotEmpty) return sess;
+      return null;
+    }
+    final s = _sessionPlantKey;
+    return s.isEmpty ? null : s;
+  }
 
   int _inclusiveCalendarDays() {
     final a = DateTime(_start.year, _start.month, _start.day);
@@ -56,6 +91,30 @@ class _ProductionAiReportScreenState extends State<ProductionAiReportScreen> {
     final now = DateTime.now();
     _end = DateTime(now.year, now.month, now.day);
     _start = _end.subtract(const Duration(days: 6));
+    final sk = _sessionPlantKey;
+    if (_isCompanyWideContextUser && sk.isNotEmpty) {
+      _reportPlantScopeKey = sk;
+    }
+    unawaited(_loadPlantChoices());
+  }
+
+  Future<void> _loadPlantChoices() async {
+    if (!_showPlantScopeSelector) {
+      if (mounted) setState(() => _plantChoicesLoaded = true);
+      return;
+    }
+    try {
+      final list = await CompanyPlantDisplayName.listSelectablePlants(
+        companyId: _companyId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _plantChoices = list;
+        _plantChoicesLoaded = true;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _plantChoicesLoaded = true);
+    }
   }
 
   Future<void> _pickStart() async {
@@ -98,8 +157,13 @@ class _ProductionAiReportScreenState extends State<ProductionAiReportScreen> {
   }
 
   Future<void> _generate() async {
-    if (_companyId.isEmpty || _plantKey.isEmpty) {
-      setState(() => _error = 'Nedostaje podatak o kompaniji ili pogonu. Obrati se administratoru.');
+    final pk = _resolvedPlantKeyForReport;
+    if (_companyId.isEmpty || pk == null || pk.isEmpty) {
+      setState(() {
+        _error = _isCompanyWideContextUser
+            ? 'Za generiranje izvještaja odaberi pogon u polju ispod (ili dodijeli pogon u profilu).'
+            : 'Nedostaje podatak o kompaniji ili pogonu. Obrati se administratoru.';
+      });
       return;
     }
     if (!_periodOrderOk) {
@@ -120,7 +184,7 @@ class _ProductionAiReportScreenState extends State<ProductionAiReportScreen> {
     try {
       final r = await _svc.generate(
         companyId: _companyId,
-        plantKey: _plantKey,
+        plantKey: pk,
         start: _start,
         end: _end,
       );
@@ -187,6 +251,64 @@ class _ProductionAiReportScreenState extends State<ProductionAiReportScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
+                if (_showPlantScopeSelector) ...[
+                  Text(
+                    'Pogon za izvještaj',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  if (!_plantChoicesLoaded)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: LinearProgressIndicator(),
+                    )
+                  else
+                    InputDecorator(
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String?>(
+                          isExpanded: true,
+                          value: _dropdownReportPlantValue,
+                          hint: const Text('Odaberi pogon'),
+                          items: _plantChoices
+                              .map(
+                                (e) => DropdownMenuItem<String?>(
+                                  value: e.plantKey,
+                                  child: Text(e.label),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: _loading
+                              ? null
+                              : (v) {
+                                  setState(() {
+                                    _reportPlantScopeKey =
+                                        v == null || v.trim().isEmpty
+                                        ? null
+                                        : v.trim();
+                                  });
+                                },
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Sažetak se odnosi na jedan pogon (praćenje i nalozi u tom kontekstu).',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 Row(
                   children: [
                     Expanded(
@@ -297,5 +419,6 @@ bool productionAiReportVisibleForRole(dynamic roleRaw) {
   return r == 'admin' ||
       r == 'super_admin' ||
       r == 'production_manager' ||
-      r == 'supervisor';
+      r == 'supervisor' ||
+      r == ProductionAccessHelper.roleQualityControl;
 }

@@ -4,6 +4,8 @@ enum AiAnalysisDomain {
   oee,
   productionFlow,
   generic,
+  /// QMS / kvaliteta (Callable [runAiAnalysis], domena `qms`) — RBAC `quality_qms` + modul quality.
+  qms,
 }
 
 extension AiAnalysisDomainApi on AiAnalysisDomain {
@@ -18,6 +20,8 @@ extension AiAnalysisDomainApi on AiAnalysisDomain {
         return 'production_flow';
       case AiAnalysisDomain.generic:
         return 'generic';
+      case AiAnalysisDomain.qms:
+        return 'qms';
     }
   }
 }

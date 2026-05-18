@@ -1,9 +1,12 @@
+import 'dart:async' show unawaited;
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../../../../core/ai/production_ai_context_scope.dart';
 import '../../../../core/access/production_access_helper.dart';
+import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/saas/production_module_keys.dart';
 import '../ai_analysis_payloads.dart';
 import '../models/ai_analysis_domain.dart';
@@ -41,8 +44,58 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
-  String get _plantKey =>
+  String get _sessionPlantKey =>
       (widget.companyData['plantKey'] ?? '').toString().trim();
+
+  String? _analysisPlantScopeKey;
+  List<({String plantKey, String label})> _plantChoices = [];
+  bool _plantChoicesLoaded = false;
+
+  bool get _isCompanyWideContextUser =>
+      ProductionAccessHelper.isCompanyWideContextRole(
+        ProductionAccessHelper.rawRoleFromCompanySession(widget.companyData),
+      );
+
+  bool get _showPlantScopeSelector => _isCompanyWideContextUser;
+
+  String? get _dropdownPlantValue {
+    final s = _analysisPlantScopeKey;
+    if (s == null || s.trim().isEmpty) return null;
+    final t = s.trim();
+    if (_plantChoices.any((e) => e.plantKey == t)) return t;
+    return null;
+  }
+
+  /// Za Firestore snimke (OEE / SCADA / nalozi) — uvek jedan pogon.
+  String? get _resolvedPlantKeyForDb {
+    if (_isCompanyWideContextUser) {
+      final scoped = (_analysisPlantScopeKey ?? '').trim();
+      if (scoped.isNotEmpty) return scoped;
+      return null;
+    }
+    final s = _sessionPlantKey;
+    return s.isEmpty ? null : s;
+  }
+
+  /// Za Callable: prazan kad company-wide bez odabranog pogona (backend: generic|qms).
+  String get _plantKeyForCallable {
+    if (_isCompanyWideContextUser) {
+      final scoped = (_analysisPlantScopeKey ?? '').trim();
+      if (scoped.isNotEmpty) return scoped;
+      return '';
+    }
+    return _sessionPlantKey;
+  }
+
+  bool get _callableAllowsEmptyPlant =>
+      _isCompanyWideContextUser &&
+      (_domain == AiAnalysisDomain.generic || _domain == AiAnalysisDomain.qms) &&
+      _plantKeyForCallable.isEmpty;
+
+  String get _missingPlantForSnapshotMessage =>
+      _isCompanyWideContextUser
+      ? 'Za učitavanje iz baze odaberi jedan pogon u polju „Doseg analize“.'
+      : 'Nedostaje podatak o kompaniji ili pogonu. Obrati se administratoru.';
 
   bool get _busy => _loading || _snapshotLoading;
 
@@ -85,6 +138,26 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
     final now = DateTime.now();
     _end = DateTime(now.year, now.month, now.day);
     _start = _end.subtract(const Duration(days: 6));
+    unawaited(_loadPlantChoices());
+  }
+
+  Future<void> _loadPlantChoices() async {
+    if (!_showPlantScopeSelector) {
+      if (mounted) setState(() => _plantChoicesLoaded = true);
+      return;
+    }
+    try {
+      final list = await CompanyPlantDisplayName.listSelectablePlants(
+        companyId: _companyId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _plantChoices = list;
+        _plantChoicesLoaded = true;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _plantChoicesLoaded = true);
+    }
   }
 
   @override
@@ -133,8 +206,9 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
   }
 
   Future<void> _loadOeeFromTracking() async {
-    if (_companyId.isEmpty || _plantKey.isEmpty) {
-      setState(() => _error = 'Nedostaje podatak o kompaniji ili pogonu. Obrati se administratoru.');
+    final pk = _resolvedPlantKeyForDb;
+    if (_companyId.isEmpty || pk == null || pk.isEmpty) {
+      setState(() => _error = _missingPlantForSnapshotMessage);
       return;
     }
     if (_rejectIfPeriodTooLongForFirestore()) return;
@@ -146,7 +220,7 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
     try {
       final payload = await _snapshotSvc.buildOeeStyleFromTracking(
         companyId: _companyId,
-        plantKey: _plantKey,
+        plantKey: pk,
         start: _start,
         end: _end,
       );
@@ -166,8 +240,9 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
   }
 
   Future<void> _loadScadaFromTracking() async {
-    if (_companyId.isEmpty || _plantKey.isEmpty) {
-      setState(() => _error = 'Nedostaje podatak o kompaniji ili pogonu. Obrati se administratoru.');
+    final pk = _resolvedPlantKeyForDb;
+    if (_companyId.isEmpty || pk == null || pk.isEmpty) {
+      setState(() => _error = _missingPlantForSnapshotMessage);
       return;
     }
     if (_rejectIfPeriodTooLongForFirestore()) return;
@@ -179,7 +254,7 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
     try {
       final payload = await _snapshotSvc.buildScadaStyleFromTracking(
         companyId: _companyId,
-        plantKey: _plantKey,
+        plantKey: pk,
         start: _start,
         end: _end,
       );
@@ -199,8 +274,9 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
   }
 
   Future<void> _loadFlowFromOrders() async {
-    if (_companyId.isEmpty || _plantKey.isEmpty) {
-      setState(() => _error = 'Nedostaje podatak o kompaniji ili pogonu. Obrati se administratoru.');
+    final pk = _resolvedPlantKeyForDb;
+    if (_companyId.isEmpty || pk == null || pk.isEmpty) {
+      setState(() => _error = _missingPlantForSnapshotMessage);
       return;
     }
     if (_rejectIfPeriodTooLongForFirestore()) return;
@@ -212,7 +288,7 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
     try {
       final payload = await _snapshotSvc.buildProductionFlowFromOrders(
         companyId: _companyId,
-        plantKey: _plantKey,
+        plantKey: pk,
         start: _start,
         end: _end,
       );
@@ -298,12 +374,45 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
           'generatedAt': now,
           'note': 'Generički demo — zamijeni stvarnim podacima iz servisa.',
         });
+      case AiAnalysisDomain.qms:
+        return AiAnalysisPayloads.qmsSnapshot(
+          source: 'production_app_demo',
+          periodLabel: 'zadnjih 7 dana (demo)',
+          openNcr: <String, dynamic>{
+            'count': 2,
+            'examples': <String>[
+              'LOT-441 — varijabla izvan granica',
+              'Ulazna kontrola šarže XY',
+            ],
+          },
+          capa: <String, dynamic>{'inProgress': 1},
+          complaints: <String, dynamic>{'open': 0},
+          incomingInspection: <String, dynamic>{
+            'lotsChecked': 12,
+            'rejectedLots': 1,
+          },
+          auditFindings: <String>[
+            'Zatvoriti jedno otvoreno zapažanje internog audit-a.',
+          ],
+        );
     }
   }
 
   Future<void> _run() async {
-    if (_companyId.isEmpty || _plantKey.isEmpty) {
-      setState(() => _error = 'Nedostaje podatak o kompaniji ili pogonu. Obrati se administratoru.');
+    if (_companyId.isEmpty) {
+      setState(
+        () => _error =
+            'Nedostaje podatak o kompaniji. Obrati se administratoru.',
+      );
+      return;
+    }
+    final pkCall = _plantKeyForCallable;
+    if (!_callableAllowsEmptyPlant && pkCall.isEmpty) {
+      setState(() {
+        _error = _isCompanyWideContextUser
+            ? 'Za ovu domenu analize odaberi pogon u polju „Doseg analize“, ili koristi domenu Generički ili QMS bez odabranog pogona (cijela tvrtka).'
+            : 'Nedostaje podatak o kompaniji ili pogonu. Obrati se administratoru.';
+      });
       return;
     }
     if (!_domainAllowedForRole) {
@@ -324,7 +433,8 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
     try {
       final r = await _svc.run(
         companyId: _companyId,
-        plantKey: _plantKey,
+        plantKey: pkCall.isEmpty ? null : pkCall,
+        allowEmptyPlantKey: _callableAllowsEmptyPlant,
         domain: _domain,
         payload: _payload!,
         analysisFocus: _focusCtrl.text.trim().isEmpty
@@ -387,7 +497,7 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Ovo nije chat. Šalje se JSON (SCADA / OEE / tok) na Callable '
+                    'Ovo nije chat. Šalje se JSON (SCADA / OEE / tok / QMS) na Callable '
                     'runAiAnalysis. Za učitavanje iz baze odaberi period (najviše '
                     '$_maxInclusivePeriodDays dan) ili koristi demo podatke.',
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -395,6 +505,70 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  if (_showPlantScopeSelector) ...[
+                    Text(
+                      'Doseg analize',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    if (!_plantChoicesLoaded)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: LinearProgressIndicator(),
+                      )
+                    else
+                      InputDecorator(
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String?>(
+                            isExpanded: true,
+                            value: _dropdownPlantValue,
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('Svi pogoni (cijela tvrtka)'),
+                              ),
+                              ..._plantChoices.map(
+                                (e) => DropdownMenuItem<String?>(
+                                  value: e.plantKey,
+                                  child: Text(e.label),
+                                ),
+                              ),
+                            ],
+                            onChanged: _busy
+                                ? null
+                                : (v) {
+                                    setState(() {
+                                      _analysisPlantScopeKey =
+                                          v == null || v.trim().isEmpty
+                                          ? null
+                                          : v.trim();
+                                      _payload = null;
+                                      _markdown = null;
+                                    });
+                                  },
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Za učitavanje OEE, operativnog snimka ili toka iz baze odaberi jedan pogon. '
+                      'Domene Generički i QMS mogu i bez odabranog pogona (doseg cijele tvrtke).',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   Row(
                     children: [
                       Expanded(
@@ -631,7 +805,8 @@ bool aiStructuredAnalysisVisibleForRole(dynamic roleRaw) {
       r == 'super_admin' ||
       r == 'production_manager' ||
       r == 'supervisor' ||
-      r == 'production_operator';
+      r == 'production_operator' ||
+      r == ProductionAccessHelper.roleQualityControl;
 }
 
 String _domainLabel(AiAnalysisDomain d) {
@@ -644,5 +819,7 @@ String _domainLabel(AiAnalysisDomain d) {
       return 'Tok proizvodnje';
     case AiAnalysisDomain.generic:
       return 'Generički';
+    case AiAnalysisDomain.qms:
+      return 'QMS / kvaliteta';
   }
 }

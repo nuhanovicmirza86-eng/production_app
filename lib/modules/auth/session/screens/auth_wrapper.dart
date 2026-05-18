@@ -155,10 +155,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
       if (plantKey.isEmpty) {
         final normRole = ProductionAccessHelper.normalizeRole(role);
-        final globalTenantAdmin =
-            ProductionAccessHelper.isAdminRole(normRole) ||
-                ProductionAccessHelper.isSuperAdminRole(normRole);
-        if (!globalTenantAdmin) {
+        if (!ProductionAccessHelper.isCompanyWideContextRole(normRole)) {
           _error =
               'U profilu nije postavljen pogon (tvornica / lokacija).\n'
               'Administrator mora dodijeliti pogon prije korištenja aplikacije.';
@@ -166,7 +163,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
           setState(() => _loading = false);
           return;
         }
-        // Admin / super_admin u kompaniji: pogon nije obavezan na korisniku —
+        // Uloge s dosegom kompanije (admin, financije, NPI/razvoj, …): pogon nije obavezan na korisniku —
         // moduli biraju kontekst (Workforce, stanica, spremljeni odabir).
       }
 

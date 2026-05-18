@@ -11,29 +11,38 @@ class ProductionTrackingAssistantClientService {
 
   Future<String> ask({
     required String companyId,
-    required String plantKey,
+    String? plantKey,
     required String prompt,
     String? evaluationEmployeeDocId,
     String? evaluationPeriodYyyyMm,
   }) async {
     final cid = companyId.trim();
-    final pk = plantKey.trim();
+    final pk = (plantKey ?? '').trim();
     final p = prompt.trim();
-    if (cid.isEmpty || pk.isEmpty || p.isEmpty) {
-      throw StateError('companyId, plantKey i prompt su obavezni.');
+    if (cid.isEmpty || p.isEmpty) {
+      throw StateError('companyId i prompt su obavezni.');
     }
     if (p.length > 8000) {
       throw StateError('Predugačak upit.');
     }
 
-    final payload = <String, dynamic>{
-      'companyId': cid,
-      'plantKey': pk,
-      'prompt': p,
-    };
     final eid = (evaluationEmployeeDocId ?? '').trim();
     final per = (evaluationPeriodYyyyMm ?? '').trim();
-    if (eid.isNotEmpty && per.isNotEmpty) {
+    final orvFocus = eid.isNotEmpty && per.isNotEmpty;
+    if (orvFocus && pk.isEmpty) {
+      throw StateError(
+        'Za fokus ocjene radnika (ORV) Callable zahtijeva plantKey — odaberite pogon u kontekstu.',
+      );
+    }
+
+    final payload = <String, dynamic>{
+      'companyId': cid,
+      'prompt': p,
+    };
+    if (pk.isNotEmpty) {
+      payload['plantKey'] = pk;
+    }
+    if (orvFocus) {
       payload['evaluationEmployeeDocId'] = eid;
       payload['evaluationPeriodYyyyMm'] = per;
     }

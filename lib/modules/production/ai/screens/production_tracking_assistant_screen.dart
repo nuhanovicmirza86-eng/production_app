@@ -4,8 +4,11 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
+import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/branding/operonix_ai_branding.dart';
+import '../../../../core/company_plant_display_name.dart';
 import '../models/production_ai_chat_message.dart';
+import '../services/firebase_callable_user_message.dart';
 import '../services/production_ai_chat_persistence.dart';
 import '../services/production_tracking_assistant_client_service.dart';
 
@@ -51,15 +54,83 @@ class _ProductionTrackingAssistantScreenState
   bool _loading = false;
   bool _restored = false;
 
+  /// Za [isCompanyWideContextRole]: [null] = Callable bez [plantKey] (cijela tvrtka).
+  /// Ne inicijalizirati iz sesijskog pogona — korisnik eksplicitno bira filter u UI.
+  String? _assistantPlantScopeKey;
+  List<({String plantKey, String label})> _plantChoices = [];
+  bool _plantChoicesLoaded = false;
+
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
-  String get _plantKey =>
+  String get _sessionPlantKey =>
       (widget.companyData['plantKey'] ?? '').toString().trim();
+
+  bool get _orvFocus {
+    final e = (widget.evaluationEmployeeDocId ?? '').trim();
+    final p = (widget.evaluationPeriodYyyyMm ?? '').trim();
+    return e.isNotEmpty && p.isNotEmpty;
+  }
+
+  bool get _isCompanyWideContextUser {
+    return ProductionAccessHelper.isCompanyWideContextRole(
+      ProductionAccessHelper.rawRoleFromCompanySession(widget.companyData),
+    );
+  }
+
+  bool get _showPlantScopeSelector =>
+      _isCompanyWideContextUser && !_orvFocus;
+
+  String get _threadStorageKey {
+    if (_isCompanyWideContextUser) {
+      if (_orvFocus) {
+        return _sessionPlantKey.isEmpty
+            ? '__orv_missing_plant__'
+            : _sessionPlantKey;
+      }
+      final scoped = (_assistantPlantScopeKey ?? '').trim();
+      if (scoped.isEmpty) return '__company_wide__';
+      return scoped;
+    }
+    return _sessionPlantKey;
+  }
+
+  bool get _canUseChatPersistence {
+    if (_companyId.isEmpty) return false;
+    if (_orvFocus) return _sessionPlantKey.isNotEmpty;
+    if (!_isCompanyWideContextUser && _sessionPlantKey.isEmpty) {
+      return false;
+    }
+    return true;
+  }
+
+  /// Za Callable: [null] = izostavi [plantKey] (backend: doseg cijele tvrtke za globalne uloge).
+  String? get _plantKeyForCallable {
+    if (_orvFocus) {
+      final s = _sessionPlantKey;
+      return s.isEmpty ? null : s;
+    }
+    if (_isCompanyWideContextUser) {
+      final scoped = (_assistantPlantScopeKey ?? '').trim();
+      if (scoped.isEmpty) return null;
+      return scoped;
+    }
+    final s = _sessionPlantKey;
+    return s.isEmpty ? null : s;
+  }
+
+  String? get _dropdownPlantValue {
+    final s = _assistantPlantScopeKey;
+    if (s == null || s.trim().isEmpty) return null;
+    final t = s.trim();
+    if (_plantChoices.any((e) => e.plantKey == t)) return t;
+    return null;
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    unawaited(_loadPlantChoices());
     unawaited(_restore());
   }
 
@@ -78,11 +149,65 @@ class _ProductionTrackingAssistantScreenState
     }
   }
 
+  Future<void> _loadPlantChoices() async {
+    if (!_showPlantScopeSelector) {
+      if (mounted) setState(() => _plantChoicesLoaded = true);
+      return;
+    }
+    try {
+      final list = await CompanyPlantDisplayName.listSelectablePlants(
+        companyId: _companyId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _plantChoices = list;
+        _plantChoicesLoaded = true;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _plantChoicesLoaded = true);
+    }
+  }
+
+  Future<void> _onAssistantScopeChanged(String? newKey) async {
+    if (_loading || !_showPlantScopeSelector) return;
+    final next = (newKey ?? '').trim();
+    final normalized = next.isEmpty ? null : next;
+    final prior = (_assistantPlantScopeKey ?? '').trim();
+    final priorNorm =
+        (_assistantPlantScopeKey == null || prior.isEmpty) ? null : prior;
+    if (normalized == priorNorm) return;
+
+    final keyForLoad =
+        (normalized == null || normalized.isEmpty)
+        ? '__company_wide__'
+        : normalized;
+
+    setState(() {
+      _assistantPlantScopeKey = normalized;
+      _turns.clear();
+      _restored = false;
+    });
+
+    final list = await ProductionAiChatPersistence.load(
+      _companyId,
+      keyForLoad,
+    );
+    if (!mounted) return;
+    setState(() {
+      _turns
+        ..clear()
+        ..addAll(list);
+      _restored = true;
+    });
+    _scrollToEnd();
+  }
+
   Future<void> _resyncFromCloud() async {
     if (_loading) return;
+    if (!_canUseChatPersistence) return;
     final list = await ProductionAiChatPersistence.reloadFromCloud(
       _companyId,
-      _plantKey,
+      _threadStorageKey,
     );
     if (!mounted) return;
     setState(() {
@@ -94,14 +219,17 @@ class _ProductionTrackingAssistantScreenState
   }
 
   Future<void> _restore() async {
-    if (_companyId.isEmpty || _plantKey.isEmpty) {
+    if (_companyId.isEmpty || !_canUseChatPersistence) {
       if (mounted) setState(() => _restored = true);
       return;
     }
     if (widget.startFreshThread) {
-      await ProductionAiChatPersistence.clear(_companyId, _plantKey);
+      await ProductionAiChatPersistence.clear(_companyId, _threadStorageKey);
     }
-    final list = await ProductionAiChatPersistence.load(_companyId, _plantKey);
+    final list = await ProductionAiChatPersistence.load(
+      _companyId,
+      _threadStorageKey,
+    );
     if (!mounted) return;
     setState(() {
       _turns
@@ -126,8 +254,14 @@ class _ProductionTrackingAssistantScreenState
   }
 
   void _schedulePersist() {
-    if (_companyId.isEmpty || _plantKey.isEmpty) return;
-    unawaited(ProductionAiChatPersistence.save(_companyId, _plantKey, List.of(_turns)));
+    if (!_canUseChatPersistence) return;
+    unawaited(
+      ProductionAiChatPersistence.save(
+        _companyId,
+        _threadStorageKey,
+        List.of(_turns),
+      ),
+    );
   }
 
   void _scrollToEnd() {
@@ -144,17 +278,47 @@ class _ProductionTrackingAssistantScreenState
   Future<void> _clearThread() async {
     if (_loading) return;
     setState(_turns.clear);
-    await ProductionAiChatPersistence.clear(_companyId, _plantKey);
+    if (_canUseChatPersistence) {
+      await ProductionAiChatPersistence.clear(_companyId, _threadStorageKey);
+    }
   }
 
   Future<void> _ask() async {
     final q = _prompt.text.trim();
     if (q.isEmpty || _loading || !_restored) return;
 
-    if (_companyId.isEmpty || _plantKey.isEmpty) {
+    if (!_canUseChatPersistence) {
       setState(() {
         _turns.add(
-          const ProductionAiChatMessage.error('Nedostaje podatak o kompaniji ili pogonu. Obrati se administratoru.'),
+          const ProductionAiChatMessage.error(
+            'Nedostaje podatak o kompaniji ili pogonu. Obrati se administratoru.',
+          ),
+        );
+      });
+      _schedulePersist();
+      _scrollToEnd();
+      return;
+    }
+
+    final pkCall = _plantKeyForCallable;
+    if (!_isCompanyWideContextUser && (pkCall == null || pkCall.isEmpty)) {
+      setState(() {
+        _turns.add(
+          const ProductionAiChatMessage.error(
+            'Nedostaje podatak o pogonu. Obrati se administratoru.',
+          ),
+        );
+      });
+      _schedulePersist();
+      _scrollToEnd();
+      return;
+    }
+    if (_orvFocus && (pkCall == null || pkCall.isEmpty)) {
+      setState(() {
+        _turns.add(
+          const ProductionAiChatMessage.error(
+            'Za ocjenu radnika potreban je pogon u kontekstu sesije (plantKey).',
+          ),
         );
       });
       _schedulePersist();
@@ -176,7 +340,7 @@ class _ProductionTrackingAssistantScreenState
     try {
       final text = await _svc.ask(
         companyId: _companyId,
-        plantKey: _plantKey,
+        plantKey: pkCall,
         prompt: q,
         evaluationEmployeeDocId: widget.evaluationEmployeeDocId,
         evaluationPeriodYyyyMm: widget.evaluationPeriodYyyyMm,
@@ -194,7 +358,9 @@ class _ProductionTrackingAssistantScreenState
     } on FirebaseFunctionsException catch (e) {
       if (!mounted) return;
       setState(() {
-        _turns.add(ProductionAiChatMessage.error(e.message ?? e.code));
+        _turns.add(
+          ProductionAiChatMessage.error(firebaseCallableUserMessage(e)),
+        );
         _loading = false;
       });
       _schedulePersist();
@@ -310,67 +476,15 @@ class _ProductionTrackingAssistantScreenState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final keyboardBottom = MediaQuery.viewInsetsOf(context).bottom;
 
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        title: const Text(kOperonixAiOperationalAssistantTitle),
-        actions: [
-          if (_turns.isNotEmpty)
-            TextButton(
-              onPressed: _loading || !_restored ? null : _clearThread,
-              child: const Text('Očisti razgovor'),
-            ),
-        ],
-      ),
-      body: !_restored
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              controller: _scroll,
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              itemCount: 1 + _turns.length + (_loading ? 1 : 0),
-              itemBuilder: (context, i) {
-                if (i == 0) {
-                  return _buildIntroSection(context, theme, scheme);
-                }
-                if (i <= _turns.length) {
-                  return _buildMessageBubble(
-                    context,
-                    _turns[i - 1],
-                    scheme,
-                    theme,
-                  );
-                }
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: scheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Asistent priprema odgovor…',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-      bottomNavigationBar: Material(
+    Widget inputBar() {
+      return Material(
         color: scheme.surface,
         elevation: 8,
         shadowColor: Colors.black26,
         child: SafeArea(
+          top: false,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: Column(
@@ -405,6 +519,190 @@ class _ProductionTrackingAssistantScreenState
             ),
           ),
         ),
+      );
+    }
+
+    return Scaffold(
+      resizeToAvoidBottomInset: false,
+      appBar: AppBar(
+        title: const Text(kOperonixAiOperationalAssistantTitle),
+        actions: [
+          IconButton(
+            tooltip: 'Više informacija o kontekstu i dosegu',
+            icon: const Icon(Icons.info_outline),
+            onPressed: () => _showAssistantScopeHelp(context),
+          ),
+          if (_turns.isNotEmpty)
+            TextButton(
+              onPressed: _loading || !_restored ? null : _clearThread,
+              child: const Text('Očisti razgovor'),
+            ),
+        ],
+      ),
+      body: Padding(
+        padding: EdgeInsets.only(bottom: keyboardBottom),
+        child: !_restored
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                children: [
+                  if (_showPlantScopeSelector) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Doseg asistenta',
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Više informacije o dosegu',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 40,
+                                  minHeight: 40,
+                                ),
+                                icon: Icon(
+                                  Icons.info_outline,
+                                  color: scheme.onSurfaceVariant,
+                                  size: 22,
+                                ),
+                                onPressed: () =>
+                                    _showAssistantScopeHelp(context),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          if (!_plantChoicesLoaded)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8),
+                              child: LinearProgressIndicator(),
+                            )
+                          else
+                            InputDecorator(
+                              decoration: const InputDecoration(
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 4,
+                                ),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String?>(
+                                  isExpanded: true,
+                                  value: _dropdownPlantValue,
+                                  items: [
+                                    const DropdownMenuItem<String?>(
+                                      value: null,
+                                      child: Text('Svi pogoni (cijela tvrtka)'),
+                                    ),
+                                    ..._plantChoices.map(
+                                      (e) => DropdownMenuItem<String?>(
+                                        value: e.plantKey,
+                                        child: Text(e.label),
+                                      ),
+                                    ),
+                                  ],
+                                  onChanged: _loading
+                                      ? null
+                                      : (v) =>
+                                            unawaited(_onAssistantScopeChanged(v)),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  Expanded(
+                    child: ListView.builder(
+                      controller: _scroll,
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                      itemCount: 1 + _turns.length + (_loading ? 1 : 0),
+                      itemBuilder: (context, i) {
+                        if (i == 0) {
+                          return _buildIntroSection(context, theme, scheme);
+                        }
+                        if (i <= _turns.length) {
+                          return _buildMessageBubble(
+                            context,
+                            _turns[i - 1],
+                            scheme,
+                            theme,
+                          );
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: scheme.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Asistent priprema odgovor…',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  inputBar(),
+                ],
+              ),
+      ),
+    );
+  }
+
+  String get _assistantScopeHelpMessage {
+    if (_orvFocus) {
+      return 'Fokus na ocjenu radnika za pogon iz sesije — odgovori koriste ORV i povezane '
+          'podatke za taj pogon (plantKey mora biti u kontekstu).';
+    }
+    if (_showPlantScopeSelector) {
+      return 'Kao korisnik s dosegom cijele tvrtke (admin, financije, voditelj kvaliteta / QMS, voditelj projekta, inženjer razvoja, …) '
+          'možete birati doseg u padajućem izboru iznad: svi pogoni (cijela tvrtka) ili jedan pogon. '
+          'Zadano je cijela tvrtka — sesijski ili spremljeni pogon ne šalje se u pozadinu dok ne odaberete '
+          'konkretan pogon. Povijest razgovora je odvojena po dosegu.';
+    }
+    return 'Kontekst za vaš pogon učitava podatke iz sustava. '
+        'Povijest razgovora sinkronizira se u oblaku (isti korisnik i pogon na svim uređajima); '
+        'lokalno se drži kopija za offline.';
+  }
+
+  void _showAssistantScopeHelp(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Informacije'),
+        content: SingleChildScrollView(
+          child: Text(_assistantScopeHelpMessage),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Zatvori'),
+          ),
+        ],
       ),
     );
   }
@@ -417,16 +715,7 @@ class _ProductionTrackingAssistantScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Kontekst za vaš pogon učitava podatke iz sustava. '
-          'Povijest razgovora sinkronizira se u oblaku (isti korisnik i pogon na svim uređajima); '
-          'lokalno se drži kopija za offline.',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: scheme.onSurfaceVariant,
-          ),
-        ),
         if (_turns.isEmpty && !_loading) ...[
-          const SizedBox(height: 24),
           Text(
             'Postavite pitanje ispod. Stariji razgovor učitava se automatski ako je spremljen.',
             textAlign: TextAlign.center,

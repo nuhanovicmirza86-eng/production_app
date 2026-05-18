@@ -6,6 +6,8 @@ Operonix Production (MES). **Zastoji** (`downtime_events`): mutacije preko `muta
 
 Kanonska arhitektura (MVP redoslijed, RBAC, shema `development_projects`, pravila za AI/Gate/Release): **`maintenance_app/docs/architecture/DEVELOPMENT_MODULE_ARCHITECTURE.md`**. Kod modula: **`lib/modules/development/`**. SaaS ključ u `enabledModules`: **`development`** (`ProductionModuleKeys.development`).
 
+**Company-wide sesija (Production, izvan samo Razvoja):** Uloga **`quality_control`** i dr. — vidi **`ProductionAccessHelper.isCompanyWideContextRole`**, `maintenance_app/docs/architecture/PRODUCTION_AI_LINE_INVENTORY.md` §1.1 i `.cursor/rules/production-auth-roles.mdc`.
+
 A new Flutter project.
 
 ## Getting Started

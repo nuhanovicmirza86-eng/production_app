@@ -166,6 +166,9 @@ class ProductionAiContextScope {
           s.contains('production_processes') ||
           s.contains('products');
     }
+    if (d == 'qms') {
+      return s.contains('quality_qms');
+    }
     if (d == 'generic') {
       return true;
     }

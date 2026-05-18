@@ -66,4 +66,26 @@ class AiAnalysisPayloads {
   /// Generički: spoji vlastite ključeve (npr. iz `toJson()` modela).
   static Map<String, dynamic> generic(Map<String, dynamic> data) =>
       Map<String, dynamic>.from(data);
+
+  /// Sažetak za QMS / kvalitetu (NCR, CAPA, inspekcije — proizvoljan oblik za prompt).
+  static Map<String, dynamic> qmsSnapshot({
+    required String source,
+    String? periodLabel,
+    Map<String, dynamic>? openNcr,
+    Map<String, dynamic>? capa,
+    Map<String, dynamic>? complaints,
+    Map<String, dynamic>? incomingInspection,
+    List<String>? auditFindings,
+  }) {
+    return <String, dynamic>{
+      'kind': 'qms_snapshot',
+      'source': source,
+      'period': ?periodLabel,
+      'openNcr': ?openNcr,
+      'capa': ?capa,
+      'customerComplaints': ?complaints,
+      'incomingInspection': ?incomingInspection,
+      'auditFindings': ?auditFindings,
+    };
+  }
 }

@@ -16,15 +16,20 @@ class AiAnalysisService {
   /// Pokreće analizu na Vertex AI (backend).
   Future<AiAnalysisResult> run({
     required String companyId,
-    required String plantKey,
+    String? plantKey,
+    /// Kada je `true`, prazan [plantKey] šalje se u Callable (company-wide + domena generic|qms na backendu).
+    bool allowEmptyPlantKey = false,
     required AiAnalysisDomain domain,
     required Map<String, dynamic> payload,
     String? analysisFocus,
   }) async {
     final cid = companyId.trim();
-    final pk = plantKey.trim();
-    if (cid.isEmpty || pk.isEmpty) {
-      throw StateError('companyId i plantKey su obavezni.');
+    final pk = (plantKey ?? '').trim();
+    if (cid.isEmpty) {
+      throw StateError('companyId je obavezan.');
+    }
+    if (pk.isEmpty && !allowEmptyPlantKey) {
+      throw StateError('plantKey je obavezan.');
     }
     if (payload.isEmpty) {
       throw StateError('payload ne smije biti prazan.');
@@ -32,10 +37,10 @@ class AiAnalysisService {
 
     final body = <String, dynamic>{
       'companyId': cid,
-      'plantKey': pk,
       'domain': domain.apiValue,
       'payload': payload,
     };
+    body['plantKey'] = pk;
     final focus = analysisFocus?.trim();
     if (focus != null && focus.isNotEmpty) {
       body['analysisFocus'] = focus;
