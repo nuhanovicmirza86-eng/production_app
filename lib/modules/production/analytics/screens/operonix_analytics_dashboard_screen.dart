@@ -2,6 +2,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
+import 'package:production_app/core/company_plant_display_name.dart';
 import 'package:production_app/core/access/production_access_helper.dart';
 import 'package:production_app/core/branding/operonix_ai_branding.dart';
 import 'package:production_app/core/errors/app_error_mapper.dart' show AppErrorMapper;
@@ -75,10 +76,30 @@ class _OperonixAnalyticsDashboardScreenState
   bool _recomputingDowntimeSummary = false;
   Object? _recomputeDowntimeError;
 
+  /// Učitani pogon iz `company_plants` (+ profil ako nije na listi).
+  List<({String plantKey, String label})> _plantOptions = const [];
+  bool _plantMenuReady = false;
+  String _selectedPlantKey = '';
+
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
-  String get _plantKey =>
+  /// `plantKey` iz sesije/profila (bez UI overridea).
+  String get _profilePlantKey =>
       (widget.companyData['plantKey'] ?? '').toString().trim();
+
+  /// Aktivni pogon za KPI: ručni odabir ako postoji, inače profil.
+  String get _effectivePlantKey {
+    final s = _selectedPlantKey.trim();
+    if (s.isNotEmpty) return s;
+    return _profilePlantKey;
+  }
+
+  /// [companyData] s [plantKey] usklađenim s odabranim pogonom (veze na zastoje / drill-down).
+  Map<String, dynamic> _companyDataForActivePlant() {
+    return Map<String, dynamic>.from(widget.companyData)
+      ..['plantKey'] = _effectivePlantKey;
+  }
+
   String get _role =>
       ProductionAccessHelper.normalizeRole(widget.companyData['role']);
 
@@ -104,7 +125,7 @@ class _OperonixAnalyticsDashboardScreenState
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => DowntimesScreen(
-          companyData: widget.companyData,
+          companyData: _companyDataForActivePlant(),
           initialTabIndex: 0,
           initialEventRangeStart: r.start,
           initialEventRangeEndExclusive: r.end,
@@ -120,7 +141,7 @@ class _OperonixAnalyticsDashboardScreenState
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => DowntimesScreen(
-          companyData: widget.companyData,
+          companyData: _companyDataForActivePlant(),
           initialTabIndex: 1,
           initialAnalyticsRangeStart: r.start,
           initialAnalyticsRangeEndExclusive: r.end,
@@ -214,8 +235,56 @@ class _OperonixAnalyticsDashboardScreenState
 
   Future<void> _bootstrap() async {
     await _primeOperationalFyBounds();
+    await _loadPlantOptions();
     if (!mounted || !_canView) return;
     await _load();
+  }
+
+  /// Popis pogona iz `company_plants`; profil se uvijek nudi ako nije na listi.
+  Future<void> _loadPlantOptions() async {
+    if (_companyId.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _plantMenuReady = true;
+          _plantOptions = const [];
+        });
+      }
+      return;
+    }
+    try {
+      final raw = await CompanyPlantDisplayName.listSelectablePlants(
+        companyId: _companyId,
+      );
+      if (!mounted) return;
+      final merged = List<({String plantKey, String label})>.from(raw);
+      final prof = _profilePlantKey;
+      if (prof.isNotEmpty && !merged.any((e) => e.plantKey == prof)) {
+        merged.add((plantKey: prof, label: prof));
+      }
+      merged.sort(
+        (a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()),
+      );
+      setState(() {
+        _plantOptions = merged;
+        if (_selectedPlantKey.trim().isEmpty) {
+          if (prof.isNotEmpty && merged.any((e) => e.plantKey == prof)) {
+            _selectedPlantKey = prof;
+          } else if (merged.isNotEmpty) {
+            _selectedPlantKey = merged.first.plantKey;
+          }
+        } else if (merged.isNotEmpty &&
+            !merged.any((e) => e.plantKey == _selectedPlantKey)) {
+          _selectedPlantKey = merged.first.plantKey;
+        }
+        _plantMenuReady = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _plantOptions = const [];
+        _plantMenuReady = true;
+      });
+    }
   }
 
   Future<void> _primeOperationalFyBounds() async {
@@ -228,7 +297,7 @@ class _OperonixAnalyticsDashboardScreenState
   }
 
   Future<void> _load() async {
-    if (_companyId.isEmpty || _plantKey.isEmpty) return;
+    if (_companyId.isEmpty || _effectivePlantKey.isEmpty) return;
     setState(() {
       _loading = true;
       _error = null;
@@ -237,7 +306,7 @@ class _OperonixAnalyticsDashboardScreenState
       final r = _resolveRange();
       final snap = await _service.load(
         companyId: _companyId,
-        plantKey: _plantKey,
+        plantKey: _effectivePlantKey,
         rangeStart: r.start,
         rangeEndExclusive: r.end,
         includeRejected: _includeRejected,
@@ -271,7 +340,7 @@ class _OperonixAnalyticsDashboardScreenState
     try {
       final md = await _backendAi.runAnalysis(
         companyId: _companyId,
-        plantKey: _plantKey,
+        plantKey: _effectivePlantKey,
         snapshot: snap,
       );
       if (mounted) {
@@ -391,7 +460,7 @@ class _OperonixAnalyticsDashboardScreenState
       final ymd = AnalyticsDowntimeDailyCallableService.dateYmd(day);
       await _downtimeDailyCallable.recomputeDaily(
         companyId: _companyId,
-        plantKey: _plantKey,
+        plantKey: _effectivePlantKey,
         summaryDateYmd: ymd,
         includeRejected: _includeRejected,
       );
@@ -433,6 +502,22 @@ class _OperonixAnalyticsDashboardScreenState
       );
     }
 
+    if (!_plantMenuReady) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Operonix Analytics'),
+          actions: [
+            IconButton(
+              tooltip: 'Osvježi',
+              onPressed: null,
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final snap = _snap;
     final theme = Theme.of(context);
 
@@ -467,6 +552,53 @@ class _OperonixAnalyticsDashboardScreenState
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  if (_plantOptions.isEmpty)
+                    Text(
+                      _profilePlantKey.isEmpty
+                          ? 'Nema dostupnih pogona (company_plants) i profil nema plantKey — '
+                              'odaberite pogon u postavkama sesije.'
+                          : 'Nema unosa u company_plants; koristi se plantKey iz profila: '
+                              '$_profilePlantKey',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    )
+                  else
+                    InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Pogon',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          value: _plantOptions.any(
+                                (e) => e.plantKey == _selectedPlantKey,
+                              )
+                              ? _selectedPlantKey
+                              : _plantOptions.first.plantKey,
+                          items: [
+                            for (final o in _plantOptions)
+                              DropdownMenuItem<String>(
+                                value: o.plantKey,
+                                child: Text(
+                                  o.label,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
+                          onChanged: _loading
+                              ? null
+                              : (v) async {
+                                  if (v == null) return;
+                                  setState(() => _selectedPlantKey = v);
+                                  await _load();
+                                },
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 6,
@@ -883,7 +1015,7 @@ class _OperonixAnalyticsDashboardScreenState
                           context,
                           MaterialPageRoute<void>(
                             builder: (_) => AnalyticsWorkCenterDetailsScreen(
-                              companyData: widget.companyData,
+                              companyData: _companyDataForActivePlant(),
                               group: g,
                               rangeLabel: _rangeLabel(snap),
                               rangeStart: snap.rangeStart,
