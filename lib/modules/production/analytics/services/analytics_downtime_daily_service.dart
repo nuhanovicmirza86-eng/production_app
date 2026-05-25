@@ -1,39 +1,36 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/analytics_downtime_daily_model.dart';
 
 /// Čitanje [analytics_downtime_daily] serverskog dnevnog sažetka zastoja.
 ///
 /// M2-C smjer:
-/// - primarno čitanje iz sekundarne Firestore baze `operonix-analytics`,
-/// - fallback na postojeću `(default)` bazu dok traje migracioni period.
+/// - primarni produkcijski read ide preko Callable proxyja
+///   [listAnalyticsDowntimeDaily],
+/// - Callable na backendu provjerava users/{uid} i RBAC u `(default)` bazi,
+/// - Callable čita `analytics_downtime_daily` iz `operonix-analytics`,
+/// - fallback ostaje postojeći Firestore read iz `(default)` baze dok traje
+///   migracioni period.
 ///
-/// Napomena:
-/// Ako `operonix-analytics` pravila još ne dopuštaju klijentski read,
-/// primarni upit će pasti s permission-denied i servis će se vratiti
-/// na postojeći `(default)` read bez pucanja dashboarda.
+/// Direktni client read iz `operonix-analytics` nije primarni put jer
+/// analytics baza nema cross-DB pristup ka users/{uid} iz `(default)`.
 class AnalyticsDowntimeDailyService {
   AnalyticsDowntimeDailyService({
-    FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
     FirebaseFirestore? fallbackFirestore,
-  })  : _primaryDb = firestore ?? _analyticsFirestore(),
+  })  : _functions = functions ??
+            FirebaseFunctions.instanceFor(region: functionsRegion),
         _fallbackDb = fallbackFirestore ?? FirebaseFirestore.instance;
 
-  static const String analyticsDatabaseId = 'operonix-analytics';
+  static const String functionsRegion = 'europe-west1';
+  static const String listCallableName = 'listAnalyticsDowntimeDaily';
 
-  final FirebaseFirestore _primaryDb;
+  final FirebaseFunctions _functions;
   final FirebaseFirestore _fallbackDb;
 
-  static FirebaseFirestore _analyticsFirestore() {
-    return FirebaseFirestore.instanceFor(
-      app: Firebase.app(),
-      databaseId: analyticsDatabaseId,
-    );
-  }
-
-  CollectionReference<Map<String, dynamic>> _col(FirebaseFirestore db) {
-    return db.collection('analytics_downtime_daily');
+  CollectionReference<Map<String, dynamic>> get _fallbackCol {
+    return _fallbackDb.collection('analytics_downtime_daily');
   }
 
   String _s(dynamic v) => (v ?? '').toString().trim();
@@ -60,14 +57,56 @@ class AnalyticsDowntimeDailyService {
     return _dayStart(t);
   }
 
-  Future<List<AnalyticsDowntimeDailyModel>> _fetchFromDb({
-    required FirebaseFirestore db,
+  Future<List<AnalyticsDowntimeDailyModel>> _fetchFromCallable({
     required String companyId,
     required String plantKey,
     required String startYmd,
     required String endYmd,
   }) async {
-    final snap = await _col(db)
+    final callable = _functions.httpsCallable(listCallableName);
+
+    final response = await callable.call(<String, dynamic>{
+      'companyId': companyId,
+      'plantKey': plantKey,
+      'startYmd': startYmd,
+      'endYmd': endYmd,
+    });
+
+    final data = response.data;
+    if (data is! Map) {
+      return const [];
+    }
+
+    final rawItems = data['items'];
+
+    if (rawItems is! List) {
+      return const [];
+    }
+
+    return rawItems
+        .map((raw) {
+          if (raw is! Map) return null;
+
+          final item = Map<String, dynamic>.from(raw);
+          final documentId = _s(item['documentId']);
+
+          if (documentId.isEmpty) {
+            return null;
+          }
+
+          return AnalyticsDowntimeDailyModel.fromMap(documentId, item);
+        })
+        .whereType<AnalyticsDowntimeDailyModel>()
+        .toList();
+  }
+
+  Future<List<AnalyticsDowntimeDailyModel>> _fetchFromDefaultDb({
+    required String companyId,
+    required String plantKey,
+    required String startYmd,
+    required String endYmd,
+  }) async {
+    final snap = await _fallbackCol
         .where('companyId', isEqualTo: companyId)
         .where('plantKey', isEqualTo: plantKey)
         .where('summaryDateYmd', isGreaterThanOrEqualTo: startYmd)
@@ -82,8 +121,8 @@ class AnalyticsDowntimeDailyService {
   ///
   /// [summaryDateYmd] je string uključen u raspon lokalnih dana.
   ///
-  /// Primarni izvor je `operonix-analytics`; ako nema podataka ili read
-  /// još nije dozvoljen pravilima, servis koristi fallback na `(default)`.
+  /// Primarni izvor je Callable proxy prema `operonix-analytics`.
+  /// Ako Callable vrati prazno ili padne, fallback ostaje `(default)` Firestore.
   Future<List<AnalyticsDowntimeDailyModel>> fetchInDateRangeLocal({
     required String companyId,
     required String plantKey,
@@ -104,26 +143,26 @@ class AnalyticsDowntimeDailyService {
     final endY = dateYmd(last);
 
     try {
-      final primaryRows = await _fetchFromDb(
-        db: _primaryDb,
+      final callableRows = await _fetchFromCallable(
         companyId: cid,
         plantKey: pk,
         startYmd: startY,
         endYmd: endY,
       );
 
-      if (primaryRows.isNotEmpty) {
-        return primaryRows;
+      if (callableRows.isNotEmpty) {
+        return callableRows;
       }
+    } on FirebaseFunctionsException {
+      // Fallback ostaje namjeran tokom M2-C:
+      // - Callable proxy može odbiti pristup,
+      // - indeks može biti u tranziciji,
+      // - analytics baza možda još nema historijske podatke.
     } on FirebaseException {
-      // Fallback ostaje namjeran tokom M2-C migracije:
-      // - analytics DB može još imati deny read pravila,
-      // - historical backfill možda nije potpun,
-      // - dashboard ne smije ostati prazan zbog tranzicije.
+      // Zaštita ako fallback/SDK sloj vrati FirebaseException kroz plugin.
     }
 
-    return _fetchFromDb(
-      db: _fallbackDb,
+    return _fetchFromDefaultDb(
       companyId: cid,
       plantKey: pk,
       startYmd: startY,

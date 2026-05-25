@@ -1,6 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Jedan zapis u `analytics_downtime_daily` (Callable i/ili noćni Scheduled preračun).
+/// Jedan zapis u `analytics_downtime_daily`
+///
+/// Podržava dva izvora:
+/// - Firestore document snapshot: [fromDoc]
+/// - Callable proxy row: [fromMap]
+///
+/// Callable proxy vraća Timestamp polja kao mapu:
+/// `{seconds, nanoseconds}`, zato [computedAt] mora podržati oba formata.
 class AnalyticsDowntimeDailyModel {
   const AnalyticsDowntimeDailyModel({
     required this.documentId,
@@ -30,6 +37,7 @@ class AnalyticsDowntimeDailyModel {
   final String plantKey;
   final String summaryDateYmd;
   final String timeZone;
+
   final int totalMinutesClipped;
   final int eventsWithMinutes;
   final int minutesOeeLoss;
@@ -37,15 +45,18 @@ class AnalyticsDowntimeDailyModel {
   final int minutesTeepLoss;
   final int plannedMinutes;
   final int unplannedMinutes;
+
   final List<AnalyticsDowntimeParetoItem> paretoTop;
   final List<AnalyticsDowntimeWcItem> byWorkCenterTop;
+
   final double? mttrMinutesResolved;
   final int closedForMttrCount;
+
   final String? calculationVersion;
   final DateTime? computedAt;
   final String? computedByUid;
 
-  /// `callable` (ručni Callable) ili `scheduled` (noćni job), ako je u dokumentu.
+  /// `callable` ili `scheduled`, ako postoji u dokumentu.
   final String? recomputeSource;
 
   static String documentIdFor(
@@ -55,6 +66,7 @@ class AnalyticsDowntimeDailyModel {
   ) {
     final ymd = summaryDateYmd.trim();
     final base = 'dd_${companyId.trim()}_${plantKey.trim()}_$ymd';
+
     return base.replaceAll(RegExp(r'[/\\\s]'), '_');
   }
 
@@ -86,37 +98,64 @@ class AnalyticsDowntimeDailyModel {
       mttrMinutesResolved: _dOpt(m['mttrMinutesResolved']),
       closedForMttrCount: _i(m['closedForMttrCount']),
       calculationVersion: _n(m['calculationVersion']),
-      computedAt: (m['computedAt'] is Timestamp)
-          ? (m['computedAt'] as Timestamp).toDate()
-          : null,
+      computedAt: _dateTimeFromTimestampLike(m['computedAt']),
       computedByUid: _n(m['computedByUid']),
       recomputeSource: _n(m['recomputeSource']),
     );
   }
 
   static String _s(dynamic v) => (v ?? '').toString().trim();
+
   static String? _n(dynamic v) {
     final s = (v ?? '').toString().trim();
+
     return s.isEmpty ? null : s;
   }
 
   static int _i(dynamic v) {
     if (v is int) return v;
     if (v is num) return v.toInt();
+
     return 0;
   }
 
   static double? _dOpt(dynamic v) {
     if (v is num) return v.toDouble();
+
+    return null;
+  }
+
+  static DateTime? _dateTimeFromTimestampLike(dynamic v) {
+    if (v is Timestamp) {
+      return v.toDate();
+    }
+
+    if (v is Map) {
+      final rawSeconds = v['seconds'];
+      final rawNanoseconds = v['nanoseconds'];
+
+      if (rawSeconds is num) {
+        final seconds = rawSeconds.toInt();
+        final nanoseconds = rawNanoseconds is num
+            ? rawNanoseconds.toInt()
+            : 0;
+
+        return Timestamp(seconds, nanoseconds).toDate();
+      }
+    }
+
     return null;
   }
 
   static List<AnalyticsDowntimeParetoItem> _pareto(dynamic raw) {
     if (raw is! List) return const [];
+
     return raw
         .map((e) {
           if (e is! Map) return null;
+
           final o = Map<String, dynamic>.from(e);
+
           return AnalyticsDowntimeParetoItem(
             key: _s(o['key']),
             label: _s(o['label']),
@@ -134,10 +173,13 @@ class AnalyticsDowntimeDailyModel {
 
   static List<AnalyticsDowntimeWcItem> _wcList(dynamic raw) {
     if (raw is! List) return const [];
+
     return raw
         .map((e) {
           if (e is! Map) return null;
+
           final o = Map<String, dynamic>.from(e);
+
           return AnalyticsDowntimeWcItem(
             key: _s(o['key']),
             label: _s(o['label']),
