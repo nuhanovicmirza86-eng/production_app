@@ -1,37 +1,28 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/analytics_downtime_daily_model.dart';
 
 /// Čitanje [analytics_downtime_daily] serverskog dnevnog sažetka zastoja.
 ///
-/// M2-C smjer:
-/// - primarni produkcijski read ide preko Callable proxyja
-///   [listAnalyticsDowntimeDaily],
+/// M3-A smjer:
+/// - produkcijski read ide samo preko Callable proxyja [listAnalyticsDowntimeDaily],
 /// - Callable na backendu provjerava users/{uid} i RBAC u `(default)` bazi,
 /// - Callable čita `analytics_downtime_daily` iz `operonix-analytics`,
-/// - fallback ostaje postojeći Firestore read iz `(default)` baze dok traje
-///   migracioni period.
+/// - direktni Firestore fallback na `(default)` je uklonjen da bi se kasnije
+///   mogao smanjiti monolitni `(default)` ruleset.
 ///
-/// Direktni client read iz `operonix-analytics` nije primarni put jer
-/// analytics baza nema cross-DB pristup ka users/{uid} iz `(default)`.
+/// Ako Callable vrati grešku ili nema redova, servis vraća praznu listu.
+/// Dashboard ne smije pucati zbog odsustva downtime analytics podataka.
 class AnalyticsDowntimeDailyService {
   AnalyticsDowntimeDailyService({
     FirebaseFunctions? functions,
-    FirebaseFirestore? fallbackFirestore,
-  })  : _functions = functions ??
-            FirebaseFunctions.instanceFor(region: functionsRegion),
-        _fallbackDb = fallbackFirestore ?? FirebaseFirestore.instance;
+  }) : _functions =
+            functions ?? FirebaseFunctions.instanceFor(region: functionsRegion);
 
   static const String functionsRegion = 'europe-west1';
   static const String listCallableName = 'listAnalyticsDowntimeDaily';
 
   final FirebaseFunctions _functions;
-  final FirebaseFirestore _fallbackDb;
-
-  CollectionReference<Map<String, dynamic>> get _fallbackCol {
-    return _fallbackDb.collection('analytics_downtime_daily');
-  }
 
   String _s(dynamic v) => (v ?? '').toString().trim();
 
@@ -73,6 +64,7 @@ class AnalyticsDowntimeDailyService {
     });
 
     final data = response.data;
+
     if (data is! Map) {
       return const [];
     }
@@ -100,29 +92,13 @@ class AnalyticsDowntimeDailyService {
         .toList();
   }
 
-  Future<List<AnalyticsDowntimeDailyModel>> _fetchFromDefaultDb({
-    required String companyId,
-    required String plantKey,
-    required String startYmd,
-    required String endYmd,
-  }) async {
-    final snap = await _fallbackCol
-        .where('companyId', isEqualTo: companyId)
-        .where('plantKey', isEqualTo: plantKey)
-        .where('summaryDateYmd', isGreaterThanOrEqualTo: startYmd)
-        .where('summaryDateYmd', isLessThanOrEqualTo: endYmd)
-        .orderBy('summaryDateYmd', descending: false)
-        .get();
-
-    return snap.docs.map(AnalyticsDowntimeDailyModel.fromDoc).toList();
-  }
-
   /// Sažetci u periodu.
   ///
   /// [summaryDateYmd] je string uključen u raspon lokalnih dana.
   ///
-  /// Primarni izvor je Callable proxy prema `operonix-analytics`.
-  /// Ako Callable vrati prazno ili padne, fallback ostaje `(default)` Firestore.
+  /// Jedini produkcijski izvor je Callable proxy prema `operonix-analytics`.
+  /// Direktni Firestore read iz `(default)` više nije fallback jer je cilj
+  /// M3-A uklanjanje zavisnosti dashboarda od monolitnog default ruleseta.
   Future<List<AnalyticsDowntimeDailyModel>> fetchInDateRangeLocal({
     required String companyId,
     required String plantKey,
@@ -143,30 +119,16 @@ class AnalyticsDowntimeDailyService {
     final endY = dateYmd(last);
 
     try {
-      final callableRows = await _fetchFromCallable(
+      return await _fetchFromCallable(
         companyId: cid,
         plantKey: pk,
         startYmd: startY,
         endYmd: endY,
       );
-
-      if (callableRows.isNotEmpty) {
-        return callableRows;
-      }
     } on FirebaseFunctionsException {
-      // Fallback ostaje namjeran tokom M2-C:
-      // - Callable proxy može odbiti pristup,
-      // - indeks može biti u tranziciji,
-      // - analytics baza možda još nema historijske podatke.
-    } on FirebaseException {
-      // Zaštita ako fallback/SDK sloj vrati FirebaseException kroz plugin.
+      return const [];
+    } catch (_) {
+      return const [];
     }
-
-    return _fetchFromDefaultDb(
-      companyId: cid,
-      plantKey: pk,
-      startYmd: startY,
-      endYmd: endY,
-    );
   }
 }
