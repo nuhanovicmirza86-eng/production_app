@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/finance_downtime_event_cost_doc.dart';
 import '../models/finance_machine_cost_doc.dart';
@@ -10,13 +10,20 @@ import 'finance_controlling_period_read_service.dart';
 
 /// Čitanje izvedenih agregata: period + pogon preko Callable [fetchFinanceControllingPeriodReads].
 class FinanceDerivedAggregatesService {
-  FinanceDerivedAggregatesService({FirebaseFirestore? firestore})
-    : _db = firestore ?? FirebaseFirestore.instance;
+  FinanceDerivedAggregatesService({
+    FirebaseFunctions? functions,
+    FinanceControllingPeriodReadService? periodReads,
+  })  : _functions =
+            functions ?? FirebaseFunctions.instanceFor(region: _functionsRegion),
+        _reads = periodReads ?? FinanceControllingPeriodReadService();
 
-  final FirebaseFirestore _db;
+  static const String _functionsRegion = 'europe-west1';
+  static const String _listDowntimeCostsCallable =
+      'listFinanceDowntimeEventCosts';
+  static const int _downtimeEventCostsLimit = 100;
 
-  final FinanceControllingPeriodReadService _reads =
-      FinanceControllingPeriodReadService();
+  final FirebaseFunctions _functions;
+  final FinanceControllingPeriodReadService _reads;
 
   Stream<List<FinanceOrderProfitabilityDoc>> watchOrderProfitability({
     required String companyId,
@@ -162,35 +169,56 @@ class FinanceDerivedAggregatesService {
     );
   }
 
-  /// Troškovi zastoja za jedan događaj (više redaka ako postoji više KPI perioda).
-  Stream<List<FinanceDowntimeEventCostDoc>> watchDowntimeEventCosts({
+  /// Troškovi zastoja za jedan događaj (Callable, jednokratno učitavanje).
+  Future<List<FinanceDowntimeEventCostDoc>> fetchDowntimeEventCosts({
     required String companyId,
     required String downtimeEventId,
   }) {
     final cid = companyId.trim();
     final eid = downtimeEventId.trim();
     if (cid.isEmpty || eid.isEmpty) {
-      return Stream<List<FinanceDowntimeEventCostDoc>>.value(const []);
+      return Future<List<FinanceDowntimeEventCostDoc>>.value(const []);
     }
-    return _db
-        .collection('finance_downtime_event_costs')
-        .where('companyId', isEqualTo: cid)
-        .where('downtimeEventId', isEqualTo: eid)
-        .snapshots()
-        .map((s) {
-          final list = s.docs
-              .map(
-                (d) =>
-                    FinanceDowntimeEventCostDoc.fromFirestore(d.id, d.data()),
-              )
-              .toList();
-          list.sort((a, b) {
-            if (b.periodYear != a.periodYear) {
-              return b.periodYear.compareTo(a.periodYear);
-            }
-            return b.periodMonth.compareTo(a.periodMonth);
-          });
-          return list;
-        });
+    return _fetchDowntimeEventCosts(cid, eid);
+  }
+
+  Future<List<FinanceDowntimeEventCostDoc>> _fetchDowntimeEventCosts(
+    String companyId,
+    String downtimeEventId,
+  ) async {
+    final callable = _functions.httpsCallable(_listDowntimeCostsCallable);
+    final response = await callable.call(<String, dynamic>{
+      'companyId': companyId,
+      'downtimeEventId': downtimeEventId,
+      'limit': _downtimeEventCostsLimit,
+    });
+
+    final data = response.data;
+    if (data is! Map) {
+      return const [];
+    }
+
+    final rawItems = data['items'];
+    if (rawItems is! List) {
+      return const [];
+    }
+
+    final list = <FinanceDowntimeEventCostDoc>[];
+    for (final raw in rawItems) {
+      if (raw is! Map) continue;
+      final item = Map<String, dynamic>.from(raw);
+      final id = (item['documentId'] ?? '').toString().trim();
+      if (id.isEmpty) continue;
+      item.remove('documentId');
+      list.add(FinanceDowntimeEventCostDoc.fromFirestore(id, item));
+    }
+
+    list.sort((a, b) {
+      if (b.periodYear != a.periodYear) {
+        return b.periodYear.compareTo(a.periodYear);
+      }
+      return b.periodMonth.compareTo(a.periodMonth);
+    });
+    return list;
   }
 }

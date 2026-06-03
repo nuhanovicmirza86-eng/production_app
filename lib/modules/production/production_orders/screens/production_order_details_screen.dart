@@ -501,6 +501,19 @@ class _ProductionOrderDetailsScreenState
     }
   }
 
+  String _executionStatusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case 'started':
+        return 'U tijeku';
+      case 'paused':
+        return 'Pauzirano';
+      case 'completed':
+        return 'Završeno';
+      default:
+        return status;
+    }
+  }
+
   Future<void> _printWorkOrder(ProductionOrderModel order) async {
     try {
       CompanyPrintIdentity? printIdentity;
@@ -718,7 +731,7 @@ class _ProductionOrderDetailsScreenState
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        _statusLabel(status),
+        _executionStatusLabel(status),
         style: TextStyle(color: color, fontWeight: FontWeight.w600),
       ),
     );
@@ -760,16 +773,16 @@ class _ProductionOrderDetailsScreenState
             ),
             const SizedBox(height: 12),
             _buildInfoRow(
-              'Operator',
+              'Operater',
               operatorName.isNotEmpty
                   ? operatorName
                   : UserDisplayLabel.labelForStored(operatorId),
             ),
-            _buildInfoRow('Start', _formatDateTime(startedAt)),
+            _buildInfoRow('Početak', _formatDateTime(startedAt)),
             _buildInfoRow('Kraj', _formatDateTime(endedAt)),
-            _buildInfoRow('Good qty', _formatQty(goodQty)),
-            _buildInfoRow('Scrap qty', _formatQty(scrapQty)),
-            _buildInfoRow('Rework qty', _formatQty(reworkQty)),
+            _buildInfoRow('Dobra količina', _formatQty(goodQty)),
+            _buildInfoRow('Škart', _formatQty(scrapQty)),
+            _buildInfoRow('Dorada', _formatQty(reworkQty)),
           ],
         ),
       ),
@@ -787,12 +800,12 @@ class _ProductionOrderDetailsScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Execution historija',
+              'Historija izvršenja',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
             const Text(
-              '🛈 Isti nalog može imati više execution sesija i više operatora.',
+              'Isti nalog može imati više sesija rada i više operatera.',
             ),
             if (_hasMyActiveExecutionForStep) ...[
               const SizedBox(height: 12),
@@ -821,7 +834,7 @@ class _ProductionOrderDetailsScreenState
                 if (!canRunWork) {
                   return Text(
                     order.status == 'draft'
-                        ? 'Pušti nalog prije pokretanja rada.'
+                        ? 'Pusti nalog prije pokretanja rada.'
                         : 'Rad se može pokrenuti samo za puštene naloge ili naloge u toku.',
                     style: TextStyle(color: Colors.grey.shade800, fontSize: 13),
                   );
@@ -857,7 +870,7 @@ class _ProductionOrderDetailsScreenState
             if (_isLoadingExecutions)
               const Center(child: CircularProgressIndicator())
             else if (_executions.isEmpty)
-              const Text('Nema execution zapisa za ovaj nalog.')
+              const Text('Nema zapisa izvršenja za ovaj nalog.')
             else
               Column(
                 children: _executions

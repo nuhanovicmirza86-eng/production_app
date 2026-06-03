@@ -117,4 +117,40 @@ class UserDisplayLabel {
     if (!_shouldLookupUserDocument(t)) return t;
     return _uidCache[t] ?? '…';
   }
+
+  /// Uklanja legacy obrazac „ime (UID)” iz [displayName].
+  static String stripEmbeddedUidFromDisplayName(String raw) {
+    final s = raw.trim();
+    if (s.isEmpty) return s;
+    final m = RegExp(
+      r'^(.+?)\s*\(([a-zA-Z0-9_-]{20,128})\)\s*$',
+    ).firstMatch(s);
+    if (m == null) return s;
+    final inner = m.group(2) ?? '';
+    if (looksLikeFirebaseUid(inner) || looksLikeProbableAuthUserKey(inner)) {
+      return (m.group(1) ?? '').trim();
+    }
+    return s;
+  }
+
+  /// Ime osobe za audit / liste: nikad sirovi Firebase UID.
+  static String personLine(String displayName, String storedId) {
+    var name = stripEmbeddedUidFromDisplayName(displayName);
+    final stored = storedId.trim();
+    if (name.isNotEmpty && looksLikeFirebaseUid(name)) {
+      name = '';
+    }
+    if (name.isNotEmpty) {
+      if (name.contains('@') && stored.isNotEmpty) {
+        final resolved = labelForStored(stored);
+        if (resolved != '…') return resolved;
+        return name;
+      }
+      return name;
+    }
+    if (stored.isEmpty) return '—';
+    if (stored.contains('@')) return stored;
+    final label = labelForStored(stored);
+    return label == '…' ? '—' : label;
+  }
 }

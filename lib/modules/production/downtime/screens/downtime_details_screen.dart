@@ -5,7 +5,9 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/format/ba_formatted_date.dart';
 import '../../../../core/theme/operonix_production_brand.dart';
+import '../../../../core/user_display_label.dart';
 import '../../../finance_integrations/models/finance_downtime_event_cost_doc.dart';
 import '../../../finance_integrations/services/finance_derived_aggregates_service.dart';
 import '../../../finance_integrations/utils/finance_permissions.dart';
@@ -32,6 +34,9 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
   late final TabController _tabController;
   final _downtimeService = DowntimeService();
   final _derivedFinance = FinanceDerivedAggregatesService();
+  String? _prefetchedUsersForEventId;
+  String? _costsLoadedForEventId;
+  Future<List<FinanceDowntimeEventCostDoc>>? _costsFuture;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -225,6 +230,51 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
     }
   }
 
+  Future<List<FinanceDowntimeEventCostDoc>> _costsForEvent(
+    DowntimeEventModel m,
+  ) {
+    if (_costsLoadedForEventId != m.id || _costsFuture == null) {
+      _costsLoadedForEventId = m.id;
+      _costsFuture = _derivedFinance.fetchDowntimeEventCosts(
+        companyId: _companyId,
+        downtimeEventId: m.id,
+      );
+    }
+    return _costsFuture!;
+  }
+
+  void _ensureUsersPrefetched(DowntimeEventModel m) {
+    if (_prefetchedUsersForEventId == m.id) return;
+    _prefetchedUsersForEventId = m.id;
+    UserDisplayLabel.prefetchUids(FirebaseFirestore.instance, [
+      m.operatorId,
+      m.reportedBy,
+      m.resolvedBy,
+      m.verifiedBy,
+      m.createdBy,
+      m.updatedBy,
+    ]).then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  String _auditTimestampLine(DateTime? at, String storedActor) {
+    if (at == null) return '—';
+    final when = BaFormattedDate.formatDateTime(at);
+    final who = UserDisplayLabel.personLine('', storedActor);
+    if (who == '—') return when;
+    return '$when · $who';
+  }
+
+  String _linkedRecordLabel(String stored) {
+    final t = stored.trim();
+    if (t.isEmpty) return '—';
+    if (UserDisplayLabel.looksLikeFirebaseUid(t)) {
+      return 'Povezano u sustavu';
+    }
+    return t;
+  }
+
   Widget _kv(String k, String v) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -295,6 +345,7 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
               child: Text('Nemaš pristup ovom zastoju.'),
             );
           }
+          _ensureUsersPrefetched(m);
 
           final now = DateTime.now();
           final mins = m.effectiveDurationMinutesNow(now);
@@ -419,11 +470,8 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
                           role: _role,
                         )) ...[
                           const SizedBox(height: 12),
-                          StreamBuilder<List<FinanceDowntimeEventCostDoc>>(
-                            stream: _derivedFinance.watchDowntimeEventCosts(
-                              companyId: _companyId,
-                              downtimeEventId: m.id,
-                            ),
+                          FutureBuilder<List<FinanceDowntimeEventCostDoc>>(
+                            future: _costsForEvent(m),
                             builder: (context, costSnap) {
                               if (costSnap.hasError) {
                                 return Card(
@@ -510,7 +558,7 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
                                               Expanded(
                                                 child: Text(
                                                   '${d.periodYear}-${d.periodMonth.toString().padLeft(2, '0')} · '
-                                                  '${d.oeeMinutesInPeriod} OEE min · ${d.businessYearId}',
+                                                  '${d.oeeMinutesInPeriod} min zastoja (OEE)',
                                                 ),
                                               ),
                                               Text(
@@ -544,11 +592,15 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
                               children: [
                                 _kv(
                                   'Početak',
-                                  m.startedAt.toLocal().toString(),
+                                  BaFormattedDate.formatDateTime(m.startedAt),
                                 ),
                                 _kv(
                                   'Kraj',
-                                  m.endedAt?.toLocal().toString() ?? '—',
+                                  m.endedAt != null
+                                      ? BaFormattedDate.formatDateTime(
+                                          m.endedAt!,
+                                        )
+                                      : '—',
                                 ),
                                 _kv(
                                   'Trajanje (min)',
@@ -582,7 +634,11 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
                                   'CAPA obavezna',
                                   m.correctiveActionRequired ? 'Da' : 'Ne',
                                 ),
-                                _kv('CAPA ID', m.correctiveActionId),
+                                if (m.correctiveActionId.isNotEmpty)
+                                  _kv(
+                                    'Povezana CAPA',
+                                    _linkedRecordLabel(m.correctiveActionId),
+                                  ),
                               ],
                             ),
                           ),
@@ -599,14 +655,25 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _kv('Nalog', m.productionOrderCode),
-                                _kv('ID naloga', m.productionOrderId),
+                                _kv(
+                                  'Nalog',
+                                  m.productionOrderCode.isNotEmpty
+                                      ? m.productionOrderCode
+                                      : '—',
+                                ),
                                 _kv(
                                   'Radni centar',
-                                  '${m.workCenterCode} ${m.workCenterName}',
+                                  '${m.workCenterCode} ${m.workCenterName}'
+                                      .trim(),
                                 ),
-                                _kv('Proces', '${m.processCode} ${m.processName}'),
-                                _kv('Smjena', m.shiftName.isNotEmpty ? m.shiftName : m.shiftId),
+                                _kv(
+                                  'Proces',
+                                  '${m.processCode} ${m.processName}'.trim(),
+                                ),
+                                _kv(
+                                  'Smjena',
+                                  m.shiftName.isNotEmpty ? m.shiftName : '—',
+                                ),
                                 if (m.productionOrderId.isNotEmpty && _canViewOrders) ...[
                                   const SizedBox(height: 12),
                                   FilledButton.tonalIcon(
@@ -661,7 +728,7 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
                             padding: EdgeInsets.all(16),
                             child: Text(
                               'Poveznica na korektivne aktivnosti iz Maintenance / QMS modula '
-                              'dolazi u sljedećoj iteraciji. Koristite CAPA ID polje ako već postoji u sistemu.',
+                              'dolazi u sljedećoj iteraciji. Referenca se veže na kartici Uzrok / rješenje.',
                             ),
                           ),
                         ),
@@ -677,12 +744,42 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _kv('Prijavio', '${m.reportedByName} (${m.reportedBy})'),
-                                _kv('Operater ID', m.operatorId),
-                                _kv('Riješio', '${m.resolvedByName} (${m.resolvedBy})'),
-                                _kv('Verificirao', '${m.verifiedByName} (${m.verifiedBy})'),
-                                _kv('Kreirano', '${m.createdAt} · ${m.createdBy}'),
-                                _kv('Ažurirano', '${m.updatedAt} · ${m.updatedBy}'),
+                                _kv(
+                                  'Prijavio',
+                                  UserDisplayLabel.personLine(
+                                    m.reportedByName,
+                                    m.reportedBy,
+                                  ),
+                                ),
+                                _kv(
+                                  'Operater',
+                                  UserDisplayLabel.personLine(
+                                    '',
+                                    m.operatorId,
+                                  ),
+                                ),
+                                _kv(
+                                  'Riješio',
+                                  UserDisplayLabel.personLine(
+                                    m.resolvedByName,
+                                    m.resolvedBy,
+                                  ),
+                                ),
+                                _kv(
+                                  'Verificirao',
+                                  UserDisplayLabel.personLine(
+                                    m.verifiedByName,
+                                    m.verifiedBy,
+                                  ),
+                                ),
+                                _kv(
+                                  'Kreirano',
+                                  _auditTimestampLine(m.createdAt, m.createdBy),
+                                ),
+                                _kv(
+                                  'Ažurirano',
+                                  _auditTimestampLine(m.updatedAt, m.updatedBy),
+                                ),
                               ],
                             ),
                           ),

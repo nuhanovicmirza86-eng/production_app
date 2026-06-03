@@ -1,6 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
+import '../../../../core/user_display_label.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/operational_business_year_context.dart';
 import '../../../../core/theme/operonix_production_brand.dart';
@@ -50,6 +52,7 @@ class _DowntimesOperativeTabState extends State<DowntimesOperativeTab> {
   DateTime? _filterEventRangeEndExclusive;
   bool _filtersExpanded = false;
   bool _appliedInitialFromParent = false;
+  String? _prefetchedListUserSignature;
 
   void _openProductionOrder(
     BuildContext context,
@@ -154,6 +157,29 @@ class _DowntimesOperativeTabState extends State<DowntimesOperativeTab> {
         _filterEventRangeEndExclusive = b.endLocalExclusive;
       });
     }
+  }
+
+  void _maybePrefetchListUsers(List<DowntimeEventModel> events) {
+    final ids = <String>{};
+    for (final e in events) {
+      for (final id in [
+        e.reportedBy,
+        e.operatorId,
+        e.resolvedBy,
+        e.verifiedBy,
+        e.createdBy,
+        e.updatedBy,
+      ]) {
+        final t = id.trim();
+        if (t.isNotEmpty) ids.add(t);
+      }
+    }
+    final sig = ids.join('|');
+    if (sig.isEmpty || _prefetchedListUserSignature == sig) return;
+    _prefetchedListUserSignature = sig;
+    UserDisplayLabel.prefetchUids(FirebaseFirestore.instance, ids).then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   Iterable<DowntimeEventModel> _applyFilters(List<DowntimeEventModel> raw) sync* {
@@ -275,6 +301,7 @@ class _DowntimesOperativeTabState extends State<DowntimesOperativeTab> {
 
         final all = snap.data!;
         final filtered = _applyFilters(all).toList();
+        _maybePrefetchListUsers(filtered);
         final now = DateTime.now();
         final kpi = DowntimeKpiSummary.compute(events: all, nowLocal: now);
 
@@ -369,7 +396,7 @@ class _DowntimesOperativeTabState extends State<DowntimesOperativeTab> {
                         padding: const EdgeInsets.only(bottom: 12),
                         child: Text(
                           'Aktivno filtriranje po centru: ${_filterWorkCenterToken!} '
-                          '(nema u trenutnom padajućem popisu; po događajima: ID ili šifra).',
+                          '(nema u trenutnom padajućem popisu; po događajima: šifra radnog centra).',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
@@ -514,14 +541,16 @@ class _DowntimesOperativeTabState extends State<DowntimesOperativeTab> {
                         '${e.workCenterCode.isNotEmpty ? e.workCenterCode : '—'} · '
                         '${e.processCode.isNotEmpty ? e.processCode : '—'}\n'
                         '${e.downtimeReason.isNotEmpty ? e.downtimeReason : e.downtimeCategory} · '
-                        '$durLabel · ${e.reportedByName.isNotEmpty ? e.reportedByName : e.reportedBy}',
+                        '$durLabel · ${UserDisplayLabel.personLine(e.reportedByName, e.reportedBy)}',
                       ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (e.productionOrderId.isNotEmpty && _canViewOrders)
                             IconButton(
-                              tooltip: 'Nalog ${e.productionOrderCode.isNotEmpty ? e.productionOrderCode : e.productionOrderId}',
+                              tooltip: e.productionOrderCode.isNotEmpty
+                                  ? 'Nalog ${e.productionOrderCode}'
+                                  : 'Otvori nalog',
                               onPressed: () {
                                 _openProductionOrder(
                                   context,
