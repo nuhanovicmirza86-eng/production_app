@@ -506,7 +506,7 @@ class OrdersService {
     final prodService = ProductionOrderService(firestore: _firestore);
     final plantCode = (companyData['plantCode'] ?? '').toString().trim();
 
-    final productionOrderId = await prodService.createProductionOrder(
+    final created = await prodService.createProductionOrder(
       companyId: companyId,
       plantKey: plantKey.trim(),
       plantCode: plantCode.isNotEmpty ? plantCode : null,
@@ -538,17 +538,8 @@ class OrdersService {
       requestedDeliveryDate: requestedDeliveryDate,
       inputMaterialLot: inputMaterialLot,
     );
-
-    final poSnap = await _firestore
-        .collection('production_orders')
-        .doc(productionOrderId)
-        .get();
-    final productionOrderCode = (poSnap.data()?['productionOrderCode'] ?? '')
-        .toString()
-        .trim();
-    if (productionOrderCode.isEmpty) {
-      throw Exception('Proizvodni nalog nema orderCode nakon kreiranja');
-    }
+    final productionOrderId = created.productionOrderId;
+    final productionOrderCode = created.productionOrderCode;
 
     await linkOrderToProduction(
       companyId: companyId,

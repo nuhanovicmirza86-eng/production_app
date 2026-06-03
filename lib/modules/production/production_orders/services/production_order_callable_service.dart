@@ -1,5 +1,16 @@
 import 'package:cloud_functions/cloud_functions.dart';
 
+/// Rezultat Callable `mutateProductionOrder` action `create`.
+class ProductionOrderCreateOutcome {
+  const ProductionOrderCreateOutcome({
+    required this.productionOrderId,
+    required this.productionOrderCode,
+  });
+
+  final String productionOrderId;
+  final String productionOrderCode;
+}
+
 /// Mutacije [production_orders], [production_order_snapshots], [production_order_audit_logs] (Admin SDK) — 022 + Faza 2B.
 class ProductionOrderCallableService {
   ProductionOrderCallableService({FirebaseFunctions? functions})
@@ -16,8 +27,8 @@ class ProductionOrderCallableService {
     return <String, dynamic>{};
   }
 
-  /// Vraća [productionOrderId] i opcionalno [productionOrderCode].
-  Future<String> createProductionOrder({
+  /// Vraća ID i šifru naloga s servera (bez dodatnog Firestore read-a).
+  Future<ProductionOrderCreateOutcome> createProductionOrder({
     required String companyId,
     required String plantKey,
     String? plantCode,
@@ -92,11 +103,18 @@ class ProductionOrderCallableService {
       'plantKey': plantKey.trim(),
       'create': create,
     });
-    final id = m['productionOrderId']?.toString() ?? '';
+    final id = m['productionOrderId']?.toString().trim() ?? '';
+    final code = m['productionOrderCode']?.toString().trim() ?? '';
     if (id.isEmpty) {
       throw Exception('Server nije vratio productionOrderId.');
     }
-    return id;
+    if (code.isEmpty) {
+      throw Exception('Server nije vratio productionOrderCode.');
+    }
+    return ProductionOrderCreateOutcome(
+      productionOrderId: id,
+      productionOrderCode: code,
+    );
   }
 
   Future<void> updateCritical({

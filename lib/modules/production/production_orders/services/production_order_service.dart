@@ -24,7 +24,7 @@ class ProductionOrderService {
 
   // ================= CREATE (Callable) =================
 
-  Future<String> createProductionOrder({
+  Future<ProductionOrderCreateOutcome> createProductionOrder({
     required String companyId,
     required String plantKey,
 
