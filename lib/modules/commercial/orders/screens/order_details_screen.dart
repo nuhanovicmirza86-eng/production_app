@@ -812,11 +812,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         ),
                       ),
                     ),
-                  if (item.linkedProductionOrderCodes.isNotEmpty)
+                  if (item.isLinkedToProductionOrder)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
-                        'PN: ${item.linkedProductionOrderCodes.join(', ')}',
+                        'PN: ${item.linkedProductionOrdersLabel}',
                         style: const TextStyle(
                           fontSize: 12,
                           color: Colors.black87,
@@ -824,7 +824,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       ),
                     ),
                   if (_order.orderType == OrderType.customer &&
-                      _canCreatePnFromLine)
+                      _canCreatePnFromLine &&
+                      !item.isLinkedToProductionOrder)
                     Padding(
                       padding: const EdgeInsets.only(top: 10),
                       child: Align(

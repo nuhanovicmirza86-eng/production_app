@@ -289,6 +289,9 @@ class OrderItemModel {
 
   final List<String> linkedProductionOrderCodes;
 
+  /// Firestore / Callable: stavka ima vezu na proizvodni nalog.
+  final bool hasProductionLink;
+
   final double deliveredQty;
   final double receivedQty;
   final double openQty;
@@ -313,6 +316,7 @@ class OrderItemModel {
     this.lineId,
     this.lineStatus,
     this.linkedProductionOrderCodes = const [],
+    this.hasProductionLink = false,
     this.deliveredQty = 0,
     this.receivedQty = 0,
     this.openQty = 0,
@@ -320,6 +324,19 @@ class OrderItemModel {
     this.discountPercent = 0,
     this.vatPercent,
   });
+
+  /// Veza na PN (šifre i/ili flag iz baze).
+  bool get isLinkedToProductionOrder =>
+      hasProductionLink || linkedProductionOrderCodes.isNotEmpty;
+
+  /// Tekst za UI (banner, red „PN:“).
+  String get linkedProductionOrdersLabel {
+    if (linkedProductionOrderCodes.isNotEmpty) {
+      return linkedProductionOrderCodes.join(', ');
+    }
+    if (hasProductionLink) return 'povezano';
+    return '';
+  }
 
   factory OrderItemModel.fromMap(Map<String, dynamic> map) {
     return OrderItemModel(
@@ -335,6 +352,7 @@ class OrderItemModel {
       linkedProductionOrderCodes: _stringList(
         map['linkedProductionOrderCodes'],
       ),
+      hasProductionLink: _bool(map['hasProductionLink']),
       deliveredQty: _d(map['deliveredQty']),
       receivedQty: _d(map['receivedQty']),
       openQty: _d(map['openQty']),
@@ -358,6 +376,7 @@ class OrderItemModel {
       linkedProductionOrderCodes: _stringList(
         map['linkedProductionOrderCodes'],
       ),
+      hasProductionLink: _bool(map['hasProductionLink']),
       deliveredQty: _d(map['deliveredQty']),
       receivedQty: _d(map['receivedQty']),
       openQty: _d(map['openQty']),
@@ -379,7 +398,15 @@ class OrderItemModel {
       if (lineId != null) 'lineId': lineId,
       if (lineStatus != null) 'status': lineStatus,
       'linkedProductionOrderCodes': linkedProductionOrderCodes,
+      if (hasProductionLink) 'hasProductionLink': true,
     };
+  }
+
+  static bool _bool(dynamic v) {
+    if (v is bool) return v;
+    if (v is num) return v != 0;
+    final s = _s(v).toLowerCase();
+    return s == 'true' || s == '1' || s == 'yes';
   }
 
   static List<String> _stringList(dynamic raw) {

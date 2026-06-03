@@ -53,6 +53,9 @@ class _OrderLineProductionCreateScreenState
   String get _plantKeyForProduction =>
       (widget.companyData['plantKey'] ?? '').toString().trim();
 
+  bool get _alreadyLinkedToProduction =>
+      widget.item.isLinkedToProductionOrder;
+
   @override
   void initState() {
     super.initState();
@@ -151,6 +154,18 @@ class _OrderLineProductionCreateScreenState
   }
 
   Future<void> _submit() async {
+    if (_alreadyLinkedToProduction) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Stavka je već povezana s proizvodnim nalogom: '
+            '${widget.item.linkedProductionOrdersLabel}',
+          ),
+        ),
+      );
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     final docId = widget.item.orderItemDocId?.trim() ?? '';
@@ -314,14 +329,47 @@ class _OrderLineProductionCreateScreenState
       );
     }
 
+    final linkedLabel = widget.item.linkedProductionOrdersLabel;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Kreiraj PN iz stavke')),
       body: AbsorbPointer(
-        absorbing: _submitting,
+        absorbing: _submitting || _alreadyLinkedToProduction,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
             if (_submitting) const LinearProgressIndicator(minHeight: 2),
+            if (_alreadyLinkedToProduction) ...[
+              Material(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.link,
+                        size: 20,
+                        color: Colors.blue.shade800,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Stavka je već povezana s proizvodnim nalogom: '
+                          '$linkedLabel',
+                          style: TextStyle(
+                            color: Colors.blue.shade900,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             Text(
               '${widget.item.productCode} — ${widget.item.productName}',
               style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
@@ -423,7 +471,9 @@ class _OrderLineProductionCreateScreenState
                     ),
                     const SizedBox(height: 16),
                     FilledButton(
-                      onPressed: _submitting ? null : _submit,
+                      onPressed: _submitting || _alreadyLinkedToProduction
+                          ? null
+                          : _submit,
                       child: const Text('Kreiraj i poveži'),
                     ),
                   ],

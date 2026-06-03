@@ -75,7 +75,7 @@ class _OrderEditScreenState extends State<OrderEditScreen> {
       v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(4);
 
   bool _lineQtyEditable(OrderItemModel it) {
-    if (it.linkedProductionOrderCodes.isNotEmpty) return false;
+    if (it.isLinkedToProductionOrder) return false;
     if (it.deliveredQty > 0 || it.receivedQty > 0) return false;
     return true;
   }
