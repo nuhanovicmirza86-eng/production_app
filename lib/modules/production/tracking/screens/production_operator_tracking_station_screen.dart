@@ -126,10 +126,8 @@ class _ProductionOperatorTrackingStationScreenState
 
   Future<void> _loadStationPageMeta() async {
     final cid = (widget.companyData['companyId'] ?? '').toString().trim();
-    final bound =
-        (widget.companyData['stationBoundPlantKey'] ?? '').toString().trim();
-    final pk = (widget.companyData['plantKey'] ?? '').toString().trim();
-    final plantKey = bound.isNotEmpty ? bound : pk;
+    final plantKey =
+        ProductionStationPage.plantKeyForStationContext(widget.companyData);
     if (cid.isEmpty || plantKey.isEmpty) return;
     final slot = ProductionStationPage.stationSlotForPhase(widget.phase);
     try {

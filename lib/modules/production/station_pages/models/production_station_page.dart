@@ -42,6 +42,17 @@ class ProductionStationPage {
     this.outboundWarehouseId,
   });
 
+  /// Pogon za upit `production_station_pages` — usklađeno s dedicated stanicom i rules `myPlantKey()`.
+  ///
+  /// Prioritet: [stationBoundPlantKey] (PC) → `plantKey` sesije → `userHomePlantKey`.
+  static String plantKeyForStationContext(Map<String, dynamic> companyData) {
+    final bound = (companyData['stationBoundPlantKey'] ?? '').toString().trim();
+    if (bound.isNotEmpty) return bound;
+    final pk = (companyData['plantKey'] ?? '').toString().trim();
+    if (pk.isNotEmpty) return pk;
+    return (companyData['userHomePlantKey'] ?? '').toString().trim();
+  }
+
   /// Deterministički id: `{companyId}__{escapedPlantKey}__{stationSlot}`.
   static String buildPageId({
     required String companyId,

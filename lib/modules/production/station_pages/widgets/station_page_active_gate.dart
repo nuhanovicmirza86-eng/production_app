@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/production_station_page.dart';
 import '../models/station_page_gate_result.dart';
 import '../services/production_station_page_service.dart';
 
@@ -38,8 +39,8 @@ class _StationPageActiveGateState extends State<StationPageActiveGate> {
     super.didUpdateWidget(oldWidget);
     final oc = (oldWidget.companyData['companyId'] ?? '').toString().trim();
     final nc = (widget.companyData['companyId'] ?? '').toString().trim();
-    final op = (oldWidget.companyData['plantKey'] ?? '').toString().trim();
-    final np = (widget.companyData['plantKey'] ?? '').toString().trim();
+    final op = ProductionStationPage.plantKeyForStationContext(oldWidget.companyData);
+    final np = ProductionStationPage.plantKeyForStationContext(widget.companyData);
     if (oc != nc || op != np || oldWidget.phase != widget.phase) {
       setState(() {
         _future = _load();
@@ -48,11 +49,8 @@ class _StationPageActiveGateState extends State<StationPageActiveGate> {
   }
 
   Future<StationPageGateResult> _load() {
-    final cid = (widget.companyData['companyId'] ?? '').toString().trim();
-    final pk = (widget.companyData['plantKey'] ?? '').toString().trim();
-    return _service.checkStationPageForLaunchPhase(
-      companyId: cid,
-      plantKey: pk,
+    return _service.checkStationPageForLaunchPhaseFromSession(
+      companyData: widget.companyData,
       phase: widget.phase,
     );
   }

@@ -80,6 +80,18 @@ class ProductionStationPageService {
   ///
   /// Blokira samo ako postoji dokument i `active == false`. Bez dokumenta ili uz drugu fazu — **dopušteno**
   /// (npr. tvrtka s jednom ili dvije stanice ne mora popunjavati sve slotove).
+  /// [companyData] — ista mapa kao u [AuthWrapper] / dedicated stanica (pogon iz konteksta).
+  Future<StationPageGateResult> checkStationPageForLaunchPhaseFromSession({
+    required Map<String, dynamic> companyData,
+    required String phase,
+  }) {
+    return checkStationPageForLaunchPhase(
+      companyId: (companyData['companyId'] ?? '').toString(),
+      plantKey: ProductionStationPage.plantKeyForStationContext(companyData),
+      phase: phase,
+    );
+  }
+
   Future<StationPageGateResult> checkStationPageForLaunchPhase({
     required String companyId,
     required String plantKey,

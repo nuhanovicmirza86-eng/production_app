@@ -263,6 +263,13 @@ class _AuthWrapperState extends State<AuthWrapper> {
         await ProductionAdminSessionPlant.applyPreferenceIfAdmin(
           _companyData!,
         );
+        // Dedicated stanica: Firestore id stranice mora koristiti pogon vezan na uređaju (ne admin pref iz drugog pogona).
+        if (_effLaunchPhase != null) {
+          final bound = _s(_companyData!['stationBoundPlantKey']);
+          if (bound.isNotEmpty) {
+            _companyData!['plantKey'] = bound;
+          }
+        }
       }
 
       _error = null;
