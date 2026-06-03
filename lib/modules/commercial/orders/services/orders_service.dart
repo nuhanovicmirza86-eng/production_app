@@ -19,9 +19,6 @@ class OrdersService {
   final FirebaseFunctions _functions;
   final OrderStatusEngine _orderStatusEngine;
 
-  CollectionReference get _orders => _firestore.collection('orders');
-  CollectionReference get _orderItems => _firestore.collection('order_items');
-
   Future<Map<String, dynamic>> _callCreateCommercialOrder(
     Map<String, dynamic> payload,
   ) async {
@@ -40,7 +37,62 @@ class OrdersService {
     return res.data;
   }
 
+  Future<Map<String, dynamic>> _callListCommercialOrders({
+    required String companyId,
+    String? orderType,
+    int limit = 100,
+  }) async {
+    final res = await _functions
+        .httpsCallable('listCommercialOrders')
+        .call<Map<String, dynamic>>({
+          'companyId': companyId,
+          if (orderType != null && orderType.trim().isNotEmpty)
+            'orderType': orderType.trim(),
+          'limit': limit,
+        });
+    return res.data;
+  }
+
+  Future<Map<String, dynamic>> _callGetCommercialOrder({
+    required String companyId,
+    required String orderId,
+  }) async {
+    final res = await _functions
+        .httpsCallable('getCommercialOrder')
+        .call<Map<String, dynamic>>({
+          'companyId': companyId,
+          'orderId': orderId,
+        });
+    return res.data;
+  }
+
+  Future<Map<String, dynamic>> _callListCommercialOrderItemsByCompany({
+    required String companyId,
+    int limit = 2000,
+  }) async {
+    final res = await _functions
+        .httpsCallable('listCommercialOrderItemsByCompany')
+        .call<Map<String, dynamic>>({
+          'companyId': companyId,
+          'limit': limit,
+        });
+    return res.data;
+  }
+
   static String _s(dynamic v) => (v ?? '').toString().trim();
+
+  static Map<String, dynamic> _mapFromDynamic(dynamic raw) {
+    if (raw is! Map) return {};
+    return Map<String, dynamic>.from(raw);
+  }
+
+  static List<Map<String, dynamic>> _listOfMaps(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .map((e) => e is Map ? Map<String, dynamic>.from(e) : null)
+        .whereType<Map<String, dynamic>>()
+        .toList();
+  }
 
   static dynamic _jsonSafeDate(dynamic v) {
     if (v == null) return null;
@@ -135,25 +187,30 @@ class OrdersService {
     required String companyId,
     required String orderId,
   }) async {
-    final doc = await _orders.doc(orderId).get();
-
-    if (!doc.exists) return null;
-
-    return {'id': doc.id, ...doc.data() as Map<String, dynamic>};
+    final data = await _callGetCommercialOrder(
+      companyId: companyId,
+      orderId: orderId,
+    );
+    if (data['success'] != true) {
+      throw Exception('Učitavanje narudžbe nije uspjelo.');
+    }
+    final order = data['order'];
+    if (order == null) return null;
+    return _mapFromDynamic(order);
   }
 
   Future<List<Map<String, dynamic>>> getOrderItems({
     required String companyId,
     required String orderId,
   }) async {
-    final query = await _orderItems
-        .where('companyId', isEqualTo: companyId)
-        .where('orderId', isEqualTo: orderId)
-        .get();
-
-    return query.docs
-        .map((d) => {'id': d.id, ...d.data() as Map<String, dynamic>})
-        .toList();
+    final data = await _callGetCommercialOrder(
+      companyId: companyId,
+      orderId: orderId,
+    );
+    if (data['success'] != true) {
+      throw Exception('Učitavanje stavki narudžbe nije uspjelo.');
+    }
+    return _listOfMaps(data['items']);
   }
 
   /// Sve stavke narudžbi za kompaniju (ograničeno) — za tabularni pregled liste.
@@ -164,18 +221,20 @@ class OrdersService {
     final cid = companyId.trim();
     if (cid.isEmpty) return const {};
 
-    final snap = await _orderItems
-        .where('companyId', isEqualTo: cid)
-        .limit(limit)
-        .get();
+    final data = await _callListCommercialOrderItemsByCompany(
+      companyId: cid,
+      limit: limit,
+    );
+    if (data['success'] != true) {
+      throw Exception('Učitavanje stavki narudžbi nije uspjelo.');
+    }
 
     final out = <String, List<OrderItemModel>>{};
-    for (final d in snap.docs) {
-      final m = Map<String, dynamic>.from(d.data() as Map);
+    for (final row in _listOfMaps(data['items'])) {
+      final m = Map<String, dynamic>.from(row);
       final oid = _s(m['orderId']);
       if (oid.isEmpty) continue;
-      final row = <String, dynamic>{'id': d.id, ...m};
-      out.putIfAbsent(oid, () => []).add(OrderItemModel.fromOrderItemRow(row));
+      out.putIfAbsent(oid, () => []).add(OrderItemModel.fromOrderItemRow(m));
     }
     for (final list in out.values) {
       list.sort((a, b) => (a.lineId ?? '').compareTo(b.lineId ?? ''));
@@ -187,21 +246,18 @@ class OrdersService {
     required String companyId,
     String? orderType,
   }) async {
-    Query query = _orders.where('companyId', isEqualTo: companyId);
-
-    if (orderType != null && orderType.trim().isNotEmpty) {
-      query = query.where('orderType', isEqualTo: orderType.trim());
+    final data = await _callListCommercialOrders(
+      companyId: companyId,
+      orderType: orderType,
+      limit: 100,
+    );
+    if (data['success'] != true) {
+      throw Exception('Pretraga narudžbi nije uspjela.');
     }
 
-    final snapshot = await query
-        .orderBy('updatedAt', descending: true)
-        .limit(100)
-        .get();
-
-    return snapshot.docs.map((d) {
-      final data = d.data() as Map<String, dynamic>;
-      return OrderModel.fromMap(d.id, data);
-    }).toList();
+    return _listOfMaps(data['orders'])
+        .map((m) => OrderModel.fromMap(_s(m['id']), m))
+        .toList();
   }
 
   /// Učitava zaglavlje narudžbe i stavke iz kolekcije `order_items` (izvor istine za linije).
@@ -209,24 +265,23 @@ class OrdersService {
     required String companyId,
     required String orderId,
   }) async {
-    final header = await getOrderById(companyId: companyId, orderId: orderId);
-    if (header == null) return null;
-
-    final rawItems = await getOrderItems(
+    final data = await _callGetCommercialOrder(
       companyId: companyId,
       orderId: orderId,
     );
-    rawItems.sort((a, b) {
-      final la = (a['lineId'] ?? '').toString();
-      final lb = (b['lineId'] ?? '').toString();
-      return la.compareTo(lb);
-    });
+    if (data['success'] != true) {
+      throw Exception('Učitavanje narudžbe nije uspjelo.');
+    }
+    final header = data['order'];
+    if (header == null) return null;
 
+    final headerMap = _mapFromDynamic(header);
+    final rawItems = _listOfMaps(data['items']);
     final items = rawItems
         .map((m) => OrderItemModel.fromOrderItemRow(m))
         .toList();
 
-    return OrderModel.fromOrderDocument(orderId, header, items: items);
+    return OrderModel.fromOrderDocument(orderId, headerMap, items: items);
   }
 
   Future<void> updateOrderStatus({
