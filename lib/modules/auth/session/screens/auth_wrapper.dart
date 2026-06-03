@@ -57,6 +57,22 @@ class _AuthWrapperState extends State<AuthWrapper> {
     return _s(raw);
   }
 
+  /// Usklađeno s Firestore `plantKeyFromUserDoc` / `myPlantKey()` (rules).
+  String _plantKeyFromUserDoc(Map<String, dynamic> data) {
+    final pk = _s(data['plantKey']);
+    if (pk.isNotEmpty) return pk;
+    final home = _s(data['homePlantKey']);
+    if (home.isNotEmpty) return home;
+    final appAccess = data['appAccess'];
+    if (appAccess is Map) {
+      final apk = _s(appAccess['plantKey']);
+      if (apk.isNotEmpty) return apk;
+      final ahome = _s(appAccess['homePlantKey']);
+      if (ahome.isNotEmpty) return ahome;
+    }
+    return '';
+  }
+
   Future<void> _handleAuth(User? user) async {
     if (!mounted) return;
 
@@ -100,7 +116,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       final status = _s(data['status']).toLowerCase();
       final role = _s(data['role']).toLowerCase();
       final companyId = _companyIdFromUserField(data['companyId']);
-      final plantKey = _s(data['plantKey']);
+      final plantKey = _plantKeyFromUserDoc(data);
 
       final rawAppAccess = data['appAccess'];
       final appAccess = rawAppAccess is Map<String, dynamic>
