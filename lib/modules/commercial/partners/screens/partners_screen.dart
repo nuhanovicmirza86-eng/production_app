@@ -585,6 +585,7 @@ class _PartnersScreenState extends State<PartnersScreen>
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String?>(
+            isExpanded: true,
             initialValue: _customerActivityFilter,
             decoration: const InputDecoration(
               labelText: 'Djelatnost',
@@ -678,6 +679,7 @@ class _PartnersScreenState extends State<PartnersScreen>
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String?>(
+            isExpanded: true,
             initialValue: _supplierActivityFilter,
             decoration: const InputDecoration(
               labelText: 'Djelatnost',
@@ -706,24 +708,73 @@ class _PartnersScreenState extends State<PartnersScreen>
     );
   }
 
+  List<Widget> _summaryFilterSlivers({required bool forCustomersTab}) {
+    if (!_summaryPanelExpanded) return const [];
+    return [
+      SliverToBoxAdapter(
+        child: Material(
+          color: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildKpis(),
+                const SizedBox(height: 8),
+                forCustomersTab ? _customerFilterBar() : _supplierFilterBar(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ];
+  }
+
   Widget _buildCustomersTab() {
     if (_loading && _customers.isEmpty && _error == null) {
-      return const Center(child: CircularProgressIndicator());
+      return CustomScrollView(
+        slivers: [
+          ..._summaryFilterSlivers(forCustomersTab: true),
+          const SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        ],
+      );
     }
     if (_customers.isEmpty && !_loading && _error == null) {
-      return _empty('Nema kupaca.');
+      return CustomScrollView(
+        slivers: [
+          ..._summaryFilterSlivers(forCustomersTab: true),
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: _empty('Nema kupaca.'),
+          ),
+        ],
+      );
     }
     final visible = _visibleCustomers;
     if (_customers.isNotEmpty &&
         visible.isEmpty &&
         !_loading &&
         _error == null) {
-      return _empty('Nema rezultata za odabrane filtere.');
+      return CustomScrollView(
+        slivers: [
+          ..._summaryFilterSlivers(forCustomersTab: true),
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: _empty('Nema rezultata za odabrane filtere.'),
+          ),
+        ],
+      );
     }
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-      itemCount: visible.length,
-      itemBuilder: (context, i) {
+    return CustomScrollView(
+      slivers: [
+        ..._summaryFilterSlivers(forCustomersTab: true),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate((context, i) {
         final c = visible[i];
         final accent = _partnerAccent(c.partnerRatingClass, c.isStrategic);
         final sectorRaw = (c.activitySector ?? '').trim();
@@ -774,28 +825,58 @@ class _PartnersScreenState extends State<PartnersScreen>
             ),
           ),
         );
-      },
+            }, childCount: visible.length),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildSuppliersTab() {
     if (_loading && _suppliers.isEmpty && _error == null) {
-      return const Center(child: CircularProgressIndicator());
+      return CustomScrollView(
+        slivers: [
+          ..._summaryFilterSlivers(forCustomersTab: false),
+          const SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        ],
+      );
     }
     if (_suppliers.isEmpty && !_loading && _error == null) {
-      return _empty('Nema dobavljača.');
+      return CustomScrollView(
+        slivers: [
+          ..._summaryFilterSlivers(forCustomersTab: false),
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: _empty('Nema dobavljača.'),
+          ),
+        ],
+      );
     }
     final visible = _visibleSuppliers;
     if (_suppliers.isNotEmpty &&
         visible.isEmpty &&
         !_loading &&
         _error == null) {
-      return _empty('Nema rezultata za odabrane filtere.');
+      return CustomScrollView(
+        slivers: [
+          ..._summaryFilterSlivers(forCustomersTab: false),
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: _empty('Nema rezultata za odabrane filtere.'),
+          ),
+        ],
+      );
     }
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-      itemCount: visible.length,
-      itemBuilder: (context, i) {
+    return CustomScrollView(
+      slivers: [
+        ..._summaryFilterSlivers(forCustomersTab: false),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate((context, i) {
         final s = visible[i];
         final oa = s.operationalAuto;
         final autoLine = oa == null
@@ -878,32 +959,30 @@ class _PartnersScreenState extends State<PartnersScreen>
             ),
           ),
         );
-      },
+            }, childCount: visible.length),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildSummaryAndFiltersPanel() {
-    final onCustomersTab = _tabController.index == 0;
+    final subtitle = _loading
+        ? 'Učitavanje…'
+        : 'Kupci: ${_customers.length} · Dobavljači: ${_suppliers.length}';
+
     return Material(
       color: Colors.white,
-      child: ExpansionTile(
-        initiallyExpanded: _summaryPanelExpanded,
-        onExpansionChanged: (expanded) {
-          setState(() => _summaryPanelExpanded = expanded);
-        },
-        tilePadding: const EdgeInsets.symmetric(horizontal: 8),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
         title: const Text('Sažetak i filteri'),
-        subtitle: Text(
-          _loading
-              ? 'Učitavanje…'
-              : 'Kupci: ${_customers.length} · Dobavljači: ${_suppliers.length}',
+        subtitle: Text(subtitle),
+        trailing: Icon(
+          _summaryPanelExpanded
+              ? Icons.keyboard_arrow_up_rounded
+              : Icons.keyboard_arrow_down_rounded,
         ),
-        children: [
-          _buildKpis(),
-          const SizedBox(height: 8),
-          onCustomersTab ? _customerFilterBar() : _supplierFilterBar(),
-        ],
+        onTap: () => setState(() => _summaryPanelExpanded = !_summaryPanelExpanded),
       ),
     );
   }
@@ -1055,7 +1134,7 @@ class _PartnersScreenState extends State<PartnersScreen>
             const LinearProgressIndicator(minHeight: 2),
           if (_error != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: Material(
                 color: Colors.red.shade50,
                 borderRadius: BorderRadius.circular(12),

@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 class SupplierEvaluationModel {
@@ -64,20 +63,21 @@ class SupplierEvaluationModel {
 }
 
 class SupplierEvaluationsService {
-  SupplierEvaluationsService({
-    FirebaseFirestore? firestore,
-    FirebaseFunctions? functions,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _functions =
-           functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
+  SupplierEvaluationsService({FirebaseFunctions? functions})
+    : _functions =
+          functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
 
-  final FirebaseFirestore _firestore;
   final FirebaseFunctions _functions;
 
-  CollectionReference<Map<String, dynamic>> get _evaluations =>
-      _firestore.collection('supplier_evaluations');
-
   static String _s(dynamic v) => (v ?? '').toString().trim();
+
+  static List<Map<String, dynamic>> _listOfMaps(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .map((e) => e is Map ? Map<String, dynamic>.from(e) : null)
+        .whereType<Map<String, dynamic>>()
+        .toList();
+  }
 
   static double calculateOverall({
     required double qualityRating,
@@ -114,16 +114,27 @@ class SupplierEvaluationsService {
     final sid = supplierId.trim();
     if (cid.isEmpty || sid.isEmpty) return const [];
 
-    final snap = await _evaluations
-        .where('companyId', isEqualTo: cid)
-        .where('supplierId', isEqualTo: sid)
-        .orderBy('createdAt', descending: true)
-        .limit(limit)
-        .get();
+    final res = await _functions
+        .httpsCallable('listSupplierEvaluationsForSupplier')
+        .call<Map<String, dynamic>>({
+          'companyId': cid,
+          'supplierId': sid,
+          'limit': limit,
+        });
+    final data = res.data;
+    if (data['success'] != true) {
+      throw Exception('Dohvat evaluacija nije uspio.');
+    }
 
-    return snap.docs
-        .map((d) => SupplierEvaluationModel.fromMap(d.id, d.data()))
-        .toList();
+    final out = <SupplierEvaluationModel>[];
+    for (final row in _listOfMaps(data['evaluations'])) {
+      final id = _s(row['id']);
+      if (id.isEmpty) continue;
+      final m = SupplierEvaluationModel.fromMap(id, row);
+      if (m.companyId != cid || m.supplierId != sid) continue;
+      out.add(m);
+    }
+    return out;
   }
 
   Future<String> createEvaluation({
