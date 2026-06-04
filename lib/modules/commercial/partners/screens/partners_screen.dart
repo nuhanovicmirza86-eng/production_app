@@ -102,12 +102,43 @@ class _PartnersScreenState extends State<PartnersScreen>
 
   bool _opRefreshing = false;
 
+  /// KPI + ABC/djelatnost filteri — po defaultu sakriveni da lista bude vidljiva.
+  bool _summaryPanelExpanded = false;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_onTabChanged);
     _searchController.addListener(_onSearchChanged);
+    _companyDocActivityCodes =
+        widget.companyData['enabledActivitySectorCodes'];
     _load();
+    unawaited(_refreshCompanyActivityCodes());
+  }
+
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging && mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _refreshCompanyActivityCodes() async {
+    if (_companyId.isEmpty) return;
+    try {
+      final compSnap = await FirebaseFirestore.instance
+          .collection('companies')
+          .doc(_companyId)
+          .get();
+      final enabledRaw = compSnap.data()?['enabledActivitySectorCodes'];
+      if (!mounted) return;
+      setState(() {
+        _companyDocActivityCodes = enabledRaw;
+        _pruneActivityFiltersIfStale();
+      });
+    } catch (_) {
+      // Ostaje widget.companyData / zadnji uspješni fetch.
+    }
   }
 
   @override
@@ -116,7 +147,9 @@ class _PartnersScreenState extends State<PartnersScreen>
     _searchController
       ..removeListener(_onSearchChanged)
       ..dispose();
-    _tabController.dispose();
+    _tabController
+      ..removeListener(_onTabChanged)
+      ..dispose();
     super.dispose();
   }
 
@@ -144,26 +177,21 @@ class _PartnersScreenState extends State<PartnersScreen>
 
     try {
       final q = _searchController.text.trim();
-      final customers = await _customersService.listCustomers(
+      final customersFuture = _customersService.listCustomers(
         companyId: _companyId,
         query: q,
       );
-      final suppliers = await _suppliersService.listSuppliers(
+      final suppliersFuture = _suppliersService.listSuppliers(
         companyId: _companyId,
         query: q,
       );
-
-      final compSnap = await FirebaseFirestore.instance
-          .collection('companies')
-          .doc(_companyId)
-          .get();
-      final enabledRaw = compSnap.data()?['enabledActivitySectorCodes'];
+      final customers = await customersFuture;
+      final suppliers = await suppliersFuture;
 
       if (!mounted) return;
       setState(() {
         _customers = customers;
         _suppliers = suppliers;
-        _companyDocActivityCodes = enabledRaw;
         _loading = false;
         _pruneActivityFiltersIfStale();
       });
@@ -504,10 +532,7 @@ class _PartnersScreenState extends State<PartnersScreen>
   }
 
   Widget _customerFilterBar() {
-    if (_customers.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Column(
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
@@ -585,14 +610,11 @@ class _PartnersScreenState extends State<PartnersScreen>
             onChanged: (v) => setState(() => _customerActivityFilter = v),
           ),
         ],
-      ),
     );
   }
 
   Widget _supplierFilterBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Column(
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (_canRunSupplierSelection)
@@ -612,7 +634,6 @@ class _PartnersScreenState extends State<PartnersScreen>
                 label: const Text('Odabir dobavljača'),
               ),
             ),
-          if (_suppliers.isEmpty) const SizedBox.shrink() else ...[
           Text(
             'Filter: kategorija (ABC)',
             style: Theme.of(context).textTheme.labelLarge,
@@ -682,12 +703,13 @@ class _PartnersScreenState extends State<PartnersScreen>
             onChanged: (v) => setState(() => _supplierActivityFilter = v),
           ),
         ],
-        ],
-      ),
     );
   }
 
   Widget _buildCustomersTab() {
+    if (_loading && _customers.isEmpty && _error == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
     if (_customers.isEmpty && !_loading && _error == null) {
       return _empty('Nema kupaca.');
     }
@@ -696,214 +718,193 @@ class _PartnersScreenState extends State<PartnersScreen>
         visible.isEmpty &&
         !_loading &&
         _error == null) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _customerFilterBar(),
-          Expanded(child: _empty('Nema rezultata za odabrane filtere.')),
-        ],
-      );
+      return _empty('Nema rezultata za odabrane filtere.');
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _customerFilterBar(),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-            itemCount: visible.length,
-            itemBuilder: (context, i) {
-              final c = visible[i];
-              final accent = _partnerAccent(c.partnerRatingClass, c.isStrategic);
-              final sectorRaw = (c.activitySector ?? '').trim();
-              final sectorLine = sectorRaw.isEmpty
-                  ? ''
-                  : 'Djelatnost: ${activitySectorLabel(c.activitySector)}\n';
-              final stratLine =
-                  c.partnerRatingClass == 'C' && c.isStrategic
-                      ? ' • Strateški (nema alternative)'
-                      : '';
-              return Card(
-                clipBehavior: Clip.antiAlias,
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: Border(
-                      left: BorderSide(color: accent, width: 5),
-                    ),
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      itemCount: visible.length,
+      itemBuilder: (context, i) {
+        final c = visible[i];
+        final accent = _partnerAccent(c.partnerRatingClass, c.isStrategic);
+        final sectorRaw = (c.activitySector ?? '').trim();
+        final sectorLine = sectorRaw.isEmpty
+            ? ''
+            : 'Djelatnost: ${activitySectorLabel(c.activitySector)}\n';
+        final stratLine = c.partnerRatingClass == 'C' && c.isStrategic
+            ? ' • Strateški (nema alternative)'
+            : '';
+        return Card(
+          clipBehavior: Clip.antiAlias,
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border(left: BorderSide(color: accent, width: 5)),
+            ),
+            child: ListTile(
+              title: Text('${c.code} — ${c.name}', maxLines: 3),
+              subtitle: Text(
+                'Pravni naziv: ${c.legalName}\n'
+                'Kategorija: ${_abcSubtitle(c.partnerRatingClass)}$stratLine\n'
+                '$sectorLine'
+                'Status: ${c.status} • Tip: ${c.customerType}',
+                maxLines: 6,
+              ),
+              isThreeLine: true,
+              trailing: PopupMenuButton<String>(
+                onSelected: (v) {
+                  if (v == 'edit' && _canManageCustomers) {
+                    _openEditCustomer(c);
+                  }
+                  if (v == 'unified') {
+                    _openCustomerUnifiedAssessment(c);
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'edit',
+                    enabled: _canManageCustomers,
+                    child: const Text('Uredi'),
                   ),
-                  child: ListTile(
-                    title: Text('${c.code} — ${c.name}', maxLines: 3),
-                    subtitle: Text(
-                      'Pravni naziv: ${c.legalName}\n'
-                      'Kategorija: ${_abcSubtitle(c.partnerRatingClass)}$stratLine\n'
-                      '$sectorLine'
-                      'Status: ${c.status} • Tip: ${c.customerType}',
-                      maxLines: 6,
-                    ),
-                    isThreeLine: true,
-                    trailing: PopupMenuButton<String>(
-                      onSelected: (v) {
-                        if (v == 'edit' && _canManageCustomers) {
-                          _openEditCustomer(c);
-                        }
-                        if (v == 'unified') {
-                          _openCustomerUnifiedAssessment(c);
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        PopupMenuItem(
-                          value: 'edit',
-                          enabled: _canManageCustomers,
-                          child: const Text('Uredi'),
-                        ),
-                        const PopupMenuItem(
-                          value: 'unified',
-                          child: Text('Procjena (šablon)'),
-                        ),
-                      ],
-                    ),
-                    onTap: _canManageCustomers
-                        ? () => _openEditCustomer(c)
-                        : null,
+                  const PopupMenuItem(
+                    value: 'unified',
+                    child: Text('Procjena (šablon)'),
                   ),
-                ),
-              );
-            },
+                ],
+              ),
+              onTap: _canManageCustomers ? () => _openEditCustomer(c) : null,
+            ),
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 
   Widget _buildSuppliersTab() {
+    if (_loading && _suppliers.isEmpty && _error == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
     if (_suppliers.isEmpty && !_loading && _error == null) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _supplierFilterBar(),
-          Expanded(child: _empty('Nema dobavljača.')),
-        ],
-      );
+      return _empty('Nema dobavljača.');
     }
     final visible = _visibleSuppliers;
     if (_suppliers.isNotEmpty &&
         visible.isEmpty &&
         !_loading &&
         _error == null) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _supplierFilterBar(),
-          Expanded(child: _empty('Nema rezultata za odabrane filtere.')),
-        ],
-      );
+      return _empty('Nema rezultata za odabrane filtere.');
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _supplierFilterBar(),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-            itemCount: visible.length,
-            itemBuilder: (context, i) {
-              final s = visible[i];
-              final oa = s.operationalAuto;
-              final autoLine = oa == null
-                  ? 'Automatski skor (narudžbe): —'
-                  : 'Automatski skor (narudžbe): ${oa.score.toStringAsFixed(0)} '
-                        '(${oa.linesAnalyzed} stavki, v${oa.algorithmVersion})';
-              final accent = _partnerAccent(
-                s.partnerRatingClass,
-                s.isStrategic,
-              );
-              final sectorRaw = (s.activitySector ?? '').trim();
-              final sectorLine = sectorRaw.isEmpty
-                  ? ''
-                  : 'Djelatnost: ${activitySectorLabel(s.activitySector)}\n';
-              final stratLine =
-                  s.partnerRatingClass == 'C' && s.isStrategic
-                      ? ' • Strateški (nema alternative)'
-                      : '';
-              return Card(
-                clipBehavior: Clip.antiAlias,
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: Border(
-                      left: BorderSide(color: accent, width: 5),
-                    ),
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      itemCount: visible.length,
+      itemBuilder: (context, i) {
+        final s = visible[i];
+        final oa = s.operationalAuto;
+        final autoLine = oa == null
+            ? 'Automatski skor (narudžbe): —'
+            : 'Automatski skor (narudžbe): ${oa.score.toStringAsFixed(0)} '
+                  '(${oa.linesAnalyzed} stavki, v${oa.algorithmVersion})';
+        final accent = _partnerAccent(s.partnerRatingClass, s.isStrategic);
+        final sectorRaw = (s.activitySector ?? '').trim();
+        final sectorLine = sectorRaw.isEmpty
+            ? ''
+            : 'Djelatnost: ${activitySectorLabel(s.activitySector)}\n';
+        final stratLine = s.partnerRatingClass == 'C' && s.isStrategic
+            ? ' • Strateški (nema alternative)'
+            : '';
+        return Card(
+          clipBehavior: Clip.antiAlias,
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border(left: BorderSide(color: accent, width: 5)),
+            ),
+            child: ListTile(
+              title: Text('${s.code} — ${s.name}', maxLines: 3),
+              subtitle: Text(
+                'Pravni naziv: ${s.legalName}\n'
+                'Kategorija: ${_abcSubtitle(s.partnerRatingClass)}$stratLine\n'
+                '$sectorLine'
+                'Status: ${s.status} • Tip: ${s.supplierType}\n'
+                'Rizik: ${s.riskLevel} • Ocjena procjene: '
+                '${s.overallScore.toStringAsFixed(1)}\n'
+                '$autoLine',
+                maxLines: 8,
+              ),
+              isThreeLine: true,
+              trailing: PopupMenuButton<String>(
+                onSelected: (v) {
+                  if (v == 'edit' && _canManageSuppliers) {
+                    _openEditSupplier(s);
+                  }
+                  if (v == 'eval') {
+                    _openSupplierEvaluations(s);
+                  }
+                  if (v == 'unified') {
+                    _openSupplierUnifiedAssessment(s);
+                  }
+                  if (v == 'operational_detail') {
+                    _showSupplierOperationalDetails(s);
+                  }
+                  if (v == 'operational' && _canRefreshSupplierOperational) {
+                    _refreshSupplierOperational(s);
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'edit',
+                    enabled: _canManageSuppliers,
+                    child: const Text('Izmijeni'),
                   ),
-                  child: ListTile(
-                    title: Text('${s.code} — ${s.name}', maxLines: 3),
-                    subtitle: Text(
-                      'Pravni naziv: ${s.legalName}\n'
-                      'Kategorija: ${_abcSubtitle(s.partnerRatingClass)}$stratLine\n'
-                      '$sectorLine'
-                      'Status: ${s.status} • Tip: ${s.supplierType}\n'
-                      'Rizik: ${s.riskLevel} • Ocjena procjene: '
-                      '${s.overallScore.toStringAsFixed(1)}\n'
-                      '$autoLine',
-                      maxLines: 8,
-                    ),
-                    isThreeLine: true,
-                    trailing: PopupMenuButton<String>(
-                      onSelected: (v) {
-                        if (v == 'edit' && _canManageSuppliers) {
-                          _openEditSupplier(s);
-                        }
-                        if (v == 'eval') {
-                          _openSupplierEvaluations(s);
-                        }
-                        if (v == 'unified') {
-                          _openSupplierUnifiedAssessment(s);
-                        }
-                        if (v == 'operational_detail') {
-                          _showSupplierOperationalDetails(s);
-                        }
-                        if (v == 'operational' &&
-                            _canRefreshSupplierOperational) {
-                          _refreshSupplierOperational(s);
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        PopupMenuItem(
-                          value: 'edit',
-                          enabled: _canManageSuppliers,
-                          child: const Text('Izmijeni'),
-                        ),
-                        const PopupMenuItem(
-                          value: 'eval',
-                          child: Text('Procjene'),
-                        ),
-                        const PopupMenuItem(
-                          value: 'unified',
-                          child: Text('Procjena (šablon)'),
-                        ),
-                        if (oa != null)
-                          const PopupMenuItem(
-                            value: 'operational_detail',
-                            child: Text('Detalji automatskog skora'),
-                          ),
-                        if (_canRefreshSupplierOperational)
-                          PopupMenuItem(
-                            value: 'operational',
-                            enabled: !_opRefreshing,
-                            child: const Text(
-                              'Osvježi automatski skor (narudžbe)',
-                            ),
-                          ),
-                      ],
-                    ),
-                    onTap: _canManageSuppliers
-                        ? () => _openEditSupplier(s)
-                        : null,
+                  const PopupMenuItem(
+                    value: 'eval',
+                    child: Text('Procjene'),
                   ),
-                ),
-              );
-            },
+                  const PopupMenuItem(
+                    value: 'unified',
+                    child: Text('Procjena (šablon)'),
+                  ),
+                  if (oa != null)
+                    const PopupMenuItem(
+                      value: 'operational_detail',
+                      child: Text('Detalji automatskog skora'),
+                    ),
+                  if (_canRefreshSupplierOperational)
+                    PopupMenuItem(
+                      value: 'operational',
+                      enabled: !_opRefreshing,
+                      child: const Text('Osvježi automatski skor (narudžbe)'),
+                    ),
+                ],
+              ),
+              onTap: _canManageSuppliers ? () => _openEditSupplier(s) : null,
+            ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSummaryAndFiltersPanel() {
+    final onCustomersTab = _tabController.index == 0;
+    return Material(
+      color: Colors.white,
+      child: ExpansionTile(
+        initiallyExpanded: _summaryPanelExpanded,
+        onExpansionChanged: (expanded) {
+          setState(() => _summaryPanelExpanded = expanded);
+        },
+        tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        title: const Text('Sažetak i filteri'),
+        subtitle: Text(
+          _loading
+              ? 'Učitavanje…'
+              : 'Kupci: ${_customers.length} · Dobavljači: ${_suppliers.length}',
         ),
-      ],
+        children: [
+          _buildKpis(),
+          const SizedBox(height: 8),
+          onCustomersTab ? _customerFilterBar() : _supplierFilterBar(),
+        ],
+      ),
     );
   }
 
@@ -1042,17 +1043,14 @@ class _PartnersScreenState extends State<PartnersScreen>
               ),
             ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: _buildKpis(),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
             child: StandardSearchField(
               controller: _searchController,
               hintText: 'Pretraga (šifra / naziv)...',
               onChanged: (_) => _onSearchChanged(),
             ),
           ),
+          _buildSummaryAndFiltersPanel(),
           if (_loading || _opRefreshing)
             const LinearProgressIndicator(minHeight: 2),
           if (_error != null)
