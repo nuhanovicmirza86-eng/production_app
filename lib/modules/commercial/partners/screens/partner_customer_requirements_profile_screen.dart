@@ -4,7 +4,7 @@ import '../../../../core/errors/app_error_mapper.dart';
 import '../models/customer_requirements_profile_model.dart';
 import '../services/customers_service.dart';
 
-/// Uređivanje `customer_requirements_profiles/{customerId}` (Callable + Firestore read).
+/// Uređivanje `customer_requirements_profiles/{customerId}` (Callable read/write).
 class PartnerCustomerRequirementsProfileScreen extends StatefulWidget {
   const PartnerCustomerRequirementsProfileScreen({
     super.key,

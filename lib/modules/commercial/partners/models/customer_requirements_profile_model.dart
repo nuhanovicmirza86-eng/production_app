@@ -57,10 +57,10 @@ class CustomerRequirementsProfileModel {
     return out;
   }
 
-  factory CustomerRequirementsProfileModel.fromDoc(
-    DocumentSnapshot<Map<String, dynamic>> doc,
+  factory CustomerRequirementsProfileModel.fromMap(
+    String id,
+    Map<String, dynamic> data,
   ) {
-    final data = doc.data() ?? {};
     final w = data['changeNotificationWeeks'];
     int? weeks;
     if (w is int) {
@@ -68,8 +68,15 @@ class CustomerRequirementsProfileModel {
     } else if (w is num) {
       weeks = w.toInt();
     }
+    DateTime? updatedAt = _ts(data['updatedAt']);
+    if (updatedAt == null) {
+      final raw = _s(data['updatedAt']);
+      if (raw.isNotEmpty) {
+        updatedAt = DateTime.tryParse(raw);
+      }
+    }
     return CustomerRequirementsProfileModel(
-      customerId: doc.id,
+      customerId: id,
       companyId: _s(data['companyId']),
       customerNameSnapshot: () {
         final s = _s(data['customerNameSnapshot']);
@@ -84,8 +91,17 @@ class CustomerRequirementsProfileModel {
       tolerancePolicy: _s(data['tolerancePolicy']),
       csrDocumentReference: _s(data['csrDocumentReference']),
       communicationContacts: _contacts(data['communicationContacts']),
-      updatedAt: _ts(data['updatedAt']),
+      updatedAt: updatedAt,
       updatedBy: _s(data['updatedBy']),
+    );
+  }
+
+  factory CustomerRequirementsProfileModel.fromDoc(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    return CustomerRequirementsProfileModel.fromMap(
+      doc.id,
+      doc.data() ?? {},
     );
   }
 

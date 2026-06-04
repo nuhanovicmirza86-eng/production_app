@@ -1,20 +1,14 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/customer_requirements_profile_model.dart';
 import '../models/partner_models.dart';
 
 class CustomersService {
-  CustomersService({FirebaseFirestore? firestore, FirebaseFunctions? functions})
-    : _firestore = firestore ?? FirebaseFirestore.instance,
-      _functions =
+  CustomersService({FirebaseFunctions? functions})
+    : _functions =
           functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
 
-  final FirebaseFirestore _firestore;
   final FirebaseFunctions _functions;
-
-  CollectionReference<Map<String, dynamic>> get _csrProfiles =>
-      _firestore.collection('customer_requirements_profiles');
 
   static String _s(dynamic v) => (v ?? '').toString().trim();
 
@@ -167,29 +161,38 @@ class CustomersService {
     final cid = companyId.trim();
     final id = customerId.trim();
     if (cid.isEmpty || id.isEmpty) return null;
-    final doc = await _csrProfiles.doc(id).get();
-    if (!doc.exists) return null;
-    final m = CustomerRequirementsProfileModel.fromDoc(doc);
-    if (m.companyId != cid) return null;
+
+    final res = await _functions
+        .httpsCallable('getCustomerRequirementsProfile')
+        .call<Map<String, dynamic>>({
+          'companyId': cid,
+          'customerId': id,
+        });
+    final data = res.data;
+    if (data['success'] != true) {
+      throw Exception('Dohvat CSR profila nije uspio.');
+    }
+    final raw = data['profile'];
+    if (raw == null) return null;
+    if (raw is! Map) return null;
+    final row = Map<String, dynamic>.from(raw);
+    final profileId = _s(row['id']).isNotEmpty ? _s(row['id']) : id;
+    final m = CustomerRequirementsProfileModel.fromMap(profileId, row);
+    if (m.companyId != cid || m.customerId != id) return null;
     return m;
   }
 
-  /// Firestore snapshot profila zahtjeva kupca (isti id kao `customers` dokument).
+  /// Jednokratno učitavanje preko Callable (nema Firestore listen nakon B4).
   Stream<CustomerRequirementsProfileModel?> watchCustomerRequirementsProfile({
     required String companyId,
     required String customerId,
   }) {
-    final cid = companyId.trim();
-    final id = customerId.trim();
-    if (cid.isEmpty || id.isEmpty) {
-      return Stream.value(null);
-    }
-    return _csrProfiles.doc(id).snapshots().map((doc) {
-      if (!doc.exists) return null;
-      final m = CustomerRequirementsProfileModel.fromDoc(doc);
-      if (m.companyId != cid) return null;
-      return m;
-    });
+    return Stream.fromFuture(
+      getCustomerRequirementsProfile(
+        companyId: companyId,
+        customerId: customerId,
+      ),
+    );
   }
 
   Future<void> upsertCustomerRequirementsProfile({
