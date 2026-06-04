@@ -10,6 +10,63 @@ class AssessmentEngineService {
 
   final FirebaseFunctions _functions;
 
+  static List<Map<String, dynamic>> _listOfMaps(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .map((e) => e is Map ? Map<String, dynamic>.from(e) : null)
+        .whereType<Map<String, dynamic>>()
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> listAssessmentTemplatesForEntity({
+    required String companyId,
+    required String entityType,
+    bool activeOnly = true,
+  }) async {
+    final cid = companyId.trim();
+    final et = entityType.trim().toLowerCase();
+    if (cid.isEmpty || et.isEmpty) return const [];
+
+    final res = await _functions
+        .httpsCallable('listAssessmentTemplatesForEntity')
+        .call<Map<String, dynamic>>({
+          'companyId': cid,
+          'entityType': et,
+          'activeOnly': activeOnly,
+        });
+    final data = res.data;
+    if (data['success'] != true) {
+      throw Exception('Dohvat šablona procjene nije uspio.');
+    }
+    return _listOfMaps(data['templates']);
+  }
+
+  Future<List<Map<String, dynamic>>> listRiskAssessmentsForEntity({
+    required String companyId,
+    required String entityType,
+    required String entityId,
+    int limit = 20,
+  }) async {
+    final cid = companyId.trim();
+    final et = entityType.trim().toLowerCase();
+    final eid = entityId.trim();
+    if (cid.isEmpty || et.isEmpty || eid.isEmpty) return const [];
+
+    final res = await _functions
+        .httpsCallable('listRiskAssessmentsForEntity')
+        .call<Map<String, dynamic>>({
+          'companyId': cid,
+          'entityType': et,
+          'entityId': eid,
+          'limit': limit,
+        });
+    final data = res.data;
+    if (data['success'] != true) {
+      throw Exception('Dohvat historije procjena nije uspio.');
+    }
+    return _listOfMaps(data['assessments']);
+  }
+
   Future<String> upsertAssessmentTemplate({
     required String companyId,
     String? templateId,

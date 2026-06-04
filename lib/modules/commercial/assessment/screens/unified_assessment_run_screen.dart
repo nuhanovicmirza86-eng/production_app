@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:production_app/core/access/production_access_helper.dart';
@@ -81,7 +80,13 @@ class _UnifiedAssessmentRunScreenState
 
   bool _computing = false;
   bool _creatingTemplate = false;
+  bool _templatesLoading = true;
+  bool _historyLoading = true;
   String? _error;
+  String? _templatesError;
+  String? _historyError;
+  List<Map<String, dynamic>> _templateRows = const [];
+  List<Map<String, dynamic>> _historyRows = const [];
   AssessmentComputeResult? _lastResult;
 
   String get _cid => widget.companyId.trim();
@@ -93,6 +98,74 @@ class _UnifiedAssessmentRunScreenState
   void initState() {
     super.initState();
     _role = ProductionAccessHelper.normalizeRole(widget.userRole);
+    _loadTemplates();
+    _loadHistory();
+  }
+
+  Map<String, dynamic> _templateDataWithoutId(Map<String, dynamic> row) {
+    final m = Map<String, dynamic>.from(row);
+    m.remove('id');
+    return m;
+  }
+
+  String _templateIdFromRow(Map<String, dynamic> row) =>
+      (row['id'] ?? '').toString().trim();
+
+  String _formatCalculatedAt(dynamic ts) {
+    if (ts is String) {
+      final dt = DateTime.tryParse(ts);
+      if (dt != null) return dt.toLocal().toString().split('.').first;
+    }
+    return '';
+  }
+
+  Future<void> _loadTemplates() async {
+    setState(() {
+      _templatesLoading = true;
+      _templatesError = null;
+    });
+    try {
+      final rows = await _engine.listAssessmentTemplatesForEntity(
+        companyId: _cid,
+        entityType: _et,
+      );
+      if (!mounted) return;
+      setState(() {
+        _templateRows = rows;
+        _templatesLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _templatesError = _mapComputeError(e);
+        _templatesLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadHistory() async {
+    setState(() {
+      _historyLoading = true;
+      _historyError = null;
+    });
+    try {
+      final rows = await _engine.listRiskAssessmentsForEntity(
+        companyId: _cid,
+        entityType: _et,
+        entityId: _eid,
+      );
+      if (!mounted) return;
+      setState(() {
+        _historyRows = rows;
+        _historyLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _historyError = _mapComputeError(e);
+        _historyLoading = false;
+      });
+    }
   }
 
   @override
@@ -231,6 +304,8 @@ class _UnifiedAssessmentRunScreenState
         payload: _starterTemplatePayload(),
       );
       if (!mounted) return;
+      await _loadTemplates();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -339,6 +414,8 @@ class _UnifiedAssessmentRunScreenState
         _computing = false;
       });
       if (!mounted) return;
+      await _loadHistory();
+      if (!mounted) return;
       final syncNote = res.legacyAssetRiskSynced
           ? ' PFMEA (najgori red) upisan u polje rizika uređaja.'
           : '';
@@ -389,9 +466,14 @@ class _UnifiedAssessmentRunScreenState
           ],
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await Future.wait([_loadTemplates(), _loadHistory()]);
+        },
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          children: [
           if (!_canCompute)
             Card(
               color: Colors.amber.shade50,
@@ -427,115 +509,7 @@ class _UnifiedAssessmentRunScreenState
               ),
             ),
           const SizedBox(height: 8),
-          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance
-                .collection('assessment_templates')
-                .where('companyId', isEqualTo: _cid)
-                .where('entityType', isEqualTo: _et)
-                .where('active', isEqualTo: true)
-                .snapshots(),
-            builder: (context, snap) {
-              if (snap.hasError) {
-                return Text('Šabloni: ${snap.error}');
-              }
-              if (!snap.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final docs = snap.data!.docs;
-              if (docs.isEmpty) {
-                return Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Nema aktivnih šablona za ovaj tip entiteta.',
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Možeš kreirati starter šablon direktno iz ovog ekrana.',
-                        ),
-                        if (_canManageTemplates) ...[
-                          const SizedBox(height: 12),
-                          FilledButton.icon(
-                            onPressed: _creatingTemplate
-                                ? null
-                                : _createStarterTemplate,
-                            icon: _creatingTemplate
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.add_task_outlined),
-                            label: const Text('Kreiraj starter šablon'),
-                          ),
-                        ] else ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            'Za kreiranje šablona potreban je manager/admin pristup '
-                            '(production_manager, logistics_manager, supervisor, '
-                            'purchasing, admin).',
-                            style: TextStyle(
-                              color: Colors.black.withValues(alpha: 0.65),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                );
-              }
-
-              final items = docs
-                  .map(
-                    (d) => DropdownMenuItem<String>(
-                      value: d.id,
-                      child: Text(
-                        (d.data()['name'] ?? d.id).toString(),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  )
-                  .toList();
-
-              final currentId = _selectedTemplateId;
-              final validId =
-                  currentId != null && docs.any((d) => d.id == currentId)
-                  ? currentId
-                  : null;
-
-              return Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Text(
-                        'Šablon',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        // ignore: deprecated_member_use
-                        value: validId,
-                        decoration: const InputDecoration(),
-                        items: items,
-                        onChanged: (v) {
-                          if (v == null) return;
-                          final doc = docs.firstWhere((e) => e.id == v).data();
-                          _onTemplateSelected(v, doc);
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
+          _buildTemplatesSection(),
           const SizedBox(height: 12),
           if (_templateDoc != null) ...[
             if (_isPfmeaTemplate(_templateDoc)) ...[
@@ -562,9 +536,141 @@ class _UnifiedAssessmentRunScreenState
             style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
           ),
           const SizedBox(height: 8),
-          _historySection(),
+          _buildHistorySection(),
         ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildTemplatesSection() {
+    if (_templatesError != null) {
+      return Text('Šabloni: $_templatesError');
+    }
+    if (_templatesLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final rows = _templateRows;
+    if (rows.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Nema aktivnih šablona za ovaj tip entiteta.'),
+              const SizedBox(height: 6),
+              const Text(
+                'Možeš kreirati starter šablon direktno iz ovog ekrana.',
+              ),
+              if (_canManageTemplates) ...[
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: _creatingTemplate ? null : _createStarterTemplate,
+                  icon: _creatingTemplate
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.add_task_outlined),
+                  label: const Text('Kreiraj starter šablon'),
+                ),
+              ] else ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Za kreiranje šablona potreban je manager/admin pristup '
+                  '(production_manager, logistics_manager, supervisor, '
+                  'purchasing, admin).',
+                  style: TextStyle(
+                    color: Colors.black.withValues(alpha: 0.65),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
+    final items = rows
+        .map(
+          (row) => DropdownMenuItem<String>(
+            value: _templateIdFromRow(row),
+            child: Text(
+              (row['name'] ?? _templateIdFromRow(row)).toString(),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        )
+        .toList();
+
+    final currentId = _selectedTemplateId;
+    final validId = currentId != null &&
+            rows.any((r) => _templateIdFromRow(r) == currentId)
+        ? currentId
+        : null;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Šablon',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              // ignore: deprecated_member_use
+              value: validId,
+              decoration: const InputDecoration(),
+              items: items,
+              onChanged: (v) {
+                if (v == null) return;
+                final row = rows.firstWhere((r) => _templateIdFromRow(r) == v);
+                _onTemplateSelected(v, _templateDataWithoutId(row));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistorySection() {
+    if (_historyError != null) {
+      return Text('Historija: $_historyError');
+    }
+    if (_historyLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    final rows = _historyRows;
+    if (rows.isEmpty) {
+      return const Text('Još nema sačuvanih procjena.');
+    }
+    return Column(
+      children: rows.map((m) {
+        final scores = (m['scores'] as Map?) ?? {};
+        final when = _formatCalculatedAt(m['calculatedAt']);
+        return Card(
+          child: ListTile(
+            title: Text(
+              'v${m['version'] ?? '?'} • ${scores['riskLevel'] ?? ''}',
+            ),
+            subtitle: Text(
+              'Skor: ${scores['totalScore'] ?? ''} • šablon: ${m['templateId'] ?? ''}\n$when',
+            ),
+            isThreeLine: true,
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -761,58 +867,6 @@ class _UnifiedAssessmentRunScreenState
       ),
       onChanged: (v) {
         if (v != null) onChanged(v);
-      },
-    );
-  }
-
-  Widget _historySection() {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collection('risk_assessments')
-          .where('companyId', isEqualTo: _cid)
-          .where('entityType', isEqualTo: _et)
-          .where('entityId', isEqualTo: _eid)
-          .orderBy('calculatedAt', descending: true)
-          .limit(20)
-          .snapshots(),
-      builder: (context, snap) {
-        if (snap.hasError) {
-          return Text('Historija: ${snap.error}');
-        }
-        if (!snap.hasData) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: CircularProgressIndicator(),
-            ),
-          );
-        }
-        final docs = snap.data!.docs;
-        if (docs.isEmpty) {
-          return const Text('Još nema sačuvanih procjena.');
-        }
-        return Column(
-          children: docs.map((d) {
-            final m = d.data();
-            final scores = (m['scores'] as Map?) ?? {};
-            final ts = m['calculatedAt'];
-            String when = '';
-            if (ts is Timestamp) {
-              when = ts.toDate().toLocal().toString().split('.').first;
-            }
-            return Card(
-              child: ListTile(
-                title: Text(
-                  'v${m['version'] ?? '?'} • ${scores['riskLevel'] ?? ''}',
-                ),
-                subtitle: Text(
-                  'Skor: ${scores['totalScore'] ?? ''} • šablon: ${m['templateId'] ?? ''}\n$when',
-                ),
-                isThreeLine: true,
-              ),
-            );
-          }).toList(),
-        );
       },
     );
   }
