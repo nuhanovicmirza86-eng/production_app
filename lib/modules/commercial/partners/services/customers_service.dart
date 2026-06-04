@@ -13,9 +13,6 @@ class CustomersService {
   final FirebaseFirestore _firestore;
   final FirebaseFunctions _functions;
 
-  CollectionReference<Map<String, dynamic>> get _customers =>
-      _firestore.collection('customers');
-
   CollectionReference<Map<String, dynamic>> get _csrProfiles =>
       _firestore.collection('customer_requirements_profiles');
 
@@ -27,6 +24,19 @@ class CustomersService {
     );
   }
 
+  static Map<String, dynamic> _mapFromDynamic(dynamic raw) {
+    if (raw is! Map) return {};
+    return Map<String, dynamic>.from(raw);
+  }
+
+  static List<Map<String, dynamic>> _listOfMaps(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .map((e) => e is Map ? Map<String, dynamic>.from(e) : null)
+        .whereType<Map<String, dynamic>>()
+        .toList();
+  }
+
   Future<List<CustomerModel>> listCustomers({
     required String companyId,
     int limit = 500,
@@ -35,35 +45,26 @@ class CustomersService {
     final cid = companyId.trim();
     if (cid.isEmpty) return const [];
 
-    final snap = await _customers
-        .where('companyId', isEqualTo: cid)
-        .limit(limit)
-        .get();
-
-    final q = query.trim().toLowerCase();
-    final out = <CustomerModel>[];
-
-    for (final doc in snap.docs) {
-      final d = doc.data();
-      final m = CustomerModel.fromMap(doc.id, d);
-      if (m.companyId != cid) continue;
-
-      if (q.isNotEmpty) {
-        final hay =
-            '${m.code.toLowerCase()} ${m.name.toLowerCase()} '
-            '${m.legalName.toLowerCase()}';
-        if (!hay.contains(q)) continue;
-      }
-
-      out.add(m);
+    final res = await _functions
+        .httpsCallable('listCommercialCustomers')
+        .call<Map<String, dynamic>>({
+          'companyId': cid,
+          'limit': limit,
+          if (query.trim().isNotEmpty) 'query': query.trim(),
+        });
+    final data = res.data;
+    if (data['success'] != true) {
+      throw Exception('Dohvat kupaca nije uspio.');
     }
 
-    out.sort((a, b) {
-      final c = a.code.toLowerCase().compareTo(b.code.toLowerCase());
-      if (c != 0) return c;
-      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-    });
-
+    final out = <CustomerModel>[];
+    for (final row in _listOfMaps(data['customers'])) {
+      final id = _s(row['id']);
+      if (id.isEmpty) continue;
+      final m = CustomerModel.fromMap(id, row);
+      if (m.companyId != cid) continue;
+      out.add(m);
+    }
     return out;
   }
 
@@ -75,13 +76,21 @@ class CustomersService {
     final id = customerId.trim();
     if (cid.isEmpty || id.isEmpty) return null;
 
-    final doc = await _customers.doc(id).get();
-    if (!doc.exists) return null;
-
-    final data = doc.data();
-    if (data == null) return null;
-
-    final model = CustomerModel.fromMap(doc.id, data);
+    final res = await _functions
+        .httpsCallable('getCommercialCustomer')
+        .call<Map<String, dynamic>>({
+          'companyId': cid,
+          'customerId': id,
+        });
+    final data = res.data;
+    if (data['success'] != true) {
+      throw Exception('Dohvat kupca nije uspio.');
+    }
+    final raw = data['customer'];
+    if (raw == null) return null;
+    final row = _mapFromDynamic(raw);
+    final docId = _s(row['id']).isEmpty ? id : _s(row['id']);
+    final model = CustomerModel.fromMap(docId, row);
     if (model.companyId != cid) return null;
     return model;
   }

@@ -1,19 +1,13 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/partner_models.dart';
 
 class SuppliersService {
-  SuppliersService({FirebaseFirestore? firestore, FirebaseFunctions? functions})
-    : _firestore = firestore ?? FirebaseFirestore.instance,
-      _functions =
+  SuppliersService({FirebaseFunctions? functions})
+    : _functions =
           functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
 
-  final FirebaseFirestore _firestore;
   final FirebaseFunctions _functions;
-
-  CollectionReference<Map<String, dynamic>> get _suppliers =>
-      _firestore.collection('suppliers');
 
   static String _s(dynamic v) => (v ?? '').toString().trim();
 
@@ -31,6 +25,19 @@ class SuppliersService {
     return m;
   }
 
+  static Map<String, dynamic> _mapFromDynamic(dynamic raw) {
+    if (raw is! Map) return {};
+    return Map<String, dynamic>.from(raw);
+  }
+
+  static List<Map<String, dynamic>> _listOfMaps(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .map((e) => e is Map ? Map<String, dynamic>.from(e) : null)
+        .whereType<Map<String, dynamic>>()
+        .toList();
+  }
+
   Future<List<SupplierModel>> listSuppliers({
     required String companyId,
     int limit = 500,
@@ -39,35 +46,26 @@ class SuppliersService {
     final cid = companyId.trim();
     if (cid.isEmpty) return const [];
 
-    final snap = await _suppliers
-        .where('companyId', isEqualTo: cid)
-        .limit(limit)
-        .get();
-
-    final q = query.trim().toLowerCase();
-    final out = <SupplierModel>[];
-
-    for (final doc in snap.docs) {
-      final d = doc.data();
-      final m = SupplierModel.fromMap(doc.id, d);
-      if (m.companyId != cid) continue;
-
-      if (q.isNotEmpty) {
-        final hay =
-            '${m.code.toLowerCase()} ${m.name.toLowerCase()} '
-            '${m.legalName.toLowerCase()}';
-        if (!hay.contains(q)) continue;
-      }
-
-      out.add(m);
+    final res = await _functions
+        .httpsCallable('listCommercialSuppliers')
+        .call<Map<String, dynamic>>({
+          'companyId': cid,
+          'limit': limit,
+          if (query.trim().isNotEmpty) 'query': query.trim(),
+        });
+    final data = res.data;
+    if (data['success'] != true) {
+      throw Exception('Dohvat dobavljača nije uspio.');
     }
 
-    out.sort((a, b) {
-      final c = a.code.toLowerCase().compareTo(b.code.toLowerCase());
-      if (c != 0) return c;
-      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-    });
-
+    final out = <SupplierModel>[];
+    for (final row in _listOfMaps(data['suppliers'])) {
+      final id = _s(row['id']);
+      if (id.isEmpty) continue;
+      final m = SupplierModel.fromMap(id, row);
+      if (m.companyId != cid) continue;
+      out.add(m);
+    }
     return out;
   }
 
@@ -79,13 +77,21 @@ class SuppliersService {
     final id = supplierId.trim();
     if (cid.isEmpty || id.isEmpty) return null;
 
-    final doc = await _suppliers.doc(id).get();
-    if (!doc.exists) return null;
-
-    final data = doc.data();
-    if (data == null) return null;
-
-    final model = SupplierModel.fromMap(doc.id, data);
+    final res = await _functions
+        .httpsCallable('getCommercialSupplier')
+        .call<Map<String, dynamic>>({
+          'companyId': cid,
+          'supplierId': id,
+        });
+    final data = res.data;
+    if (data['success'] != true) {
+      throw Exception('Dohvat dobavljača nije uspio.');
+    }
+    final raw = data['supplier'];
+    if (raw == null) return null;
+    final row = _mapFromDynamic(raw);
+    final docId = _s(row['id']).isEmpty ? id : _s(row['id']);
+    final model = SupplierModel.fromMap(docId, row);
     if (model.companyId != cid) return null;
     return model;
   }
