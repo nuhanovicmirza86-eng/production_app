@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../analytics/services/analytics_callable_parse.dart';
+
 /// Agregat po smjeni — piše ga sistem (summary servis), ne ručni unos.
 class OoeShiftSummary {
   final String id;
@@ -152,7 +154,10 @@ class OoeShiftSummary {
       orderId: map['orderId']?.toString(),
       productId: map['productId']?.toString(),
       shiftId: map['shiftId']?.toString(),
-      shiftDate: (map['shiftDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      shiftDate: AnalyticsCallableParse.dateTimeFromTimestampLike(
+            map['shiftDate'],
+          ) ??
+          DateTime.now(),
       operatingTimeSeconds: (map['operatingTimeSeconds'] as num?)?.toInt() ?? 0,
       runTimeSeconds: (map['runTimeSeconds'] as num?)?.toInt() ?? 0,
       stopTimeSeconds: (map['stopTimeSeconds'] as num?)?.toInt() ?? 0,
@@ -178,8 +183,10 @@ class OoeShiftSummary {
       ooe: (map['ooe'] as num?)?.toDouble() ?? 0,
       topLosses: topLosses,
       topTpmLosses: topTpmLosses,
-      lastCalculatedAt:
-          (map['lastCalculatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      lastCalculatedAt: AnalyticsCallableParse.dateTimeFromTimestampLike(
+            map['lastCalculatedAt'],
+          ) ??
+          DateTime.now(),
       calculationVersion:
           (map['calculationVersion'] ?? currentVersion).toString(),
     );

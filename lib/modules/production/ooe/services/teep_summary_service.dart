@@ -1,18 +1,57 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
+import '../../analytics/services/analytics_callable_parse.dart';
+import '../../analytics/services/analytics_summary_reads_callable_service.dart';
 import '../models/teep_summary.dart';
 
 /// Čitanje agregata [teep_summaries] (OEE + OOE + TEEP u istom dokumentu).
+///
+/// M4: Callable [listTeepSummaries] primarno; Firestore fallback privremeno.
 class TeepSummaryService {
-  TeepSummaryService({FirebaseFirestore? firestore})
-    : _db = firestore ?? FirebaseFirestore.instance;
+  TeepSummaryService({
+    FirebaseFirestore? firestore,
+    AnalyticsSummaryReadsCallableService? readsCallable,
+  }) : _db = firestore ?? FirebaseFirestore.instance,
+       _readsCallable =
+           readsCallable ?? AnalyticsSummaryReadsCallableService();
 
   final FirebaseFirestore _db;
+  final AnalyticsSummaryReadsCallableService _readsCallable;
 
   CollectionReference<Map<String, dynamic>> get _col =>
       _db.collection('teep_summaries');
 
   String _s(dynamic v) => (v ?? '').toString().trim();
+
+  Future<List<TeepSummary>> _fetchFromCallableOrFirestore({
+    required String companyId,
+    required String plantKey,
+    String scopeType = 'plant',
+    String scopeId = '',
+    String periodType = 'day',
+    String? periodStartYmd,
+    String? periodEndYmd,
+    int limit = 100,
+    required Future<List<TeepSummary>> Function() firestoreFetch,
+  }) async {
+    try {
+      return await _readsCallable.listTeepSummaries(
+        companyId: companyId,
+        plantKey: plantKey,
+        scopeType: scopeType,
+        scopeId: scopeId,
+        periodType: periodType,
+        periodStartYmd: periodStartYmd,
+        periodEndYmd: periodEndYmd,
+        limit: limit,
+      );
+    } on FirebaseFunctionsException {
+      return firestoreFetch();
+    } catch (_) {
+      return firestoreFetch();
+    }
+  }
 
   /// Pronalazi dnevni sažetak za stroj iz stream liste (isti kalendar dan lokalno).
   TeepSummary? pickMachineDaySummary({
@@ -48,13 +87,20 @@ class TeepSummaryService {
     final cid = _s(companyId);
     final pk = _s(plantKey);
 
-    return _col
-        .where('companyId', isEqualTo: cid)
-        .where('plantKey', isEqualTo: pk)
-        .orderBy('periodDate', descending: true)
-        .limit(limit)
-        .snapshots()
-        .map((s) => s.docs.map(TeepSummary.fromDoc).toList());
+    return AnalyticsSummaryReadsCallableService.watchWithCallablePrimary(
+      fetchPrimary: () => _readsCallable.listTeepSummaries(
+        companyId: cid,
+        plantKey: pk,
+        limit: limit,
+      ),
+      firestoreFallback: () => _col
+          .where('companyId', isEqualTo: cid)
+          .where('plantKey', isEqualTo: pk)
+          .orderBy('periodDate', descending: true)
+          .limit(limit)
+          .snapshots()
+          .map((s) => s.docs.map(TeepSummary.fromDoc).toList()),
+    );
   }
 
   /// Jednokratno učitavanje zadnjih dokumenata za pogon (isti upit kao [watchRecentForPlant]).
@@ -68,13 +114,20 @@ class TeepSummaryService {
     final pk = _s(plantKey);
     if (cid.isEmpty || pk.isEmpty) return const [];
 
-    final snap = await _col
-        .where('companyId', isEqualTo: cid)
-        .where('plantKey', isEqualTo: pk)
-        .orderBy('periodDate', descending: true)
-        .limit(limit)
-        .get();
-    return snap.docs.map(TeepSummary.fromDoc).toList();
+    return _fetchFromCallableOrFirestore(
+      companyId: cid,
+      plantKey: pk,
+      limit: limit,
+      firestoreFetch: () async {
+        final snap = await _col
+            .where('companyId', isEqualTo: cid)
+            .where('plantKey', isEqualTo: pk)
+            .orderBy('periodDate', descending: true)
+            .limit(limit)
+            .get();
+        return snap.docs.map(TeepSummary.fromDoc).toList();
+      },
+    );
   }
 
   static DateTime _localDayStart(DateTime d) =>
@@ -92,8 +145,8 @@ class TeepSummaryService {
     return _localDayStart(t);
   }
 
-  /// Dnevni sažetak za cijeli pogon: točan upit po datumu (zahtijeva Firestore indeks,
-  /// vidi [maintenance_app]/firestore.indexes.json). Za plant je [scopeId] prazan.
+  /// Dnevni sažetak za cijeli pogon: točan upit po datumu.
+  /// Za plant je [scopeId] prazan.
   Future<List<TeepSummary>> fetchPlantDaySummariesInDateRange({
     required String companyId,
     required String plantKey,
@@ -108,19 +161,41 @@ class TeepSummaryService {
     final last = _lastIncludedLocalDay(rangeEndExclusiveLocal);
     if (last.isBefore(first)) return const [];
 
-    final startTs = Timestamp.fromDate(_anchorUtcNoonForLocalCalendarDay(first));
-    final endTs = Timestamp.fromDate(_anchorUtcNoonForLocalCalendarDay(last));
+    final startY = AnalyticsCallableParse.dateYmd(first);
+    final endY = AnalyticsCallableParse.dateYmd(last);
 
-    final snap = await _col
-        .where('companyId', isEqualTo: cid)
-        .where('plantKey', isEqualTo: pk)
-        .where('scopeType', isEqualTo: 'plant')
-        .where('scopeId', isEqualTo: '')
-        .where('periodType', isEqualTo: 'day')
-        .where('periodDate', isGreaterThanOrEqualTo: startTs)
-        .where('periodDate', isLessThanOrEqualTo: endTs)
-        .orderBy('periodDate', descending: false)
-        .get();
-    return snap.docs.map(TeepSummary.fromDoc).toList();
+    final items = await _fetchFromCallableOrFirestore(
+      companyId: cid,
+      plantKey: pk,
+      scopeType: 'plant',
+      scopeId: '',
+      periodType: 'day',
+      periodStartYmd: startY,
+      periodEndYmd: endY,
+      limit: 500,
+      firestoreFetch: () async {
+        final startTs = Timestamp.fromDate(
+          _anchorUtcNoonForLocalCalendarDay(first),
+        );
+        final endTs = Timestamp.fromDate(
+          _anchorUtcNoonForLocalCalendarDay(last),
+        );
+
+        final snap = await _col
+            .where('companyId', isEqualTo: cid)
+            .where('plantKey', isEqualTo: pk)
+            .where('scopeType', isEqualTo: 'plant')
+            .where('scopeId', isEqualTo: '')
+            .where('periodType', isEqualTo: 'day')
+            .where('periodDate', isGreaterThanOrEqualTo: startTs)
+            .where('periodDate', isLessThanOrEqualTo: endTs)
+            .orderBy('periodDate', descending: false)
+            .get();
+        return snap.docs.map(TeepSummary.fromDoc).toList();
+      },
+    );
+
+    items.sort((a, b) => a.periodDate.compareTo(b.periodDate));
+    return items;
   }
 }

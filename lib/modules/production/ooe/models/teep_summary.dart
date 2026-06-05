@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../analytics/services/analytics_callable_parse.dart';
+
 /// Proširen sažetak: OEE (planirana proizvodnja), OOE (operativno), TEEP (kalendar).
 ///
 /// **Poslovno pravilo:** OEE i OOE dijele iste P i Q; Availability ima različitu bazu vremena.
@@ -109,9 +111,10 @@ class TeepSummary {
   }
 
   factory TeepSummary.fromMap(String id, Map<String, dynamic> map) {
-    DateTime pd = DateTime.now();
-    final rawPd = map['periodDate'];
-    if (rawPd is Timestamp) pd = rawPd.toDate();
+    final pd = AnalyticsCallableParse.dateTimeFromTimestampLike(
+          map['periodDate'],
+        ) ??
+        DateTime.now();
 
     List<Map<String, dynamic>> topLosses = const [];
     final raw = map['topLosses'];
@@ -148,8 +151,10 @@ class TeepSummary {
       ooe: (map['ooe'] as num?)?.toDouble() ?? 0,
       teep: (map['teep'] as num?)?.toDouble() ?? 0,
       topLosses: topLosses,
-      lastCalculatedAt:
-          (map['lastCalculatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      lastCalculatedAt: AnalyticsCallableParse.dateTimeFromTimestampLike(
+            map['lastCalculatedAt'],
+          ) ??
+          DateTime.now(),
       calculationVersion: (map['calculationVersion'] ?? defaultVersion).toString(),
     );
   }
