@@ -15,6 +15,7 @@ import '../utils/finance_currency_display.dart';
 import '../utils/finance_permissions.dart';
 import '../widgets/finance_erp_hub_tab_body.dart';
 import '../widgets/finance_screen_context_info.dart';
+import '../../finance/cash_flow/screens/finance_cash_flow_hub_tab_body.dart';
 import 'finance_ai_assistant_screen.dart';
 import 'finance_controlling_dashboard_tab.dart';
 import 'finance_controlling_operative_tab_widgets.dart';
@@ -78,7 +79,7 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
       debugUnlockModule: widget.debugUnlockModule,
     );
     _tabController = TabController(
-      length: _showControlling ? 8 : 1,
+      length: _showControlling ? 9 : 1,
       vsync: this,
     );
     final now = DateTime.now();
@@ -217,6 +218,7 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
             Tab(text: 'Održavanje'),
             Tab(text: 'Nabava'),
             Tab(text: 'Budžeti'),
+            Tab(text: 'Cash Flow'),
             Tab(text: 'ERP'),
           ],
         ),
@@ -297,6 +299,10 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
                   businessYearId: _businessYearId,
                   periodYear: _periodYear,
                   periodMonth: _periodMonth,
+                ),
+                FinanceCashFlowHubTabBody(
+                  companyData: widget.companyData,
+                  debugUnlockModule: widget.debugUnlockModule,
                 ),
                 FinanceErpHubTabBody(
                   companyData: widget.companyData,

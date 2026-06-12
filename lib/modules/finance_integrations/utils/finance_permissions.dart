@@ -121,6 +121,170 @@ class FinancePermissions {
         r == ProductionAccessHelper.roleProjectManager;
   }
 
+  /// Operativni Cash Flow (računi, kategorije, transakcije) — modul [finance_controlling].
+  static bool canAccessCashFlowOperative({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canViewControllingAnalytics(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  static bool _cashFlowOperativeUnlocked({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canAccessCashFlowOperative(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  static bool _isCashFlowManagerRole(String role) {
+    final r = ProductionAccessHelper.normalizeRole(role);
+    return ProductionAccessHelper.isSuperAdminRole(r) ||
+        ProductionAccessHelper.isAdminRole(r) ||
+        r == ProductionAccessHelper.roleAccountingManager;
+  }
+
+  static String _currentUserId(Map<String, dynamic> companyData) {
+    return (companyData['userId'] ?? companyData['uid'] ?? '').toString().trim();
+  }
+
+  /// Pregled transakcija i realizovanog Cash Flow izvještaja.
+  static bool canViewRealizedCashFlow({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return _cashFlowOperativeUnlocked(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  /// Kreiranje draft transakcije.
+  static bool canCreateCashTransactionDraft({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return _cashFlowOperativeUnlocked(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  /// Uređivanje drafta; referent samo vlastiti nacrt.
+  static bool canEditCashTransactionDraft({
+    required Map<String, dynamic> companyData,
+    required String role,
+    required String transactionCreatedBy,
+    bool debugUnlockModule = false,
+  }) {
+    if (!_cashFlowOperativeUnlocked(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    )) {
+      return false;
+    }
+    if (_isCashFlowManagerRole(role)) return true;
+    final r = ProductionAccessHelper.normalizeRole(role);
+    if (r == ProductionAccessHelper.roleAccountingClerk) {
+      final uid = _currentUserId(companyData);
+      return uid.isNotEmpty && uid == transactionCreatedBy.trim();
+    }
+    return false;
+  }
+
+  /// Knjiženje drafta — ne referent.
+  static bool canPostCashTransaction({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    if (!_cashFlowOperativeUnlocked(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    )) {
+      return false;
+    }
+    return _isCashFlowManagerRole(role);
+  }
+
+  /// Usklađivanje knjižene transakcije (bez promjene salda).
+  static bool canReconcileCashTransaction({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return _cashFlowOperativeUnlocked(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  /// Storno knjižene transakcije (reversal) — ne referent.
+  static bool canReverseCashTransaction({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    if (!_cashFlowOperativeUnlocked(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    )) {
+      return false;
+    }
+    return _isCashFlowManagerRole(role);
+  }
+
+  /// Otkaz drafta — ista logika kao uređivanje drafta.
+  static bool canCancelCashTransactionDraft({
+    required Map<String, dynamic> companyData,
+    required String role,
+    required String transactionCreatedBy,
+    bool debugUnlockModule = false,
+  }) {
+    return canEditCashTransactionDraft(
+      companyData: companyData,
+      role: role,
+      transactionCreatedBy: transactionCreatedBy,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  /// Kreiranje / izmjena računa i Cash Flow kategorija — ne [accounting_clerk].
+  static bool canManageCashFlowMasterData({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    if (!canAccessCashFlowOperative(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    )) {
+      return false;
+    }
+    final r = ProductionAccessHelper.normalizeRole(role);
+    return ProductionAccessHelper.isSuperAdminRole(r) ||
+        ProductionAccessHelper.isAdminRole(r) ||
+        r == ProductionAccessHelper.roleAccountingManager;
+  }
+
   /// Finance AI (Callable [runFinanceControllingAiInsight]) — isti skup uloga kao preračun KPI na backendu.
   static bool canRunFinanceControllingAiInsight({
     required Map<String, dynamic> companyData,
