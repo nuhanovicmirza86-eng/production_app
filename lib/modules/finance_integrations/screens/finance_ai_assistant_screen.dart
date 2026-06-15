@@ -4,6 +4,8 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/company_plant_display_name.dart';
+import '../../finance/ai_advisory/screens/finance_ai_alerts_panel.dart';
+import '../../finance/shared/finance_strings.dart';
 import '../models/finance_ai_company_memory_doc.dart';
 import '../models/finance_ai_insight_doc.dart';
 import '../models/finance_kpi_snapshot_model.dart';
@@ -54,6 +56,12 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
       (widget.companyData['role'] ?? '').toString().trim();
 
   bool get _canAi => FinancePermissions.canRunFinanceControllingAiInsight(
+        companyData: widget.companyData,
+        role: _role,
+        debugUnlockModule: widget.debugUnlockModule,
+      );
+
+  bool get _canViewAdvisory => FinancePermissions.canViewFinanceAiAdvisory(
         companyData: widget.companyData,
         role: _role,
         debugUnlockModule: widget.debugUnlockModule,
@@ -365,7 +373,7 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
     final locale = Localizations.localeOf(context).toString();
     final periodFmt = DateFormat.yMMMM(locale);
 
-    if (!_canAi) {
+    if (!_canAi && !_canViewAdvisory) {
       return Scaffold(
         appBar: AppBar(title: const Text('Finance AI asistent')),
         body: Center(
@@ -494,6 +502,28 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
                 ),
               );
             },
+          ),
+          if (_canViewAdvisory) ...[
+            const SizedBox(height: 16),
+            FinanceAiAlertsPanel(
+              companyData: widget.companyData,
+              businessYearId: widget.businessYearId.trim(),
+              sessionPlantKey: widget.plantKey.trim(),
+              debugUnlockModule: widget.debugUnlockModule,
+            ),
+          ],
+          if (_canViewAdvisory && _canAi) ...[
+            const SizedBox(height: 20),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+          ],
+          if (_canAi) ...[
+          const SizedBox(height: 12),
+          Text(
+            FinanceStrings.t(context, 'advisory_controlling_section_title'),
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 12),
           StreamBuilder<FinanceKpiSnapshotModel?>(
@@ -669,6 +699,7 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
               );
             },
           ),
+          ],
         ],
       ),
     );

@@ -546,4 +546,72 @@ class FinancePermissions {
     };
     return allowed.contains(r);
   }
+
+  /// Pregled proaktivnih finance AI upozorenja (Callable list/get).
+  static bool canViewFinanceAiAdvisory({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canViewControllingAnalytics(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  /// Potvrda pregleda — clerk+ uz modul controlling.
+  static bool canAcknowledgeFinanceAiAlert({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canViewFinanceAiAdvisory(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  /// Odbacivanje — manager/admin/super_admin.
+  static bool canDismissFinanceAiAlert({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    if (!canViewFinanceAiAdvisory(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    )) {
+      return false;
+    }
+    return _isCashFlowManagerRole(role);
+  }
+
+  /// Feedback na alert — clerk+.
+  static bool canSubmitFinanceAiFeedback({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canViewFinanceAiAdvisory(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  /// Ručno pokretanje advisory analize — AI entitlement + finance uloga.
+  static bool canRunFinanceAiAdvisoryAnalysis({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canRunFinanceControllingAiInsight(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
 }

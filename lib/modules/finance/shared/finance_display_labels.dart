@@ -177,4 +177,96 @@ class FinanceDisplayLabels {
   }
 
   static const forecastBucketTypeCodes = <String>['day', 'week', 'month'];
+
+  static String advisorySeverity(BuildContext context, String severity) {
+    switch (severity.trim().toLowerCase()) {
+      case 'info':
+        return FinanceStrings.t(context, 'advisory_severity_info');
+      case 'medium':
+        return FinanceStrings.t(context, 'advisory_severity_medium');
+      case 'high':
+        return FinanceStrings.t(context, 'advisory_severity_high');
+      case 'critical':
+        return FinanceStrings.t(context, 'advisory_severity_critical');
+      default:
+        return severity;
+    }
+  }
+
+  static const advisorySeverityCodes = <String>[
+    'info',
+    'medium',
+    'high',
+    'critical',
+  ];
+
+  static String advisoryStatus(BuildContext context, String status) {
+    switch (status.trim().toLowerCase()) {
+      case 'open':
+        return FinanceStrings.t(context, 'advisory_status_open');
+      case 'acknowledged':
+        return FinanceStrings.t(context, 'advisory_status_acknowledged');
+      case 'resolved':
+        return FinanceStrings.t(context, 'advisory_status_resolved');
+      case 'dismissed':
+        return FinanceStrings.t(context, 'advisory_status_dismissed');
+      default:
+        return status;
+    }
+  }
+
+  static const advisoryStatusCodes = <String>[
+    'open',
+    'acknowledged',
+    'resolved',
+    'dismissed',
+  ];
+
+  static String advisoryRuleId(BuildContext context, String ruleId) {
+    final key = 'advisory_rule_${ruleId.replaceAll('.', '_')}';
+    final translated = FinanceStrings.t(context, key);
+    if (translated != key) return translated;
+    return ruleId;
+  }
+
+  static String advisoryConfidenceOrigin(BuildContext context, String origin) {
+    switch (origin.trim().toLowerCase()) {
+      case 'deterministic_only':
+        return FinanceStrings.t(context, 'advisory_origin_deterministic_only');
+      case 'deterministic_with_ai_interpretation':
+        return FinanceStrings.t(
+          context,
+          'advisory_origin_deterministic_with_ai_interpretation',
+        );
+      case 'insufficient_facts':
+        return FinanceStrings.t(context, 'advisory_origin_insufficient_facts');
+      default:
+        return origin;
+    }
+  }
+
+  static String advisoryFactType(BuildContext context, String factType) {
+    final key = 'advisory_fact_${factType.trim()}';
+    final translated = FinanceStrings.t(context, key);
+    if (translated != key) return translated;
+    return factType;
+  }
+
+  static String advisorySnapshotKey(BuildContext context, String key) {
+    switch (key.trim()) {
+      case 'amount':
+      case 'nominalAmount':
+      case 'weightedAmount':
+      case 'balance':
+      case 'threshold':
+      case 'minimumCashReserve':
+        return FinanceStrings.t(context, key);
+      default:
+        return key.replaceAll(RegExp(r'([A-Z])'), ' \$1').trim();
+    }
+  }
+
+  static String advisoryConfidenceFactorKey(BuildContext context, String key) {
+    return key.replaceAll('_', ' ');
+  }
 }
