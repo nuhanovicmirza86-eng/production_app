@@ -33,6 +33,8 @@ class FinanceCashTransaction {
     this.reconciledByEmail,
     this.postedAt,
     this.reconciledAt,
+    this.allocatedAmount = 0,
+    this.unallocatedAmount,
   });
 
   final String id;
@@ -66,6 +68,8 @@ class FinanceCashTransaction {
   final String? reconciledByEmail;
   final DateTime? postedAt;
   final DateTime? reconciledAt;
+  final double allocatedAmount;
+  final double? unallocatedAmount;
 
   bool get isDraft => status == 'draft' || status == 'planned';
   bool get isPosted => status == 'posted';
@@ -74,6 +78,18 @@ class FinanceCashTransaction {
   bool get isPostedLike => isPosted || isReconciled;
   bool get hasReversal => (reversalTransactionId ?? '').isNotEmpty;
   bool get isReversal => (reversalOfTransactionId ?? '').isNotEmpty;
+
+  double get effectiveUnallocatedAmount {
+    if (unallocatedAmount != null) return unallocatedAmount!;
+    return FinanceCallableUtils.parseAmount(amount) -
+        FinanceCallableUtils.parseAmount(allocatedAmount);
+  }
+
+  bool get canAllocateToInvoices =>
+      isPostedLike &&
+      isActual &&
+      !isReversal &&
+      effectiveUnallocatedAmount > 0.005;
 
   factory FinanceCashTransaction.fromCallableMap(
     String id,
@@ -120,6 +136,10 @@ class FinanceCashTransaction {
       reconciledByEmail: _opt(data['reconciledByEmail']),
       postedAt: data['postedAt'] as DateTime?,
       reconciledAt: data['reconciledAt'] as DateTime?,
+      allocatedAmount: FinanceCallableUtils.parseAmount(data['allocatedAmount']),
+      unallocatedAmount: data.containsKey('unallocatedAmount')
+          ? FinanceCallableUtils.parseAmount(data['unallocatedAmount'])
+          : null,
     );
   }
 

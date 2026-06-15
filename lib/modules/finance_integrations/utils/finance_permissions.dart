@@ -416,6 +416,48 @@ class FinancePermissions {
     );
   }
 
+  /// Pregled alokacija plaćanja (faktura / transakcija).
+  static bool canViewPaymentAllocations({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return _invoicesOperativeUnlocked(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  /// Kreiranje / batch alokacije — referent i manager.
+  static bool canCreatePaymentAllocation({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return _invoicesOperativeUnlocked(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  /// Poništenje alokacije — samo manager/admin/super_admin.
+  static bool canCancelPaymentAllocation({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    if (!_invoicesOperativeUnlocked(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    )) {
+      return false;
+    }
+    return _isInvoiceManagerRole(role);
+  }
+
   /// Finance AI (Callable [runFinanceControllingAiInsight]) — isti skup uloga kao preračun KPI na backendu.
   static bool canRunFinanceControllingAiInsight({
     required Map<String, dynamic> companyData,

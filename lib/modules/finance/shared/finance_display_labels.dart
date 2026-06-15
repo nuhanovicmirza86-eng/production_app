@@ -113,4 +113,15 @@ class FinanceDisplayLabels {
     'paid',
     'cancelled',
   ];
+
+  static String allocationStatus(BuildContext context, String status) {
+    switch (status.trim().toLowerCase()) {
+      case 'active':
+        return FinanceStrings.t(context, 'allocation_status_active');
+      case 'cancelled':
+        return FinanceStrings.t(context, 'allocation_status_cancelled');
+      default:
+        return status;
+    }
+  }
 }

@@ -6,6 +6,7 @@ import '../../shared/finance_display_labels.dart';
 import '../../shared/finance_error_mapper.dart';
 import '../../shared/finance_money_format.dart';
 import '../../shared/finance_strings.dart';
+import '../../payment_allocations/widgets/finance_payment_allocations_section.dart';
 import '../models/finance_sales_invoice.dart';
 import '../services/finance_invoices_service.dart';
 import '../widgets/finance_invoice_widgets.dart';
@@ -33,6 +34,7 @@ class _FinanceSalesInvoiceDetailScreenState
   final _service = FinanceInvoicesService();
   late FinanceSalesInvoice _invoice;
   bool _busy = false;
+  final _allocationsKey = GlobalKey<FinancePaymentAllocationsSectionState>();
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -77,6 +79,7 @@ class _FinanceSalesInvoiceDetailScreenState
       );
       if (!mounted) return;
       setState(() => _invoice = fresh);
+      await _allocationsKey.currentState?.reload();
     } catch (_) {
       /* keep cached row */
     }
@@ -267,6 +270,16 @@ class _FinanceSalesInvoiceDetailScreenState
               FinanceStrings.t(context, 'reference'),
               inv.reference!,
             ),
+          const Divider(height: 32),
+          FinancePaymentAllocationsSection(
+            key: _allocationsKey,
+            companyData: widget.companyData,
+            debugUnlockModule: widget.debugUnlockModule,
+            mode: FinancePaymentAllocationsSectionMode.invoice,
+            invoiceId: inv.id,
+            invoiceType: 'sales',
+            onChanged: _refresh,
+          ),
           const SizedBox(height: 24),
           if (_canIssue)
             FilledButton(

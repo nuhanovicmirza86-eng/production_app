@@ -10,6 +10,8 @@ import '../../shared/finance_display_labels.dart';
 import '../../shared/finance_error_mapper.dart';
 import '../../shared/finance_money_format.dart';
 import '../../shared/finance_strings.dart';
+import '../../payment_allocations/screens/finance_allocate_payment_screen.dart';
+import '../../payment_allocations/widgets/finance_payment_allocations_section.dart';
 import '../models/finance_cash_transaction.dart';
 import '../services/finance_cash_transactions_service.dart';
 import 'finance_cash_transaction_form_screen.dart';
@@ -41,6 +43,7 @@ class _FinanceCashTransactionDetailScreenState
   bool _actionInProgress = false;
   FinanceAccount? _account;
   FinanceCashFlowCategory? _category;
+  final _allocationsKey = GlobalKey<FinancePaymentAllocationsSectionState>();
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -88,11 +91,34 @@ class _FinanceCashTransactionDetailScreenState
         debugUnlockModule: widget.debugUnlockModule,
       );
 
+  bool get _canAllocate => _tx.canAllocateToInvoices &&
+      FinancePermissions.canCreatePaymentAllocation(
+        companyData: widget.companyData,
+        role: _role,
+        debugUnlockModule: widget.debugUnlockModule,
+      );
+
   @override
   void initState() {
     super.initState();
     _tx = widget.transaction;
     _loadMasters();
+    _refreshTransaction();
+  }
+
+  Future<void> _refreshTransaction() async {
+    try {
+      final fresh = await _txService.findTransactionById(
+        companyId: _companyId,
+        transactionId: _tx.id,
+      );
+      if (fresh != null && mounted) {
+        setState(() => _tx = fresh);
+      }
+      await _allocationsKey.currentState?.reload();
+    } catch (_) {
+      /* zadrži keširani red */
+    }
   }
 
   Future<void> _loadMasters() async {
@@ -234,6 +260,23 @@ class _FinanceCashTransactionDetailScreenState
     }
   }
 
+  Future<void> _allocate() async {
+    if (_actionInProgress) return;
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => FinanceAllocatePaymentScreen(
+          companyData: widget.companyData,
+          transaction: _tx,
+          debugUnlockModule: widget.debugUnlockModule,
+        ),
+      ),
+    );
+    if (changed == true && mounted) {
+      await _refreshTransaction();
+      if (mounted) Navigator.pop(context, true);
+    }
+  }
+
   Future<void> _openLinked(String? linkedId) async {
     if (linkedId == null || linkedId.isEmpty) return;
     try {
@@ -329,6 +372,19 @@ class _FinanceCashTransactionDetailScreenState
             FinanceStrings.t(context, 'amount'),
             FinanceMoneyFormat.format(_tx.amount, _tx.currency),
           ),
+          if (_tx.isPostedLike && _tx.isActual) ...[
+            _row(
+              FinanceStrings.t(context, 'allocated_amount'),
+              FinanceMoneyFormat.format(_tx.allocatedAmount, _tx.currency),
+            ),
+            _row(
+              FinanceStrings.t(context, 'unallocated_amount'),
+              FinanceMoneyFormat.format(
+                _tx.effectiveUnallocatedAmount,
+                _tx.currency,
+              ),
+            ),
+          ],
           _row(
             FinanceStrings.t(context, 'direction'),
             FinanceDisplayLabels.transactionDirection(context, _tx.direction),
@@ -397,7 +453,22 @@ class _FinanceCashTransactionDetailScreenState
                   ? null
                   : () => _openLinked(_tx.reversalOfTransactionId),
             ),
+          const Divider(height: 32),
+          FinancePaymentAllocationsSection(
+            key: _allocationsKey,
+            companyData: widget.companyData,
+            debugUnlockModule: widget.debugUnlockModule,
+            mode: FinancePaymentAllocationsSectionMode.transaction,
+            transactionId: _tx.id,
+            onChanged: _refreshTransaction,
+          ),
           const SizedBox(height: 24),
+          if (_canAllocate)
+            FilledButton(
+              onPressed: _actionInProgress ? null : _allocate,
+              child: Text(FinanceStrings.t(context, 'allocate_to_invoices')),
+            ),
+          if (_canAllocate) const SizedBox(height: 8),
           if (_canPost)
             FilledButton(
               onPressed: _actionInProgress ? null : _post,
