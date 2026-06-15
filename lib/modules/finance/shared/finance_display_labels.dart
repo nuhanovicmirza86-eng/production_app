@@ -88,4 +88,29 @@ class FinanceDisplayLabels {
     'inflow',
     'outflow',
   ];
+
+  static String invoiceStatus(BuildContext context, String status) {
+    switch (status.trim().toLowerCase()) {
+      case 'draft':
+        return FinanceStrings.t(context, 'inv_status_draft');
+      case 'open':
+        return FinanceStrings.t(context, 'inv_status_open');
+      case 'partial':
+        return FinanceStrings.t(context, 'inv_status_partial');
+      case 'paid':
+        return FinanceStrings.t(context, 'inv_status_paid');
+      case 'cancelled':
+        return FinanceStrings.t(context, 'inv_status_cancelled');
+      default:
+        return status;
+    }
+  }
+
+  static const invoiceStatusCodes = <String>[
+    'draft',
+    'open',
+    'partial',
+    'paid',
+    'cancelled',
+  ];
 }

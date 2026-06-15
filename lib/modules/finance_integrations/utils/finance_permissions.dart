@@ -285,6 +285,137 @@ class FinancePermissions {
         r == ProductionAccessHelper.roleAccountingManager;
   }
 
+  static bool _invoicesOperativeUnlocked({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canViewControllingAnalytics(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  static bool _isInvoiceManagerRole(String role) {
+    return _isCashFlowManagerRole(role);
+  }
+
+  /// Pregled faktura, potraživanja i obaveza.
+  static bool canViewFinanceInvoices({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return _invoicesOperativeUnlocked(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  static bool canViewReceivables({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canViewFinanceInvoices(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  static bool canViewPayables({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canViewFinanceInvoices(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  /// Kreiranje nacrta fakture.
+  static bool canCreateFinanceInvoiceDraft({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return _invoicesOperativeUnlocked(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  /// Uređivanje nacrta; referent samo vlastiti nacrt.
+  static bool canEditFinanceInvoiceDraft({
+    required Map<String, dynamic> companyData,
+    required String role,
+    required String invoiceCreatedBy,
+    bool debugUnlockModule = false,
+  }) {
+    if (!_invoicesOperativeUnlocked(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    )) {
+      return false;
+    }
+    if (_isInvoiceManagerRole(role)) return true;
+    final r = ProductionAccessHelper.normalizeRole(role);
+    if (r == ProductionAccessHelper.roleAccountingClerk) {
+      final uid = _currentUserId(companyData);
+      return uid.isNotEmpty && uid == invoiceCreatedBy.trim();
+    }
+    return false;
+  }
+
+  /// Izdavanje izlazne fakture — ne referent.
+  static bool canIssueSalesInvoice({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    if (!_invoicesOperativeUnlocked(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    )) {
+      return false;
+    }
+    return _isInvoiceManagerRole(role);
+  }
+
+  /// Odobravanje ulazne fakture — ne referent.
+  static bool canApprovePurchaseInvoice({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canIssueSalesInvoice(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  /// Otkaz fakture prema backend pravilima — ne referent.
+  static bool canCancelFinanceInvoice({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canIssueSalesInvoice(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
   /// Finance AI (Callable [runFinanceControllingAiInsight]) — isti skup uloga kao preračun KPI na backendu.
   static bool canRunFinanceControllingAiInsight({
     required Map<String, dynamic> companyData,
