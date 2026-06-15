@@ -5,6 +5,8 @@ import '../../accounts/screens/finance_accounts_screen.dart';
 import '../../cash_flow_categories/screens/finance_cash_flow_categories_screen.dart';
 import '../../cash_transactions/screens/finance_cash_transactions_screen.dart';
 import '../../cash_transactions/screens/finance_realized_cash_flow_screen.dart';
+import '../../forecast/screens/finance_cash_flow_forecast_screen.dart';
+import '../../planned_cash_items/screens/finance_planned_cash_items_screen.dart';
 import '../../shared/finance_strings.dart';
 
 /// Tab **Cash Flow** unutar postojećeg Finance & Controlling huba.
@@ -95,6 +97,34 @@ class FinanceCashFlowHubTabBody extends StatelessWidget {
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => FinanceRealizedCashFlowScreen(
+                companyData: companyData,
+                debugUnlockModule: debugUnlockModule,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _CashFlowEntryCard(
+          icon: Icons.event_note_outlined,
+          title: FinanceStrings.t(context, 'card_planned_items_title'),
+          subtitle: FinanceStrings.t(context, 'card_planned_items_subtitle'),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => FinancePlannedCashItemsScreen(
+                companyData: companyData,
+                debugUnlockModule: debugUnlockModule,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _CashFlowEntryCard(
+          icon: Icons.timeline_outlined,
+          title: FinanceStrings.t(context, 'card_forecast_title'),
+          subtitle: FinanceStrings.t(context, 'card_forecast_subtitle'),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => FinanceCashFlowForecastScreen(
                 companyData: companyData,
                 debugUnlockModule: debugUnlockModule,
               ),

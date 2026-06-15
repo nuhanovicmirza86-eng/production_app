@@ -124,4 +124,57 @@ class FinanceDisplayLabels {
         return status;
     }
   }
+
+  static String plannedCashItemStatus(BuildContext context, String status) {
+    switch (status.trim().toLowerCase()) {
+      case 'draft':
+        return FinanceStrings.t(context, 'planned_status_draft');
+      case 'approved':
+        return FinanceStrings.t(context, 'planned_status_approved');
+      case 'cancelled':
+        return FinanceStrings.t(context, 'planned_status_cancelled');
+      default:
+        return status;
+    }
+  }
+
+  static const plannedCashItemStatusCodes = <String>[
+    'draft',
+    'approved',
+    'cancelled',
+  ];
+
+  static String probabilitySource(BuildContext context, String source) {
+    switch (source.trim().toLowerCase()) {
+      case 'manual_confirmed':
+        return FinanceStrings.t(context, 'prob_source_manual_confirmed');
+      case 'company_rule':
+        return FinanceStrings.t(context, 'prob_source_company_rule');
+      case 'system_default':
+        return FinanceStrings.t(context, 'prob_source_system_default');
+      default:
+        return source;
+    }
+  }
+
+  static const probabilitySourceCodes = <String>[
+    'manual_confirmed',
+    'company_rule',
+    'system_default',
+  ];
+
+  static String forecastBucketType(BuildContext context, String bucketType) {
+    switch (bucketType.trim().toLowerCase()) {
+      case 'day':
+        return FinanceStrings.t(context, 'forecast_bucket_day');
+      case 'week':
+        return FinanceStrings.t(context, 'forecast_bucket_week');
+      case 'month':
+        return FinanceStrings.t(context, 'forecast_bucket_month');
+      default:
+        return bucketType;
+    }
+  }
+
+  static const forecastBucketTypeCodes = <String>['day', 'week', 'month'];
 }

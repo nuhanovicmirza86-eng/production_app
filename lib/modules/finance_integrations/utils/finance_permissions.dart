@@ -458,6 +458,60 @@ class FinancePermissions {
     return _isInvoiceManagerRole(role);
   }
 
+  /// Pregled planiranih CF stavki i prognoze.
+  static bool canViewPlannedCashFlow({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canViewRealizedCashFlow(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  /// Kreiranje / izmjena draft planirane stavke.
+  static bool canCreatePlannedCashItemDraft({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canCreateCashTransactionDraft(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  /// Uređivanje drafta; referent samo vlastiti nacrt.
+  static bool canEditPlannedCashItemDraft({
+    required Map<String, dynamic> companyData,
+    required String role,
+    required String itemCreatedBy,
+    bool debugUnlockModule = false,
+  }) {
+    return canEditCashTransactionDraft(
+      companyData: companyData,
+      role: role,
+      transactionCreatedBy: itemCreatedBy,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  /// Odobravanje / otkaz planirane stavke — ne referent.
+  static bool canApproveCancelPlannedCashItem({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canPostCashTransaction(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
   /// Finance AI (Callable [runFinanceControllingAiInsight]) — isti skup uloga kao preračun KPI na backendu.
   static bool canRunFinanceControllingAiInsight({
     required Map<String, dynamic> companyData,
