@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/company_plant_display_name.dart';
 import '../../finance/ai_advisory/screens/finance_ai_alerts_panel.dart';
+import '../../finance/ai_kpi/screens/finance_ai_recommendation_kpi_screen.dart';
 import '../../finance/ai_notifications/screens/finance_ai_notification_inbox_screen.dart';
 import '../../finance/ai_notifications/widgets/finance_ai_notification_badge.dart';
 import '../../finance/shared/finance_strings.dart';
@@ -694,6 +695,24 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
         refreshListenable: _notificationRefresh,
         onDeliveryChanged: _refreshNotificationBadge,
       ),
+      if (FinancePermissions.canViewFinanceAiRecommendationKpis(
+        companyData: widget.companyData,
+        role: _role,
+        debugUnlockModule: widget.debugUnlockModule,
+      )) ...[
+        const SizedBox(height: 20),
+        const Divider(height: 1),
+        const SizedBox(height: 12),
+        FinanceAiRecommendationKpiScreen(
+          key: const ValueKey('finance-ai-kpi-panel'),
+          companyData: widget.companyData,
+          periodYear: widget.periodYear,
+          periodMonth: widget.periodMonth,
+          plantScopeKey: _assistantPlantKey,
+          onPlantScopeChanged: _canPickPlantScope ? _onAssistantPlantScopeChanged : null,
+          debugUnlockModule: widget.debugUnlockModule,
+        ),
+      ],
     ];
   }
 

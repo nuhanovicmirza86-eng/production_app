@@ -627,4 +627,20 @@ class FinancePermissions {
       debugUnlockModule: debugUnlockModule,
     );
   }
+
+  /// Zbirni KPI rezultati AI preporuka — manager/admin/super_admin (ne clerk).
+  static bool canViewFinanceAiRecommendationKpis({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    if (!canViewControllingAnalytics(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    )) {
+      return false;
+    }
+    return _isCashFlowManagerRole(role);
+  }
 }
