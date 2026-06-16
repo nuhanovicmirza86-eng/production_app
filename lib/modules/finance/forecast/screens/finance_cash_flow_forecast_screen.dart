@@ -248,8 +248,9 @@ class _FinanceCashFlowForecastScreenState
           ),
           const SizedBox(height: 12),
           if (!_useCustomPeriod)
-            DropdownButtonFormField<int>(
-              value: _horizonDays,
+          DropdownButtonFormField<int>(
+            isExpanded: true,
+            value: _horizonDays,
               decoration: InputDecoration(
                 labelText: FinanceStrings.t(context, 'forecast_horizon'),
                 border: const OutlineInputBorder(),
@@ -288,6 +289,7 @@ class _FinanceCashFlowForecastScreenState
           ],
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
+            isExpanded: true,
             value: _bucketType,
             decoration: InputDecoration(
               labelText: FinanceStrings.t(context, 'forecast_bucket_type'),
@@ -307,6 +309,7 @@ class _FinanceCashFlowForecastScreenState
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String?>(
+            isExpanded: true,
             decoration: InputDecoration(
               labelText: FinanceStrings.t(context, 'filter_account'),
               border: const OutlineInputBorder(),
@@ -315,12 +318,18 @@ class _FinanceCashFlowForecastScreenState
             items: [
               DropdownMenuItem(
                 value: null,
-                child: Text(FinanceStrings.t(context, 'filter_all_accounts')),
+                child: Text(
+                  FinanceStrings.t(context, 'filter_all_accounts'),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               ..._accounts.map(
                 (a) => DropdownMenuItem(
                   value: a.id,
-                  child: Text('${a.accountCode} · ${a.name}'),
+                  child: Text(
+                    '${a.accountCode} · ${a.name}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
             ],

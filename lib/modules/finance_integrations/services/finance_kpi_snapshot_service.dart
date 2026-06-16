@@ -8,6 +8,29 @@ class FinanceKpiSnapshotService {
       FinanceControllingPeriodReadService();
 
   /// Jedan snapshot za tenant + poslovnu godinu + mjesec + pogon (Callable; prazan plantKey = rollup).
+  Future<FinanceKpiSnapshotModel?> loadSnapshot({
+    required String companyId,
+    required String businessYearId,
+    required int periodYear,
+    required int periodMonth,
+    String plantKey = '',
+  }) async {
+    final cid = companyId.trim();
+    final by = businessYearId.trim();
+    if (cid.isEmpty || by.isEmpty) {
+      return null;
+    }
+    final pk = plantKey.trim();
+    final bundle = await _reads.load(
+      companyId: cid,
+      businessYearId: by,
+      periodYear: periodYear,
+      periodMonth: periodMonth,
+      plantKey: pk,
+    );
+    return bundle.kpi;
+  }
+
   Stream<FinanceKpiSnapshotModel?> watchSnapshot({
     required String companyId,
     required String businessYearId,
@@ -15,22 +38,14 @@ class FinanceKpiSnapshotService {
     required int periodMonth,
     String plantKey = '',
   }) {
-    final cid = companyId.trim();
-    final by = businessYearId.trim();
-    if (cid.isEmpty || by.isEmpty) {
-      return Stream<FinanceKpiSnapshotModel?>.value(null);
-    }
-    final pk = plantKey.trim();
     return Stream.fromFuture(
-      _reads
-          .load(
-            companyId: cid,
-            businessYearId: by,
-            periodYear: periodYear,
-            periodMonth: periodMonth,
-            plantKey: pk,
-          )
-          .then((b) => b.kpi),
-    );
+      loadSnapshot(
+        companyId: companyId,
+        businessYearId: businessYearId,
+        periodYear: periodYear,
+        periodMonth: periodMonth,
+        plantKey: plantKey,
+      ),
+    ).asBroadcastStream();
   }
 }

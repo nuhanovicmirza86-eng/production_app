@@ -8,7 +8,6 @@ import '../models/finance_ai_insight_doc.dart';
 import '../models/finance_controlling_defaults_view.dart';
 import '../models/finance_kpi_snapshot_model.dart';
 import '../services/finance_ai_insight_service.dart';
-import '../services/finance_ai_insights_list_service.dart';
 import '../services/finance_company_operational_config_service.dart';
 import '../services/finance_controlling_period_read_service.dart';
 import '../services/finance_exchange_rate_service.dart';
@@ -46,14 +45,21 @@ class FinanceControllingDashboardTab extends StatefulWidget {
 }
 
 class _FinanceControllingDashboardTabState
-    extends State<FinanceControllingDashboardTab> {
+    extends State<FinanceControllingDashboardTab>
+    with AutomaticKeepAliveClientMixin {
   final _recompute = FinanceKpiRecomputeService();
   final _aiInsight = FinanceAiInsightService();
-  final _aiInsightsList = FinanceAiInsightsListService();
+  final _periodReads = FinanceControllingPeriodReadService();
   final _ratesSvc = FinanceExchangeRateService();
   bool _recomputing = false;
   bool _aiRunning = false;
+  bool _dashboardToolsExpanded = false;
+  String _toolsPlantLine = 'Preračun za: …';
+  Future<List<FinanceAiInsightDoc>>? _recentAiInsightsFuture;
   Map<String, dynamic>? _ratesDoc;
+
+  @override
+  bool get wantKeepAlive => true;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -65,6 +71,61 @@ class _FinanceControllingDashboardTabState
   void initState() {
     super.initState();
     _refreshRates();
+    _loadToolsPlantLine();
+  }
+
+  @override
+  void didUpdateWidget(covariant FinanceControllingDashboardTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.plantKey != widget.plantKey) {
+      _loadToolsPlantLine();
+    }
+    if (oldWidget.businessYearId != widget.businessYearId ||
+        oldWidget.periodYear != widget.periodYear ||
+        oldWidget.periodMonth != widget.periodMonth ||
+        oldWidget.plantKey != widget.plantKey) {
+      _recentAiInsightsFuture = null;
+    }
+  }
+
+  Future<List<FinanceAiInsightDoc>> _loadRecentAiInsights() {
+    return _periodReads
+        .load(
+          companyId: _companyId,
+          businessYearId: widget.businessYearId.trim(),
+          periodYear: widget.periodYear,
+          periodMonth: widget.periodMonth,
+          plantKey: widget.plantKey.trim(),
+          aiInsightsLimit: 12,
+        )
+        .then((b) => b.aiInsights);
+  }
+
+  void _toggleDashboardToolsExpanded(bool canAi) {
+    final next = !_dashboardToolsExpanded;
+    setState(() {
+      _dashboardToolsExpanded = next;
+      if (next && canAi) {
+        _recentAiInsightsFuture ??= _loadRecentAiInsights();
+      }
+    });
+  }
+
+  Future<void> _loadToolsPlantLine() async {
+    final pk = widget.plantKey.trim();
+    if (pk.isEmpty) {
+      if (mounted) {
+        setState(() => _toolsPlantLine = 'Preračun za: svi pogoni');
+      }
+      return;
+    }
+    final label = await CompanyPlantDisplayName.resolve(
+      companyId: _companyId,
+      plantKey: pk,
+    );
+    if (mounted) {
+      setState(() => _toolsPlantLine = 'Preračun za: $label');
+    }
   }
 
   Future<void> _refreshRates() async {
@@ -723,8 +784,261 @@ class _FinanceControllingDashboardTabState
     );
   }
 
+  Widget _buildDashboardToolsExpandedBody({
+    required BuildContext context,
+    required ThemeData theme,
+    required ColorScheme cs,
+    required bool canAi,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (canAi)
+                  FilledButton.tonalIcon(
+                    onPressed: _aiRunning || _recomputing
+                        ? null
+                        : () => _onFinanceAiInsight(context),
+                    icon: _aiRunning
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.auto_awesome_outlined, size: 18),
+                    label: Text(_aiRunning ? 'AI…' : 'AI uvid'),
+                  ),
+                FilledButton.tonal(
+                  onPressed: _recomputing || _aiRunning
+                      ? null
+                      : () => _onRecompute(context),
+                  child: _recomputing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Preračunaj KPI'),
+                ),
+              ],
+            ),
+          ),
+          if (canAi) ...[
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () {
+                  Navigator.push<void>(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => FinanceAiAssistantScreen(
+                        companyData: widget.companyData,
+                        businessYearId: widget.businessYearId.trim(),
+                        periodYear: widget.periodYear,
+                        periodMonth: widget.periodMonth,
+                        plantKey: widget.plantKey.trim(),
+                        debugUnlockModule: widget.debugUnlockModule,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.smart_toy_outlined, size: 18),
+                label: const Text(
+                  'AI centar — upozorenja i memorija kompanije',
+                ),
+              ),
+            ),
+            if (_recentAiInsightsFuture != null)
+              FutureBuilder<List<FinanceAiInsightDoc>>(
+                future: _recentAiInsightsFuture,
+                builder: (context, histSnap) {
+                  if (histSnap.hasError) return const SizedBox.shrink();
+                  if (histSnap.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: LinearProgressIndicator(minHeight: 2),
+                    );
+                  }
+                  final list = histSnap.data;
+                  if (list == null || list.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  final locale = Localizations.localeOf(context).toString();
+                  final fmt = DateFormat.yMMMd(locale).add_Hm();
+                  return Card(
+                    margin: const EdgeInsets.only(top: 8),
+                    color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              left: 12,
+                              top: 8,
+                              right: 12,
+                            ),
+                            child: Text(
+                              'Zadnji AI uvidi (ovaj period)',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          ...list.map((e) {
+                            final when = e.createdAt != null
+                                ? fmt.format(e.createdAt!.toLocal())
+                                : '—';
+                            return ListTile(
+                              dense: true,
+                              leading: const Icon(
+                                Icons.history_edu_outlined,
+                                size: 22,
+                              ),
+                              title: Text(
+                                when,
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                              subtitle: Text(
+                                '${e.insightKind == FinanceAiInsightService.insightKindWatchlist ? 'Lista za praćenje' : 'Analiza'}'
+                                '${e.sourceTrigger == 'scheduled_nightly' ? ' · noćni' : ''} · '
+                                '${e.analysisFocus ?? 'Opći uvid (bez dodatnog fokusa)'}',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              onTap: () => _showInsightMarkdownDialog(
+                                context,
+                                markdown: e.analysisMarkdown,
+                                title: 'AI uvid · $when',
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCollapsibleDashboardTools({
+    required BuildContext context,
+    required ThemeData theme,
+    required ColorScheme cs,
+    required bool canAi,
+    required String plantLine,
+  }) {
+    return Material(
+      color: cs.surfaceContainerHighest.withValues(alpha: 0.2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            onTap: () => _toggleDashboardToolsExpanded(canAi),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.tune_outlined,
+                    size: 22,
+                    color: cs.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          canAi ? 'Preračun i AI uvid' : 'Preračun KPI',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          plantLine,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    _dashboardToolsExpanded
+                        ? Icons.expand_less
+                        : Icons.expand_more,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_dashboardToolsExpanded)
+            _buildDashboardToolsExpandedBody(
+              context: context,
+              theme: theme,
+              cs: cs,
+              canAi: canAi,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashboardScrollView({
+    required BuildContext context,
+    required ThemeData theme,
+    required ColorScheme cs,
+    required bool canAi,
+    required List<Widget> bodyChildren,
+  }) {
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(
+          child: _buildCollapsibleDashboardTools(
+            context: context,
+            theme: theme,
+            cs: cs,
+            canAi: canAi,
+            plantLine: _toolsPlantLine,
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.all(16),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate(
+              bodyChildren,
+              addAutomaticKeepAlives: false,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
@@ -775,436 +1089,270 @@ class _FinanceControllingDashboardTabState
           debugUnlockModule: widget.debugUnlockModule,
         );
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  FutureBuilder<String>(
-                    key: ValueKey<String>(
-                      '${widget.plantKey.trim()}-$_companyId',
-                    ),
-                    future: widget.plantKey.trim().isEmpty
-                        ? Future.value('svi pogoni')
-                        : CompanyPlantDisplayName.resolve(
-                            companyId: _companyId,
-                            plantKey: widget.plantKey.trim(),
-                          ),
-                    builder: (context, snap) {
-                      final plantLine = widget.plantKey.trim().isEmpty
-                          ? 'Preračun za: svi pogoni'
-                          : 'Preračun za: ${snap.connectionState == ConnectionState.waiting ? '…' : (snap.data ?? widget.plantKey.trim())}';
-                      return Text(
-                        plantLine,
-                        style: theme.textTheme.bodySmall,
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        if (canAi)
-                          FilledButton.tonalIcon(
-                            onPressed: _aiRunning || _recomputing
-                                ? null
-                                : () => _onFinanceAiInsight(context),
-                            icon: _aiRunning
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.auto_awesome_outlined,
-                                    size: 18,
-                                  ),
-                            label: Text(_aiRunning ? 'AI…' : 'AI uvid'),
-                          ),
-                        FilledButton.tonal(
-                          onPressed:
-                              _recomputing || _aiRunning
-                                  ? null
-                                  : () => _onRecompute(context),
-                          child: _recomputing
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text('Preračunaj KPI'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (canAi) ...[
-                    const SizedBox(height: 2),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        onPressed: () {
-                          Navigator.push<void>(
-                            context,
-                            MaterialPageRoute<void>(
-                              builder: (_) => FinanceAiAssistantScreen(
-                                companyData: widget.companyData,
-                                businessYearId: widget.businessYearId.trim(),
-                                periodYear: widget.periodYear,
-                                periodMonth: widget.periodMonth,
-                                plantKey: widget.plantKey.trim(),
-                                debugUnlockModule: widget.debugUnlockModule,
-                              ),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.smart_toy_outlined, size: 18),
-                        label: const Text(
-                          'AI centar — upozorenja i memorija kompanije',
+        return StreamBuilder<FinanceKpiSnapshotModel?>(
+          stream: svc.watchSnapshot(
+            companyId: _companyId,
+            businessYearId: widget.businessYearId.trim(),
+            periodYear: widget.periodYear,
+            periodMonth: widget.periodMonth,
+            plantKey: widget.plantKey.trim(),
+          ),
+          builder: (context, snap) {
+            if (snap.hasError) {
+              return _buildDashboardScrollView(
+                context: context,
+                theme: theme,
+                cs: cs,
+                canAi: canAi,
+                bodyChildren: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          financeUserFacingLoadError(snap.error),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: cs.error),
                         ),
                       ),
+                      FinanceTechnicalInfoIcon(
+                        detail: '${snap.error}',
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            }
+            if (snap.connectionState == ConnectionState.waiting) {
+              return _buildDashboardScrollView(
+                context: context,
+                theme: theme,
+                cs: cs,
+                canAi: canAi,
+                bodyChildren: const [
+                  SizedBox(height: 48),
+                  Center(child: CircularProgressIndicator()),
+                  SizedBox(height: 48),
+                ],
+              );
+            }
+
+            final m = snap.data;
+            final locale = Localizations.localeOf(context).toString();
+
+            if (m == null) {
+              return _buildDashboardScrollView(
+                context: context,
+                theme: theme,
+                cs: cs,
+                canAi: canAi,
+                bodyChildren: [
+                  _financeDefaultsCard(
+                    context: context,
+                    def: def,
+                    theme: theme,
+                    cs: cs,
+                    selectedPlantKey: widget.plantKey.trim(),
+                  ),
+                  const SizedBox(height: 12),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Za ovaj period još nema spremljenog sažetka.',
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          ),
+                          FinanceScreenContextInfo(
+                            title: 'Kada se podaci pojave',
+                            body:
+                                'Koristite gumb „Preračunaj KPI” iznad ili pričekajte '
+                                'automatski noćni proračun. Potrebni su operativni podaci '
+                                '(npr. zastoji) i postavke valute/satnice u postavkama kompanije.',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            final snapBase = m.canonicalBaseCurrency;
+            final mhr = m.effectiveMachineHourlyRate;
+            final rateNoteShort = mhr == null
+                ? 'Satnica za proračun zastoja nije postavljena.'
+                : 'Zastoj: ${m.downtimeOeeMinutes} min × $mhr $snapBase/h.';
+            final rateNoteDetail = mhr == null
+                ? 'U postavkama kompanije uneste satnicu radnog sata u baznoj valuti. '
+                    'Bez toga novčani iznos gubitka zastoja ostaje nula; minute se i dalje prikazuju.'
+                : 'Procjena temelji se na OEE minutama zastoja i postavljenoj satnici. '
+                    'Za prikaz u drugoj valuti koriste se postavljene vrijednosti tečaja kad su dostupne.';
+
+            final displayShort = snapBase == def.displayCurrency
+                ? 'Iznosi u valuti $snapBase.'
+                : 'Valuta proračuna: $snapBase · prikaz: ${def.displayCurrency}.';
+            final displayDetail = snapBase == def.displayCurrency
+                ? 'Svi iznosi u ovom sažetku čitaju se u istoj valuti.'
+                : 'Sažetak se interno vodi u baznoj valuti; na ekranu se iznosi mogu pokazati u valuti prikaza '
+                    'prema postavkama i dostupnim tečajevima.';
+
+            return _buildDashboardScrollView(
+              context: context,
+              theme: theme,
+              cs: cs,
+              canAi: canAi,
+              bodyChildren: [
+                _financeDefaultsCard(
+                  context: context,
+                  def: def,
+                  theme: theme,
+                  cs: cs,
+                  selectedPlantKey: widget.plantKey.trim(),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Sažetak · ${widget.periodYear} / ${widget.periodMonth}',
+                        style: theme.textTheme.titleMedium,
+                      ),
+                    ),
+                    FinanceScreenContextInfo(
+                      title: 'Valuta i prikaz',
+                      body: '$displayShort\n\n$displayDetail',
                     ),
                   ],
-                ],
-              ),
-            ),
-            if (canAi)
-              StreamBuilder<List<FinanceAiInsightDoc>>(
-                stream: _aiInsightsList.watchRecentForPeriod(
-                  companyId: _companyId,
-                  businessYearId: widget.businessYearId.trim(),
-                  periodYear: widget.periodYear,
-                  periodMonth: widget.periodMonth,
-                  plantKey: widget.plantKey.trim(),
                 ),
-                builder: (context, histSnap) {
-                  if (histSnap.hasError) return const SizedBox.shrink();
-                  final list = histSnap.data;
-                  if (list == null || list.isEmpty) {
-                    return const SizedBox.shrink();
-                  }
-                  final locale = Localizations.localeOf(context).toString();
-                  final fmt = DateFormat.yMMMd(locale).add_Hm();
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                    child: Card(
-                      color: cs.surfaceContainerHighest.withValues(alpha: 0.2),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Padding(
-                              padding:
-                                  const EdgeInsets.only(left: 12, top: 8, right: 12),
-                              child: Text(
-                                'Zadnji AI uvidi (ovaj period)',
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            SizedBox(
-                              height: (56 * list.length).clamp(56, 240).toDouble(),
-                              child: ListView.builder(
-                                padding: EdgeInsets.zero,
-                                itemCount: list.length,
-                                itemBuilder: (ctx, i) {
-                                  final e = list[i];
-                                  final when = e.createdAt != null
-                                      ? fmt.format(e.createdAt!.toLocal())
-                                      : '—';
-                                  return ListTile(
-                                    dense: true,
-                                    leading: const Icon(
-                                      Icons.history_edu_outlined,
-                                      size: 22,
-                                    ),
-                                    title: Text(
-                                      when,
-                                      style: theme.textTheme.bodyMedium,
-                                    ),
-                                    subtitle: Text(
-                                      '${e.insightKind == FinanceAiInsightService.insightKindWatchlist ? 'Lista za praćenje' : 'Analiza'}'
-                                      '${e.sourceTrigger == 'scheduled_nightly' ? ' · noćni' : ''} · '
-                                      '${e.analysisFocus ?? 'Opći uvid (bez dodatnog fokusa)'}',
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    onTap: () => _showInsightMarkdownDialog(
-                                      context,
-                                      markdown: e.analysisMarkdown,
-                                      title: 'AI uvid · $when',
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
+                const SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        rateNoteShort,
+                        style: theme.textTheme.bodySmall,
                       ),
                     ),
-                  );
-                },
-              ),
-            Expanded(
-              child: StreamBuilder<FinanceKpiSnapshotModel?>(
-                stream: svc.watchSnapshot(
-                  companyId: _companyId,
-                  businessYearId: widget.businessYearId.trim(),
-                  periodYear: widget.periodYear,
-                  periodMonth: widget.periodMonth,
-                  plantKey: widget.plantKey.trim(),
+                    FinanceScreenContextInfo(
+                      title: 'Zastoj u novcu',
+                      body: rateNoteDetail,
+                    ),
+                  ],
                 ),
-                builder: (context, snap) {
-                  if (snap.hasError) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                financeUserFacingLoadError(snap.error),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: cs.error),
-                              ),
-                            ),
-                            FinanceTechnicalInfoIcon(
-                              detail: '${snap.error}',
-                            ),
-                          ],
-                        ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _KpiCard(
+                      title: 'Prihod',
+                      value: _formatMoney(
+                        m.revenue,
+                        snapBase,
+                        def,
+                        locale,
                       ),
-                    );
-                  }
-                  if (snap.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  final m = snap.data;
-                  final locale = Localizations.localeOf(context).toString();
-
-                  if (m == null) {
-                    return ListView(
-                      padding: const EdgeInsets.all(20),
-                      children: [
-                        _financeDefaultsCard(
-                          context: context,
-                          def: def,
-                          theme: theme,
-                          cs: cs,
-                          selectedPlantKey: widget.plantKey.trim(),
-                        ),
-                        const SizedBox(height: 12),
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    'Za ovaj period još nema spremljenog sažetka.',
-                                    style: theme.textTheme.bodyMedium,
-                                  ),
-                                ),
-                                FinanceScreenContextInfo(
-                                  title: 'Kada se podaci pojave',
-                                  body:
-                                      'Koristite gumb „Preračunaj KPI” iznad ili pričekajte '
-                                      'automatski noćni proračun. Potrebni su operativni podaci '
-                                      '(npr. zastoji) i postavke valute/satnice u postavkama kompanije.',
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  }
-
-                  final snapBase = m.canonicalBaseCurrency;
-                  final mhr = m.effectiveMachineHourlyRate;
-                  final rateNoteShort = mhr == null
-                      ? 'Satnica za proračun zastoja nije postavljena.'
-                      : 'Zastoj: ${m.downtimeOeeMinutes} min × $mhr $snapBase/h.';
-                  final rateNoteDetail = mhr == null
-                      ? 'U postavkama kompanije uneste satnicu radnog sata u baznoj valuti. '
-                          'Bez toga novčani iznos gubitka zastoja ostaje nula; minute se i dalje prikazuju.'
-                      : 'Procjena temelji se na OEE minutama zastoja i postavljenoj satnici. '
-                          'Za prikaz u drugoj valuti koriste se postavljene vrijednosti tečaja kad su dostupne.';
-
-                  final displayShort = snapBase == def.displayCurrency
-                      ? 'Iznosi u valuti $snapBase.'
-                      : 'Valuta proračuna: $snapBase · prikaz: ${def.displayCurrency}.';
-                  final displayDetail = snapBase == def.displayCurrency
-                      ? 'Svi iznosi u ovom sažetku čitaju se u istoj valuti.'
-                      : 'Sažetak se interno vodi u baznoj valuti; na ekranu se iznosi mogu pokazati u valuti prikaza '
-                          'prema postavkama i dostupnim tečajevima.';
-
-                  return ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      _financeDefaultsCard(
-                        context: context,
-                        def: def,
-                        theme: theme,
-                        cs: cs,
-                        selectedPlantKey: widget.plantKey.trim(),
+                      icon: Icons.trending_up_outlined,
+                      subtitle: m.orderProfitabilityAvailable || m.revenue > 0
+                          ? null
+                          : 'Prihod nije dostupan za prikaz.',
+                    ),
+                    _KpiCard(
+                      title: 'Ukupni trošak',
+                      value: _formatMoney(
+                        m.totalCost,
+                        snapBase,
+                        def,
+                        locale,
                       ),
-                      const SizedBox(height: 12),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Sažetak · ${widget.periodYear} / ${widget.periodMonth}',
-                              style: theme.textTheme.titleMedium,
-                            ),
-                          ),
-                          FinanceScreenContextInfo(
-                            title: 'Valuta i prikaz',
-                            body: '$displayShort\n\n$displayDetail',
-                          ),
-                        ],
+                      icon: Icons.account_balance_wallet_outlined,
+                    ),
+                    _KpiCard(
+                      title: 'Bruto marža',
+                      value: _formatMoney(
+                        m.grossMargin,
+                        snapBase,
+                        def,
+                        locale,
                       ),
-                      const SizedBox(height: 6),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              rateNoteShort,
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          ),
-                          FinanceScreenContextInfo(
-                            title: 'Zastoj u novcu',
-                            body: rateNoteDetail,
-                          ),
-                        ],
+                      icon: Icons.pie_chart_outline,
+                    ),
+                    _KpiCard(
+                      title: 'Trošak scrappa',
+                      value: _formatMoney(
+                        m.scrapCost,
+                        snapBase,
+                        def,
+                        locale,
                       ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          _KpiCard(
-                            title: 'Prihod',
-                            value: _formatMoney(
-                              m.revenue,
-                              snapBase,
-                              def,
-                              locale,
-                            ),
-                            icon: Icons.trending_up_outlined,
-                            subtitle: m.orderProfitabilityAvailable || m.revenue > 0
-                                ? null
-                                : 'Prihod nije dostupan za prikaz.',
-                          ),
-                          _KpiCard(
-                            title: 'Ukupni trošak',
-                            value: _formatMoney(
-                              m.totalCost,
-                              snapBase,
-                              def,
-                              locale,
-                            ),
-                            icon: Icons.account_balance_wallet_outlined,
-                          ),
-                          _KpiCard(
-                            title: 'Bruto marža',
-                            value: _formatMoney(
-                              m.grossMargin,
-                              snapBase,
-                              def,
-                              locale,
-                            ),
-                            icon: Icons.pie_chart_outline,
-                          ),
-                          _KpiCard(
-                            title: 'Trošak scrappa',
-                            value: _formatMoney(
-                              m.scrapCost,
-                              snapBase,
-                              def,
-                              locale,
-                            ),
-                            icon: Icons.recycling_outlined,
-                          ),
-                          _KpiCard(
-                            title: 'Gubitak zastoja',
-                            value: _formatMoney(
-                              m.downtimeLoss,
-                              snapBase,
-                              def,
-                              locale,
-                            ),
-                            icon: Icons.timer_off_outlined,
-                          ),
-                          _KpiCard(
-                            title: 'Održavanje',
-                            value: _formatMoney(
-                              m.maintenanceCost,
-                              snapBase,
-                              def,
-                              locale,
-                            ),
-                            icon: Icons.build_circle_outlined,
-                          ),
-                          _KpiCard(
-                            title: 'Energija',
-                            value: _formatMoney(
-                              m.energyCost,
-                              snapBase,
-                              def,
-                              locale,
-                            ),
-                            icon: Icons.bolt_outlined,
-                          ),
-                          _KpiCard(
-                            title: 'Trošak po komadu',
-                            value: _formatMoney(
-                              m.costPerProduct,
-                              snapBase,
-                              def,
-                              locale,
-                            ),
-                            icon: Icons.inventory_2_outlined,
-                          ),
-                        ],
+                      icon: Icons.recycling_outlined,
+                    ),
+                    _KpiCard(
+                      title: 'Gubitak zastoja',
+                      value: _formatMoney(
+                        m.downtimeLoss,
+                        snapBase,
+                        def,
+                        locale,
                       ),
-                      if (m.scrapCost > 0 ||
-                          m.maintenanceCost > 0 ||
-                          m.copqQualityNcrClosedCount > 0 ||
-                          m.maintenanceClosedFaultCount > 0)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 10),
-                          child: Text(
-                            'COPQ / održavanje (izvor): škart ${m.copqProductionScrapQty.toStringAsFixed(0)} kom · '
-                            'rework ${m.copqProductionReworkQty.toStringAsFixed(0)} kom · '
-                            'NCR zatvoreno ${m.copqQualityNcrClosedCount} · '
-                            'kvarovi zatvoreni ${m.maintenanceClosedFaultCount}',
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ],
+                      icon: Icons.timer_off_outlined,
+                    ),
+                    _KpiCard(
+                      title: 'Održavanje',
+                      value: _formatMoney(
+                        m.maintenanceCost,
+                        snapBase,
+                        def,
+                        locale,
+                      ),
+                      icon: Icons.build_circle_outlined,
+                    ),
+                    _KpiCard(
+                      title: 'Energija',
+                      value: _formatMoney(
+                        m.energyCost,
+                        snapBase,
+                        def,
+                        locale,
+                      ),
+                      icon: Icons.bolt_outlined,
+                    ),
+                    _KpiCard(
+                      title: 'Trošak po komadu',
+                      value: _formatMoney(
+                        m.costPerProduct,
+                        snapBase,
+                        def,
+                        locale,
+                      ),
+                      icon: Icons.inventory_2_outlined,
+                    ),
+                  ],
+                ),
+                if (m.scrapCost > 0 ||
+                    m.maintenanceCost > 0 ||
+                    m.copqQualityNcrClosedCount > 0 ||
+                    m.maintenanceClosedFaultCount > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Text(
+                      'COPQ / održavanje (izvor): škart ${m.copqProductionScrapQty.toStringAsFixed(0)} kom · '
+                      'rework ${m.copqProductionReworkQty.toStringAsFixed(0)} kom · '
+                      'NCR zatvoreno ${m.copqQualityNcrClosedCount} · '
+                      'kvarovi zatvoreni ${m.maintenanceClosedFaultCount}',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+              ],
+            );
+          },
         );
       },
     );

@@ -14,6 +14,7 @@ import '../models/finance_kpi_snapshot_model.dart';
 import '../services/finance_ai_company_memory_service.dart';
 import '../services/finance_ai_insight_service.dart';
 import '../services/finance_ai_insights_list_service.dart';
+import '../services/finance_controlling_period_read_service.dart';
 import '../services/finance_kpi_snapshot_service.dart';
 import '../utils/finance_load_error_presenter.dart';
 import '../utils/finance_permissions.dart';
@@ -51,6 +52,194 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
 
   bool _runningWatch = false;
   bool _runningAnalysis = false;
+
+  bool _panelLoading = true;
+  String? _panelLoadError;
+  String _periodHeaderLine = '';
+  FinanceAiCompanyMemoryDoc? _memoryDoc;
+  FinanceKpiSnapshotModel? _kpiSnapshot;
+  List<FinanceAiInsightDoc> _recentInsights = const [];
+  String _assistantPlantKey = '';
+
+  String get _profilePlantKey =>
+      (widget.companyData['plantKey'] ?? '').toString().trim();
+
+  bool get _canPickPlantScope => FinancePermissions.shouldUseHubPlantScopeSelector(
+        role: _role,
+        profilePlantKey: _profilePlantKey,
+      );
+
+  void _seedAssistantPlantKey() {
+    if (_canPickPlantScope) {
+      _assistantPlantKey = widget.plantKey.trim();
+    } else if (_profilePlantKey.isNotEmpty) {
+      _assistantPlantKey = widget.plantKey.trim();
+    } else {
+      _assistantPlantKey = _profilePlantKey;
+    }
+  }
+
+  void _onAssistantPlantScopeChanged(String plantKey) {
+    final next = plantKey.trim();
+    if (next == _assistantPlantKey) return;
+    setState(() => _assistantPlantKey = next);
+    _loadPanelData();
+    _refreshNotificationBadge();
+  }
+
+  String get _effectivePlantKey => _assistantPlantKey.trim();
+
+  @override
+  void initState() {
+    super.initState();
+    _seedAssistantPlantKey();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadPanelData();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant FinanceAiAssistantScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.businessYearId != widget.businessYearId ||
+        oldWidget.periodYear != widget.periodYear ||
+        oldWidget.periodMonth != widget.periodMonth) {
+      _loadPanelData();
+    }
+  }
+
+  Future<void> _loadPanelData({bool invalidatePeriodCache = false}) async {
+    if (!mounted) return;
+    setState(() {
+      _panelLoading = true;
+      _panelLoadError = null;
+    });
+
+    if (invalidatePeriodCache && _companyId.isNotEmpty) {
+      FinanceControllingPeriodReadService.invalidatePeriod(
+        companyId: _companyId,
+        businessYearId: widget.businessYearId.trim(),
+        periodYear: widget.periodYear,
+        periodMonth: widget.periodMonth,
+        plantKey: _effectivePlantKey,
+      );
+    }
+
+    try {
+      final locale = Localizations.localeOf(context).toString();
+      final periodFmt = DateFormat.yMMMM(locale);
+      final pk = _effectivePlantKey;
+      final periodPart = periodFmt.format(
+        DateTime(widget.periodYear, widget.periodMonth),
+      );
+
+      final memoryFuture = _memorySvc.loadMemory(companyId: _companyId);
+      final kpiFuture = _kpiSvc.loadSnapshot(
+        companyId: _companyId,
+        businessYearId: widget.businessYearId.trim(),
+        periodYear: widget.periodYear,
+        periodMonth: widget.periodMonth,
+        plantKey: pk,
+      );
+      final insightsFuture = _insightsList.loadRecentForPeriod(
+        companyId: _companyId,
+        businessYearId: widget.businessYearId.trim(),
+        periodYear: widget.periodYear,
+        periodMonth: widget.periodMonth,
+        plantKey: pk,
+        limit: 8,
+      );
+      final plantLabelFuture = pk.isEmpty
+          ? Future<String>.value('')
+          : CompanyPlantDisplayName.resolve(
+              companyId: _companyId,
+              plantKey: pk,
+            );
+
+      final results = await Future.wait<Object?>([
+        memoryFuture,
+        kpiFuture,
+        insightsFuture,
+        plantLabelFuture,
+      ]);
+
+      if (!mounted) return;
+
+      final plantLabel = results[3] as String? ?? '';
+      final plantLine = pk.isEmpty
+          ? 'svi pogoni (zbroj)'
+          : 'pogon: ${plantLabel.isNotEmpty ? plantLabel : pk}';
+
+      setState(() {
+        _periodHeaderLine = '$periodPart · $plantLine';
+        _memoryDoc = results[0] as FinanceAiCompanyMemoryDoc?;
+        _kpiSnapshot = results[1] as FinanceKpiSnapshotModel?;
+        _recentInsights = (results[2] as List<FinanceAiInsightDoc>?) ?? const [];
+        _panelLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _panelLoadError = financeUserFacingLoadError(e);
+        _panelLoading = false;
+      });
+    }
+  }
+
+  Future<void> _reloadMemoryOnly() async {
+    try {
+      final memory = await _memorySvc.loadMemory(companyId: _companyId);
+      if (!mounted) return;
+      setState(() => _memoryDoc = memory);
+    } catch (_) {
+      // Ostavi postojeći prikaz; korisnik već ima snackbar iz akcije.
+    }
+  }
+
+  Future<void> _reloadInsightsOnly() async {
+    if (_companyId.isEmpty) return;
+    FinanceControllingPeriodReadService.invalidatePeriod(
+      companyId: _companyId,
+      businessYearId: widget.businessYearId.trim(),
+      periodYear: widget.periodYear,
+      periodMonth: widget.periodMonth,
+      plantKey: _effectivePlantKey,
+    );
+    try {
+      final pk = _effectivePlantKey;
+      final results = await Future.wait<Object?>([
+        _kpiSvc.loadSnapshot(
+          companyId: _companyId,
+          businessYearId: widget.businessYearId.trim(),
+          periodYear: widget.periodYear,
+          periodMonth: widget.periodMonth,
+          plantKey: pk,
+        ),
+        _insightsList.loadRecentForPeriod(
+          companyId: _companyId,
+          businessYearId: widget.businessYearId.trim(),
+          periodYear: widget.periodYear,
+          periodMonth: widget.periodMonth,
+          plantKey: pk,
+          limit: 8,
+        ),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _kpiSnapshot = results[0] as FinanceKpiSnapshotModel?;
+        _recentInsights =
+            (results[1] as List<FinanceAiInsightDoc>?) ?? const [];
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(financeUserFacingLoadError(e)),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
+  }
 
   @override
   void dispose() {
@@ -127,7 +316,7 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
         businessYearId: widget.businessYearId.trim(),
         periodYear: widget.periodYear,
         periodMonth: widget.periodMonth,
-        plantKey: widget.plantKey.trim(),
+        plantKey: _effectivePlantKey,
         insightKind: FinanceAiInsightService.insightKindWatchlist,
       );
       if (!context.mounted) return;
@@ -136,6 +325,7 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
         markdown: r.markdown,
         title: 'AI — signalni pregled',
       );
+      _reloadInsightsOnly();
     } on FirebaseFunctionsException catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -204,7 +394,7 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
         businessYearId: widget.businessYearId.trim(),
         periodYear: widget.periodYear,
         periodMonth: widget.periodMonth,
-        plantKey: widget.plantKey.trim(),
+        plantKey: _effectivePlantKey,
         analysisFocus: focus,
         insightKind: FinanceAiInsightService.insightKindAnalysis,
       );
@@ -214,6 +404,7 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
         markdown: r.markdown,
         title: 'AI — analiza',
       );
+      _reloadInsightsOnly();
     } on FirebaseFunctionsException catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -299,6 +490,7 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('AI kontekst kompanije je spremljen.')),
       );
+      _reloadMemoryOnly();
     } on FirebaseFunctionsException catch (e) {
       ctrl.dispose();
       if (!context.mounted) return;
@@ -379,12 +571,303 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
     return out;
   }
 
+  List<Widget> _buildScrollChildren(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme cs,
+    String locale,
+  ) {
+    final children = <Widget>[];
+
+    if (_periodHeaderLine.isNotEmpty) {
+      children.add(
+        Text(
+          _periodHeaderLine,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    } else if (_panelLoading) {
+      children.add(
+        Text(
+          DateFormat.yMMMM(locale).format(
+            DateTime(widget.periodYear, widget.periodMonth),
+          ),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+
+    children.add(const SizedBox(height: 12));
+    children.add(_buildMemoryCard(context, theme, cs));
+    children.addAll(_buildAdvisorySections(context));
+    children.addAll(_buildControllingSections(context, theme, cs, locale));
+    return children;
+  }
+
+  Widget _buildMemoryCard(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme cs,
+  ) {
+    final m = _memoryDoc;
+    final hasCtx = (m?.assistantContext ?? '').trim().isNotEmpty;
+    return Card(
+      color: cs.surfaceContainerHighest.withValues(alpha: 0.25),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.psychology_outlined,
+                  color: cs.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    hasCtx
+                        ? 'Memorija kompanije aktivna (kontekst za svaki AI poziv).'
+                        : 'Još nema spremljenog poslovnog konteksta za AI.',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+            if (hasCtx) ...[
+              const SizedBox(height: 8),
+              Text(
+                m!.assistantContext.trim(),
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
+            if (_canEditMemory) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => _editMemoryDialog(context, m),
+                  icon: const Icon(Icons.edit_note_outlined),
+                  label: Text(
+                    hasCtx ? 'Uredi kontekst' : 'Dodaj kontekst',
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildAdvisorySections(BuildContext context) {
+    if (!_canViewAdvisory) return const [];
+    return [
+      const SizedBox(height: 16),
+      FinanceAiAlertsPanel(
+        key: const ValueKey('finance-ai-alerts-panel'),
+        companyData: widget.companyData,
+        businessYearId: widget.businessYearId.trim(),
+        plantScopeKey: _assistantPlantKey,
+        onPlantScopeChanged: _canPickPlantScope ? _onAssistantPlantScopeChanged : null,
+        debugUnlockModule: widget.debugUnlockModule,
+        onAlertsChanged: _refreshNotificationBadge,
+      ),
+      const SizedBox(height: 20),
+      const Divider(height: 1),
+      const SizedBox(height: 12),
+      FinanceAiNotificationInboxPanel(
+        key: const ValueKey('finance-ai-inbox-panel'),
+        companyData: widget.companyData,
+        plantScopeKey: _assistantPlantKey,
+        onPlantScopeChanged: _canPickPlantScope ? _onAssistantPlantScopeChanged : null,
+        debugUnlockModule: widget.debugUnlockModule,
+        refreshListenable: _notificationRefresh,
+        onDeliveryChanged: _refreshNotificationBadge,
+      ),
+    ];
+  }
+
+  List<Widget> _buildControllingSections(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme cs,
+    String locale,
+  ) {
+    if (!_canAi) return const [];
+
+    final children = <Widget>[
+      if (_canViewAdvisory) ...[
+        const SizedBox(height: 20),
+        const Divider(height: 1),
+        const SizedBox(height: 12),
+      ] else
+        const SizedBox(height: 12),
+      Text(
+        FinanceStrings.t(context, 'advisory_controlling_section_title'),
+        style: theme.textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      const SizedBox(height: 12),
+    ];
+
+    if (_panelLoading && _kpiSnapshot == null) {
+      children.add(const LinearProgressIndicator(minHeight: 2));
+    } else {
+      final chips = _signalsFromKpi(_kpiSnapshot);
+      children.add(
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Brzi numerički signali (iz sažetka)',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ...chips.map(
+                  (c) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          c.icon,
+                          size: 20,
+                          color: c.emphasis ? cs.error : cs.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(c.text)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    children.addAll([
+      const SizedBox(height: 12),
+      Text(
+        'AI radnje',
+        style: theme.textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      const SizedBox(height: 8),
+      FilledButton.icon(
+        onPressed: (_runningWatch || _runningAnalysis)
+            ? null
+            : () => _runWatchlist(context),
+        icon: _runningWatch
+            ? SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: cs.onPrimary,
+                ),
+              )
+            : const Icon(Icons.shield_moon_outlined),
+        label: Text(
+          _runningWatch ? 'Signalni pregled…' : 'Signalni pregled (brza lista)',
+        ),
+      ),
+      const SizedBox(height: 8),
+      FilledButton.tonalIcon(
+        onPressed: (_runningWatch || _runningAnalysis)
+            ? null
+            : () => _runAnalysis(context),
+        icon: _runningAnalysis
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.auto_awesome_outlined),
+        label: Text(_runningAnalysis ? 'Analiza…' : 'Dubinska analiza'),
+      ),
+      const SizedBox(height: 20),
+      Text(
+        'Zadnji zapisi u ovom periodu',
+        style: theme.textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      const SizedBox(height: 8),
+    ]);
+
+    if (_panelLoading && _recentInsights.isEmpty) {
+      children.add(const LinearProgressIndicator(minHeight: 2));
+    } else if (_recentInsights.isEmpty) {
+      children.add(
+        Text(
+          'Još nema AI zapisa za ovaj period.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: cs.onSurfaceVariant,
+          ),
+        ),
+      );
+    } else {
+      final df = DateFormat.yMMMd(locale).add_Hm();
+      children.addAll(
+        _recentInsights.map((e) {
+          final when = e.createdAt != null
+              ? df.format(e.createdAt!.toLocal())
+              : '—';
+          final kindLabel =
+              e.insightKind == FinanceAiInsightService.insightKindWatchlist
+                  ? 'Lista za praćenje'
+                  : 'Analiza';
+          final sched =
+              e.sourceTrigger == 'scheduled_nightly' ? ' · noćni' : '';
+          return Card(
+            margin: const EdgeInsets.only(bottom: 6),
+            child: ListTile(
+              dense: true,
+              title: Text(when),
+              subtitle: Text(
+                e.analysisFocus != null && e.analysisFocus!.trim().isNotEmpty
+                    ? '${e.analysisFocus} · $kindLabel$sched'
+                    : '$kindLabel$sched',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _showMarkdown(
+                context,
+                markdown: e.analysisMarkdown,
+                title: 'AI zapis — $when',
+              ),
+            ),
+          );
+        }),
+      );
+    }
+
+    return children;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final locale = Localizations.localeOf(context).toString();
-    final periodFmt = DateFormat.yMMMM(locale);
 
     if (!_canAi && !_canViewAdvisory) {
       return Scaffold(
@@ -428,7 +911,7 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
               FinanceAiNotificationBadge(
                 companyId: _companyId,
                 companyData: widget.companyData,
-                plantKey: widget.plantKey.trim(),
+                plantKey: _effectivePlantKey,
                 refreshListenable: _notificationRefresh,
                 debugUnlockModule: widget.debugUnlockModule,
               ),
@@ -447,298 +930,42 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          FutureBuilder<String>(
-            future: widget.plantKey.trim().isEmpty
-                ? Future<String>.value('')
-                : CompanyPlantDisplayName.resolve(
-                    companyId: _companyId,
-                    plantKey: widget.plantKey.trim(),
-                  ),
-            builder: (context, plantSnap) {
-              final pk = widget.plantKey.trim();
-              final plantLine = pk.isEmpty
-                  ? 'svi pogoni (zbroj)'
-                  : 'pogon: ${plantSnap.connectionState == ConnectionState.waiting ? '…' : (plantSnap.data != null && plantSnap.data!.isNotEmpty ? plantSnap.data! : pk)}';
-              return Text(
-                '${periodFmt.format(DateTime(widget.periodYear, widget.periodMonth))} · '
-                '$plantLine',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          StreamBuilder<FinanceAiCompanyMemoryDoc?>(
-            stream: _memorySvc.watchMemory(companyId: _companyId),
-            builder: (context, memSnap) {
-              final m = memSnap.data;
-              final hasCtx = (m?.assistantContext ?? '').trim().isNotEmpty;
-              return Card(
-                color: cs.surfaceContainerHighest.withValues(alpha: 0.25),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.psychology_outlined,
-                            color: cs.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              hasCtx
-                                  ? 'Memorija kompanije aktivna (kontekst za svaki AI poziv).'
-                                  : 'Još nema spremljenog poslovnog konteksta za AI.',
-                              style: theme.textTheme.bodyMedium,
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (hasCtx) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          m!.assistantContext.trim(),
-                          maxLines: 4,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                      if (_canEditMemory) ...[
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton.icon(
-                            onPressed: () => _editMemoryDialog(context, m),
-                            icon: const Icon(Icons.edit_note_outlined),
-                            label: Text(
-                              hasCtx ? 'Uredi kontekst' : 'Dodaj kontekst',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-          if (_canViewAdvisory) ...[
-            const SizedBox(height: 16),
-            FinanceAiAlertsPanel(
-              companyData: widget.companyData,
-              businessYearId: widget.businessYearId.trim(),
-              sessionPlantKey: widget.plantKey.trim(),
-              debugUnlockModule: widget.debugUnlockModule,
-              onAlertsChanged: _refreshNotificationBadge,
+      body: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          if (_panelLoading && _periodHeaderLine.isEmpty)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: LinearProgressIndicator(minHeight: 2),
+              ),
             ),
-            const SizedBox(height: 20),
-            const Divider(height: 1),
-            const SizedBox(height: 12),
-            FinanceAiNotificationInboxPanel(
-              companyData: widget.companyData,
-              sessionPlantKey: widget.plantKey.trim(),
-              debugUnlockModule: widget.debugUnlockModule,
-              refreshListenable: _notificationRefresh,
-              onDeliveryChanged: _refreshNotificationBadge,
-            ),
-          ],
-          if (_canViewAdvisory && _canAi) ...[
-            const SizedBox(height: 20),
-            const Divider(height: 1),
-            const SizedBox(height: 12),
-          ],
-          if (_canAi) ...[
-          const SizedBox(height: 12),
-          Text(
-            FinanceStrings.t(context, 'advisory_controlling_section_title'),
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 12),
-          StreamBuilder<FinanceKpiSnapshotModel?>(
-            stream: _kpiSvc.watchSnapshot(
-              companyId: _companyId,
-              businessYearId: widget.businessYearId.trim(),
-              periodYear: widget.periodYear,
-              periodMonth: widget.periodMonth,
-              plantKey: widget.plantKey.trim(),
-            ),
-            builder: (context, kpiSnap) {
-              final chips = _signalsFromKpi(kpiSnap.data);
-              return Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Brzi numerički signali (iz sažetka)',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      ...chips.map(
-                        (c) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Icon(
-                                c.icon,
-                                size: 20,
-                                color: c.emphasis
-                                    ? cs.error
-                                    : cs.onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(child: Text(c.text)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'AI radnje',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: (_runningWatch || _runningAnalysis)
-                ? null
-                : () => _runWatchlist(context),
-            icon: _runningWatch
-                ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: cs.onPrimary,
-                    ),
-                  )
-                : const Icon(Icons.shield_moon_outlined),
-            label: Text(_runningWatch ? 'Signalni pregled…' : 'Signalni pregled (brza lista)'),
-          ),
-          const SizedBox(height: 8),
-          FilledButton.tonalIcon(
-            onPressed: (_runningWatch || _runningAnalysis)
-                ? null
-                : () => _runAnalysis(context),
-            icon: _runningAnalysis
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.auto_awesome_outlined),
-            label: Text(_runningAnalysis ? 'Analiza…' : 'Dubinska analiza'),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'Zadnji zapisi u ovom periodu',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          StreamBuilder<List<FinanceAiInsightDoc>>(
-            stream: _insightsList.watchRecentForPeriod(
-              companyId: _companyId,
-              businessYearId: widget.businessYearId.trim(),
-              periodYear: widget.periodYear,
-              periodMonth: widget.periodMonth,
-              plantKey: widget.plantKey.trim(),
-              limit: 8,
-            ),
-            builder: (context, hist) {
-              if (hist.hasError) {
-                final msg = financeUserFacingLoadError(hist.error);
-                final raw = '${hist.error}'.trim();
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        msg,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: cs.error,
-                        ),
+          if (_panelLoadError != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Card(
+                  color: cs.errorContainer.withValues(alpha: 0.35),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      _panelLoadError!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.error,
                       ),
                     ),
-                    if (raw.isNotEmpty)
-                      FinanceTechnicalInfoIcon(
-                        detail: raw,
-                        dialogTitle: 'Tehnički detalj',
-                      ),
-                  ],
-                );
-              }
-              final list = hist.data;
-              if (list == null) {
-                return const LinearProgressIndicator(minHeight: 2);
-              }
-              if (list.isEmpty) {
-                return Text(
-                  'Još nema AI zapisa za ovaj period.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
                   ),
-                );
-              }
-              final df = DateFormat.yMMMd(locale).add_Hm();
-              return Column(
-                children: list.map((e) {
-                  final when = e.createdAt != null
-                      ? df.format(e.createdAt!.toLocal())
-                      : '—';
-                  final kindLabel =
-                      e.insightKind == FinanceAiInsightService.insightKindWatchlist
-                          ? 'Lista za praćenje'
-                          : 'Analiza';
-                  final sched =
-                      e.sourceTrigger == 'scheduled_nightly' ? ' · noćni' : '';
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 6),
-                    child: ListTile(
-                      dense: true,
-                      title: Text(when),
-                      subtitle: Text(
-                        e.analysisFocus != null &&
-                                e.analysisFocus!.trim().isNotEmpty
-                            ? '${e.analysisFocus} · $kindLabel$sched'
-                            : '$kindLabel$sched',
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => _showMarkdown(
-                        context,
-                        markdown: e.analysisMarkdown,
-                        title: 'AI zapis — $when',
-                      ),
-                    ),
-                  );
-                }).toList(),
-              );
-            },
+                ),
+              ),
+            ),
+          SliverPadding(
+            padding: const EdgeInsets.all(16),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate(
+                _buildScrollChildren(context, theme, cs, locale),
+              ),
+            ),
           ),
-          ],
         ],
       ),
     );

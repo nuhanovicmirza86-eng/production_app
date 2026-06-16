@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/company_plant_display_name.dart';
 import '../../shared/finance_display_labels.dart';
+import '../../shared/finance_error_mapper.dart';
 import '../../shared/finance_strings.dart';
 import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../models/finance_ai_notification_delivery.dart';
@@ -16,14 +17,16 @@ class FinanceAiNotificationInboxPanel extends StatefulWidget {
   const FinanceAiNotificationInboxPanel({
     super.key,
     required this.companyData,
-    this.sessionPlantKey = '',
+    required this.plantScopeKey,
+    this.onPlantScopeChanged,
     this.debugUnlockModule = false,
     this.refreshListenable,
     this.onDeliveryChanged,
   });
 
   final Map<String, dynamic> companyData;
-  final String sessionPlantKey;
+  final String plantScopeKey;
+  final ValueChanged<String>? onPlantScopeChanged;
   final bool debugUnlockModule;
   final Listenable? refreshListenable;
   final VoidCallback? onDeliveryChanged;
@@ -40,11 +43,11 @@ class _FinanceAiNotificationInboxPanelState
   bool _showHistory = false;
   bool _unreadOnly = false;
   String? _severityMin;
-  String _filterPlantKey = '';
   bool _loading = false;
   String? _error;
   List<FinanceAiNotificationDelivery> _allDeliveries = const [];
   Map<String, String> _plantLabels = const {};
+  bool _externalRefreshQueued = false;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -68,10 +71,6 @@ class _FinanceAiNotificationInboxPanelState
   @override
   void initState() {
     super.initState();
-    _filterPlantKey = widget.sessionPlantKey.trim();
-    if (!_canPickPlant && _profilePlantKey.isNotEmpty) {
-      _filterPlantKey = _profilePlantKey;
-    }
     widget.refreshListenable?.addListener(_onExternalRefresh);
     _loadDeliveries();
   }
@@ -83,6 +82,9 @@ class _FinanceAiNotificationInboxPanelState
       oldWidget.refreshListenable?.removeListener(_onExternalRefresh);
       widget.refreshListenable?.addListener(_onExternalRefresh);
     }
+    if (oldWidget.plantScopeKey != widget.plantScopeKey) {
+      _loadDeliveries();
+    }
   }
 
   @override
@@ -92,7 +94,12 @@ class _FinanceAiNotificationInboxPanelState
   }
 
   void _onExternalRefresh() {
-    _loadDeliveries();
+    if (_externalRefreshQueued || _loading) return;
+    _externalRefreshQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _externalRefreshQueued = false;
+      if (mounted) _loadDeliveries();
+    });
   }
 
   List<String> get _statusFilter {
@@ -131,7 +138,9 @@ class _FinanceAiNotificationInboxPanelState
       final list = await _svc.listDeliveries(
         companyId: _companyId,
         status: _statusFilter,
-        plantKey: _filterPlantKey.trim().isEmpty ? null : _filterPlantKey.trim(),
+        plantKey: widget.plantScopeKey.trim().isEmpty
+            ? null
+            : widget.plantScopeKey.trim(),
       );
       await _resolvePlantLabels(list);
       if (!mounted) return;
@@ -143,7 +152,7 @@ class _FinanceAiNotificationInboxPanelState
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = FinanceErrorMapper.toMessage(e, context: context);
       });
     }
   }
@@ -182,7 +191,6 @@ class _FinanceAiNotificationInboxPanelState
 
   void _notifyChanged() {
     _loadDeliveries();
-    widget.onDeliveryChanged?.call();
   }
 
   @override
@@ -207,7 +215,7 @@ class _FinanceAiNotificationInboxPanelState
             FinanceAiNotificationSectionBadge(
               companyId: _companyId,
               companyData: widget.companyData,
-              plantKey: _filterPlantKey,
+              plantKey: widget.plantScopeKey,
               refreshListenable: widget.refreshListenable,
               debugUnlockModule: widget.debugUnlockModule,
             ),
@@ -219,14 +227,11 @@ class _FinanceAiNotificationInboxPanelState
           companyData: widget.companyData,
           role: _role,
           profilePlantKey: _profilePlantKey,
-          filterPlantKey: _filterPlantKey,
+          filterPlantKey: widget.plantScopeKey,
           showHistory: _showHistory,
           unreadOnly: _unreadOnly,
           severityMin: _severityMin,
-          onPlantChanged: (v) {
-            setState(() => _filterPlantKey = v);
-            _notifyChanged();
-          },
+          onPlantChanged: widget.onPlantScopeChanged ?? (_) {},
           onHistoryChanged: (v) {
             setState(() => _showHistory = v);
             _loadDeliveries();
@@ -244,7 +249,7 @@ class _FinanceAiNotificationInboxPanelState
           const LinearProgressIndicator(minHeight: 2)
         else if (_error != null)
           Text(
-            FinanceStrings.t(context, 'notification_load_error'),
+            _error!,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.error,
             ),

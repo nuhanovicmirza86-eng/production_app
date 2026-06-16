@@ -380,6 +380,52 @@ class _PeriodHeader extends StatefulWidget {
 class _PeriodHeaderState extends State<_PeriodHeader> {
   bool _didSuggestFinancialYear = false;
   bool _showFyPickerOverride = false;
+  List<({String plantKey, String label})> _plants = const [];
+  bool _plantsLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPlantsIfNeeded();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PeriodHeader oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.companyId != widget.companyId ||
+        oldWidget.showPlantScopePicker != widget.showPlantScopePicker) {
+      _loadPlantsIfNeeded();
+    }
+  }
+
+  Future<void> _loadPlantsIfNeeded() async {
+    if (!widget.showPlantScopePicker) {
+      if (_plants.isNotEmpty || _plantsLoading) {
+        setState(() {
+          _plants = const [];
+          _plantsLoading = false;
+        });
+      }
+      return;
+    }
+    setState(() => _plantsLoading = true);
+    try {
+      final plants = await CompanyPlantDisplayName.listSelectablePlants(
+        companyId: widget.companyId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _plants = plants;
+        _plantsLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _plants = const [];
+        _plantsLoading = false;
+      });
+    }
+  }
 
   static List<int> _yearChoices() {
     final y = DateTime.now().toLocal().year;
@@ -454,72 +500,62 @@ class _PeriodHeaderState extends State<_PeriodHeader> {
     }
 
     final selected = widget.hubPlantScopeKey.trim();
-    return FutureBuilder<List<({String plantKey, String label})>>(
-      key: ValueKey<String>('fin-plants-${widget.companyId}'),
-      future: CompanyPlantDisplayName.listSelectablePlants(
-        companyId: widget.companyId,
+    if (_plantsLoading) {
+      return Text(
+        'Doseg podataka: učitavanje pogona…',
+        style: muted,
+      );
+    }
+    final items = <DropdownMenuItem<String>>[
+      const DropdownMenuItem(
+        value: '',
+        child: Text('Svi pogoni (cijela tvrtka)'),
       ),
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return Text(
-            'Doseg podataka: učitavanje pogona…',
-            style: muted,
-          );
-        }
-        final plants = snap.data ?? [];
-        final items = <DropdownMenuItem<String>>[
-          const DropdownMenuItem(
-            value: '',
-            child: Text('Svi pogoni (cijela tvrtka)'),
+      ..._plants.map(
+        (p) => DropdownMenuItem(
+          value: p.plantKey,
+          child: Text(p.label),
+        ),
+      ),
+    ];
+    var value = selected;
+    final known = items.any((e) => e.value == value);
+    if (!known && value.isNotEmpty) {
+      items.insert(
+        1,
+        DropdownMenuItem(
+          value: value,
+          child: const Text('Odabrani pogon (provjerite šifarnik)'),
+        ),
+      );
+    }
+    if (!items.any((e) => e.value == value)) {
+      value = '';
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Doseg pogona',
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
           ),
-          ...plants.map(
-            (p) => DropdownMenuItem(
-              value: p.plantKey,
-              child: Text(p.label),
-            ),
+        ),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          decoration: const InputDecoration(
+            isDense: true,
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           ),
-        ];
-        var value = selected;
-        final known = items.any((e) => e.value == value);
-        if (!known && value.isNotEmpty) {
-          items.insert(
-            1,
-            DropdownMenuItem(
-              value: value,
-              child: const Text('Odabrani pogon (provjerite šifarnik)'),
-            ),
-          );
-        }
-        if (!items.any((e) => e.value == value)) {
-          value = '';
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Doseg pogona',
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 6),
-            DropdownButtonFormField<String>(
-              key: ValueKey<String>('fin-scope-$value-${items.length}'),
-              decoration: const InputDecoration(
-                isDense: true,
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              ),
-              initialValue: value,
-              isExpanded: true,
-              items: items,
-              onChanged: (v) {
-                if (v != null) widget.onHubPlantScopeChanged(v);
-              },
-            ),
-          ],
-        );
-      },
+          value: value,
+          isExpanded: true,
+          items: items,
+          onChanged: (v) {
+            if (v != null) widget.onHubPlantScopeChanged(v);
+          },
+        ),
+      ],
     );
   }
 
@@ -659,14 +695,11 @@ class _PeriodHeaderState extends State<_PeriodHeader> {
                       if (!hideFyDropdown) {
                         return [
                           DropdownButtonFormField<String>(
-                            key: ValueKey<String?>(
-                              'fy-$fyValue-${items.length}',
-                            ),
                             decoration: const InputDecoration(
                               labelText: 'Poslovna godina',
                               isDense: true,
                             ),
-                            initialValue: fyValue,
+                            value: fyValue,
                             isExpanded: true,
                             items: items,
                             onChanged: (v) {
@@ -713,15 +746,11 @@ class _PeriodHeaderState extends State<_PeriodHeader> {
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<int>(
-                            key: ValueKey<int>(
-                              widget.periodYear,
-                            ),
                             decoration: const InputDecoration(
                               labelText: 'Godina (kalendarska)',
                               isDense: true,
                             ),
-                            initialValue:
-                                _yearChoices().contains(widget.periodYear)
+                            value: _yearChoices().contains(widget.periodYear)
                                 ? widget.periodYear
                                 : _yearChoices().first,
                             isExpanded: true,
@@ -741,14 +770,11 @@ class _PeriodHeaderState extends State<_PeriodHeader> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: DropdownButtonFormField<int>(
-                            key: ValueKey<int>(
-                              widget.periodMonth,
-                            ),
                             decoration: const InputDecoration(
                               labelText: 'Mjesec',
                               isDense: true,
                             ),
-                            initialValue: widget.periodMonth,
+                            value: widget.periodMonth,
                             isExpanded: true,
                             items: List.generate(12, (i) {
                               final m = i + 1;

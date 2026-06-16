@@ -146,6 +146,12 @@ class _FinanceCashFlowCategoriesScreenState
       appBar: AppBar(
         title: Text(FinanceStrings.t(context, 'categories_title')),
         actions: [
+          if (_canManage)
+            IconButton(
+              tooltip: FinanceStrings.t(context, 'category_new'),
+              icon: const Icon(Icons.add),
+              onPressed: () => _openForm(),
+            ),
           IconButton(
             tooltip: FinanceStrings.t(context, 'refresh'),
             onPressed: _loading ? null : _load,
@@ -153,13 +159,6 @@ class _FinanceCashFlowCategoriesScreenState
           ),
         ],
       ),
-      floatingActionButton: _canManage
-          ? FloatingActionButton.extended(
-              onPressed: () => _openForm(),
-              icon: const Icon(Icons.add),
-              label: Text(FinanceStrings.t(context, 'category_new')),
-            )
-          : null,
       body: Column(
         children: [
           SwitchListTile(
@@ -187,16 +186,10 @@ class _FinanceCashFlowCategoriesScreenState
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_error!, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _load,
-                child: Text(FinanceStrings.t(context, 'refresh')),
-              ),
-            ],
+          child: Text(
+            _error!,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
         ),
       );

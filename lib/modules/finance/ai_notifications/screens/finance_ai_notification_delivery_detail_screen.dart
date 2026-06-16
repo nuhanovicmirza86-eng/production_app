@@ -138,11 +138,16 @@ class _FinanceAiNotificationDeliveryDetailScreenState
   Future<void> _openAlertDetail() async {
     final delivery = _delivery;
     if (delivery == null || delivery.alertId.trim().isEmpty) return;
+    if (_alert == null) {
+      _showError(FinanceStrings.t(context, 'notification_alert_unavailable'));
+      return;
+    }
     final alertChanged = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => FinanceAiAlertDetailScreen(
           companyData: widget.companyData,
           alertId: delivery.alertId,
+          initialAlert: _alert,
           debugUnlockModule: widget.debugUnlockModule,
         ),
       ),
@@ -299,7 +304,7 @@ class _FinanceAiNotificationDeliveryDetailScreenState
                             ),
                           const SizedBox(height: 8),
                           FilledButton.icon(
-                            onPressed: delivery.alertId.trim().isEmpty
+                            onPressed: delivery.alertId.trim().isEmpty || _alert == null
                                 ? null
                                 : _openAlertDetail,
                             icon: const Icon(Icons.open_in_new_outlined),

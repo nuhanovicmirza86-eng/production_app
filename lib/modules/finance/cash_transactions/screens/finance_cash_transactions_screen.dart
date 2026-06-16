@@ -35,6 +35,7 @@ class _FinanceCashTransactionsScreenState
   final _accountsService = FinanceAccountsService();
 
   bool _loading = true;
+  bool _filtersExpanded = true;
   String? _error;
   List<FinanceCashTransaction> _transactions = const [];
   List<FinanceAccount> _accounts = const [];
@@ -102,6 +103,7 @@ class _FinanceCashTransactionsScreenState
       setState(() {
         _transactions = items;
         _loading = false;
+        _filtersExpanded = false;
       });
     } catch (e) {
       if (!mounted) return;
@@ -119,6 +121,38 @@ class _FinanceCashTransactionsScreenState
       }
     }
     return accountId;
+  }
+
+  String _formatDate(DateTime d) {
+    return DateFormat.yMMMd(Localizations.localeOf(context).languageCode)
+        .format(d);
+  }
+
+  String _filterLabel(String? code, String Function(String) labelFor) {
+    if (code == null || code.isEmpty) {
+      return FinanceStrings.t(context, 'filter_all');
+    }
+    return labelFor(code);
+  }
+
+  Widget _dropdownText(String text) {
+    return Text(text, overflow: TextOverflow.ellipsis);
+  }
+
+  String _filtersSubtitle() {
+    final period = '${_formatDate(_dateFrom)} – ${_formatDate(_dateTo)}';
+    final status = _filterLabel(
+      _statusFilter,
+      (code) => FinanceDisplayLabels.transactionStatus(context, code),
+    );
+    final account = _accountFilter == null
+        ? FinanceStrings.t(context, 'filter_all_accounts')
+        : _accountLabel(_accountFilter!);
+    final direction = _filterLabel(
+      _directionFilter,
+      (code) => FinanceDisplayLabels.transactionDirection(context, code),
+    );
+    return '$period · $status · $account · $direction';
   }
 
   Future<void> _openForm() async {
@@ -165,6 +199,12 @@ class _FinanceCashTransactionsScreenState
       appBar: AppBar(
         title: Text(FinanceStrings.t(context, 'transactions_title')),
         actions: [
+          if (_canCreate)
+            IconButton(
+              tooltip: FinanceStrings.t(context, 'transaction_new'),
+              icon: const Icon(Icons.add),
+              onPressed: _openForm,
+            ),
           IconButton(
             tooltip: FinanceStrings.t(context, 'refresh'),
             onPressed: _loading ? null : _load,
@@ -172,16 +212,9 @@ class _FinanceCashTransactionsScreenState
           ),
         ],
       ),
-      floatingActionButton: _canCreate
-          ? FloatingActionButton.extended(
-              onPressed: _openForm,
-              icon: const Icon(Icons.add),
-              label: Text(FinanceStrings.t(context, 'transaction_new')),
-            )
-          : null,
       body: Column(
         children: [
-          _buildFilters(),
+          _buildFiltersPanel(),
           const Divider(height: 1),
           Expanded(child: _buildList()),
         ],
@@ -189,11 +222,42 @@ class _FinanceCashTransactionsScreenState
     );
   }
 
-  Widget _buildFilters() {
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _buildFiltersPanel() {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Material(
+      color: cs.surfaceContainerHighest.withValues(alpha: 0.2),
+      child: ExpansionTile(
+        key: ValueKey<bool>(_filtersExpanded),
+        maintainState: true,
+        initiallyExpanded: _filtersExpanded,
+        onExpansionChanged: (expanded) {
+          setState(() => _filtersExpanded = expanded);
+        },
+        shape: const Border(),
+        collapsedShape: const Border(),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        leading: Icon(
+          Icons.tune_outlined,
+          size: 22,
+          color: cs.onSurfaceVariant,
+        ),
+        title: Text(
+          FinanceStrings.t(context, 'filter_period'),
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Text(
+          _filtersSubtitle(),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: cs.onSurfaceVariant,
+          ),
+        ),
         children: [
           Row(
             children: [
@@ -218,6 +282,7 @@ class _FinanceCashTransactionsScreenState
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String?>(
+            isExpanded: true,
             decoration: InputDecoration(
               labelText: FinanceStrings.t(context, 'filter_status'),
               border: const OutlineInputBorder(),
@@ -226,12 +291,12 @@ class _FinanceCashTransactionsScreenState
             items: [
               DropdownMenuItem(
                 value: null,
-                child: Text(FinanceStrings.t(context, 'filter_all')),
+                child: _dropdownText(FinanceStrings.t(context, 'filter_all')),
               ),
               ...FinanceDisplayLabels.transactionStatusCodes.map(
                 (code) => DropdownMenuItem(
                   value: code,
-                  child: Text(
+                  child: _dropdownText(
                     FinanceDisplayLabels.transactionStatus(context, code),
                   ),
                 ),
@@ -243,6 +308,7 @@ class _FinanceCashTransactionsScreenState
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String?>(
+            isExpanded: true,
             decoration: InputDecoration(
               labelText: FinanceStrings.t(context, 'filter_account'),
               border: const OutlineInputBorder(),
@@ -251,12 +317,14 @@ class _FinanceCashTransactionsScreenState
             items: [
               DropdownMenuItem(
                 value: null,
-                child: Text(FinanceStrings.t(context, 'filter_all_accounts')),
+                child: _dropdownText(
+                  FinanceStrings.t(context, 'filter_all_accounts'),
+                ),
               ),
               ..._accounts.map(
                 (a) => DropdownMenuItem(
                   value: a.id,
-                  child: Text('${a.accountCode} · ${a.name}'),
+                  child: _dropdownText('${a.accountCode} · ${a.name}'),
                 ),
               ),
             ],
@@ -266,6 +334,7 @@ class _FinanceCashTransactionsScreenState
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String?>(
+            isExpanded: true,
             decoration: InputDecoration(
               labelText: FinanceStrings.t(context, 'filter_direction'),
               border: const OutlineInputBorder(),
@@ -274,12 +343,12 @@ class _FinanceCashTransactionsScreenState
             items: [
               DropdownMenuItem(
                 value: null,
-                child: Text(FinanceStrings.t(context, 'filter_all')),
+                child: _dropdownText(FinanceStrings.t(context, 'filter_all')),
               ),
               ...FinanceDisplayLabels.transactionDirectionCodes.map(
                 (code) => DropdownMenuItem(
                   value: code,
-                  child: Text(
+                  child: _dropdownText(
                     FinanceDisplayLabels.transactionDirection(context, code),
                   ),
                 ),
@@ -308,16 +377,10 @@ class _FinanceCashTransactionsScreenState
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_error!, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _load,
-                child: Text(FinanceStrings.t(context, 'refresh')),
-              ),
-            ],
+          child: Text(
+            _error!,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
         ),
       );
@@ -335,50 +398,78 @@ class _FinanceCashTransactionsScreenState
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         itemCount: _transactions.length,
-        separatorBuilder: (_, _) => const Divider(height: 1),
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
         itemBuilder: (context, index) {
           final tx = _transactions[index];
           final dateText = tx.transactionDate != null
               ? dateFmt.format(tx.transactionDate!)
               : '—';
-          return ListTile(
-            title: Text(
-              tx.transactionCode.isNotEmpty
-                  ? tx.transactionCode
-                  : tx.id,
+          final title = tx.transactionCode.isNotEmpty
+              ? tx.transactionCode
+              : tx.id;
+          return Card(
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => _openDetail(tx),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$dateText · ${_accountLabel(tx.accountId)}',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            FinanceDisplayLabels.transactionDirection(
+                              context,
+                              tx.direction,
+                            ),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          FinanceMoneyFormat.format(tx.amount, tx.currency),
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 4),
+                        Chip(
+                          label: Text(
+                            FinanceDisplayLabels.transactionStatus(
+                              context,
+                              tx.status,
+                            ),
+                          ),
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$dateText · ${_accountLabel(tx.accountId)}',
-                ),
-                Text(
-                  FinanceDisplayLabels.transactionDirection(
-                    context,
-                    tx.direction,
-                  ),
-                ),
-              ],
-            ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  FinanceMoneyFormat.format(tx.amount, tx.currency),
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                Chip(
-                  label: Text(
-                    FinanceDisplayLabels.transactionStatus(context, tx.status),
-                  ),
-                  visualDensity: VisualDensity.compact,
-                ),
-              ],
-            ),
-            onTap: () => _openDetail(tx),
           );
         },
       ),

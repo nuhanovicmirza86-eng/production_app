@@ -307,6 +307,8 @@ class FinanceStrings {
     'advisory_controlling_section_title': 'Kontroling AI analiza',
     'advisory_empty': 'Nema upozorenja za odabrane filtere.',
     'advisory_load_error': 'Učitavanje upozorenja nije uspjelo.',
+    'advisory_alert_not_found':
+        'Upozorenje više nije dostupno. Možda je riješeno ili uklonjeno iz sustava.',
     'advisory_filter_status': 'Status',
     'advisory_filter_severity': 'Ozbiljnost',
     'advisory_filter_plant': 'Pogon',
@@ -319,6 +321,7 @@ class FinanceStrings {
     'advisory_run_summary':
         'Evaluirano pravila: {rules} · nova: {created} · ažurirana: {updated} · riješena: {resolved} · preskočeno: {skipped}',
     'advisory_confidence_label': 'Pouzdanost: {score}%',
+    'advisory_confidence_score': 'Pouzdanost',
     'advisory_plant_scope': 'Pogon: {plant}',
     'advisory_detected_range': 'Prvo otkriveno: {first} · zadnje: {last}',
     'advisory_severity_info': 'Informacija',
@@ -337,7 +340,6 @@ class FinanceStrings {
     'advisory_confidence_origin': 'Izvor pouzdanosti',
     'advisory_confidence_factors': 'Faktori pouzdanosti',
     'advisory_analysis_date': 'Datum analize',
-    'advisory_evaluator_version': 'Verzija evaluatora',
     'advisory_facts_empty': 'Nema dostupnih činjenica za ovo upozorenje.',
     'advisory_fact_as_of': 'Stanje na: {date}',
     'advisory_acknowledge': 'Potvrdi da je pregledano',
@@ -365,10 +367,39 @@ class FinanceStrings {
     'advisory_open_recommendation': 'Otvori preporučeni ekran',
     'advisory_resolution_reason': 'Razlog rješenja',
     'advisory_dismiss_reason_label': 'Razlog odbacivanja',
-    'advisory_origin_deterministic_only': 'Deterministička procjena',
+    'advisory_origin_deterministic_only': 'Procjena iz poslovnih podataka',
     'advisory_origin_deterministic_with_ai_interpretation':
-        'Deterministička procjena s AI tumačenjem',
-    'advisory_origin_insufficient_facts': 'Nedovoljno činjenica',
+        'Procjena iz podataka s AI objašnjenjem',
+    'advisory_origin_insufficient_facts': 'Nedovoljno podataka za pouzdanu procjenu',
+    'advisory_snapshot_threshold': 'Operativni prag',
+    'advisory_snapshot_minimum_cash_reserve': 'Minimalna gotovinska rezerva',
+    'advisory_snapshot_base_currency': 'Osnovna valuta',
+    'advisory_snapshot_first_nominal_below_reserve_date':
+        'Prvi datum ispod rezerve (nominalno)',
+    'advisory_snapshot_first_weighted_below_reserve_date':
+        'Prvi datum ispod rezerve (ponderisano)',
+    'advisory_snapshot_minimum_nominal_balance': 'Najniži nominalni saldo',
+    'advisory_snapshot_minimum_weighted_balance': 'Najniži ponderisani saldo',
+    'advisory_snapshot_nominal_negative_balance_expected':
+        'Očekivan negativan saldo (nominalno)',
+    'advisory_snapshot_weighted_negative_balance_expected':
+        'Očekivan negativan saldo (ponderisano)',
+    'advisory_snapshot_customer_name': 'Kupac',
+    'advisory_snapshot_supplier_name': 'Dobavljač',
+    'advisory_snapshot_direction': 'Smjer',
+    'advisory_snapshot_allocated_amount': 'Raspodijeljeni iznos',
+    'advisory_snapshot_unallocated_amount': 'Neraspodijeljeni iznos',
+    'advisory_snapshot_nominal_amount': 'Nominalni iznos',
+    'advisory_snapshot_status': 'Status',
+    'advisory_factor_fact_completeness': 'Potpunost podataka',
+    'advisory_factor_forecast_horizon_days': 'Horizont prognoze',
+    'advisory_factor_signal_strength': 'Jačina signala',
+    'advisory_factor_data_freshness': 'Svježina podataka',
+    'advisory_factor_days_one': '1 dan',
+    'advisory_factor_days_many': '{count} dana',
+    'advisory_freshness_current': 'Aktualni podaci',
+    'advisory_freshness_minutes': 'Prije {count} min',
+    'advisory_freshness_hours': 'Prije {count} h',
     'advisory_rule_liquidity_below_minimum_reserve_nominal':
         'Likvidnost ispod minimalne rezerve (nominalno)',
     'advisory_rule_liquidity_below_minimum_reserve_weighted':
@@ -408,6 +439,8 @@ class FinanceStrings {
     'notification_mark_read': 'Označi kao pročitano',
     'notification_marked_read': 'Obavijest je označena kao pročitana.',
     'notification_open_alert': 'Otvori povezano upozorenje',
+    'notification_alert_unavailable':
+        'Povezano upozorenje više nije u sustavu. Prikazani su podaci iz obavijesti.',
     'notification_closed_reason': 'Razlog zatvaranja',
     'notification_status_unread': 'Nepročitano',
     'notification_status_read': 'Pročitano',
@@ -712,6 +745,8 @@ class FinanceStrings {
     'advisory_controlling_section_title': 'Controlling AI analysis',
     'advisory_empty': 'No alerts for the selected filters.',
     'advisory_load_error': 'Failed to load alerts.',
+    'advisory_alert_not_found':
+        'This alert is no longer available. It may have been resolved or removed.',
     'advisory_filter_status': 'Status',
     'advisory_filter_severity': 'Severity',
     'advisory_filter_plant': 'Plant',
@@ -724,6 +759,7 @@ class FinanceStrings {
     'advisory_run_summary':
         'Rules evaluated: {rules} · new: {created} · updated: {updated} · resolved: {resolved} · skipped: {skipped}',
     'advisory_confidence_label': 'Confidence: {score}%',
+    'advisory_confidence_score': 'Confidence',
     'advisory_plant_scope': 'Plant: {plant}',
     'advisory_detected_range': 'First detected: {first} · last: {last}',
     'advisory_severity_info': 'Info',
@@ -742,7 +778,6 @@ class FinanceStrings {
     'advisory_confidence_origin': 'Confidence origin',
     'advisory_confidence_factors': 'Confidence factors',
     'advisory_analysis_date': 'Analysis date',
-    'advisory_evaluator_version': 'Evaluator version',
     'advisory_facts_empty': 'No facts available for this alert.',
     'advisory_fact_as_of': 'As of: {date}',
     'advisory_acknowledge': 'Mark as reviewed',
@@ -770,10 +805,40 @@ class FinanceStrings {
     'advisory_open_recommendation': 'Open recommended screen',
     'advisory_resolution_reason': 'Resolution reason',
     'advisory_dismiss_reason_label': 'Dismiss reason',
-    'advisory_origin_deterministic_only': 'Deterministic assessment',
+    'advisory_origin_deterministic_only': 'Assessment from business data',
     'advisory_origin_deterministic_with_ai_interpretation':
-        'Deterministic with AI interpretation',
-    'advisory_origin_insufficient_facts': 'Insufficient facts',
+        'Assessment from data with AI explanation',
+    'advisory_origin_insufficient_facts':
+        'Insufficient data for a reliable assessment',
+    'advisory_snapshot_threshold': 'Operating threshold',
+    'advisory_snapshot_minimum_cash_reserve': 'Minimum cash reserve',
+    'advisory_snapshot_base_currency': 'Base currency',
+    'advisory_snapshot_first_nominal_below_reserve_date':
+        'First date below reserve (nominal)',
+    'advisory_snapshot_first_weighted_below_reserve_date':
+        'First date below reserve (weighted)',
+    'advisory_snapshot_minimum_nominal_balance': 'Lowest nominal balance',
+    'advisory_snapshot_minimum_weighted_balance': 'Lowest weighted balance',
+    'advisory_snapshot_nominal_negative_balance_expected':
+        'Negative balance expected (nominal)',
+    'advisory_snapshot_weighted_negative_balance_expected':
+        'Negative balance expected (weighted)',
+    'advisory_snapshot_customer_name': 'Customer',
+    'advisory_snapshot_supplier_name': 'Supplier',
+    'advisory_snapshot_direction': 'Direction',
+    'advisory_snapshot_allocated_amount': 'Allocated amount',
+    'advisory_snapshot_unallocated_amount': 'Unallocated amount',
+    'advisory_snapshot_nominal_amount': 'Nominal amount',
+    'advisory_snapshot_status': 'Status',
+    'advisory_factor_fact_completeness': 'Data completeness',
+    'advisory_factor_forecast_horizon_days': 'Forecast horizon',
+    'advisory_factor_signal_strength': 'Signal strength',
+    'advisory_factor_data_freshness': 'Data freshness',
+    'advisory_factor_days_one': '1 day',
+    'advisory_factor_days_many': '{count} days',
+    'advisory_freshness_current': 'Current data',
+    'advisory_freshness_minutes': '{count} min ago',
+    'advisory_freshness_hours': '{count} h ago',
     'advisory_rule_liquidity_below_minimum_reserve_nominal':
         'Liquidity below minimum reserve (nominal)',
     'advisory_rule_liquidity_below_minimum_reserve_weighted':
@@ -812,6 +877,8 @@ class FinanceStrings {
     'notification_mark_read': 'Mark as read',
     'notification_marked_read': 'Notification marked as read.',
     'notification_open_alert': 'Open linked alert',
+    'notification_alert_unavailable':
+        'The linked alert is no longer in the system. Notification details are shown below.',
     'notification_closed_reason': 'Close reason',
     'notification_status_unread': 'Unread',
     'notification_status_read': 'Read',

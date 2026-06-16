@@ -121,6 +121,12 @@ class _FinancePurchaseInvoicesScreenState
       appBar: AppBar(
         title: Text(FinanceStrings.t(context, 'purchase_invoices_title')),
         actions: [
+          if (_canCreate)
+            IconButton(
+              tooltip: FinanceStrings.t(context, 'purchase_invoice_new'),
+              icon: const Icon(Icons.add),
+              onPressed: () => _openForm(),
+            ),
           IconButton(
             tooltip: FinanceStrings.t(context, 'refresh'),
             icon: const Icon(Icons.refresh),
@@ -128,17 +134,12 @@ class _FinancePurchaseInvoicesScreenState
           ),
         ],
       ),
-      floatingActionButton: _canCreate
-          ? FloatingActionButton(
-              onPressed: () => _openForm(),
-              child: const Icon(Icons.add),
-            )
-          : null,
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: DropdownButtonFormField<String?>(
+              isExpanded: true,
               value: _statusFilter,
               decoration: InputDecoration(
                 labelText: FinanceStrings.t(context, 'filter_status'),

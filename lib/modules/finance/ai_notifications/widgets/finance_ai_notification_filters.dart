@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/company_plant_display_name.dart';
 import '../../shared/finance_display_labels.dart';
+import '../../shared/finance_plant_filter_dropdown.dart';
 import '../../shared/finance_strings.dart';
 import '../../../finance_integrations/utils/finance_permissions.dart';
 
@@ -104,38 +104,13 @@ class FinanceAiNotificationFilters extends StatelessWidget {
           ],
           onChanged: onSeverityChanged,
         ),
-        if (_canPickPlant) _buildPlantDropdown(context),
+        if (_canPickPlant)
+          FinancePlantFilterDropdown(
+            companyId: companyId,
+            selectedPlantKey: filterPlantKey,
+            onChanged: onPlantChanged,
+          ),
       ],
-    );
-  }
-
-  Widget _buildPlantDropdown(BuildContext context) {
-    return FutureBuilder<List<({String plantKey, String label})>>(
-      future: CompanyPlantDisplayName.listSelectablePlants(
-        companyId: companyId,
-      ),
-      builder: (context, snap) {
-        final plants = snap.data ?? [];
-        return DropdownButton<String>(
-          value: filterPlantKey,
-          hint: Text(FinanceStrings.t(context, 'advisory_filter_plant')),
-          items: [
-            DropdownMenuItem(
-              value: '',
-              child: Text(
-                FinanceStrings.t(context, 'advisory_filter_all_plants'),
-              ),
-            ),
-            ...plants.map(
-              (p) => DropdownMenuItem(
-                value: p.plantKey,
-                child: Text(p.label),
-              ),
-            ),
-          ],
-          onChanged: (v) => onPlantChanged(v ?? ''),
-        );
-      },
     );
   }
 }

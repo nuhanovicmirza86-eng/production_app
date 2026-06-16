@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
+import 'package:intl/intl.dart';
 
+import 'finance_money_format.dart';
 import 'finance_strings.dart';
 
 class FinanceDisplayLabels {
@@ -280,21 +282,162 @@ class FinanceDisplayLabels {
     return factType;
   }
 
+  static const _advisorySnapshotStringKeys = <String, String>{
+    'accountCode': 'account_code',
+    'currentBalance': 'current_balance',
+    'currency': 'currency',
+    'threshold': 'advisory_snapshot_threshold',
+    'minimumCashReserve': 'advisory_snapshot_minimum_cash_reserve',
+    'baseCurrency': 'advisory_snapshot_base_currency',
+    'firstNominalBelowReserveDate':
+        'advisory_snapshot_first_nominal_below_reserve_date',
+    'firstWeightedBelowReserveDate':
+        'advisory_snapshot_first_weighted_below_reserve_date',
+    'minimumNominalBalance': 'advisory_snapshot_minimum_nominal_balance',
+    'minimumWeightedBalance': 'advisory_snapshot_minimum_weighted_balance',
+    'nominalNegativeBalanceExpected':
+        'advisory_snapshot_nominal_negative_balance_expected',
+    'weightedNegativeBalanceExpected':
+        'advisory_snapshot_weighted_negative_balance_expected',
+    'openAmount': 'open_amount',
+    'dueDate': 'due_date',
+    'customerName': 'advisory_snapshot_customer_name',
+    'supplierName': 'advisory_snapshot_supplier_name',
+    'direction': 'advisory_snapshot_direction',
+    'amount': 'amount',
+    'allocatedAmount': 'advisory_snapshot_allocated_amount',
+    'unallocatedAmount': 'advisory_snapshot_unallocated_amount',
+    'nominalAmount': 'advisory_snapshot_nominal_amount',
+    'status': 'advisory_snapshot_status',
+  };
+
+  static const _advisoryConfidenceFactorStringKeys = <String, String>{
+    'factCompleteness': 'advisory_factor_fact_completeness',
+    'forecastHorizonDays': 'advisory_factor_forecast_horizon_days',
+    'signalStrength': 'advisory_factor_signal_strength',
+    'dataFreshnessMinutes': 'advisory_factor_data_freshness',
+  };
+
   static String advisorySnapshotKey(BuildContext context, String key) {
-    switch (key.trim()) {
-      case 'amount':
-      case 'nominalAmount':
-      case 'weightedAmount':
-      case 'balance':
-      case 'threshold':
-      case 'minimumCashReserve':
-        return FinanceStrings.t(context, key);
-      default:
-        return key.replaceAll(RegExp(r'([A-Z])'), ' \$1').trim();
+    final trimmed = key.trim();
+    final stringKey = _advisorySnapshotStringKeys[trimmed];
+    if (stringKey != null) {
+      return FinanceStrings.t(context, stringKey);
     }
+    final snake = _camelToSnake(trimmed);
+    final translated = FinanceStrings.t(context, snake);
+    if (translated != snake) return translated;
+    return _humanizeCamelCase(trimmed);
   }
 
   static String advisoryConfidenceFactorKey(BuildContext context, String key) {
-    return key.replaceAll('_', ' ');
+    final trimmed = key.trim();
+    final stringKey = _advisoryConfidenceFactorStringKeys[trimmed];
+    if (stringKey != null) {
+      return FinanceStrings.t(context, stringKey);
+    }
+    final snake = _camelToSnake(trimmed);
+    final translated = FinanceStrings.t(context, snake);
+    if (translated != snake) return translated;
+    return _humanizeCamelCase(trimmed);
+  }
+
+  static String advisoryConfidenceFactorValue(
+    BuildContext context,
+    String key,
+    dynamic value,
+  ) {
+    if (value is! num) return value?.toString() ?? '';
+    final n = value.toDouble();
+    switch (key.trim()) {
+      case 'factCompleteness':
+      case 'signalStrength':
+        return '${n.round()}%';
+      case 'forecastHorizonDays':
+        final days = n.round();
+        if (days == 1) {
+          return FinanceStrings.t(context, 'advisory_factor_days_one');
+        }
+        return FinanceStrings.t(context, 'advisory_factor_days_many')
+            .replaceAll('{count}', '$days');
+      case 'dataFreshnessMinutes':
+        if (n <= 0) {
+          return FinanceStrings.t(context, 'advisory_freshness_current');
+        }
+        final minutes = n.round();
+        if (minutes < 60) {
+          return FinanceStrings.t(context, 'advisory_freshness_minutes')
+              .replaceAll('{count}', '$minutes');
+        }
+        final hours = (minutes / 60).round();
+        return FinanceStrings.t(context, 'advisory_freshness_hours')
+            .replaceAll('{count}', '$hours');
+      default:
+        return n == n.roundToDouble()
+            ? n.toStringAsFixed(0)
+            : n.toStringAsFixed(2);
+    }
+  }
+
+  static String advisorySnapshotValue(
+    BuildContext context,
+    String key,
+    dynamic value,
+  ) {
+    if (value == null) return '';
+    final k = key.trim().toLowerCase();
+    if (value is bool) {
+      return value
+          ? FinanceStrings.t(context, 'forecast_yes')
+          : FinanceStrings.t(context, 'forecast_no');
+    }
+    if (k == 'direction' && value is String) {
+      return transactionDirection(context, value);
+    }
+    if (k == 'status' && value is String) {
+      final status = value.trim().toLowerCase();
+      if (status == 'draft') {
+        return plannedCashItemStatus(context, value);
+      }
+      return invoiceStatus(context, value);
+    }
+    if (value is num &&
+        (k.contains('amount') ||
+            k.contains('balance') ||
+            k.contains('threshold') ||
+            k.contains('reserve'))) {
+      return FinanceMoneyFormat.format(value.toDouble(), null);
+    }
+    if (k.contains('date') && value is String) {
+      final parsed = DateTime.tryParse(value);
+      if (parsed != null) {
+        final locale = Localizations.localeOf(context).toString();
+        return DateFormat.yMMMd(locale).format(parsed.toLocal());
+      }
+    }
+    return value.toString();
+  }
+
+  static String _camelToSnake(String key) {
+    return key
+        .replaceAllMapped(
+          RegExp(r'([a-z0-9])([A-Z])'),
+          (m) => '${m[1]}_${m[2]?.toLowerCase()}',
+        )
+        .replaceAllMapped(
+          RegExp(r'([A-Z]+)([A-Z][a-z])'),
+          (m) => '${m[1]?.toLowerCase()}_${m[2]}',
+        )
+        .toLowerCase();
+  }
+
+  static String _humanizeCamelCase(String key) {
+    return key
+        .replaceAllMapped(
+          RegExp(r'([a-z0-9])([A-Z])'),
+          (m) => '${m[1]} ${m[2]}',
+        )
+        .replaceAll('_', ' ')
+        .trim();
   }
 }

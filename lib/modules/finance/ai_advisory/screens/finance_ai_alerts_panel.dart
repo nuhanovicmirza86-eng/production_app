@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/company_plant_display_name.dart';
 import '../../shared/finance_display_labels.dart';
+import '../../shared/finance_plant_filter_dropdown.dart';
 import '../../shared/finance_strings.dart';
 import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../models/finance_ai_alert.dart';
@@ -17,14 +18,16 @@ class FinanceAiAlertsPanel extends StatefulWidget {
     super.key,
     required this.companyData,
     required this.businessYearId,
-    this.sessionPlantKey = '',
+    required this.plantScopeKey,
+    this.onPlantScopeChanged,
     this.debugUnlockModule = false,
     this.onAlertsChanged,
   });
 
   final Map<String, dynamic> companyData;
   final String businessYearId;
-  final String sessionPlantKey;
+  final String plantScopeKey;
+  final ValueChanged<String>? onPlantScopeChanged;
   final bool debugUnlockModule;
   final VoidCallback? onAlertsChanged;
 
@@ -37,7 +40,6 @@ class _FinanceAiAlertsPanelState extends State<FinanceAiAlertsPanel> {
 
   bool _showHistory = false;
   String? _severityMin;
-  String _filterPlantKey = '';
   bool _loading = false;
   bool _actionInProgress = false;
   String? _error;
@@ -72,11 +74,16 @@ class _FinanceAiAlertsPanelState extends State<FinanceAiAlertsPanel> {
   @override
   void initState() {
     super.initState();
-    _filterPlantKey = widget.sessionPlantKey.trim();
-    if (!_canPickPlant && _profilePlantKey.isNotEmpty) {
-      _filterPlantKey = _profilePlantKey;
-    }
     _loadAlerts();
+  }
+
+  @override
+  void didUpdateWidget(covariant FinanceAiAlertsPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.plantScopeKey != widget.plantScopeKey ||
+        oldWidget.businessYearId != widget.businessYearId) {
+      _loadAlerts();
+    }
   }
 
   List<String> get _statusFilter {
@@ -95,7 +102,9 @@ class _FinanceAiAlertsPanelState extends State<FinanceAiAlertsPanel> {
         companyId: _companyId,
         status: _statusFilter,
         severityMin: _severityMin,
-        plantKey: _filterPlantKey.trim().isEmpty ? null : _filterPlantKey.trim(),
+        plantKey: widget.plantScopeKey.trim().isEmpty
+            ? null
+            : widget.plantScopeKey.trim(),
       );
       await _resolvePlantLabels(list);
       if (!mounted) return;
@@ -134,7 +143,9 @@ class _FinanceAiAlertsPanelState extends State<FinanceAiAlertsPanel> {
     try {
       final result = await _svc.runAdvisoryAnalysis(
         companyId: _companyId,
-        plantKey: _filterPlantKey.trim().isEmpty ? null : _filterPlantKey.trim(),
+        plantKey: widget.plantScopeKey.trim().isEmpty
+            ? null
+            : widget.plantScopeKey.trim(),
         businessYearId: widget.businessYearId.trim().isEmpty
             ? null
             : widget.businessYearId.trim(),
@@ -179,6 +190,7 @@ class _FinanceAiAlertsPanelState extends State<FinanceAiAlertsPanel> {
         builder: (_) => FinanceAiAlertDetailScreen(
           companyData: widget.companyData,
           alertId: alert.alertId,
+          initialAlert: alert,
           debugUnlockModule: widget.debugUnlockModule,
         ),
       ),
@@ -297,41 +309,13 @@ class _FinanceAiAlertsPanelState extends State<FinanceAiAlertsPanel> {
             _loadAlerts();
           },
         ),
-        if (_canPickPlant) _buildPlantDropdown(context),
+        if (_canPickPlant && widget.onPlantScopeChanged != null)
+          FinancePlantFilterDropdown(
+            companyId: _companyId,
+            selectedPlantKey: widget.plantScopeKey,
+            onChanged: widget.onPlantScopeChanged!,
+          ),
       ],
-    );
-  }
-
-  Widget _buildPlantDropdown(BuildContext context) {
-    return FutureBuilder<List<({String plantKey, String label})>>(
-      future: CompanyPlantDisplayName.listSelectablePlants(
-        companyId: _companyId,
-      ),
-      builder: (context, snap) {
-        final plants = snap.data ?? [];
-        return DropdownButton<String>(
-          value: _filterPlantKey,
-          hint: Text(FinanceStrings.t(context, 'advisory_filter_plant')),
-          items: [
-            DropdownMenuItem(
-              value: '',
-              child: Text(
-                FinanceStrings.t(context, 'advisory_filter_all_plants'),
-              ),
-            ),
-            ...plants.map(
-              (p) => DropdownMenuItem(
-                value: p.plantKey,
-                child: Text(p.label),
-              ),
-            ),
-          ],
-          onChanged: (v) {
-            setState(() => _filterPlantKey = v ?? '');
-            _loadAlerts();
-          },
-        );
-      },
     );
   }
 }

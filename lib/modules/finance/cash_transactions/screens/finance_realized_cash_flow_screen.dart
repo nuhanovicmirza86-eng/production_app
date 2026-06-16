@@ -33,6 +33,7 @@ class _FinanceRealizedCashFlowScreenState
   final _accountsService = FinanceAccountsService();
 
   bool _loading = false;
+  bool _filtersExpanded = true;
   String? _error;
   FinanceRealizedCashFlowSummary? _summary;
   List<FinanceAccount> _accounts = const [];
@@ -93,6 +94,7 @@ class _FinanceRealizedCashFlowScreenState
       setState(() {
         _summary = summary;
         _loading = false;
+        _filtersExpanded = false;
       });
     } catch (e) {
       if (!mounted) return;
@@ -107,6 +109,129 @@ class _FinanceRealizedCashFlowScreenState
     if (d == null) return '—';
     return DateFormat.yMMMd(Localizations.localeOf(context).languageCode)
         .format(d);
+  }
+
+  String _accountLabel(String accountId) {
+    for (final a in _accounts) {
+      if (a.id == accountId) {
+        return '${a.accountCode} · ${a.name}';
+      }
+    }
+    return accountId;
+  }
+
+  String _selectedAccountLabel() {
+    final id = _accountFilter;
+    if (id == null || id.isEmpty) {
+      return FinanceStrings.t(context, 'filter_all_accounts');
+    }
+    return _accountLabel(id);
+  }
+
+  Widget _dropdownText(String text) {
+    return Text(text, overflow: TextOverflow.ellipsis);
+  }
+
+  Widget _buildFiltersPanel() {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final periodLabel = '${_formatDate(_dateFrom)} – ${_formatDate(_dateTo)}';
+
+    return Material(
+      color: cs.surfaceContainerHighest.withValues(alpha: 0.2),
+      child: ExpansionTile(
+        key: ValueKey<bool>(_filtersExpanded),
+        maintainState: true,
+        initiallyExpanded: _filtersExpanded,
+        onExpansionChanged: (expanded) {
+          setState(() => _filtersExpanded = expanded);
+        },
+        shape: const Border(),
+        collapsedShape: const Border(),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        leading: Icon(
+          Icons.tune_outlined,
+          size: 22,
+          color: cs.onSurfaceVariant,
+        ),
+        title: Text(
+          FinanceStrings.t(context, 'filter_period'),
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Text(
+          '$periodLabel · ${_selectedAccountLabel()}',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: cs.onSurfaceVariant,
+          ),
+        ),
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: FinanceDatePickerField(
+                  label: FinanceStrings.t(context, 'date_from'),
+                  value: _dateFrom,
+                  lastDate: _dateTo,
+                  onChanged: (d) => setState(() => _dateFrom = d),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FinanceDatePickerField(
+                  label: FinanceStrings.t(context, 'date_to'),
+                  value: _dateTo,
+                  firstDate: _dateFrom,
+                  onChanged: (d) => setState(() => _dateTo = d),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String?>(
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: FinanceStrings.t(context, 'filter_account'),
+              border: const OutlineInputBorder(),
+            ),
+            value: _accountFilter,
+            items: [
+              DropdownMenuItem(
+                value: null,
+                child: _dropdownText(
+                  FinanceStrings.t(context, 'filter_all_accounts'),
+                ),
+              ),
+              ..._accounts.map(
+                (a) => DropdownMenuItem(
+                  value: a.id,
+                  child: _dropdownText('${a.accountCode} · ${a.name}'),
+                ),
+              ),
+            ],
+            onChanged: _loading
+                ? null
+                : (v) => setState(() => _accountFilter = v),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _loading ? null : _load,
+            icon: _loading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.assessment_outlined),
+            label: Text(FinanceStrings.t(context, 'load_report')),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _metricCard(String label, double value, String? currency) {
@@ -189,66 +314,18 @@ class _FinanceRealizedCashFlowScreenState
     return Scaffold(
       appBar: AppBar(
         title: Text(FinanceStrings.t(context, 'realized_title')),
+        actions: [
+          IconButton(
+            tooltip: FinanceStrings.t(context, 'refresh'),
+            onPressed: _loading || _summary == null ? null : _load,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: FinanceDatePickerField(
-                  label: FinanceStrings.t(context, 'date_from'),
-                  value: _dateFrom,
-                  lastDate: _dateTo,
-                  onChanged: (d) => setState(() => _dateFrom = d),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FinanceDatePickerField(
-                  label: FinanceStrings.t(context, 'date_to'),
-                  value: _dateTo,
-                  firstDate: _dateFrom,
-                  onChanged: (d) => setState(() => _dateTo = d),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String?>(
-            decoration: InputDecoration(
-              labelText: FinanceStrings.t(context, 'filter_account'),
-              border: const OutlineInputBorder(),
-            ),
-            value: _accountFilter,
-            items: [
-              DropdownMenuItem(
-                value: null,
-                child: Text(FinanceStrings.t(context, 'filter_all_accounts')),
-              ),
-              ..._accounts.map(
-                (a) => DropdownMenuItem(
-                  value: a.id,
-                  child: Text('${a.accountCode} · ${a.name}'),
-                ),
-              ),
-            ],
-            onChanged: _loading
-                ? null
-                : (v) => setState(() => _accountFilter = v),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: _loading ? null : _load,
-            icon: _loading
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.assessment_outlined),
-            label: Text(FinanceStrings.t(context, 'load_report')),
-          ),
+          _buildFiltersPanel(),
           if (_error != null) ...[
             const SizedBox(height: 16),
             Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),

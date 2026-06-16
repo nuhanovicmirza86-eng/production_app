@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../shared/finance_display_labels.dart';
-import '../../shared/finance_money_format.dart';
 import '../../shared/finance_strings.dart';
 import '../models/finance_ai_alert.dart';
 
@@ -60,7 +59,7 @@ class FinanceAiFactsSection extends StatelessWidget {
                   ...fact.snapshot.entries.map((e) {
                     return Text(
                       '${FinanceDisplayLabels.advisorySnapshotKey(context, e.key)}: '
-                      '${_formatSnapshotValue(context, e.key, e.value)}',
+                      '${FinanceDisplayLabels.advisorySnapshotValue(context, e.key, e.value)}',
                       style: Theme.of(context).textTheme.bodySmall,
                     );
                   }),
@@ -71,20 +70,5 @@ class FinanceAiFactsSection extends StatelessWidget {
         );
       }).toList(),
     );
-  }
-
-  String _formatSnapshotValue(BuildContext context, String key, dynamic value) {
-    if (value is num &&
-        (key.toLowerCase().contains('amount') ||
-            key.toLowerCase().contains('balance') ||
-            key.toLowerCase().contains('threshold'))) {
-      return FinanceMoneyFormat.format(value.toDouble(), null);
-    }
-    if (value is bool) {
-      return value
-          ? FinanceStrings.t(context, 'forecast_yes')
-          : FinanceStrings.t(context, 'forecast_no');
-    }
-    return value?.toString() ?? '';
   }
 }

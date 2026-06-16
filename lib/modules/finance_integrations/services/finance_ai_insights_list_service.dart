@@ -8,6 +8,32 @@ class FinanceAiInsightsListService {
   final FinanceControllingPeriodReadService _reads =
       FinanceControllingPeriodReadService();
 
+  Future<List<FinanceAiInsightDoc>> loadRecentForPeriod({
+    required String companyId,
+    required String businessYearId,
+    required int periodYear,
+    required int periodMonth,
+    String plantKey = '',
+    int limit = 12,
+  }) async {
+    final cid = companyId.trim();
+    final by = businessYearId.trim();
+    if (cid.isEmpty || by.isEmpty) {
+      return const [];
+    }
+    final pk = plantKey.trim();
+    final lim = limit.clamp(1, 50);
+    final bundle = await _reads.load(
+      companyId: cid,
+      businessYearId: by,
+      periodYear: periodYear,
+      periodMonth: periodMonth,
+      plantKey: pk,
+      aiInsightsLimit: lim,
+    );
+    return bundle.aiInsights;
+  }
+
   Stream<List<FinanceAiInsightDoc>> watchRecentForPeriod({
     required String companyId,
     required String businessYearId,
@@ -16,24 +42,15 @@ class FinanceAiInsightsListService {
     String plantKey = '',
     int limit = 12,
   }) {
-    final cid = companyId.trim();
-    final by = businessYearId.trim();
-    if (cid.isEmpty || by.isEmpty) {
-      return Stream<List<FinanceAiInsightDoc>>.value(const []);
-    }
-    final pk = plantKey.trim();
-    final lim = limit.clamp(1, 50);
     return Stream.fromFuture(
-      _reads
-          .load(
-            companyId: cid,
-            businessYearId: by,
-            periodYear: periodYear,
-            periodMonth: periodMonth,
-            plantKey: pk,
-            aiInsightsLimit: lim,
-          )
-          .then((b) => b.aiInsights),
-    );
+      loadRecentForPeriod(
+        companyId: companyId,
+        businessYearId: businessYearId,
+        periodYear: periodYear,
+        periodMonth: periodMonth,
+        plantKey: plantKey,
+        limit: limit,
+      ),
+    ).asBroadcastStream();
   }
 }

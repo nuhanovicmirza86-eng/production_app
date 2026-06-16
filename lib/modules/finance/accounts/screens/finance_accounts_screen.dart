@@ -28,6 +28,9 @@ class _FinanceAccountsScreenState extends State<FinanceAccountsScreen> {
   bool _loading = true;
   String? _error;
   List<FinanceAccount> _accounts = const [];
+  bool _activeOnly = false;
+  String? _typeFilter;
+  String? _currencyFilter;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -53,11 +56,21 @@ class _FinanceAccountsScreenState extends State<FinanceAccountsScreen> {
       _error = null;
     });
     try {
-      final items = await _service.listAccounts(companyId: _companyId);
+      final items = await _service.listAccounts(
+        companyId: _companyId,
+        activeOnly: _activeOnly,
+      );
       if (!mounted) return;
       setState(() {
         _accounts = items;
         _loading = false;
+        final codes = items
+            .map((a) => a.currency)
+            .where((c) => c.isNotEmpty)
+            .toSet();
+        if (_currencyFilter != null && !codes.contains(_currencyFilter)) {
+          _currencyFilter = null;
+        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -128,6 +141,104 @@ class _FinanceAccountsScreenState extends State<FinanceAccountsScreen> {
     return '${fmt.format(a.currentBalance)} ${a.currency}';
   }
 
+  List<String> get _currencyOptions {
+    final codes = <String>{};
+    for (final a in _accounts) {
+      if (a.currency.isNotEmpty) codes.add(a.currency);
+    }
+    final list = codes.toList()..sort();
+    return list;
+  }
+
+  List<FinanceAccount> get _filteredAccounts {
+    return _accounts.where((a) {
+      if (_typeFilter != null &&
+          a.accountType.trim().toLowerCase() != _typeFilter) {
+        return false;
+      }
+      if (_currencyFilter != null && a.currency != _currencyFilter) {
+        return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  Widget _dropdownText(String text) {
+    return Text(text, overflow: TextOverflow.ellipsis);
+  }
+
+  Widget _buildFilters() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(FinanceStrings.t(context, 'filter_active_only')),
+            value: _activeOnly,
+            onChanged: _loading
+                ? null
+                : (v) {
+                    setState(() => _activeOnly = v);
+                    _load();
+                  },
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String?>(
+            isExpanded: true,
+            value: _typeFilter,
+            decoration: InputDecoration(
+              labelText: FinanceStrings.t(context, 'account_type'),
+              border: const OutlineInputBorder(),
+            ),
+            items: [
+              DropdownMenuItem(
+                value: null,
+                child: _dropdownText(FinanceStrings.t(context, 'filter_all')),
+              ),
+              ...FinanceDisplayLabels.accountTypeCodes.map(
+                (code) => DropdownMenuItem(
+                  value: code,
+                  child: _dropdownText(
+                    FinanceDisplayLabels.accountType(context, code),
+                  ),
+                ),
+              ),
+            ],
+            onChanged: _loading
+                ? null
+                : (v) => setState(() => _typeFilter = v),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String?>(
+            isExpanded: true,
+            value: _currencyFilter,
+            decoration: InputDecoration(
+              labelText: FinanceStrings.t(context, 'currency'),
+              border: const OutlineInputBorder(),
+            ),
+            items: [
+              DropdownMenuItem(
+                value: null,
+                child: _dropdownText(FinanceStrings.t(context, 'filter_all')),
+              ),
+              ..._currencyOptions.map(
+                (code) => DropdownMenuItem(
+                  value: code,
+                  child: _dropdownText(code),
+                ),
+              ),
+            ],
+            onChanged: _loading
+                ? null
+                : (v) => setState(() => _currencyFilter = v),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!FinancePermissions.canAccessCashFlowOperative(
@@ -149,6 +260,12 @@ class _FinanceAccountsScreenState extends State<FinanceAccountsScreen> {
       appBar: AppBar(
         title: Text(FinanceStrings.t(context, 'accounts_title')),
         actions: [
+          if (_canManage)
+            IconButton(
+              tooltip: FinanceStrings.t(context, 'account_new'),
+              icon: const Icon(Icons.add),
+              onPressed: () => _openForm(),
+            ),
           IconButton(
             tooltip: FinanceStrings.t(context, 'refresh'),
             onPressed: _loading ? null : _load,
@@ -156,14 +273,13 @@ class _FinanceAccountsScreenState extends State<FinanceAccountsScreen> {
           ),
         ],
       ),
-      floatingActionButton: _canManage
-          ? FloatingActionButton.extended(
-              onPressed: () => _openForm(),
-              icon: const Icon(Icons.add),
-              label: Text(FinanceStrings.t(context, 'account_new')),
-            )
-          : null,
-      body: _buildBody(),
+      body: Column(
+        children: [
+          _buildFilters(),
+          const Divider(height: 1),
+          Expanded(child: _buildBody()),
+        ],
+      ),
     );
   }
 
@@ -175,21 +291,16 @@ class _FinanceAccountsScreenState extends State<FinanceAccountsScreen> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_error!, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _load,
-                child: Text(FinanceStrings.t(context, 'refresh')),
-              ),
-            ],
+          child: Text(
+            _error!,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
         ),
       );
     }
-    if (_accounts.isEmpty) {
+    final visible = _filteredAccounts;
+    if (visible.isEmpty) {
       return Center(
         child: Text(FinanceStrings.t(context, 'accounts_empty')),
       );
@@ -199,10 +310,10 @@ class _FinanceAccountsScreenState extends State<FinanceAccountsScreen> {
       onRefresh: _load,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: _accounts.length,
+        itemCount: visible.length,
         separatorBuilder: (_, _) => const Divider(height: 1),
         itemBuilder: (context, index) {
-          final a = _accounts[index];
+          final a = visible[index];
           return ListTile(
             title: Text(a.name),
             subtitle: Column(

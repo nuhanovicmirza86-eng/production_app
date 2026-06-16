@@ -14,12 +14,16 @@ class FinanceAiCompanyMemoryService {
 
   static const String _getCallableName = 'getFinanceAiCompanyMemory';
 
-  Stream<FinanceAiCompanyMemoryDoc?> watchMemory({required String companyId}) {
+  Future<FinanceAiCompanyMemoryDoc?> loadMemory({required String companyId}) {
     final cid = companyId.trim();
     if (cid.isEmpty) {
-      return Stream<FinanceAiCompanyMemoryDoc?>.value(null);
+      return Future<FinanceAiCompanyMemoryDoc?>.value(null);
     }
-    return Stream.fromFuture(_fetchMemory(cid));
+    return _fetchMemory(cid);
+  }
+
+  Stream<FinanceAiCompanyMemoryDoc?> watchMemory({required String companyId}) {
+    return Stream.fromFuture(loadMemory(companyId: companyId)).asBroadcastStream();
   }
 
   Future<FinanceAiCompanyMemoryDoc?> _fetchMemory(String companyId) async {

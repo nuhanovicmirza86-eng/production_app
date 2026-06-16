@@ -18,11 +18,13 @@ class FinanceAiAlertDetailScreen extends StatefulWidget {
     super.key,
     required this.companyData,
     required this.alertId,
+    this.initialAlert,
     this.debugUnlockModule = false,
   });
 
   final Map<String, dynamic> companyData;
   final String alertId;
+  final FinanceAiAlert? initialAlert;
   final bool debugUnlockModule;
 
   @override
@@ -66,14 +68,20 @@ class _FinanceAiAlertDetailScreenState extends State<FinanceAiAlertDetailScreen>
   @override
   void initState() {
     super.initState();
+    _alert = widget.initialAlert;
+    _loading = widget.initialAlert == null;
     _load();
   }
 
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (_alert == null) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    } else {
+      setState(() => _error = null);
+    }
     try {
       final alert = await _svc.getAlert(
         companyId: _companyId,
@@ -92,14 +100,37 @@ class _FinanceAiAlertDetailScreenState extends State<FinanceAiAlertDetailScreen>
         _alert = alert;
         _plantLabel = plantLabel;
         _loading = false;
+        _error = null;
       });
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+      final message = _friendlyLoadError(context, e);
+      setState(() {
+        _loading = false;
+        _error = _alert == null ? message : null;
+      });
+      if (_alert != null) {
+        _showError(message);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = _alert == null ? FinanceStrings.t(context, 'advisory_load_error') : null;
       });
+      if (_alert != null) {
+        _showError(FinanceStrings.t(context, 'advisory_load_error'));
+      }
     }
+  }
+
+  String _friendlyLoadError(BuildContext context, FirebaseFunctionsException e) {
+    if (e.code == 'not-found') {
+      return FinanceStrings.t(context, 'advisory_alert_not_found');
+    }
+    final msg = e.message?.trim();
+    if (msg != null && msg.isNotEmpty) return msg;
+    return FinanceStrings.t(context, 'advisory_load_error');
   }
 
   Future<void> _acknowledge() async {
@@ -220,13 +251,43 @@ class _FinanceAiAlertDetailScreenState extends State<FinanceAiAlertDetailScreen>
         appBar: AppBar(
           title: Text(FinanceStrings.t(context, 'advisory_detail_title')),
         ),
-        body: _loading
+        body: _loading && _alert == null
             ? const Center(child: CircularProgressIndicator())
-            : _error != null
-                ? Center(child: Text(_error!))
+            : _error != null && _alert == null
+                ? _buildErrorState(context)
                 : alert == null
                     ? const SizedBox.shrink()
                     : _buildBody(context, theme, alert),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.info_outline,
+              size: 48,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _error ?? FinanceStrings.t(context, 'advisory_load_error'),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyLarge,
+            ),
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(_changed),
+              child: Text(FinanceStrings.t(context, 'cancel')),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -241,8 +302,11 @@ class _FinanceAiAlertDetailScreenState extends State<FinanceAiAlertDetailScreen>
     final analysisDate = alert.lastDetectedAt ?? alert.triggeredAt;
     final observedText = [
       if (alert.headline.isNotEmpty) alert.headline,
-      if (alert.summary.isNotEmpty) alert.summary,
-      if (alert.aiExplanation.causeSummary.trim().isNotEmpty)
+      if (alert.summary.isNotEmpty && alert.summary.trim() != alert.headline.trim())
+        alert.summary,
+      if (alert.aiExplanation.causeSummary.trim().isNotEmpty &&
+          alert.aiExplanation.causeSummary.trim() != alert.headline.trim() &&
+          alert.aiExplanation.causeSummary.trim() != alert.summary.trim())
         alert.aiExplanation.causeSummary.trim(),
     ].join('\n\n');
 
@@ -301,10 +365,7 @@ class _FinanceAiAlertDetailScreenState extends State<FinanceAiAlertDetailScreen>
         ),
         _assessmentRow(
           context,
-          FinanceStrings.t(context, 'advisory_confidence_label')
-              .replaceAll('{score}', '')
-              .replaceAll(': %', '')
-              .trim(),
+          FinanceStrings.t(context, 'advisory_confidence_score'),
           '${alert.confidenceScore.toStringAsFixed(0)}%',
         ),
         _assessmentRow(
@@ -323,7 +384,8 @@ class _FinanceAiAlertDetailScreenState extends State<FinanceAiAlertDetailScreen>
           ),
           ...alert.confidenceFactors.entries.map(
             (e) => Text(
-              '${FinanceDisplayLabels.advisoryConfidenceFactorKey(context, e.key)}: ${e.value}',
+              '${FinanceDisplayLabels.advisoryConfidenceFactorKey(context, e.key)}: '
+              '${FinanceDisplayLabels.advisoryConfidenceFactorValue(context, e.key, e.value)}',
               style: theme.textTheme.bodySmall,
             ),
           ),
@@ -333,12 +395,6 @@ class _FinanceAiAlertDetailScreenState extends State<FinanceAiAlertDetailScreen>
             context,
             FinanceStrings.t(context, 'advisory_analysis_date'),
             df.format(analysisDate.toLocal()),
-          ),
-        if (alert.contractVersion.isNotEmpty)
-          _assessmentRow(
-            context,
-            FinanceStrings.t(context, 'advisory_evaluator_version'),
-            alert.contractVersion,
           ),
         if (alert.resolutionReason != null &&
             alert.resolutionReason!.trim().isNotEmpty)

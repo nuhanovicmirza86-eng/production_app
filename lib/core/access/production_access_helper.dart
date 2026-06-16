@@ -1,3 +1,5 @@
+import '../saas/production_module_keys.dart';
+
 enum ProductionDashboardCard {
   products,
   productionOrders,
@@ -32,6 +34,9 @@ enum ProductionDashboardCard {
 
   /// SaaS modul Finance & Controlling (`finance_controlling` / `finance_integrations`): troškovi, KPI, ERP sync.
   financeControlling,
+
+  /// Operonix APS — Napredno planiranje (scenariji, Gantt, optimizacija).
+  advancedPlanning,
 }
 
 enum ProductionAccessLevel { hidden, view, manage }
@@ -77,6 +82,7 @@ Map<ProductionDashboardCard, ProductionAccessLevel> _accessQualityManagerHub() {
     ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
     ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
     ProductionDashboardCard.financeControlling: ProductionAccessLevel.view,
+    ProductionDashboardCard.advancedPlanning: ProductionAccessLevel.hidden,
   };
 }
 
@@ -279,6 +285,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
       ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
       ProductionDashboardCard.financeControlling: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.advancedPlanning: ProductionAccessLevel.hidden,
     },
     roleShiftLead: {
       /// Pregled linije/smjene: bez QMS/Personal modula u Productionu (to ostaje PM, kvaliteta).
@@ -303,6 +310,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
       ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
       ProductionDashboardCard.financeControlling: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.advancedPlanning: ProductionAccessLevel.hidden,
     },
     roleProductionManager: {
       ProductionDashboardCard.products: ProductionAccessLevel.manage,
@@ -325,6 +333,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.manage,
       ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.manage,
       ProductionDashboardCard.financeControlling: ProductionAccessLevel.view,
+      ProductionDashboardCard.advancedPlanning: ProductionAccessLevel.manage,
     },
     roleProjectManager:
         _accessNpiEngineeringHub(ProductionAccessLevel.manage),
@@ -351,6 +360,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
       ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
       ProductionDashboardCard.financeControlling: ProductionAccessLevel.view,
+      ProductionDashboardCard.advancedPlanning: ProductionAccessLevel.hidden,
     },
     roleLogisticsManager: {
       ProductionDashboardCard.products: ProductionAccessLevel.hidden,
@@ -374,6 +384,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
       ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
       ProductionDashboardCard.financeControlling: ProductionAccessLevel.view,
+      ProductionDashboardCard.advancedPlanning: ProductionAccessLevel.hidden,
     },
     roleAdmin: {
       ProductionDashboardCard.products: ProductionAccessLevel.manage,
@@ -396,6 +407,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.manage,
       ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
       ProductionDashboardCard.financeControlling: ProductionAccessLevel.manage,
+      ProductionDashboardCard.advancedPlanning: ProductionAccessLevel.manage,
     },
     roleSuperAdmin: {
       ProductionDashboardCard.products: ProductionAccessLevel.manage,
@@ -418,6 +430,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.manage,
       ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
       ProductionDashboardCard.financeControlling: ProductionAccessLevel.manage,
+      ProductionDashboardCard.advancedPlanning: ProductionAccessLevel.manage,
     },
     roleMaintenanceManager: {
       ProductionDashboardCard.products: ProductionAccessLevel.hidden,
@@ -441,6 +454,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
       ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
       ProductionDashboardCard.financeControlling: ProductionAccessLevel.view,
+      ProductionDashboardCard.advancedPlanning: ProductionAccessLevel.hidden,
     },
     roleQualityOperator: {
       ProductionDashboardCard.products: ProductionAccessLevel.view,
@@ -463,6 +477,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
       ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
       ProductionDashboardCard.financeControlling: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.advancedPlanning: ProductionAccessLevel.hidden,
     },
     roleAccountingManager: {
       ProductionDashboardCard.products: ProductionAccessLevel.hidden,
@@ -485,6 +500,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.hidden,
       ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
       ProductionDashboardCard.financeControlling: ProductionAccessLevel.manage,
+      ProductionDashboardCard.advancedPlanning: ProductionAccessLevel.hidden,
     },
     roleAccountingClerk: {
       ProductionDashboardCard.products: ProductionAccessLevel.hidden,
@@ -507,6 +523,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.aiAssistant: ProductionAccessLevel.hidden,
       ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
       ProductionDashboardCard.financeControlling: ProductionAccessLevel.view,
+      ProductionDashboardCard.advancedPlanning: ProductionAccessLevel.hidden,
     },
     roleQualityControl: _accessQualityManagerHub(),
   };
@@ -616,5 +633,55 @@ class ProductionAccessHelper {
   static bool canEditStationScreenCustomColors(String role) {
     final r = normalizeRole(role);
     return r == roleAdmin || r == roleSuperAdmin;
+  }
+
+  /// APS P0+ — pregled (samo uloga; modul kompanije provjeri zasebno).
+  /// Kanonske uloge: [roleAdmin], [roleSuperAdmin], [roleProductionManager].
+  static bool canViewAps(String role) {
+    final r = normalizeRole(role);
+    return r == roleSuperAdmin ||
+        r == roleAdmin ||
+        r == roleProductionManager;
+  }
+
+  /// APS P0 — create/update master data (**samo uloga**).
+  /// Modul `advanced_planning` na kompaniji provjeri s [canAccessApsP0Callable].
+  static bool canManageApsMasterData(String role) {
+    final r = normalizeRole(role);
+    return r == roleSuperAdmin || r == roleAdmin || r == roleProductionManager;
+  }
+
+  /// APS P0 Callable pristup = **oba** uslova: modul kompanije + uloga.
+  /// `advanced_planning` je entitlement, **ne** `users.role`.
+  static bool canAccessApsP0Callable({
+    required String role,
+    required Map<String, dynamic> companyData,
+  }) {
+    return ProductionModuleKeys.hasAdvancedPlanningModule(companyData) &&
+        canManageApsMasterData(role);
+  }
+
+  /// APS P1 Callable pristup = modul + uloga (P0 gate + `aps_scenario_planning`).
+  static bool canAccessApsP1Callable({
+    required String role,
+    required Map<String, dynamic> companyData,
+  }) {
+    return ProductionModuleKeys.hasApsScenarioPlanningModule(companyData) &&
+        canManageApsMasterData(role);
+  }
+
+  /// APS P6 Callable pristup = P1 gate + add-on `aps_ai_assistant`.
+  static bool canAccessApsP6Callable({
+    required String role,
+    required Map<String, dynamic> companyData,
+  }) {
+    return ProductionModuleKeys.hasApsAiAssistantModule(companyData) &&
+        canAccessApsP1Callable(role: role, companyData: companyData);
+  }
+
+  /// APS P4+ — odobrenje scenarija i release u MES (uloga; modul kao gore).
+  static bool canApproveApsRelease(String role) {
+    final r = normalizeRole(role);
+    return r == roleSuperAdmin || r == roleAdmin || r == roleProductionManager;
   }
 }
