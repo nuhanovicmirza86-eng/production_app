@@ -1,0 +1,380 @@
+{
+  "generatedAt": "2026-06-16T04:20:11.392Z",
+  "runId": "MQG4UW74",
+  "companyId": "plamingo",
+  "analysisRunId": "qfjjUyiN94LDNpwKjFI1",
+  "requestId": "smoke-p1-ui-run-MQG4UW74",
+  "companyHasAi": true,
+  "alertOpen": {
+    "alertId": "wzSWoGgqp0juHAIaZXbs",
+    "companyId": "plamingo",
+    "plantKey": "",
+    "businessYearId": "",
+    "ruleId": "planned_items.draft_backlog",
+    "dedupeKey": "plamingo:planned_items.draft_backlog:global",
+    "signalHash": "5a5858c310efc6da5e9cdf396e5ebcb8bf587764b45641a8ac049ae3c0768ea7",
+    "status": "open",
+    "severity": "info",
+    "headline": "Planirane stavke čekaju odobrenje",
+    "summary": "4 planiranih stavki u statusu nacrt.",
+    "factsUsed": [
+      {
+        "factType": "planned_cash_item",
+        "sourceCollection": "finance_planned_cash_items",
+        "sourceId": "AzUM9CKx3sexnP698qCl",
+        "label": "Smoke P1 UI draft MQG4UW74-3",
+        "asOfAt": {
+          "seconds": 1781583584,
+          "nanoseconds": 652000000
+        },
+        "snapshot": {
+          "direction": "outflow",
+          "nominalAmount": 103,
+          "status": "draft"
+        }
+      },
+      {
+        "factType": "planned_cash_item",
+        "sourceCollection": "finance_planned_cash_items",
+        "sourceId": "MuzmAEaHKCqvAWwtjPA7",
+        "label": "Smoke P1 UI draft MQG4UW74-2",
+        "asOfAt": {
+          "seconds": 1781583584,
+          "nanoseconds": 331000000
+        },
+        "snapshot": {
+          "direction": "outflow",
+          "nominalAmount": 102,
+          "status": "draft"
+        }
+      },
+      {
+        "factType": "planned_cash_item",
+        "sourceCollection": "finance_planned_cash_items",
+        "sourceId": "ZiYg0mX8wmqxus42YDe6",
+        "label": "Smoke P1 UI draft MQG4UW74-1",
+        "asOfAt": {
+          "seconds": 1781583584,
+          "nanoseconds": 17000000
+        },
+        "snapshot": {
+          "direction": "outflow",
+          "nominalAmount": 101,
+          "status": "draft"
+        }
+      }
+    ],
+    "confidenceScore": 95,
+    "confidenceOrigin": "deterministic_only",
+    "confidenceFactors": {
+      "factCompleteness": 75,
+      "dataFreshnessMinutes": 0,
+      "signalStrength": 70,
+      "forecastHorizonDays": 30
+    },
+    "primaryRecommendation": {
+      "actionType": "review_draft_planned_items",
+      "title": "Pregledajte nacrte planiranih stavki",
+      "detail": "Odobrite ili otkažite nacrte prije uključivanja u prognozu.",
+      "navigationParams": {
+        "status": "draft"
+      }
+    },
+    "aiExplanation": {
+      "causeSummary": "4 planiranih stavki u statusu nacrt.",
+      "recommendedActionNarrative": "Odobrite ili otkažite nacrte prije uključivanja u prognozu.",
+      "limitations": "P1-M1 koristi deterministički tekst; generativni AI nije korišten za odluku.",
+      "generatedAt": {
+        "seconds": 1781583588,
+        "nanoseconds": 558000000
+      },
+      "modelId": "deterministic-template-v1",
+      "promptVersion": "2026-06-finance-ai-p1-m1-v1"
+    },
+    "analysisRunId": "qfjjUyiN94LDNpwKjFI1",
+    "triggerSource": "manual",
+    "triggeredAt": {
+      "seconds": 1781583588,
+      "nanoseconds": 558000000
+    },
+    "firstDetectedAt": {
+      "seconds": 1781583588,
+      "nanoseconds": 558000000
+    },
+    "lastDetectedAt": {
+      "seconds": 1781583588,
+      "nanoseconds": 558000000
+    },
+    "contractVersion": "2026-06-finance-ai-p1-v1",
+    "documentId": "wzSWoGgqp0juHAIaZXbs",
+    "createdAt": {
+      "seconds": 1781583588,
+      "nanoseconds": 585000000
+    },
+    "updatedAt": {
+      "seconds": 1781583588,
+      "nanoseconds": 585000000
+    },
+    "primaryRecommendationId": "8IPdFl0cmpfWhpKKttkf"
+  },
+  "alertAck": {
+    "alertId": "wzSWoGgqp0juHAIaZXbs",
+    "companyId": "plamingo",
+    "plantKey": "",
+    "businessYearId": "",
+    "ruleId": "planned_items.draft_backlog",
+    "dedupeKey": "plamingo:planned_items.draft_backlog:global",
+    "signalHash": "5a5858c310efc6da5e9cdf396e5ebcb8bf587764b45641a8ac049ae3c0768ea7",
+    "severity": "info",
+    "headline": "Planirane stavke čekaju odobrenje",
+    "summary": "4 planiranih stavki u statusu nacrt.",
+    "factsUsed": [
+      {
+        "factType": "planned_cash_item",
+        "sourceCollection": "finance_planned_cash_items",
+        "sourceId": "AzUM9CKx3sexnP698qCl",
+        "label": "Smoke P1 UI draft MQG4UW74-3",
+        "asOfAt": {
+          "seconds": 1781583584,
+          "nanoseconds": 652000000
+        },
+        "snapshot": {
+          "direction": "outflow",
+          "nominalAmount": 103,
+          "status": "draft"
+        }
+      },
+      {
+        "factType": "planned_cash_item",
+        "sourceCollection": "finance_planned_cash_items",
+        "sourceId": "MuzmAEaHKCqvAWwtjPA7",
+        "label": "Smoke P1 UI draft MQG4UW74-2",
+        "asOfAt": {
+          "seconds": 1781583584,
+          "nanoseconds": 331000000
+        },
+        "snapshot": {
+          "direction": "outflow",
+          "nominalAmount": 102,
+          "status": "draft"
+        }
+      },
+      {
+        "factType": "planned_cash_item",
+        "sourceCollection": "finance_planned_cash_items",
+        "sourceId": "ZiYg0mX8wmqxus42YDe6",
+        "label": "Smoke P1 UI draft MQG4UW74-1",
+        "asOfAt": {
+          "seconds": 1781583584,
+          "nanoseconds": 17000000
+        },
+        "snapshot": {
+          "direction": "outflow",
+          "nominalAmount": 101,
+          "status": "draft"
+        }
+      }
+    ],
+    "confidenceScore": 95,
+    "confidenceOrigin": "deterministic_only",
+    "confidenceFactors": {
+      "factCompleteness": 75,
+      "dataFreshnessMinutes": 0,
+      "signalStrength": 70,
+      "forecastHorizonDays": 30
+    },
+    "primaryRecommendation": {
+      "actionType": "review_draft_planned_items",
+      "title": "Pregledajte nacrte planiranih stavki",
+      "detail": "Odobrite ili otkažite nacrte prije uključivanja u prognozu.",
+      "navigationParams": {
+        "status": "draft"
+      }
+    },
+    "aiExplanation": {
+      "causeSummary": "4 planiranih stavki u statusu nacrt.",
+      "recommendedActionNarrative": "Odobrite ili otkažite nacrte prije uključivanja u prognozu.",
+      "limitations": "P1-M1 koristi deterministički tekst; generativni AI nije korišten za odluku.",
+      "generatedAt": {
+        "seconds": 1781583588,
+        "nanoseconds": 558000000
+      },
+      "modelId": "deterministic-template-v1",
+      "promptVersion": "2026-06-finance-ai-p1-m1-v1"
+    },
+    "analysisRunId": "qfjjUyiN94LDNpwKjFI1",
+    "triggerSource": "manual",
+    "triggeredAt": {
+      "seconds": 1781583588,
+      "nanoseconds": 558000000
+    },
+    "firstDetectedAt": {
+      "seconds": 1781583588,
+      "nanoseconds": 558000000
+    },
+    "lastDetectedAt": {
+      "seconds": 1781583588,
+      "nanoseconds": 558000000
+    },
+    "contractVersion": "2026-06-finance-ai-p1-v1",
+    "documentId": "wzSWoGgqp0juHAIaZXbs",
+    "createdAt": {
+      "seconds": 1781583588,
+      "nanoseconds": 585000000
+    },
+    "primaryRecommendationId": "8IPdFl0cmpfWhpKKttkf",
+    "acknowledgedByUid": "6EqhbXY5NvRisrT5EkyKsWnLrms2",
+    "acknowledgedAt": {
+      "seconds": 1781583600,
+      "nanoseconds": 464000000
+    },
+    "status": "acknowledged",
+    "updatedAt": {
+      "seconds": 1781583600,
+      "nanoseconds": 464000000
+    }
+  },
+  "alertDismissed": {
+    "alertId": "wzSWoGgqp0juHAIaZXbs",
+    "companyId": "plamingo",
+    "plantKey": "",
+    "businessYearId": "",
+    "ruleId": "planned_items.draft_backlog",
+    "dedupeKey": "plamingo:planned_items.draft_backlog:global",
+    "signalHash": "5a5858c310efc6da5e9cdf396e5ebcb8bf587764b45641a8ac049ae3c0768ea7",
+    "severity": "info",
+    "headline": "Planirane stavke čekaju odobrenje",
+    "summary": "4 planiranih stavki u statusu nacrt.",
+    "factsUsed": [
+      {
+        "factType": "planned_cash_item",
+        "sourceCollection": "finance_planned_cash_items",
+        "sourceId": "AzUM9CKx3sexnP698qCl",
+        "label": "Smoke P1 UI draft MQG4UW74-3",
+        "asOfAt": {
+          "seconds": 1781583584,
+          "nanoseconds": 652000000
+        },
+        "snapshot": {
+          "direction": "outflow",
+          "nominalAmount": 103,
+          "status": "draft"
+        }
+      },
+      {
+        "factType": "planned_cash_item",
+        "sourceCollection": "finance_planned_cash_items",
+        "sourceId": "MuzmAEaHKCqvAWwtjPA7",
+        "label": "Smoke P1 UI draft MQG4UW74-2",
+        "asOfAt": {
+          "seconds": 1781583584,
+          "nanoseconds": 331000000
+        },
+        "snapshot": {
+          "direction": "outflow",
+          "nominalAmount": 102,
+          "status": "draft"
+        }
+      },
+      {
+        "factType": "planned_cash_item",
+        "sourceCollection": "finance_planned_cash_items",
+        "sourceId": "ZiYg0mX8wmqxus42YDe6",
+        "label": "Smoke P1 UI draft MQG4UW74-1",
+        "asOfAt": {
+          "seconds": 1781583584,
+          "nanoseconds": 17000000
+        },
+        "snapshot": {
+          "direction": "outflow",
+          "nominalAmount": 101,
+          "status": "draft"
+        }
+      }
+    ],
+    "confidenceScore": 95,
+    "confidenceOrigin": "deterministic_only",
+    "confidenceFactors": {
+      "factCompleteness": 75,
+      "dataFreshnessMinutes": 0,
+      "signalStrength": 70,
+      "forecastHorizonDays": 30
+    },
+    "primaryRecommendation": {
+      "actionType": "review_draft_planned_items",
+      "title": "Pregledajte nacrte planiranih stavki",
+      "detail": "Odobrite ili otkažite nacrte prije uključivanja u prognozu.",
+      "navigationParams": {
+        "status": "draft"
+      }
+    },
+    "aiExplanation": {
+      "causeSummary": "4 planiranih stavki u statusu nacrt.",
+      "recommendedActionNarrative": "Odobrite ili otkažite nacrte prije uključivanja u prognozu.",
+      "limitations": "P1-M1 koristi deterministički tekst; generativni AI nije korišten za odluku.",
+      "generatedAt": {
+        "seconds": 1781583588,
+        "nanoseconds": 558000000
+      },
+      "modelId": "deterministic-template-v1",
+      "promptVersion": "2026-06-finance-ai-p1-m1-v1"
+    },
+    "analysisRunId": "qfjjUyiN94LDNpwKjFI1",
+    "triggerSource": "manual",
+    "triggeredAt": {
+      "seconds": 1781583588,
+      "nanoseconds": 558000000
+    },
+    "firstDetectedAt": {
+      "seconds": 1781583588,
+      "nanoseconds": 558000000
+    },
+    "lastDetectedAt": {
+      "seconds": 1781583588,
+      "nanoseconds": 558000000
+    },
+    "contractVersion": "2026-06-finance-ai-p1-v1",
+    "documentId": "wzSWoGgqp0juHAIaZXbs",
+    "createdAt": {
+      "seconds": 1781583588,
+      "nanoseconds": 585000000
+    },
+    "primaryRecommendationId": "8IPdFl0cmpfWhpKKttkf",
+    "acknowledgedByUid": "6EqhbXY5NvRisrT5EkyKsWnLrms2",
+    "acknowledgedAt": {
+      "seconds": 1781583600,
+      "nanoseconds": 464000000
+    },
+    "dismissReason": "UI acceptance dismiss MQG4UW74",
+    "dismissedByUid": "MySVwajEr0Yzg3rncgwLeXD8zwn2",
+    "dismissedAt": {
+      "seconds": 1781583604,
+      "nanoseconds": 71000000
+    },
+    "status": "dismissed",
+    "updatedAt": {
+      "seconds": 1781583604,
+      "nanoseconds": 71000000
+    }
+  },
+  "historyAlertIds": [
+    "wzSWoGgqp0juHAIaZXbs",
+    "CAnpn55iBOgUXxUJrXPf",
+    "9ay2odcBBuNFhXGdwXxu",
+    "e70Qk6mYqonDI7QETiZv",
+    "nEwvyA5tCPCQplTPzdrv"
+  ],
+  "feedbackId": "GIE6euen9ojRBnqcLRTg",
+  "p13ActionScreens": {
+    "view_cash_flow_forecast": "FinanceCashFlowForecastScreen",
+    "view_receivables": "FinanceReceivablesScreen",
+    "view_payables": "FinancePayablesScreen",
+    "view_planned_cash_items": "FinancePlannedCashItemsScreen",
+    "review_draft_planned_items": "FinancePlannedCashItemsScreen",
+    "view_account": "FinanceAccountsScreen",
+    "view_payment_allocations": "FinanceCashTransactionsScreen",
+    "no_action": null
+  },
+  "insightsCountBefore": 39,
+  "insightsCountAfter": 39
+}

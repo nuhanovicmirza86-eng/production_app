@@ -35,7 +35,9 @@ class FinanceAiAdvisoryNavigation {
     required Map<String, dynamic> companyData,
     bool debugUnlockModule = false,
   }) {
-    switch (action) {
+    final type = screenTypeForAction(action);
+    if (type == null) return null;
+    switch (action.trim().toLowerCase()) {
       case 'view_cash_flow_forecast':
         return MaterialPageRoute<void>(
           builder: (_) => FinanceCashFlowForecastScreen(
@@ -88,6 +90,29 @@ class FinanceAiAdvisoryNavigation {
             debugUnlockModule: debugUnlockModule,
           ),
         );
+    }
+  }
+
+  /// Kanonski P1–P3 ekran za actionType (integration / QA).
+  static String? screenTypeForAction(String actionType) {
+    switch (actionType.trim().toLowerCase()) {
+      case 'view_cash_flow_forecast':
+        return 'FinanceCashFlowForecastScreen';
+      case 'view_receivables':
+        return 'FinanceReceivablesScreen';
+      case 'view_payables':
+        return 'FinancePayablesScreen';
+      case 'view_planned_cash_items':
+      case 'review_draft_planned_items':
+        return 'FinancePlannedCashItemsScreen';
+      case 'view_account':
+        return 'FinanceAccountsScreen';
+      case 'view_payment_allocations':
+        return 'FinanceCashTransactionsScreen';
+      case 'no_action':
+        return null;
+      default:
+        return 'FinanceCashFlowHubTabBody';
     }
   }
 }
