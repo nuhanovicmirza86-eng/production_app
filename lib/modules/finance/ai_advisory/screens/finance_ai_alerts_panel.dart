@@ -19,12 +19,14 @@ class FinanceAiAlertsPanel extends StatefulWidget {
     required this.businessYearId,
     this.sessionPlantKey = '',
     this.debugUnlockModule = false,
+    this.onAlertsChanged,
   });
 
   final Map<String, dynamic> companyData;
   final String businessYearId;
   final String sessionPlantKey;
   final bool debugUnlockModule;
+  final VoidCallback? onAlertsChanged;
 
   @override
   State<FinanceAiAlertsPanel> createState() => _FinanceAiAlertsPanelState();
@@ -181,7 +183,10 @@ class _FinanceAiAlertsPanelState extends State<FinanceAiAlertsPanel> {
         ),
       ),
     );
-    if (changed == true) await _loadAlerts();
+    if (changed == true) {
+      await _loadAlerts();
+      widget.onAlertsChanged?.call();
+    }
   }
 
   @override

@@ -222,6 +222,34 @@ class FinanceDisplayLabels {
     'dismissed',
   ];
 
+  static String notificationDeliveryStatus(
+    BuildContext context,
+    String status,
+  ) {
+    switch (status.trim().toLowerCase()) {
+      case 'unread':
+        return FinanceStrings.t(context, 'notification_status_unread');
+      case 'read':
+        return FinanceStrings.t(context, 'notification_status_read');
+      case 'acknowledged':
+        return FinanceStrings.t(context, 'notification_status_acknowledged');
+      case 'superseded':
+        return FinanceStrings.t(context, 'notification_status_superseded');
+      case 'closed':
+        return FinanceStrings.t(context, 'notification_status_closed');
+      default:
+        return status;
+    }
+  }
+
+  static const notificationDeliveryStatusCodes = <String>[
+    'unread',
+    'read',
+    'acknowledged',
+    'superseded',
+    'closed',
+  ];
+
   static String advisoryRuleId(BuildContext context, String ruleId) {
     final key = 'advisory_rule_${ruleId.replaceAll('.', '_')}';
     final translated = FinanceStrings.t(context, key);

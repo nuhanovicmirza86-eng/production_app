@@ -17,6 +17,7 @@ import '../widgets/finance_erp_hub_tab_body.dart';
 import '../widgets/finance_screen_context_info.dart';
 import '../../finance/cash_flow/screens/finance_cash_flow_hub_tab_body.dart';
 import '../../finance/invoices/screens/finance_invoices_hub_tab_body.dart';
+import '../../finance/ai_notifications/widgets/finance_ai_notification_badge.dart';
 import 'finance_ai_assistant_screen.dart';
 import 'finance_controlling_dashboard_tab.dart';
 import 'finance_controlling_operative_tab_widgets.dart';
@@ -51,6 +52,14 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
   bool _didAutoSelectFy = false;
   /// Samo kad [FinancePermissions.shouldUseHubPlantScopeSelector]: prazan = svi pogoni.
   String _financeHubPlantScope = '';
+  final _aiNotificationRefresh = ValueNotifier<int>(0);
+
+  @override
+  void dispose() {
+    _aiNotificationRefresh.dispose();
+    _tabController.dispose();
+    super.dispose();
+  }
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -100,6 +109,7 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
 
   Future<void> _onFinanceHubPlantScopeChanged(String plantKey) async {
     setState(() => _financeHubPlantScope = plantKey.trim());
+    _aiNotificationRefresh.value++;
     await FinanceControllingPlantScopePreference.save(
       _companyId,
       plantKey,
@@ -112,12 +122,6 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
     );
     if (!mounted) return;
     setState(() => _businessYearId = id.trim());
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   @override
@@ -177,11 +181,23 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
             companyData: widget.companyData,
             role: _role,
             debugUnlockModule: widget.debugUnlockModule,
-          ))
+          ) ||
+              FinancePermissions.canViewFinanceAiAdvisory(
+                companyData: widget.companyData,
+                role: _role,
+                debugUnlockModule: widget.debugUnlockModule,
+              ))
             IconButton(
               tooltip: 'AI asistent',
-              icon: const Icon(Icons.smart_toy_outlined),
-              onPressed: () {
+              icon: FinanceAiNotificationBadge(
+                companyId: _companyId,
+                companyData: widget.companyData,
+                plantKey: _effectiveFinancePlantKey,
+                refreshListenable: _aiNotificationRefresh,
+                debugUnlockModule: widget.debugUnlockModule,
+                child: const Icon(Icons.smart_toy_outlined),
+              ),
+              onPressed: () async {
                 if (_businessYearId.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -192,7 +208,7 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
                   );
                   return;
                 }
-                Navigator.push<void>(
+                await Navigator.push<void>(
                   context,
                   MaterialPageRoute<void>(
                     builder: (_) => FinanceAiAssistantScreen(
@@ -205,6 +221,7 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
                     ),
                   ),
                 );
+                if (mounted) _aiNotificationRefresh.value++;
               },
             ),
         ],

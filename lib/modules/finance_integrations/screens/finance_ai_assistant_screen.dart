@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 
 import '../../../core/company_plant_display_name.dart';
 import '../../finance/ai_advisory/screens/finance_ai_alerts_panel.dart';
+import '../../finance/ai_notifications/screens/finance_ai_notification_inbox_screen.dart';
+import '../../finance/ai_notifications/widgets/finance_ai_notification_badge.dart';
 import '../../finance/shared/finance_strings.dart';
 import '../models/finance_ai_company_memory_doc.dart';
 import '../models/finance_ai_insight_doc.dart';
@@ -45,9 +47,20 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
   final _memorySvc = FinanceAiCompanyMemoryService();
   final _insightsList = FinanceAiInsightsListService();
   final _kpiSvc = FinanceKpiSnapshotService();
+  final _notificationRefresh = ValueNotifier<int>(0);
 
   bool _runningWatch = false;
   bool _runningAnalysis = false;
+
+  @override
+  void dispose() {
+    _notificationRefresh.dispose();
+    super.dispose();
+  }
+
+  void _refreshNotificationBadge() {
+    _notificationRefresh.value++;
+  }
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -406,7 +419,22 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Finance AI asistent'),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Finance AI asistent'),
+            if (_canViewAdvisory) ...[
+              const SizedBox(width: 8),
+              FinanceAiNotificationBadge(
+                companyId: _companyId,
+                companyData: widget.companyData,
+                plantKey: widget.plantKey.trim(),
+                refreshListenable: _notificationRefresh,
+                debugUnlockModule: widget.debugUnlockModule,
+              ),
+            ],
+          ],
+        ),
         actions: [
           FinanceScreenContextInfo(
             title: 'Kako asistent koristi kontekst',
@@ -510,6 +538,17 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
               businessYearId: widget.businessYearId.trim(),
               sessionPlantKey: widget.plantKey.trim(),
               debugUnlockModule: widget.debugUnlockModule,
+              onAlertsChanged: _refreshNotificationBadge,
+            ),
+            const SizedBox(height: 20),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            FinanceAiNotificationInboxPanel(
+              companyData: widget.companyData,
+              sessionPlantKey: widget.plantKey.trim(),
+              debugUnlockModule: widget.debugUnlockModule,
+              refreshListenable: _notificationRefresh,
+              onDeliveryChanged: _refreshNotificationBadge,
             ),
           ],
           if (_canViewAdvisory && _canAi) ...[
