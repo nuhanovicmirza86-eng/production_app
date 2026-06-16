@@ -602,6 +602,19 @@ class FinancePermissions {
     );
   }
 
+  /// Telemetry interakcija s preporukom — isti krug kao feedback.
+  static bool canRecordFinanceAiInteraction({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canSubmitFinanceAiFeedback(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
   /// Ručno pokretanje advisory analize — AI entitlement + finance uloga.
   static bool canRunFinanceAiAdvisoryAnalysis({
     required Map<String, dynamic> companyData,

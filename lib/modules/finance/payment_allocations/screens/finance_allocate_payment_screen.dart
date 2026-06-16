@@ -2,6 +2,8 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../../ai_advisory/services/finance_ai_advisory_action_bridge.dart';
+import '../../ai_advisory/services/finance_ai_outcome_service.dart';
 import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../../cash_transactions/models/finance_cash_transaction.dart';
 import '../../cash_transactions/services/finance_cash_transactions_service.dart';
@@ -278,13 +280,22 @@ class _FinanceAllocatePaymentScreenState
             ),
           )
           .toList();
-      await _allocService.allocatePayment(
+      final result = await _allocService.allocatePayment(
         companyId: _companyId,
         transactionId: _tx.id,
         lines: lines,
         requestId:
             '${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(1 << 30)}',
       );
+      final auditLogId = (result['auditLogId'] ?? '').toString().trim();
+      if (auditLogId.isNotEmpty) {
+        await FinanceAiAdvisoryActionBridge.tryCompleteFromWorkflow(
+          outcomeService: FinanceAiOutcomeService(),
+          targetEntityType: 'finance_cash_transaction',
+          targetEntityId: _tx.id,
+          actionAuditId: auditLogId,
+        );
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(FinanceStrings.t(context, 'allocation_saved'))),

@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 
+import '../ai_advisory/models/finance_ai_outcome_evidence.dart';
 import 'finance_money_format.dart';
 import 'finance_strings.dart';
 
@@ -439,5 +440,90 @@ class FinanceDisplayLabels {
         )
         .replaceAll('_', ' ')
         .trim();
+  }
+
+  static String advisoryOutcomeStatus(BuildContext context, String status) {
+    final key = 'advisory_outcome_status_${status.trim()}';
+    final localized = FinanceStrings.t(context, key);
+    if (localized != key) return localized;
+    return _humanizeCamelCase(status);
+  }
+
+  static String advisoryOutcomeStatusMessage(BuildContext context, String status) {
+    final key = 'advisory_outcome_message_${status.trim()}';
+    final localized = FinanceStrings.t(context, key);
+    if (localized != key) return localized;
+    return advisoryOutcomeStatus(context, status);
+  }
+
+  static String advisoryOutcomeAttribution(BuildContext context, String level) {
+    switch (level.trim().toLowerCase()) {
+      case 'direct':
+        return FinanceStrings.t(context, 'advisory_outcome_attribution_direct');
+      case 'contributing':
+        return FinanceStrings.t(
+          context,
+          'advisory_outcome_attribution_contributing',
+        );
+      case 'uncertain':
+        return FinanceStrings.t(context, 'advisory_outcome_attribution_uncertain');
+      case 'not_attributable':
+        return FinanceStrings.t(
+          context,
+          'advisory_outcome_attribution_not_attributable',
+        );
+      default:
+        return _humanizeCamelCase(level);
+    }
+  }
+
+  static String advisoryOutcomeConfirmationMethod(
+    BuildContext context,
+    String method,
+  ) {
+    switch (method.trim().toLowerCase()) {
+      case 'overdue_amount_reduction':
+        return FinanceStrings.t(
+          context,
+          'advisory_outcome_confirmation_overdue_amount_reduction',
+        );
+      case 'invoice_payment_timing':
+        return FinanceStrings.t(
+          context,
+          'advisory_outcome_confirmation_invoice_payment_timing',
+        );
+      case 'forecast_risk_removed':
+        return FinanceStrings.t(
+          context,
+          'advisory_outcome_confirmation_forecast_risk_removed',
+        );
+      default:
+        return _humanizeCamelCase(method);
+    }
+  }
+
+  static String advisoryOutcomeEvidenceMeasured(
+    BuildContext context,
+    FinanceAiOutcomeEvidence evidence,
+  ) {
+    final field = evidence.sourceFieldPath.trim().toLowerCase();
+    if (field.contains('overdue')) {
+      return FinanceStrings.t(context, 'advisory_outcome_evidence_overdue_amount');
+    }
+    if (field.contains('openamount') || field == 'open_amount') {
+      return FinanceStrings.t(context, 'advisory_outcome_evidence_open_amount');
+    }
+    if (evidence.evidenceType.trim().toLowerCase().contains('forecast')) {
+      return FinanceStrings.t(context, 'advisory_outcome_evidence_forecast_signal');
+    }
+    final type = evidence.evidenceType.trim();
+    if (type.isNotEmpty) {
+      final key = 'advisory_outcome_evidence_${type.replaceAll('.', '_')}';
+      final localized = FinanceStrings.t(context, key);
+      if (localized != key) return localized;
+      return _humanizeCamelCase(type);
+    }
+    if (field.isNotEmpty) return _humanizeCamelCase(field);
+    return FinanceStrings.t(context, 'advisory_outcome_evidence_title');
   }
 }

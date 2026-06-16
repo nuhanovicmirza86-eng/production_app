@@ -116,6 +116,7 @@ class FinanceAiAlert {
     required this.confidenceFactors,
     required this.primaryRecommendation,
     required this.aiExplanation,
+    this.primaryRecommendationId = '',
     this.plantKey = '',
     this.businessYearId = '',
     this.dedupeKey = '',
@@ -147,6 +148,7 @@ class FinanceAiAlert {
   final Map<String, dynamic> confidenceFactors;
   final FinanceAiPrimaryRecommendation primaryRecommendation;
   final FinanceAiAlertExplanation aiExplanation;
+  final String primaryRecommendationId;
   final String analysisRunId;
   final String triggerSource;
   final DateTime? triggeredAt;
@@ -207,6 +209,7 @@ class FinanceAiAlert {
             ? Map<String, dynamic>.from(m['primaryRecommendation'] as Map)
             : null,
       ),
+      primaryRecommendationId: (m['primaryRecommendationId'] ?? '').toString(),
       aiExplanation: FinanceAiAlertExplanation.fromMap(
         m['aiExplanation'] is Map
             ? Map<String, dynamic>.from(m['aiExplanation'] as Map)
