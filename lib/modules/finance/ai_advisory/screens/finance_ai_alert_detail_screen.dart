@@ -267,9 +267,11 @@ class _FinanceAiAlertDetailScreenState extends State<FinanceAiAlertDetailScreen>
           reasonCode,
         ),
         metadata: {
-          'filterPreset': reasonCode,
-          if (otherText != null && otherText.trim().isNotEmpty)
-            'navigationTarget': otherText.trim(),
+          'rejectionReasonCode': reasonCode,
+          if (reasonCode == FinanceAiRejectReasonCodes.other &&
+              otherText != null &&
+              otherText.trim().isNotEmpty)
+            'rejectionReasonText': otherText.trim(),
         },
       );
     } finally {
