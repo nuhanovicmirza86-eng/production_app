@@ -39,25 +39,47 @@ class FinanceDatePickerField extends StatelessWidget {
   Widget build(BuildContext context) {
     final fmt = DateFormat.yMMMd(Localizations.localeOf(context).languageCode);
     final text = value != null ? fmt.format(value!) : '—';
+    final theme = Theme.of(context);
 
-    return InputDecorator(
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-      ),
-      child: InkWell(
-        onTap: () => _pick(context),
-        child: Row(
-          children: [
-            Expanded(child: Text(text)),
-            IconButton(
-              tooltip: FinanceStrings.t(context, 'pick_date'),
-              icon: const Icon(Icons.calendar_today_outlined),
-              onPressed: () => _pick(context),
-            ),
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w500,
+          ),
+          maxLines: 2,
+          softWrap: true,
         ),
-      ),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: () => _pick(context),
+          borderRadius: BorderRadius.circular(4),
+          child: InputDecorator(
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
+              suffixIcon: Icon(
+                Icons.calendar_today_outlined,
+                size: 20,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            child: Text(
+              text,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

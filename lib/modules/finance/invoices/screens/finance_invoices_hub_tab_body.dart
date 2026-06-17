@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../finance_integrations/utils/finance_permissions.dart';
-import '../../shared/finance_strings.dart';
-import '../../receivables/screens/finance_receivables_screen.dart';
 import '../../payables/screens/finance_payables_screen.dart';
+import '../../receivables/screens/finance_receivables_screen.dart';
+import '../../shared/finance_hub_entry_card.dart';
+import '../../shared/finance_strings.dart';
 import 'finance_purchase_invoices_screen.dart';
 import 'finance_sales_invoices_screen.dart';
 
@@ -41,15 +42,11 @@ class FinanceInvoicesHubTabBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(
-          FinanceStrings.t(context, 'invoices_hub_subtitle'),
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 16),
-        _EntryCard(
+        FinanceHubEntryCard(
           icon: Icons.receipt_long_outlined,
           title: FinanceStrings.t(context, 'card_sales_invoices_title'),
-          subtitle: FinanceStrings.t(context, 'card_sales_invoices_subtitle'),
+          helpTitleKey: 'help_card_sales_invoices_title',
+          helpBodyKey: 'help_card_sales_invoices_body',
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => FinanceSalesInvoicesScreen(
@@ -60,10 +57,11 @@ class FinanceInvoicesHubTabBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        _EntryCard(
+        FinanceHubEntryCard(
           icon: Icons.request_quote_outlined,
           title: FinanceStrings.t(context, 'card_purchase_invoices_title'),
-          subtitle: FinanceStrings.t(context, 'card_purchase_invoices_subtitle'),
+          helpTitleKey: 'help_card_purchase_invoices_title',
+          helpBodyKey: 'help_card_purchase_invoices_body',
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => FinancePurchaseInvoicesScreen(
@@ -74,10 +72,11 @@ class FinanceInvoicesHubTabBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        _EntryCard(
+        FinanceHubEntryCard(
           icon: Icons.account_balance_outlined,
           title: FinanceStrings.t(context, 'card_receivables_title'),
-          subtitle: FinanceStrings.t(context, 'card_receivables_subtitle'),
+          helpTitleKey: 'help_card_receivables_title',
+          helpBodyKey: 'help_card_receivables_body',
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => FinanceReceivablesScreen(
@@ -88,10 +87,11 @@ class FinanceInvoicesHubTabBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        _EntryCard(
+        FinanceHubEntryCard(
           icon: Icons.payments_outlined,
           title: FinanceStrings.t(context, 'card_payables_title'),
-          subtitle: FinanceStrings.t(context, 'card_payables_subtitle'),
+          helpTitleKey: 'help_card_payables_title',
+          helpBodyKey: 'help_card_payables_body',
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => FinancePayablesScreen(
@@ -102,51 +102,6 @@ class FinanceInvoicesHubTabBody extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _EntryCard extends StatelessWidget {
-  const _EntryCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, size: 28),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 6),
-                    Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

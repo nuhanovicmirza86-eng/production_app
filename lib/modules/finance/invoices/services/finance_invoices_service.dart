@@ -63,14 +63,24 @@ class FinanceInvoicesService {
     required String companyId,
     required String invoiceId,
   }) async {
+    final map = await getSalesInvoiceRaw(
+      companyId: companyId,
+      invoiceId: invoiceId,
+    );
+    final id = (map['documentId'] ?? invoiceId).toString();
+    return FinanceSalesInvoice.fromCallableMap(id, map);
+  }
+
+  Future<Map<String, dynamic>> getSalesInvoiceRaw({
+    required String companyId,
+    required String invoiceId,
+  }) async {
     final callable = _functions.httpsCallable('getFinanceSalesInvoice');
     final response = await callable.call(<String, dynamic>{
       'companyId': companyId.trim(),
       'invoiceId': invoiceId.trim(),
     });
-    final map = Map<String, dynamic>.from(response.data as Map);
-    final id = (map['documentId'] ?? invoiceId).toString();
-    return FinanceSalesInvoice.fromCallableMap(id, map);
+    return Map<String, dynamic>.from(response.data as Map);
   }
 
   Future<String> createSalesDraft({
@@ -193,14 +203,24 @@ class FinanceInvoicesService {
     required String companyId,
     required String invoiceId,
   }) async {
+    final map = await getPurchaseInvoiceRaw(
+      companyId: companyId,
+      invoiceId: invoiceId,
+    );
+    final id = (map['documentId'] ?? invoiceId).toString();
+    return FinancePurchaseInvoice.fromCallableMap(id, map);
+  }
+
+  Future<Map<String, dynamic>> getPurchaseInvoiceRaw({
+    required String companyId,
+    required String invoiceId,
+  }) async {
     final callable = _functions.httpsCallable('getFinancePurchaseInvoice');
     final response = await callable.call(<String, dynamic>{
       'companyId': companyId.trim(),
       'invoiceId': invoiceId.trim(),
     });
-    final map = Map<String, dynamic>.from(response.data as Map);
-    final id = (map['documentId'] ?? invoiceId).toString();
-    return FinancePurchaseInvoice.fromCallableMap(id, map);
+    return Map<String, dynamic>.from(response.data as Map);
   }
 
   Future<String> createPurchaseDraft({

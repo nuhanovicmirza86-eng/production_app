@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 
 import '../ai_advisory/models/finance_ai_outcome_evidence.dart';
+import '../bank_reconciliation/models/finance_bank_match_confirmation.dart';
 import 'finance_money_format.dart';
 import 'finance_strings.dart';
 
@@ -442,6 +443,8 @@ class FinanceDisplayLabels {
         .trim();
   }
 
+  static String humanizeToken(String key) => _humanizeCamelCase(key);
+
   static String advisoryOutcomeStatus(BuildContext context, String status) {
     final key = 'advisory_outcome_status_${status.trim()}';
     final localized = FinanceStrings.t(context, key);
@@ -525,5 +528,87 @@ class FinanceDisplayLabels {
     }
     if (field.isNotEmpty) return _humanizeCamelCase(field);
     return FinanceStrings.t(context, 'advisory_outcome_evidence_title');
+  }
+
+  static const bankStatementStatusCodes = <String>[
+    'imported',
+    'unmatched',
+    'suggested',
+    'confirmed',
+    'posted',
+    'partially_reconciled',
+    'reconciled',
+    'ignored',
+  ];
+
+  static String bankStatementStatus(BuildContext context, String status) {
+    switch (status.trim().toLowerCase()) {
+      case 'imported':
+        return FinanceStrings.t(context, 'bank_status_imported');
+      case 'unmatched':
+        return FinanceStrings.t(context, 'bank_status_unmatched');
+      case 'suggested':
+        return FinanceStrings.t(context, 'bank_status_suggested');
+      case 'confirmed':
+        return FinanceStrings.t(context, 'bank_status_confirmed');
+      case 'posted':
+        return FinanceStrings.t(context, 'bank_status_posted');
+      case 'partially_reconciled':
+        return FinanceStrings.t(context, 'bank_status_partially_reconciled');
+      case 'reconciled':
+        return FinanceStrings.t(context, 'bank_status_reconciled');
+      case 'ignored':
+        return FinanceStrings.t(context, 'bank_status_ignored');
+      default:
+        return status;
+    }
+  }
+
+  static String matchConfidence(BuildContext context, String level) {
+    switch (level.trim().toLowerCase()) {
+      case 'high':
+        return FinanceStrings.t(context, 'bank_match_confidence_high');
+      case 'medium':
+        return FinanceStrings.t(context, 'bank_match_confidence_medium');
+      case 'low':
+        return FinanceStrings.t(context, 'bank_match_confidence_low');
+      default:
+        return level;
+    }
+  }
+
+  static String matchSignal(BuildContext context, String signal) {
+    final key = 'bank_signal_${signal.trim().toLowerCase()}';
+    final localized = FinanceStrings.t(context, key);
+    if (localized != key) return localized;
+    return _humanizeCamelCase(signal);
+  }
+
+  static String blockingReason(BuildContext context, String reason) {
+    final key = 'bank_blocking_${reason.trim().toLowerCase()}';
+    final localized = FinanceStrings.t(context, key);
+    if (localized != key) return localized;
+    return _humanizeCamelCase(reason);
+  }
+
+  static String reconciliationStatus(BuildContext context, String status) {
+    switch (status.trim().toLowerCase()) {
+      case 'reconciled':
+        return FinanceStrings.t(context, 'bank_status_reconciled');
+      case 'partially_reconciled':
+        return FinanceStrings.t(context, 'bank_status_partially_reconciled');
+      default:
+        return status;
+    }
+  }
+
+  static String bankMatchConfirmationStatus(
+    BuildContext context,
+    FinanceBankMatchConfirmation confirmation,
+  ) {
+    if (confirmation.isCancelled) {
+      return FinanceStrings.t(context, 'tx_status_cancelled');
+    }
+    return reconciliationStatus(context, confirmation.reconciliationStatus);
   }
 }

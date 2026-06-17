@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../../accounts/screens/finance_accounts_screen.dart';
+import '../../bank_reconciliation/screens/finance_bank_statements_screen.dart';
 import '../../cash_flow_categories/screens/finance_cash_flow_categories_screen.dart';
 import '../../cash_transactions/screens/finance_cash_transactions_screen.dart';
 import '../../cash_transactions/screens/finance_realized_cash_flow_screen.dart';
 import '../../forecast/screens/finance_cash_flow_forecast_screen.dart';
 import '../../planned_cash_items/screens/finance_planned_cash_items_screen.dart';
+import '../../shared/finance_hub_entry_card.dart';
 import '../../shared/finance_strings.dart';
 
 /// Tab **Cash Flow** unutar postojećeg Finance & Controlling huba.
@@ -40,18 +42,20 @@ class FinanceCashFlowHubTabBody extends StatelessWidget {
       );
     }
 
+    final canBank = FinancePermissions.canViewBankReconciliation(
+      companyData: companyData,
+      role: _role,
+      debugUnlockModule: debugUnlockModule,
+    );
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(
-          FinanceStrings.t(context, 'finance_hub_subtitle'),
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 16),
-        _CashFlowEntryCard(
+        FinanceHubEntryCard(
           icon: Icons.account_balance_wallet_outlined,
           title: FinanceStrings.t(context, 'card_accounts_title'),
-          subtitle: FinanceStrings.t(context, 'card_accounts_subtitle'),
+          helpTitleKey: 'help_card_accounts_title',
+          helpBodyKey: 'help_card_accounts_body',
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => FinanceAccountsScreen(
@@ -62,10 +66,11 @@ class FinanceCashFlowHubTabBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        _CashFlowEntryCard(
+        FinanceHubEntryCard(
           icon: Icons.category_outlined,
           title: FinanceStrings.t(context, 'card_categories_title'),
-          subtitle: FinanceStrings.t(context, 'card_categories_subtitle'),
+          helpTitleKey: 'help_card_categories_title',
+          helpBodyKey: 'help_card_categories_body',
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => FinanceCashFlowCategoriesScreen(
@@ -76,10 +81,11 @@ class FinanceCashFlowHubTabBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        _CashFlowEntryCard(
+        FinanceHubEntryCard(
           icon: Icons.receipt_long_outlined,
           title: FinanceStrings.t(context, 'card_transactions_title'),
-          subtitle: FinanceStrings.t(context, 'card_transactions_subtitle'),
+          helpTitleKey: 'help_card_transactions_title',
+          helpBodyKey: 'help_card_transactions_body',
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => FinanceCashTransactionsScreen(
@@ -90,10 +96,11 @@ class FinanceCashFlowHubTabBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        _CashFlowEntryCard(
+        FinanceHubEntryCard(
           icon: Icons.assessment_outlined,
           title: FinanceStrings.t(context, 'card_realized_title'),
-          subtitle: FinanceStrings.t(context, 'card_realized_subtitle'),
+          helpTitleKey: 'help_card_realized_title',
+          helpBodyKey: 'help_card_realized_body',
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => FinanceRealizedCashFlowScreen(
@@ -104,10 +111,11 @@ class FinanceCashFlowHubTabBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        _CashFlowEntryCard(
+        FinanceHubEntryCard(
           icon: Icons.event_note_outlined,
           title: FinanceStrings.t(context, 'card_planned_items_title'),
-          subtitle: FinanceStrings.t(context, 'card_planned_items_subtitle'),
+          helpTitleKey: 'help_card_planned_items_title',
+          helpBodyKey: 'help_card_planned_items_body',
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => FinancePlannedCashItemsScreen(
@@ -117,11 +125,29 @@ class FinanceCashFlowHubTabBody extends StatelessWidget {
             ),
           ),
         ),
+        if (canBank) ...[
+          const SizedBox(height: 12),
+          FinanceHubEntryCard(
+            icon: Icons.account_balance_outlined,
+            title: FinanceStrings.t(context, 'card_bank_statements_title'),
+            helpTitleKey: 'help_card_bank_statements_title',
+            helpBodyKey: 'help_card_bank_statements_body',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => FinanceBankStatementsScreen(
+                  companyData: companyData,
+                  debugUnlockModule: debugUnlockModule,
+                ),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
-        _CashFlowEntryCard(
+        FinanceHubEntryCard(
           icon: Icons.timeline_outlined,
           title: FinanceStrings.t(context, 'card_forecast_title'),
-          subtitle: FinanceStrings.t(context, 'card_forecast_subtitle'),
+          helpTitleKey: 'help_card_forecast_title',
+          helpBodyKey: 'help_card_forecast_body',
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => FinanceCashFlowForecastScreen(
@@ -132,54 +158,6 @@ class FinanceCashFlowHubTabBody extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _CashFlowEntryCard extends StatelessWidget {
-  const _CashFlowEntryCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, size: 28),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 6),
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

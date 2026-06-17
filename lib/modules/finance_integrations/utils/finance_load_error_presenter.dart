@@ -35,21 +35,33 @@ Future<void> showFinanceTechnicalDetailDialog(
   BuildContext context, {
   required String title,
   required String detail,
+  String? closeLabel,
+  Widget? footer,
 }) async {
   await showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text(title),
       content: SingleChildScrollView(
-        child: SelectableText(
-          detail.isEmpty ? '—' : detail,
-          style: Theme.of(ctx).textTheme.bodySmall,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SelectableText(
+              detail.isEmpty ? '—' : detail,
+              style: Theme.of(ctx).textTheme.bodySmall,
+            ),
+            if (footer != null) ...[
+              const SizedBox(height: 12),
+              footer,
+            ],
+          ],
         ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx),
-          child: const Text('Zatvori'),
+          child: Text(closeLabel ?? 'Zatvori'),
         ),
       ],
     ),

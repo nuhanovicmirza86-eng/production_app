@@ -68,6 +68,14 @@ class FinanceStrings {
     'type_virtual': 'Virtualni račun',
     'type_credit_line': 'Kreditni račun',
     'error_generic': 'Došlo je do greške. Pokušajte ponovo.',
+    'error_function_not_found':
+        'Servis za bankovne stavke nije dostupan (Cloud Function nije deployana). '
+        'Osvježite aplikaciju kasnije ili kontaktirajte administratora.',
+    'error_parse': 'Neispravan odgovor servera pri učitavanju podataka.',
+    'error_server_internal':
+        'Greška na serveru pri učitavanju podataka. Pokušajte ponovo za nekoliko sekundi.',
+    'error_missing_company':
+        'Nedostaje kontekst kompanije. Odjavite se i ponovo se prijavite.',
     'saved': 'Spremljeno.',
     'deactivated': 'Deaktivirano.',
     'pick_date': 'Odaberi datum',
@@ -420,6 +428,7 @@ class FinanceStrings {
     'advisory_outcome_evidence_open_amount': 'Otvoreni iznos',
     'advisory_outcome_evidence_forecast_signal': 'Signal prognoze likvidnosti',
     'retry': 'Ponovi',
+    'more_actions': 'Više akcija',
     'advisory_resolution_reason': 'Razlog rješenja',
     'advisory_dismiss_reason_label': 'Razlog odbacivanja',
     'advisory_origin_deterministic_only': 'Procjena iz poslovnih podataka',
@@ -573,6 +582,438 @@ class FinanceStrings {
     'notification_status_acknowledged': 'Potvrđeno',
     'notification_status_superseded': 'Zamijenjeno',
     'notification_status_closed': 'Zatvoreno',
+    'card_bank_statements_title': 'Bankovne stavke',
+    'card_bank_statements_subtitle':
+        'Import iz ERP-a, pregled stavki, prijedlozi uparivanja i potvrda usklađivanja.',
+    'bank_statements_title': 'Bankovne stavke',
+    'bank_statements_empty': 'Nema bankovnih stavki za odabrane filtere.',
+    'bank_import': 'Pokreni import',
+    'bank_import_title': 'Import bankovnih stavki',
+    'bank_import_connection': 'ERP veza',
+    'bank_import_account': 'Bankovni račun',
+    'bank_import_started': 'Import je pokrenut.',
+    'bank_import_status': 'Status importa',
+    'bank_import_success': 'Bankovne stavke su uspješno importovane.',
+    'bank_import_success_detail':
+        'Import završen: {created} novih, {updated} ažuriranih stavki.',
+    'bank_import_partial':
+        'Import djelomično uspješan ({failed} grešaka). Provjerite sync log.',
+    'bank_import_failed': 'Import bankovnih stavki nije uspio.',
+    'bank_ignore': 'Ignoriši stavku',
+    'bank_restore': 'Vrati ignorisanu stavku',
+    'bank_ignore_reason': 'Razlog ignorisanja',
+    'bank_detail_title': 'Bankovna stavka',
+    'bank_booking_date': 'Datum knjiženja',
+    'bank_value_date': 'Datum valute',
+    'bank_counterparty': 'Partner / platitelj',
+    'bank_reference': 'Referenca plaćanja',
+    'bank_description': 'Opis',
+    'bank_status_imported': 'Uvezeno',
+    'bank_status_unmatched': 'Neupareno',
+    'bank_status_suggested': 'Ima prijedloge',
+    'bank_status_confirmed': 'Potvrđeno',
+    'bank_status_posted': 'Knjiženo',
+    'bank_status_partially_reconciled': 'Djelimično usklađeno',
+    'bank_status_reconciled': 'Usklađeno',
+    'bank_status_ignored': 'Ignorisano',
+    'bank_match_suggestions_title': 'Prijedlozi uparivanja',
+    'bank_match_suggestions_empty': 'Nema prijedloga za ovu stavku.',
+    'bank_match_generate': 'Generiši prijedloge',
+    'bank_match_generate_success': 'Generisano {count} prijedlog(a).',
+    'bank_match_generate_none': 'Nema novih kandidata za uparivanje.',
+    'bank_match_generate_skipped_reconciled':
+        'Usklađena/knjižena stavka — novi prijedlozi se ne generišu.',
+    'bank_match_suggestions_empty_reconciled':
+        'Stavka je već usklađena — prijedlozi više nisu potrebni.',
+    'bank_match_score': 'Score',
+    'bank_match_confidence': 'Pouzdanost',
+    'bank_match_open_amount': 'Otvoreni iznos fakture',
+    'bank_match_signals': 'Poslovni razlozi',
+    'bank_match_blocking': 'Blokirajući razlozi',
+    'bank_match_dismiss': 'Odbaci prijedlog',
+    'bank_match_restore_suggestion': 'Vrati odbačeni prijedlog',
+    'bank_match_dismiss_reason': 'Razlog odbacivanja',
+    'bank_match_continue_confirm': 'Nastavi na potvrdu',
+    'bank_match_blocked_hint':
+        'Prijedlog ima blokirajuće razloge i ne može se potvrditi.',
+    'bank_match_confirm_title': 'Potvrda uparivanja',
+    'bank_match_confirm_preview': 'Pregled prije potvrde',
+    'bank_match_bank_amount': 'Bankovna stavka',
+    'bank_match_allocated': 'Raspoređeno',
+    'bank_match_unallocated': 'Neraspoređeno',
+    'bank_match_result_partial': 'Rezultat: djelimično usklađeno',
+    'bank_match_result_full': 'Rezultat: potpuno usklađeno',
+    'bank_match_result_over': 'Raspodjela prelazi iznos stavke',
+    'bank_match_category': 'Cash Flow kategorija',
+    'bank_match_note': 'Napomena',
+    'bank_match_add_line': 'Dodaj fakturu',
+    'bank_match_confirm_submit': 'Potvrdi uparivanje',
+    'bank_match_confirmations_title': 'Historija potvrda',
+    'bank_match_confirmations_empty': 'Nema potvrda za ovu stavku.',
+    'bank_match_confirmation_detail': 'Detalj potvrde',
+    'bank_match_confirmation_unlabeled': 'Potvrda uparivanja',
+    'bank_match_confirmed_by': 'Potvrdio',
+    'bank_match_confirmed_at': 'Vrijeme potvrde',
+    'bank_match_cash_transaction': 'Cash Flow transakcija',
+    'bank_match_allocations': 'Alokacije po fakturama',
+    'bank_match_cancel': 'Otkaži potvrdu',
+    'bank_match_cancel_confirm_title': 'Otkazivanje potvrde uparivanja',
+    'bank_match_cancel_confirm_body':
+        'Operonix Industrial će kreirati reversal Cash Flow zapis, poništiti povezane alokacije, vratiti otvorene iznose faktura i zadržati puni audit trag. Nema brisanja podataka.',
+    'bank_match_cancel_reason': 'Razlog otkazivanja',
+    'bank_match_cancel_result_title': 'Rezultat otkazivanja',
+    'bank_match_cancelled_at': 'Vrijeme otkazivanja',
+    'bank_match_cancelled_by': 'Otkazao',
+    'bank_match_reversal_txn': 'Reversal transakcija',
+    'bank_match_cancelled': 'Potvrda je otkazana.',
+    'bank_audit_trail_title': 'Historija i audit trag',
+    'bank_audit_trail_empty': 'Nema audit zapisa za ovu bankovnu stavku.',
+    'bank_audit_trail_tap_detail': 'Dodirnite za prije/poslije i povezane zapise',
+    'audit_performed_by': 'Izvršio',
+    'audit_entity_type': 'Tip entiteta',
+    'audit_source': 'Izvor',
+    'audit_request_id': 'Request ID',
+    'audit_related_entities': 'Povezani zapisi',
+    'audit_before': 'Stanje prije',
+    'audit_after': 'Stanje poslije',
+    'audit_action_bank_statement_import_create': 'Bankovna stavka uvezena',
+    'audit_action_bank_statement_import_update': 'Bankovna stavka ažurirana iz ERP-a',
+    'audit_action_bank_statement_ignore': 'Bankovna stavka ignorisana',
+    'audit_action_bank_statement_restore': 'Bankovna stavka vraćena iz ignorisanih',
+    'audit_action_bank_statement_status_suggested': 'Status stavke: prijedlozi dostupni',
+    'audit_action_bank_match_suggestion_create': 'Prijedlog uparivanja generisan',
+    'audit_action_bank_match_suggestion_refresh': 'Prijedlog uparivanja osvježen',
+    'audit_action_bank_match_suggestion_dismiss': 'Prijedlog uparivanja odbačen',
+    'audit_action_bank_match_suggestion_restore': 'Odbačeni prijedlog vraćen',
+    'audit_action_bank_match_confirm': 'Potvrda uparivanja kreirana',
+    'audit_action_bank_match_post': 'Bankovna stavka usklađena (knjiženje)',
+    'audit_action_bank_match_allocate': 'Alokacija na fakturu kreirana',
+    'audit_action_bank_match_cancel': 'Potvrda uparivanja otkazana',
+    'audit_action_cancel': 'Alokacija poništena',
+    'audit_source_manual': 'Ručna radnja korisnika',
+    'audit_source_scheduled': 'Automatski posao (scheduler)',
+    'audit_source_system': 'Sistem',
+    'audit_entity_finance_bank_statement_transactions': 'Bankovna stavka',
+    'audit_entity_finance_bank_match_confirmations': 'Potvrda uparivanja',
+    'audit_entity_finance_bank_match_suggestions': 'Prijedlog uparivanja',
+    'audit_entity_finance_payment_allocation': 'Alokacija plaćanja',
+    'audit_entity_finance_cash_transactions': 'Cash Flow transakcija',
+    'bank_match_confidence_high': 'Visoka pouzdanost',
+    'bank_match_confidence_medium': 'Srednja pouzdanost',
+    'bank_match_confidence_low': 'Niska pouzdanost',
+    'bank_match_intro_primary':
+        'Operonix Industrial je pronašao moguće fakture za ovu bankovnu stavku. '
+        'Prvo pregledajte prijedloge s visokom pouzdanošću i provjerite razloge podudaranja prije potvrde.',
+    'bank_match_show_weak': 'Prikaži slabe prijedloge ({count})',
+    'bank_match_hide_weak': 'Sakrij slabe prijedloge',
+    'bank_match_card_open': 'Otvoreno',
+    'bank_match_card_title': 'Faktura {number} — {partner}',
+    'bank_match_card_bank_payment': 'Bankovna uplata',
+    'bank_match_card_bank_payout': 'Bankovna isplata',
+    'bank_match_amount_diff_none': 'Iznosi se podudaraju',
+    'bank_match_amount_diff_over': 'Banka je veća za {amount}',
+    'bank_match_amount_diff_under': 'Banka je manja za {amount}',
+    'bank_match_top_reasons': 'Razlozi',
+    'bank_match_tap_for_detail': 'Dodirnite za detaljno poređenje',
+    'bank_match_detail_title': 'Poređenje prijedloga',
+    'bank_match_detail_bank_section': 'Bankovna stavka',
+    'bank_match_detail_invoice_section': 'Faktura',
+    'bank_match_detail_why': 'Zašto je predložena',
+    'bank_match_detail_warnings': 'Upozorenja',
+    'bank_match_detail_invoice_total': 'Ukupni iznos fakture',
+    'bank_match_detail_invoice_due': 'Datum dospijeća',
+    'bank_match_detail_partner_account': 'Račun partnera',
+    'bank_match_detail_invoice_type_sales': 'Izlazna faktura (sales)',
+    'bank_match_detail_invoice_type_purchase': 'Ulazna faktura (purchase)',
+    'bank_match_detail_invoice_number': 'Broj fakture',
+    'bank_match_detail_back': 'Nazad na druge prijedloge',
+    'bank_match_detail_blocked_title': 'Potvrda nije moguća',
+    'bank_match_dismissed_section': 'Odbačeni prijedlozi',
+    'bank_match_hidden_useful_hint':
+        'Još {count} korisnih prijedloga nije prikazano — prikažite slabe ili generišite ponovo.',
+    'bank_match_sentence_invoice_number_exact':
+        'Broj fakture pronađen je u pozivu na broj',
+    'bank_match_sentence_payment_reference_exact':
+        'Referenca plaćanja potpuno odgovara fakturi',
+    'bank_match_sentence_exact_amount':
+        'Iznos bankovne stavke potpuno odgovara otvorenom iznosu fakture',
+    'bank_match_sentence_partial_amount':
+        'Iznos bankovne stavke djelimično pokriva otvoreni iznos fakture',
+    'bank_match_sentence_partner_account_exact':
+        'Bankovni račun partnera se podudara',
+    'bank_match_sentence_partner_name_normalized':
+        'Naziv partnera se podudara',
+    'bank_match_sentence_due_date_proximity':
+        'Datum plaćanja je blizu datuma dospijeća',
+    'bank_match_sentence_booking_date_proximity':
+        'Datum knjiženja je blizu datuma dospijeća',
+    'bank_match_sentence_currency_exact': 'Valuta se podudara',
+    'bank_match_sentence_open_amount_compatible':
+        'Otvoreni iznos fakture je kompatibilan s bankovnom stavkom',
+    'bank_match_warn_low_score':
+        'Niska pouzdanost — provjerite ručno prije potvrde',
+    'bank_match_warn_amount_diff': 'Iznos se razlikuje od otvorenog iznosa fakture',
+    'bank_match_warn_partner_weak':
+        'Partner nije pouzdano prepoznat (samo naziv, bez računa ili iznosa)',
+    'bank_match_warn_currency_date_only':
+        'Podudara se uglavnom samo valuta i/ili blizina datuma',
+    'bank_match_block_sentence_currency_mismatch': 'Valuta fakture i bankovne stavke se ne podudaraju',
+    'bank_match_block_sentence_invoice_closed': 'Faktura je već zatvorena',
+    'bank_match_block_sentence_invoice_conflict_requires_review':
+        'Faktura ima sync konflikt koji zahtijeva pregled',
+    'bank_match_block_sentence_bank_transaction_ignored':
+        'Bankovna stavka je ignorisana',
+    'bank_match_block_sentence_bank_transaction_already_posted':
+        'Bankovna stavka je već knjižena ili usklađena',
+    'bank_match_block_sentence_invalid_direction': 'Smjer fakture ne odgovara bankovnoj stavci',
+    'bank_match_block_sentence_missing_open_amount': 'Faktura nema otvoreni iznos',
+    'concurrency_refresh_hint':
+        'Podaci su osvježeni ispod. Provjerite iznose i ponovo pritisnite Potvrdi uparivanje.',
+    'bank_match_confirm_not_saved':
+        'Uparivanje nije potvrđeno — ništa nije spremljeno.',
+    'filter_currency': 'Valuta',
+    'bank_signal_exact_amount': 'Tačan iznos',
+    'bank_signal_partial_amount': 'Djelimičan iznos',
+    'bank_signal_invoice_number_exact': 'Broj fakture',
+    'bank_signal_payment_reference_exact': 'Referenca plaćanja',
+    'bank_signal_partner_account_exact': 'Račun partnera',
+    'bank_signal_partner_name_normalized': 'Naziv partnera',
+    'bank_signal_due_date_proximity': 'Blizina dospijeća',
+    'bank_signal_booking_date_proximity': 'Blizina datuma knjiženja',
+    'bank_signal_currency_exact': 'Ista valuta',
+    'bank_signal_open_amount_compatible': 'Kompatibilan otvoreni iznos',
+    'bank_blocking_currency_mismatch': 'Valuta se ne podudara',
+    'bank_blocking_invoice_closed': 'Faktura je zatvorena',
+    'bank_blocking_invoice_conflict_requires_review': 'Faktura zahtijeva sync pregled',
+    'bank_blocking_bank_transaction_ignored': 'Bankovna stavka je ignorisana',
+    'bank_blocking_bank_transaction_already_posted': 'Bankovna stavka je već knjižena',
+    'bank_blocking_invalid_direction': 'Neispravan smjer',
+    'bank_blocking_missing_open_amount': 'Nema otvorenog iznosa',
+    'bank_blocking_duplicate_candidate': 'Dupli kandidat',
+    'help_info_tooltip': 'Pojašnjenje',
+    'help_info_close': 'Zatvori',
+    'help_term_open_amount_title': 'Otvoreni iznos',
+    'help_term_open_amount_body':
+        'Dio fakture koji još nije plaćen. Kad potvrdite uparivanje, ovaj iznos se smanjuje za uplaćeni dio.',
+    'help_term_unallocated_title': 'Neraspoređeni iznos',
+    'help_term_unallocated_body':
+        'Dio bankovne stavke koji niste još povezali s fakturama. Ostaje neusmjeren dok ga ne alocirate pri potvrdi.',
+    'help_term_partially_reconciled_title': 'Djelimično usklađeno',
+    'help_term_partially_reconciled_body':
+        'Bankovna stavka je djelimično povezana s fakturama — dio iznosa je raspoređen, dio još nije.',
+    'help_term_match_confidence_title': 'Pouzdanost prijedloga',
+    'help_term_match_confidence_body':
+        'Koliko Operonix vjeruje da bankovna stavka odgovara toj fakturi, na temelju iznosa, partnera i reference. '
+        'Visoka pouzdanost ne zamjenjuje vašu provjeru.',
+    'help_term_cash_flow_category_title': 'Cash Flow kategorija',
+    'help_term_cash_flow_category_body':
+        'Razvrstava novac u operativni, investicioni ili finansijski tok — potrebna pri potvrdi uparivanja za izvještaj novca.',
+    'help_cash_flow_tab_title': 'Tab Cash Flow — pregled',
+    'help_cash_flow_tab_body':
+        'Operativni novčani tok u Operonixu: evidentirate račune i blagajne, kategorije Cash Flow-a, '
+        'ručne transakcije, planirane stavke i prognozu. Bankovne stavke iz ERP-a uparujete s fakturama '
+        'i potvrđujete knjiženje. Sve mutacije idu preko sigurnog backend sloja; iznosi na fakturama '
+        'ne računava aplikacija lokalno.\n\n'
+        'Referent (accounting_clerk) uglavnom unosi nacrte i pregleda; šef računovodstva, admin i '
+        'super_admin odobravaju, knjiže, usklađuju banku i otkazuju potvrde.',
+    'help_card_accounts_title': 'Računi i blagajne',
+    'help_card_accounts_body':
+        'Šifrarnik novčanih mjesta: bankovni računi, devizni računi, blagajne. Ovdje vidite trenutno '
+        'stanje koje backend održava na temelju knjiženih transakcija. Račun mora postojati prije '
+        'knjiženja uplate/isplate ili bankovne potvrde.',
+    'help_card_categories_title': 'Cash Flow kategorije',
+    'help_card_categories_body':
+        'Kategorije razvrstavaju svaki novčani tok u operativnu, investicionu ili finansijsku aktivnost '
+        '(Cash Flow izvještaj). Obavezne su pri kreiranju transakcije ili potvrdi bankovne stavke.',
+    'help_card_transactions_title': 'Transakcije',
+    'help_card_transactions_body':
+        'Ručni operativni novac: nacrt → knjiženje → usklađivanje ili storno. Za alokaciju na fakturu '
+        'koristite akciju na knjiženoj transakciji. Ovo nije isto što i bankovna stavka iz ERP-a — '
+        'banka ima poseban tok uvoza i potvrde uparivanja.',
+    'help_card_realized_title': 'Realizovani Cash Flow',
+    'help_card_realized_body':
+        'Sažetak već knjiženih i usklađenih transakcija za odabrani period. Koristite za brzu sliku '
+        'priliva i odliva po računu, kategoriji i smjeru — bez ručnog sabiranja u Excelu.',
+    'help_card_planned_items_title': 'Planirane stavke',
+    'help_card_planned_items_body':
+        'Budući očekivani prilivi i odlivi (npr. planirane rate, poznate obaveze). Nacrt se odobrava '
+        'prije nego uđe u prognozu. Ne zamjenjuje stvarne bankovne izvode.',
+    'help_card_forecast_title': 'Prognoza Cash Flow-a',
+    'help_card_forecast_body':
+        'Projekcija novca na temelju planiranih stavki i poznatog stanja računa. Pomaže vidjeti '
+        'mogući manjak likvidnosti u narednim tjednima — operativna procjena, ne ERP izvještaj.',
+    'help_card_bank_statements_title': 'Bankovne stavke',
+    'help_card_bank_statements_body':
+        'Stavke s bankovnog izvoda uvezenog iz ERP veze. Tipičan tok:\n'
+        '1) Pokreni import (ERP veza + bankovni račun).\n'
+        '2) Pregledaj stavke i filtere (period, račun, status, smjer, valuta).\n'
+        '3) Generiši prijedloge uparivanja — priliv traži izlazne (sales) fakture, odliv ulazne (purchase).\n'
+        '4) Ručno potvrdi iznose po fakturi (djelimično ili potpuno).\n'
+        '5) Pregledaj historiju potvrde; po potrebi otkaz (reversal, bez brisanja).\n\n'
+        'Referent vidi sve; import, ignore i potvrdu rade manager/admin/super_admin.',
+    'help_invoices_tab_title': 'Tab Fakture i otvorene stavke',
+    'help_invoices_tab_body':
+        'Operativne fakture i otvorena potraživanja/obaveze unutar tenanta. Izlazne i ulazne fakture '
+        'mogu doći iz ERP sync-a ili ručnog nacrta. Otvoreni iznosi služe za alokacije plaćanja i '
+        'bankovno uparivanje.',
+    'help_card_sales_invoices_title': 'Izlazne fakture',
+    'help_card_sales_invoices_body':
+        'Fakture kupcima: nacrt, izdavanje, otkaz. Otvoreni iznos se smanjuje alokacijama i bankovnom '
+        'potvrdom uplate. Status sync konflikta blokira automatske prijedloge dok se ne riješi u ERP-u.',
+    'help_card_purchase_invoices_title': 'Ulazne fakture',
+    'help_card_purchase_invoices_body':
+        'Fakture dobavljača: nacrt, odobrenje, otkaz. Koriste se pri uparivanju odliva s bankovne stavke '
+        'i ručnoj alokaciji plaćanja.',
+    'help_card_receivables_title': 'Potraživanja',
+    'help_card_receivables_body':
+        'Pregled otvorenih izlaznih faktura po kupcu — dospijeća, zakašnjenja i ukupni otvoreni iznos '
+        'za brzu kontrolu naplate.',
+    'help_card_payables_title': 'Obaveze',
+    'help_card_payables_body':
+        'Pregled otvorenih ulaznih faktura prema dobavljačima — šta je za platiti i u kojem iznosu.',
+    'help_erp_tab_title': 'Tab ERP integracija',
+    'help_erp_tab_body':
+        'Povezivanje Operonix Financija s vašim računovodstvenim sustavom (npr. Pantheon). Veza drži '
+        'credentials na serveru; aplikacija ne piše direktno u ERP bankovni izvod. Sync poslovi povlače '
+        'fakture i bankovne stavke; mapiranja usklađuju polja; logovi pomažu pri greškama.',
+    'help_erp_connections_title': 'Aktivne ERP veze',
+    'help_erp_connections_body':
+        'Lista konfiguriranih konektora po kompaniji. Nova veza zahtijeva admin/manager ovlasti. '
+        'Bez aktivne veze bankovni import i sync faktura ne rade.',
+    'help_erp_bank_tile_title': 'Bankovne stavke (iz ERP taba)',
+    'help_erp_bank_tile_body':
+        'Isti ekran kao u tabu Cash Flow — brzi ulaz nakon podešavanja veze. Import bankovnog izvoda '
+        'radi ovdje ili na listi stavki (ikona oblaka).',
+    'help_erp_integration_dashboard_title': 'Pregled integracije',
+    'help_erp_integration_dashboard_body':
+        'Sažetak stanja konektora, zadnjih sync runova i osnovnih KPI integracije.',
+    'help_erp_document_links_title': 'Veze dokumenata',
+    'help_erp_document_links_body':
+        'Mapiranje Operonix entiteta (nalog, faktura, …) na zapise u ERP-u radi traceability.',
+    'help_erp_control_snapshots_title': 'Kontrolni snimci',
+    'help_erp_control_snapshots_body':
+        'Snimci za reconciliaciju kontroling podataka između Operonixa i ERP-a.',
+    'help_erp_error_resolution_title': 'Rješavanje grešaka sinkronizacije',
+    'help_erp_error_resolution_body':
+        'Ponovni pokušaj ili otkaz sync poslova koji su pali; prvi korak kad import ne donese očekivane stavke.',
+    'help_erp_sync_jobs_title': 'Sync poslovi',
+    'help_erp_sync_jobs_body':
+        'Pregled zakazanih i ručnih poslova sinkronizacije — status, trajanje, tip (fakture, banka, …).',
+    'help_erp_sync_logs_title': 'Sync logovi',
+    'help_erp_sync_logs_body':
+        'Detaljni zapisi po poslu — korisno za support i audit kada treba vidjeti šta je ERP vratio.',
+    'help_erp_mappings_title': 'Mapiranja',
+    'help_erp_mappings_body':
+        'Pravila kako ERP polja postaju Operonix finance_* dokumenti. Ne mijenjajte bez razumijevanja '
+        'poslovnog uticaja na fakture i banku.',
+    'help_erp_csv_export_title': 'CSV / Excel izvoz',
+    'help_erp_csv_export_body':
+        'Veze koje podržavaju izvoz podataka u CSV/Excel za ručnu provjeru ili vanjski alat.',
+    'help_bank_list_title': 'Lista bankovnih stavki',
+    'help_bank_list_body':
+        'Prikaz uvezenih stavki s bankovnog izvoda. Filter perioda je na klijentu (datum knjiženja); '
+        'ostali filteri su po statusu, računu, smjeru i valuti. Ikona oblaka: import (ERP veza + račun). '
+        'Tap na stavku otvara detalj, prijedloge i historiju potvrda.',
+    'help_bank_import_title': 'Import bankovnog izvoda',
+    'help_bank_import_body':
+        'Ručno pokretanje povlačenja novih stavki iz ERP-a za odabranu vezu i bankovni račun. '
+        'Nakon importa osvježite listu. Status sync runa prikazuje se u dijalogu. Samo manager/admin/super_admin.',
+    'help_bank_detail_title': 'Detalj bankovne stavke',
+    'help_bank_detail_body':
+        'Osnovni podaci stavke (iznos, smjer, partner, reference). Ignoriraj stavku samo dok '
+        'nije knjižena ili usklađena (imported, unmatched, suggested, confirmed). '
+        'Knjižene/usklađene stavke nije moguće ignorisati — za poništavanje uparivanja koristite '
+        'otkazivanje potvrde u historiji. Generiši prijedloge nakon importa. '
+        'Prijedlog s crvenim blocking razlozima ne može u potvrdu.',
+    'help_bank_suggestions_title': 'Prijedlozi uparivanja',
+    'help_bank_suggestions_body':
+        'Automatski kandidati: faktura, score, pouzdanost i poslovni signali (iznos, referenca, …). '
+        'Priliv → samo sales fakture; odliv → samo purchase. Odbaci loše prijedloge; odbačeni se '
+        'ne vraćaju automatski osim restore akcije. Nastavi na potvrdu ne popunjava iznos — vi odlučujete.\n\n'
+        'Prijedlog s blocking razlozima ne može u potvrdu — razlozi su navedeni na kartici prijedloga.',
+    'help_bank_confirm_title': 'Potvrda uparivanja',
+    'help_bank_confirm_body':
+        'Ručno zadajete iznos po fakturi (1 ili više linija), Cash Flow kategoriju i napomenu. '
+        'Pregled prije potvrde pokazuje bankovni iznos, raspoređeno i neraspoređeno. Djelimična uplata '
+        'daje partially_reconciled; puna raspodjela reconciled. Isti requestId pri ponovnom slanju ne duplira.',
+    'help_bank_confirmation_title': 'Historija potvrde',
+    'help_bank_confirmation_body':
+        'Audit zapis: ko je potvrdio, Cash Flow transakcija, alokacije po fakturama, status usklađivanja. '
+        'Otkaz (manager+) kreira reversal transakciju i vraća otvorene iznose faktura — nema brisanja zapisa.',
+    'help_bank_audit_trail_title': 'Historija i audit trag',
+    'help_bank_audit_trail_body':
+        'IATF trag svih poslovno relevantnih događaja za ovu bankovnu stavku — učitava se iz finance_audit_logs '
+        'pri svakom otvaranju. Prikazuje tko, kada, šta je promijenjeno (prije/poslije), razlog i povezane entitete. '
+        'Zapisi se ne brišu i ne mijenjaju nakon snimanja.',
+    'finance_assistant_title': 'Finance asistent',
+    'finance_assistant_module': 'Finance & Controlling',
+    'finance_assistant_fab_title': 'Pitaj Finance asistenta',
+    'finance_assistant_fab_subtitle':
+        'Objasnit ću vam ovaj ekran i sljedeći korak.',
+    'finance_assistant_current_screen': 'Trenutno objašnjavam: {screen}',
+    'finance_assistant_new_chat': 'Novi razgovor',
+    'finance_assistant_input_hint': 'Postavite pitanje…',
+    'finance_assistant_ask_more': 'Pitaj Finance asistenta više o ovome',
+    'finance_assistant_ctx_status': 'Status stavke: {status}',
+    'finance_assistant_ctx_actions': 'Dostupne akcije: {actions}',
+    'finance_assistant_screen_bank_statements_list': 'Bankovne stavke',
+    'finance_assistant_screen_bank_statement_detail': 'Detalj bankovne stavke',
+    'finance_assistant_screen_bank_match_confirm': 'Potvrda uparivanja',
+    'finance_assistant_screen_bank_match_confirmation_detail': 'Detalj potvrde',
+    'finance_assistant_intro_bank_statements_list':
+        'Tu sam da objasnim ovaj ekran i pomognem vam da povežete bankovne uplate ili isplate s fakturama. '
+        'Ništa neću knjižiti niti potvrditi umjesto vas.',
+    'finance_assistant_intro_bank_statement_detail':
+        'Na detalju stavke vidite prijedloge, historiju potvrda i audit trag. '
+        'Vodim vas kroz sljedeći korak — bez automatskih knjiženja.',
+    'finance_assistant_intro_bank_match_confirm':
+        'Ovdje ručno zadajete alokacije prije knjiženja. Provjerite iznose prije potvrde.',
+    'finance_assistant_intro_bank_match_confirmation_detail':
+        'Ovdje je audit zapis potvrde ili otkazivanja. Mogu objasniti reversal i alokacije.',
+    'finance_assistant_q_bank_list_purpose': 'Čemu služi ovaj ekran?',
+    'finance_assistant_q_bank_generate': 'Šta znači Generiši prijedloge?',
+    'finance_assistant_q_bank_why_suggested': 'Zašto je ova faktura predložena?',
+    'finance_assistant_q_bank_confirm_effect': 'Šta će se desiti ako potvrdim?',
+    'finance_assistant_q_bank_cancel_effect': 'Šta znači otkazivanje potvrde?',
+    'finance_assistant_q_bank_next_step': 'Koji je moj sljedeći korak?',
+    'finance_assistant_a_bank_list_purpose':
+        'Šta znači: ovdje su uvezene bankovne stavke koje treba povezati s fakturama.\n\n'
+        'Šta uraditi: filtrirajte period, otvorite stavku ili pokrenite import.\n\n'
+        'Šta se dešava: import povlači nove stavke iz ERP-a; dalje radite uparivanje na detalju.',
+    'finance_assistant_a_bank_generate':
+        'Šta znači: Operonix traži fakture koje odgovaraju iznosu, referenci i partneru.\n\n'
+        'Šta uraditi: na detalju stavke kliknite Generiši prijedloge.\n\n'
+        'Šta se dešava: dobijate rangirane kandidate; vi odlučujete koji ide u potvrdu.',
+    'finance_assistant_a_bank_why_suggested':
+        'Šta znači: prijedlog je zasnovan na signali poput iznosa, broja fakture i reference plaćanja.\n\n'
+        'Šta uraditi: otvorite prijedlog i provjerite blocking razloge (npr. valuta).\n\n'
+        'Šta se dešava: loš prijedlog možete odbaciti; dobar vodi na Potvrdi.',
+    'finance_assistant_a_bank_confirm_effect':
+        'Šta znači: potvrda knjiži Cash Flow transakciju i alokacije na fakture.\n\n'
+        'Šta uraditi: provjerite iznose, kategoriju i napomenu, zatim Potvrdi.\n\n'
+        'Šta se dešava: bankovna stavka postaje djelimično ili potpuno usklađena; zapis ostaje u audit tragu.',
+    'finance_assistant_a_bank_cancel_effect':
+        'Šta znači: otkazivanje kreira reversal i vraća otvorene iznose faktura.\n\n'
+        'Šta uraditi: unesite poslovni razlog otkazivanja.\n\n'
+        'Šta se dešava: potvrda prelazi u otkazano; cijeli lanac ostaje vidljiv u historiji.',
+    'finance_assistant_a_bank_next_step':
+        'Šta uraditi: slijedite status stavke — import → prijedlozi → potvrda → usklađivanje.\n\n'
+        'Ako je akcija nedostupna, provjerite ulogu i blocking razlog na prijedlogu.',
+    'finance_assistant_a_free_text':
+        'Za detaljno pitanje koristite predložena dugmad ili kontaktirajte administratora. '
+        'Ja objašnjavam tok i pojmove — ne izvršavam knjiženja umjesto vas.',
+    'finance_assistant_a_default':
+        'Odaberite jedno od predloženih pitanja ili opišite što vas zbunjuje na ovom ekranu.',
+    'help_finance_hub_tabs_title': 'Finance & Controlling — tabovi',
+    'help_finance_hub_tabs_body':
+        'Gornji tabovi dijele modul na cjeline:\n'
+        '• Pregled — sažetak KPI i kontroling kartice za odabrano razdoblje.\n'
+        '• Proizvodnja, Zastoji, Kvalitet, Održavanje, Nabava — agregati troškova i operativnih pokazatelja po domeni.\n'
+        '• Budžeti — plan vs. stvarno po poslovnoj godini.\n'
+        '• Cash Flow — operativni novac, računi, transakcije, bankovne stavke (ⓘ na svakoj kartici).\n'
+        '• Fakture i otvorene stavke — izlazne/ulazne fakture, potraživanja i obaveze.\n'
+        '• ERP — veza s računovodstvenim sustavom, sync i bankovni import.\n\n'
+        'Na svakoj kartici unutar taba dodirnite ⓘ za detaljno objašnjenje bez ulaska u ekran.',
   };
 
   static const _en = <String, String>{
@@ -630,6 +1071,14 @@ class FinanceStrings {
     'type_virtual': 'Virtual account',
     'type_credit_line': 'Credit line',
     'error_generic': 'Something went wrong. Please try again.',
+    'error_function_not_found':
+        'Bank statement service is unavailable (Cloud Function not deployed). '
+        'Try again later or contact your administrator.',
+    'error_parse': 'Invalid server response while loading data.',
+    'error_server_internal':
+        'Server error while loading data. Please try again in a few seconds.',
+    'error_missing_company':
+        'Company context is missing. Sign out and sign in again.',
     'saved': 'Saved.',
     'deactivated': 'Deactivated.',
     'pick_date': 'Pick date',
@@ -985,6 +1434,7 @@ class FinanceStrings {
     'advisory_outcome_evidence_open_amount': 'Open amount',
     'advisory_outcome_evidence_forecast_signal': 'Liquidity forecast signal',
     'retry': 'Retry',
+    'more_actions': 'More actions',
     'advisory_resolution_reason': 'Resolution reason',
     'advisory_dismiss_reason_label': 'Dismiss reason',
     'advisory_origin_deterministic_only': 'Assessment from business data',
@@ -1139,5 +1589,426 @@ class FinanceStrings {
     'notification_status_acknowledged': 'Acknowledged',
     'notification_status_superseded': 'Superseded',
     'notification_status_closed': 'Closed',
+    'card_bank_statements_title': 'Bank statement lines',
+    'card_bank_statements_subtitle':
+        'ERP import, line review, match suggestions and reconciliation confirmation.',
+    'bank_statements_title': 'Bank statement lines',
+    'bank_statements_empty': 'No bank lines for the selected filters.',
+    'bank_import': 'Run import',
+    'bank_import_title': 'Import bank statement lines',
+    'bank_import_connection': 'ERP connection',
+    'bank_import_account': 'Bank account',
+    'bank_import_started': 'Import started.',
+    'bank_import_status': 'Import status',
+    'bank_import_success': 'Bank statement lines imported successfully.',
+    'bank_import_success_detail':
+        'Import completed: {created} new, {updated} updated lines.',
+    'bank_import_partial':
+        'Import partially succeeded ({failed} errors). Check the sync log.',
+    'bank_import_failed': 'Bank statement import failed.',
+    'bank_ignore': 'Ignore line',
+    'bank_restore': 'Restore ignored line',
+    'bank_ignore_reason': 'Ignore reason',
+    'bank_detail_title': 'Bank line',
+    'bank_booking_date': 'Booking date',
+    'bank_value_date': 'Value date',
+    'bank_counterparty': 'Partner / payer',
+    'bank_reference': 'Payment reference',
+    'bank_description': 'Description',
+    'bank_status_imported': 'Imported',
+    'bank_status_unmatched': 'Unmatched',
+    'bank_status_suggested': 'Has suggestions',
+    'bank_status_confirmed': 'Confirmed',
+    'bank_status_posted': 'Posted',
+    'bank_status_partially_reconciled': 'Partially reconciled',
+    'bank_status_reconciled': 'Reconciled',
+    'bank_status_ignored': 'Ignored',
+    'bank_match_suggestions_title': 'Match suggestions',
+    'bank_match_suggestions_empty': 'No suggestions for this line.',
+    'bank_match_generate': 'Generate suggestions',
+    'bank_match_generate_success': 'Generated {count} suggestion(s).',
+    'bank_match_generate_none': 'No new match candidates found.',
+    'bank_match_generate_skipped_reconciled':
+        'Reconciled/posted line — new suggestions are not generated.',
+    'bank_match_suggestions_empty_reconciled':
+        'Line is already reconciled — suggestions are no longer needed.',
+    'bank_match_score': 'Score',
+    'bank_match_confidence': 'Confidence',
+    'bank_match_open_amount': 'Invoice open amount',
+    'bank_match_signals': 'Business signals',
+    'bank_match_blocking': 'Blocking reasons',
+    'bank_match_dismiss': 'Dismiss suggestion',
+    'bank_match_restore_suggestion': 'Restore dismissed suggestion',
+    'bank_match_dismiss_reason': 'Dismiss reason',
+    'bank_match_continue_confirm': 'Continue to confirmation',
+    'bank_match_blocked_hint':
+        'This suggestion has blocking reasons and cannot be confirmed.',
+    'bank_match_confirm_title': 'Confirm match',
+    'bank_match_confirm_preview': 'Preview before confirm',
+    'bank_match_bank_amount': 'Bank line',
+    'bank_match_allocated': 'Allocated',
+    'bank_match_unallocated': 'Unallocated',
+    'bank_match_result_partial': 'Result: partially reconciled',
+    'bank_match_result_full': 'Result: fully reconciled',
+    'bank_match_result_over': 'Allocation exceeds line amount',
+    'bank_match_category': 'Cash Flow category',
+    'bank_match_note': 'Note',
+    'bank_match_add_line': 'Add invoice',
+    'bank_match_confirm_submit': 'Confirm match',
+    'bank_match_confirmations_title': 'Confirmation history',
+    'bank_match_confirmations_empty': 'No confirmations for this line.',
+    'bank_match_confirmation_detail': 'Confirmation detail',
+    'bank_match_confirmation_unlabeled': 'Match confirmation',
+    'bank_match_confirmed_by': 'Confirmed by',
+    'bank_match_confirmed_at': 'Confirmed at',
+    'bank_match_cash_transaction': 'Cash Flow transaction',
+    'bank_match_allocations': 'Invoice allocations',
+    'bank_match_cancel': 'Cancel confirmation',
+    'bank_match_cancel_confirm_title': 'Cancel match confirmation',
+    'bank_match_cancel_confirm_body':
+        'Operonix Industrial will create a reversal Cash Flow entry, void related allocations, restore invoice open amounts and keep a full audit trail. No data will be deleted.',
+    'bank_match_cancel_reason': 'Cancellation reason',
+    'bank_match_cancel_result_title': 'Cancellation result',
+    'bank_match_cancelled_at': 'Cancelled at',
+    'bank_match_cancelled_by': 'Cancelled by',
+    'bank_match_reversal_txn': 'Reversal transaction',
+    'bank_match_cancelled': 'Confirmation cancelled.',
+    'bank_audit_trail_title': 'History and audit trail',
+    'bank_audit_trail_empty': 'No audit records for this bank line.',
+    'bank_audit_trail_tap_detail': 'Tap for before/after and related records',
+    'audit_performed_by': 'Performed by',
+    'audit_entity_type': 'Entity type',
+    'audit_source': 'Source',
+    'audit_request_id': 'Request ID',
+    'audit_related_entities': 'Related records',
+    'audit_before': 'Before',
+    'audit_after': 'After',
+    'audit_action_bank_statement_import_create': 'Bank line imported',
+    'audit_action_bank_statement_import_update': 'Bank line updated from ERP',
+    'audit_action_bank_statement_ignore': 'Bank line ignored',
+    'audit_action_bank_statement_restore': 'Bank line restored from ignored',
+    'audit_action_bank_statement_status_suggested': 'Line status: suggestions available',
+    'audit_action_bank_match_suggestion_create': 'Match suggestion generated',
+    'audit_action_bank_match_suggestion_refresh': 'Match suggestion refreshed',
+    'audit_action_bank_match_suggestion_dismiss': 'Match suggestion dismissed',
+    'audit_action_bank_match_suggestion_restore': 'Dismissed suggestion restored',
+    'audit_action_bank_match_confirm': 'Match confirmation created',
+    'audit_action_bank_match_post': 'Bank line reconciled (posted)',
+    'audit_action_bank_match_allocate': 'Invoice allocation created',
+    'audit_action_bank_match_cancel': 'Match confirmation cancelled',
+    'audit_action_cancel': 'Allocation voided',
+    'audit_source_manual': 'Manual user action',
+    'audit_source_scheduled': 'Scheduled job',
+    'audit_source_system': 'System',
+    'audit_entity_finance_bank_statement_transactions': 'Bank statement line',
+    'audit_entity_finance_bank_match_confirmations': 'Match confirmation',
+    'audit_entity_finance_bank_match_suggestions': 'Match suggestion',
+    'audit_entity_finance_payment_allocation': 'Payment allocation',
+    'audit_entity_finance_cash_transactions': 'Cash Flow transaction',
+    'bank_match_confidence_high': 'High confidence',
+    'bank_match_confidence_medium': 'Medium confidence',
+    'bank_match_confidence_low': 'Low confidence',
+    'bank_match_intro_primary':
+        'Operonix Industrial found possible invoices for this bank line. '
+        'Review high-confidence suggestions first and check match reasons before confirming.',
+    'bank_match_show_weak': 'Show weak suggestions ({count})',
+    'bank_match_hide_weak': 'Hide weak suggestions',
+    'bank_match_card_open': 'Open amount',
+    'bank_match_card_title': 'Invoice {number} — {partner}',
+    'bank_match_card_bank_payment': 'Bank inflow',
+    'bank_match_card_bank_payout': 'Bank outflow',
+    'bank_match_amount_diff_none': 'Amounts match',
+    'bank_match_amount_diff_over': 'Bank amount exceeds by {amount}',
+    'bank_match_amount_diff_under': 'Bank amount is short by {amount}',
+    'bank_match_top_reasons': 'Reasons',
+    'bank_match_tap_for_detail': 'Tap for detailed comparison',
+    'bank_match_detail_title': 'Suggestion comparison',
+    'bank_match_detail_bank_section': 'Bank line',
+    'bank_match_detail_invoice_section': 'Invoice',
+    'bank_match_detail_why': 'Why suggested',
+    'bank_match_detail_warnings': 'Warnings',
+    'bank_match_detail_invoice_total': 'Invoice gross amount',
+    'bank_match_detail_invoice_due': 'Due date',
+    'bank_match_detail_partner_account': 'Partner account',
+    'bank_match_detail_invoice_type_sales': 'Sales invoice',
+    'bank_match_detail_invoice_type_purchase': 'Purchase invoice',
+    'bank_match_detail_invoice_number': 'Invoice number',
+    'bank_match_detail_back': 'Back to other suggestions',
+    'bank_match_detail_blocked_title': 'Confirmation not allowed',
+    'bank_match_dismissed_section': 'Dismissed suggestions',
+    'bank_match_hidden_useful_hint':
+        '{count} more useful suggestions are hidden — show weak list or regenerate.',
+    'bank_match_sentence_invoice_number_exact':
+        'Invoice number found in payment reference',
+    'bank_match_sentence_payment_reference_exact':
+        'Payment reference fully matches the invoice',
+    'bank_match_sentence_exact_amount':
+        'Bank line amount fully matches the invoice open amount',
+    'bank_match_sentence_partial_amount':
+        'Bank line amount partially covers the invoice open amount',
+    'bank_match_sentence_partner_account_exact':
+        'Partner bank account matches',
+    'bank_match_sentence_partner_name_normalized':
+        'Partner name matches',
+    'bank_match_sentence_due_date_proximity':
+        'Payment date is close to the invoice due date',
+    'bank_match_sentence_booking_date_proximity':
+        'Booking date is close to the invoice due date',
+    'bank_match_sentence_currency_exact': 'Currency matches',
+    'bank_match_sentence_open_amount_compatible':
+        'Invoice open amount is compatible with the bank line',
+    'bank_match_warn_low_score':
+        'Low confidence — verify manually before confirming',
+    'bank_match_warn_amount_diff': 'Amount differs from invoice open amount',
+    'bank_match_warn_partner_weak':
+        'Partner not reliably matched (name only, no account or amount match)',
+    'bank_match_warn_currency_date_only':
+        'Mostly currency and/or date proximity only',
+    'bank_match_block_sentence_currency_mismatch':
+        'Invoice and bank line currencies do not match',
+    'bank_match_block_sentence_invoice_closed': 'Invoice is already closed',
+    'bank_match_block_sentence_invoice_conflict_requires_review':
+        'Invoice has a sync conflict requiring review',
+    'bank_match_block_sentence_bank_transaction_ignored': 'Bank line is ignored',
+    'bank_match_block_sentence_bank_transaction_already_posted':
+        'Bank line is already posted or reconciled',
+    'bank_match_block_sentence_invalid_direction':
+        'Invoice type does not match bank line direction',
+    'bank_match_block_sentence_missing_open_amount': 'Invoice has no open amount',
+    'concurrency_refresh_hint':
+        'Data was refreshed below. Review amounts and press Confirm match again.',
+    'bank_match_confirm_not_saved':
+        'Match was not confirmed — nothing was saved.',
+    'filter_currency': 'Currency',
+    'bank_signal_exact_amount': 'Exact amount',
+    'bank_signal_partial_amount': 'Partial amount',
+    'bank_signal_invoice_number_exact': 'Invoice number',
+    'bank_signal_payment_reference_exact': 'Payment reference',
+    'bank_signal_partner_account_exact': 'Partner account',
+    'bank_signal_partner_name_normalized': 'Partner name',
+    'bank_signal_due_date_proximity': 'Due date proximity',
+    'bank_signal_booking_date_proximity': 'Booking date proximity',
+    'bank_signal_currency_exact': 'Same currency',
+    'bank_signal_open_amount_compatible': 'Compatible open amount',
+    'bank_blocking_currency_mismatch': 'Currency mismatch',
+    'bank_blocking_invoice_closed': 'Invoice is closed',
+    'bank_blocking_invoice_conflict_requires_review': 'Invoice requires sync review',
+    'bank_blocking_bank_transaction_ignored': 'Bank line is ignored',
+    'bank_blocking_bank_transaction_already_posted': 'Bank line already posted',
+    'bank_blocking_invalid_direction': 'Invalid direction',
+    'bank_blocking_missing_open_amount': 'Missing open amount',
+    'bank_blocking_duplicate_candidate': 'Duplicate candidate',
+    'help_info_tooltip': 'Explanation',
+    'help_info_close': 'Close',
+    'help_term_open_amount_title': 'Open amount',
+    'help_term_open_amount_body':
+        'The part of the invoice not yet paid. When you confirm a match, this amount is reduced by the allocated payment.',
+    'help_term_unallocated_title': 'Unallocated amount',
+    'help_term_unallocated_body':
+        'The part of the bank line not yet linked to invoices. It stays unassigned until you allocate it on confirm.',
+    'help_term_partially_reconciled_title': 'Partially reconciled',
+    'help_term_partially_reconciled_body':
+        'The bank line is partly linked to invoices — some of the amount is allocated, some is not yet.',
+    'help_term_match_confidence_title': 'Suggestion confidence',
+    'help_term_match_confidence_body':
+        'How strongly Operonix believes the bank line matches that invoice, based on amount, counterparty and reference. '
+        'High confidence does not replace your review.',
+    'help_term_cash_flow_category_title': 'Cash Flow category',
+    'help_term_cash_flow_category_body':
+        'Classifies cash as operating, investing or financing — required when confirming a match for cash reporting.',
+    'help_cash_flow_tab_title': 'Cash Flow tab — overview',
+    'help_cash_flow_tab_body':
+        'Operational cash in Operonix: accounts, Cash Flow categories, manual transactions, '
+        'planned items and forecast. ERP bank lines are matched to invoices and posted through '
+        'confirmation. All writes go through the secure backend; the app does not recalculate '
+        'canonical invoice amounts locally.\n\n'
+        'Clerk (accounting_clerk) mainly drafts and views; accounting manager, admin and '
+        'super_admin approve, post, reconcile bank lines and cancel confirmations.',
+    'help_card_accounts_title': 'Accounts and cash registers',
+    'help_card_accounts_body':
+        'Master data for cash locations: bank accounts, FX accounts, registers. Balances are '
+        'maintained by the backend from posted transactions. An account must exist before posting '
+        'or bank confirmation.',
+    'help_card_categories_title': 'Cash Flow categories',
+    'help_card_categories_body':
+        'Categories classify each cash movement as operating, investing or financing activity. '
+        'Required when creating a transaction or confirming a bank line.',
+    'help_card_transactions_title': 'Transactions',
+    'help_card_transactions_body':
+        'Manual operational cash: draft → post → reconcile or reverse. Allocate to invoices from '
+        'a posted transaction. This is not the same as an ERP bank line — bank has its own import '
+        'and match confirmation flow.',
+    'help_card_realized_title': 'Realized Cash Flow',
+    'help_card_realized_body':
+        'Summary of posted and reconciled transactions for the selected period — inflows and '
+        'outflows by account, category and direction.',
+    'help_card_planned_items_title': 'Planned items',
+    'help_card_planned_items_body':
+        'Expected future inflows and outflows. Drafts must be approved before they affect forecast. '
+        'Does not replace actual bank statements.',
+    'help_card_forecast_title': 'Cash Flow forecast',
+    'help_card_forecast_body':
+        'Projection based on planned items and known balances — operational liquidity view, not an ERP report.',
+    'help_card_bank_statements_title': 'Bank statement lines',
+    'help_card_bank_statements_body':
+        'Lines imported from ERP. Typical flow:\n'
+        '1) Run import (ERP connection + bank account).\n'
+        '2) Review list and filters.\n'
+        '3) Generate match suggestions — inflow → sales invoices, outflow → purchase.\n'
+        '4) Manually confirm amounts per invoice (partial or full).\n'
+        '5) Review confirmation history; cancel if needed (reversal, no delete).\n\n'
+        'Clerk can view; import, ignore and confirm require manager/admin/super_admin.',
+    'help_invoices_tab_title': 'Invoices and open items tab',
+    'help_invoices_tab_body':
+        'Operational invoices and open receivables/payables within the tenant. May come from ERP sync '
+        'or manual drafts. Open amounts feed payment allocation and bank matching.',
+    'help_card_sales_invoices_title': 'Sales invoices',
+    'help_card_sales_invoices_body':
+        'Customer invoices: draft, issue, cancel. Open amount decreases via allocations and bank '
+        'confirmation. Sync conflict status blocks automatic suggestions until resolved in ERP.',
+    'help_card_purchase_invoices_title': 'Purchase invoices',
+    'help_card_purchase_invoices_body':
+        'Supplier invoices: draft, approve, cancel. Used when matching outflows and manual payment allocation.',
+    'help_card_receivables_title': 'Receivables',
+    'help_card_receivables_body':
+        'Open sales invoices by customer — due dates, overdue and totals.',
+    'help_card_payables_title': 'Payables',
+    'help_card_payables_body':
+        'Open purchase invoices by supplier — what is due and how much.',
+    'help_erp_tab_title': 'ERP integration tab',
+    'help_erp_tab_body':
+        'Connect Operonix Finance to your accounting system. Credentials stay on the server; the app '
+        'does not write bank files back to ERP. Sync jobs pull invoices and bank lines; mappings align fields.',
+    'help_erp_connections_title': 'Active ERP connections',
+    'help_erp_connections_body':
+        'Configured connectors per company. New connections require manager/admin rights. '
+        'Without a connection, bank import and invoice sync will not run.',
+    'help_erp_bank_tile_title': 'Bank lines (from ERP tab)',
+    'help_erp_bank_tile_body':
+        'Same screen as in the Cash Flow tab — quick entry after setup. Import from the cloud icon on the list.',
+    'help_erp_integration_dashboard_title': 'Integration dashboard',
+    'help_erp_integration_dashboard_body':
+        'Connector health, recent sync runs and integration summary.',
+    'help_erp_document_links_title': 'Document links',
+    'help_erp_document_links_body':
+        'Operonix entities mapped to ERP records for traceability.',
+    'help_erp_control_snapshots_title': 'Control snapshots',
+    'help_erp_control_snapshots_body':
+        'Snapshots for reconciling controlling data between Operonix and ERP.',
+    'help_erp_error_resolution_title': 'Sync error resolution',
+    'help_erp_error_resolution_body':
+        'Retry or cancel failed sync jobs — first step when import returns nothing unexpected.',
+    'help_erp_sync_jobs_title': 'Sync jobs',
+    'help_erp_sync_jobs_body':
+        'Scheduled and manual sync jobs — status, duration and type (invoices, bank, …).',
+    'help_erp_sync_logs_title': 'Sync logs',
+    'help_erp_sync_logs_body':
+        'Detailed job logs for support and audit.',
+    'help_erp_mappings_title': 'Mappings',
+    'help_erp_mappings_body':
+        'Rules for ERP fields becoming Operonix finance documents. Change only with business impact in mind.',
+    'help_erp_csv_export_title': 'CSV / Excel export',
+    'help_erp_csv_export_body':
+        'Connections that support CSV/Excel export for manual checks.',
+    'help_bank_list_title': 'Bank line list',
+    'help_bank_list_body':
+        'Imported bank statement lines. Period filter is client-side on booking date. Cloud icon runs import. '
+        'Tap a line for detail, suggestions and confirmation history.',
+    'help_bank_import_title': 'Bank statement import',
+    'help_bank_import_body':
+        'Pull new lines from ERP for the selected connection and bank account. Refresh the list after import. '
+        'Manager/admin/super_admin only.',
+    'help_bank_detail_title': 'Bank line detail',
+    'help_bank_detail_body':
+        'Line details (amount, direction, counterparty, references). Ignore only while not posted '
+        'or reconciled (imported, unmatched, suggested, confirmed). Posted/reconciled lines cannot '
+        'be ignored — cancel the confirmation in history to undo a match. Generate suggestions after '
+        'import. Blocked suggestions cannot be confirmed.',
+    'help_bank_suggestions_title': 'Match suggestions',
+    'help_bank_suggestions_body':
+        'Automatic candidates with score, confidence and business signals. Inflow → sales only; outflow → purchase only. '
+        'Dismiss bad matches. Continue to confirmation does not auto-fill amounts.\n\n'
+        'Suggestions with blocking reasons cannot be confirmed — reasons are listed on the suggestion card.',
+    'help_bank_confirm_title': 'Confirm match',
+    'help_bank_confirm_body':
+        'Set amount per invoice, Cash Flow category and note. Preview shows bank amount, allocated and unallocated. '
+        'Partial → partially_reconciled; full → reconciled. Same requestId on retry does not duplicate.',
+    'help_bank_confirmation_title': 'Confirmation history',
+    'help_bank_confirmation_body':
+        'Who confirmed, Cash Flow transaction, invoice allocations and reconciliation status. '
+        'Cancel (manager+) creates reversal and restores invoice open amounts — no delete.',
+    'help_bank_audit_trail_title': 'History and audit trail',
+    'help_bank_audit_trail_body':
+        'IATF trail of all business-relevant events for this bank line — loaded from finance_audit_logs on every open. '
+        'Shows who, when, what changed (before/after), reason and related entities. Records are append-only.',
+    'finance_assistant_title': 'Finance assistant',
+    'finance_assistant_module': 'Finance & Controlling',
+    'finance_assistant_fab_title': 'Ask Finance assistant',
+    'finance_assistant_fab_subtitle':
+        'I will explain this screen and the next step.',
+    'finance_assistant_current_screen': 'Currently explaining: {screen}',
+    'finance_assistant_new_chat': 'New conversation',
+    'finance_assistant_input_hint': 'Ask a question…',
+    'finance_assistant_ask_more': 'Ask Finance assistant more about this',
+    'finance_assistant_ctx_status': 'Line status: {status}',
+    'finance_assistant_ctx_actions': 'Available actions: {actions}',
+    'finance_assistant_screen_bank_statements_list': 'Bank statement lines',
+    'finance_assistant_screen_bank_statement_detail': 'Bank line detail',
+    'finance_assistant_screen_bank_match_confirm': 'Confirm match',
+    'finance_assistant_screen_bank_match_confirmation_detail': 'Confirmation detail',
+    'finance_assistant_intro_bank_statements_list':
+        'I am here to explain this screen and help you link bank inflows or outflows to invoices. '
+        'I will not post or confirm anything for you.',
+    'finance_assistant_intro_bank_statement_detail':
+        'On the line detail you see suggestions, confirmation history and the audit trail. '
+        'I guide the next step — no automatic posting.',
+    'finance_assistant_intro_bank_match_confirm':
+        'Here you set allocations before posting. Review amounts before confirming.',
+    'finance_assistant_intro_bank_match_confirmation_detail':
+        'This is the audit record of a confirmation or cancellation. I can explain reversal and allocations.',
+    'finance_assistant_q_bank_list_purpose': 'What is this screen for?',
+    'finance_assistant_q_bank_generate': 'What does Generate suggestions mean?',
+    'finance_assistant_q_bank_why_suggested': 'Why was this invoice suggested?',
+    'finance_assistant_q_bank_confirm_effect': 'What happens if I confirm?',
+    'finance_assistant_q_bank_cancel_effect': 'What does cancelling a confirmation mean?',
+    'finance_assistant_q_bank_next_step': 'What is my next step?',
+    'finance_assistant_a_bank_list_purpose':
+        'What it means: imported bank lines that should be matched to invoices.\n\n'
+        'What to do: filter the period, open a line or run import.\n\n'
+        'What happens: import pulls new lines from ERP; matching continues on the detail screen.',
+    'finance_assistant_a_bank_generate':
+        'What it means: Operonix searches invoices matching amount, reference and partner.\n\n'
+        'What to do: on the line detail tap Generate suggestions.\n\n'
+        'What happens: you get ranked candidates; you choose which goes to confirmation.',
+    'finance_assistant_a_bank_why_suggested':
+        'What it means: the suggestion uses signals such as amount, invoice number and payment reference.\n\n'
+        'What to do: open the suggestion and check blocking reasons (e.g. currency).\n\n'
+        'What happens: dismiss a bad match; proceed with a good one to Confirm.',
+    'finance_assistant_a_bank_confirm_effect':
+        'What it means: confirmation posts a Cash Flow transaction and allocations to invoices.\n\n'
+        'What to do: review amounts, category and note, then Confirm.\n\n'
+        'What happens: the bank line becomes partially or fully reconciled; the trail is kept.',
+    'finance_assistant_a_bank_cancel_effect':
+        'What it means: cancellation creates a reversal and restores open invoice amounts.\n\n'
+        'What to do: enter a business reason for cancellation.\n\n'
+        'What happens: confirmation becomes cancelled; the full chain stays visible in history.',
+    'finance_assistant_a_bank_next_step':
+        'What to do: follow the line status — import → suggestions → confirm → reconcile.\n\n'
+        'If an action is unavailable, check your role and blocking reasons on the suggestion.',
+    'finance_assistant_a_free_text':
+        'For detailed questions use the suggested chips or contact your administrator. '
+        'I explain flow and terms — I do not post on your behalf.',
+    'finance_assistant_a_default':
+        'Pick a suggested question or describe what is unclear on this screen.',
+    'help_finance_hub_tabs_title': 'Finance & Controlling — tabs',
+    'help_finance_hub_tabs_body':
+        'Top tabs split the module:\n'
+        '• Overview — KPI and controlling cards for the selected period.\n'
+        '• Production, Downtime, Quality, Maintenance, Procurement — cost and operational aggregates.\n'
+        '• Budgets — plan vs. actual for the business year.\n'
+        '• Cash Flow — operational cash, accounts, transactions, bank lines (ⓘ on each card).\n'
+        '• Invoices and open items — sales/purchase invoices, receivables and payables.\n'
+        '• ERP — accounting connection, sync and bank import.\n\n'
+        'Tap ⓘ on any hub card for details without opening the screen.',
   };
 }

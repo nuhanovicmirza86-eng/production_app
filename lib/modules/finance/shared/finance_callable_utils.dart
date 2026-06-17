@@ -5,11 +5,17 @@ class FinanceCallableUtils {
   FinanceCallableUtils._();
 
   static DateTime? parseTimestamp(dynamic v) {
+    if (v == null) return null;
     if (v is Timestamp) return v.toDate();
     if (v is DateTime) return v;
+    if (v is String) {
+      final s = v.trim();
+      if (s.isEmpty) return null;
+      return DateTime.tryParse(s);
+    }
     if (v is Map) {
-      final sec = v['seconds'];
-      final ns = v['nanoseconds'];
+      final sec = v['seconds'] ?? v['_seconds'];
+      final ns = v['nanoseconds'] ?? v['_nanoseconds'];
       if (sec is num) {
         final millis =
             sec.toInt() * 1000 + ((ns is num ? ns.toInt() : 0) ~/ 1000000);
