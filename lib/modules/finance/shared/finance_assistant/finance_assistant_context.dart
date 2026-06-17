@@ -81,6 +81,7 @@ abstract final class FinanceAssistantTabs {
   static const procurement = 'hub_procurement';
   static const budgets = 'hub_budgets';
   static const cashFlow = 'cash_flow';
+  static const advancedCashFlow = 'hub_advanced_cash_flow';
   static const invoices = 'hub_invoices';
   static const erp = 'hub_erp';
   static const erpOnly = 'erp_integrations';
@@ -140,4 +141,13 @@ abstract final class FinanceAssistantScreens {
   static const aiAlertDetail = 'finance_ai_alert_detail';
   static const aiNotificationDeliveryDetail =
       'finance_ai_notification_delivery_detail';
+
+  // P5 — Napredna Cash Flow analiza
+  static const advancedCashFlowHub = 'finance_advanced_cash_flow_hub';
+  static const scenariosHub = 'finance_scenarios_hub';
+  static const scenarioOptimistic = 'finance_scenario_optimistic';
+  static const scenarioBase = 'finance_scenario_base';
+  static const scenarioPessimistic = 'finance_scenario_pessimistic';
+  static const scenarioDetail = 'finance_scenario_detail';
+  static const whatIf = 'finance_what_if';
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../finance_integrations/utils/finance_permissions.dart';
+import '../../advanced_cash_flow/screens/finance_advanced_cash_flow_screen.dart';
 import '../../accounts/screens/finance_accounts_screen.dart';
 import '../../bank_reconciliation/screens/finance_bank_statements_screen.dart';
 import '../../cash_flow_categories/screens/finance_cash_flow_categories_screen.dart';
@@ -142,6 +143,21 @@ class FinanceCashFlowHubTabBody extends StatelessWidget {
             ),
           ),
         ],
+        const SizedBox(height: 12),
+        FinanceHubEntryCard(
+          icon: Icons.insights_outlined,
+          title: FinanceStrings.t(context, 'card_advanced_cash_flow_title'),
+          helpTitleKey: 'help_card_advanced_cash_flow_title',
+          helpBodyKey: 'help_card_advanced_cash_flow_body',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => FinanceAdvancedCashFlowScreen(
+                companyData: companyData,
+                debugUnlockModule: debugUnlockModule,
+              ),
+            ),
+          ),
+        ),
         const SizedBox(height: 12),
         FinanceHubEntryCard(
           icon: Icons.timeline_outlined,

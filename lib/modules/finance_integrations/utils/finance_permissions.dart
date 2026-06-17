@@ -471,6 +471,45 @@ class FinancePermissions {
     );
   }
 
+  /// P5 — Napredna Cash Flow analiza (pregled scenarija).
+  static bool canViewCashFlowScenarios({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canViewPlannedCashFlow(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  /// P5 — kreiranje, izmjena, proračun i arhiviranje scenarija.
+  static bool canManageCashFlowScenarios({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canPostCashTransaction(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  /// P5 — odobravanje scenarija (isto kao manage).
+  static bool canApproveCashFlowScenario({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canManageCashFlowScenarios(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
   /// Kreiranje / izmjena draft planirane stavke.
   static bool canCreatePlannedCashItemDraft({
     required Map<String, dynamic> companyData,
@@ -642,5 +681,60 @@ class FinancePermissions {
       return false;
     }
     return _isCashFlowManagerRole(role);
+  }
+
+  /// Pregled bankovnih stavki, prijedloga i potvrda — clerk+ uz finance suite.
+  static bool canViewBankReconciliation({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canViewFinanceInvoices(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  /// Import bankovnih stavki — manager/admin/super_admin.
+  static bool canImportBankStatements({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    if (!canViewBankReconciliation(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    )) {
+      return false;
+    }
+    return _isCashFlowManagerRole(role);
+  }
+
+  /// Ignore/restore bankovne stavke i dismiss/restore prijedloga.
+  static bool canManageBankStatementLines({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canImportBankStatements(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
+  }
+
+  /// Potvrda i otkaz bank match — manager/admin/super_admin.
+  static bool canConfirmBankMatch({
+    required Map<String, dynamic> companyData,
+    required String role,
+    bool debugUnlockModule = false,
+  }) {
+    return canImportBankStatements(
+      companyData: companyData,
+      role: role,
+      debugUnlockModule: debugUnlockModule,
+    );
   }
 }

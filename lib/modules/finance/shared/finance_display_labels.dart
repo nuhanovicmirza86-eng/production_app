@@ -611,4 +611,48 @@ class FinanceDisplayLabels {
     }
     return reconciliationStatus(context, confirmation.reconciliationStatus);
   }
+
+  static const scenarioTypeCodes = <String>[
+    'optimistic',
+    'base',
+    'pessimistic',
+    'what_if',
+  ];
+
+  static const scenarioStatusCodes = <String>[
+    'draft',
+    'calculated',
+    'approved',
+    'archived',
+  ];
+
+  static String scenarioType(BuildContext context, String type) {
+    switch (type.trim().toLowerCase()) {
+      case 'optimistic':
+        return FinanceStrings.t(context, 'scenario_type_optimistic');
+      case 'base':
+        return FinanceStrings.t(context, 'scenario_type_base');
+      case 'pessimistic':
+        return FinanceStrings.t(context, 'scenario_type_pessimistic');
+      case 'what_if':
+        return FinanceStrings.t(context, 'scenario_type_what_if');
+      default:
+        return type;
+    }
+  }
+
+  static String scenarioStatus(BuildContext context, String status) {
+    switch (status.trim().toLowerCase()) {
+      case 'draft':
+        return FinanceStrings.t(context, 'scenario_status_draft');
+      case 'calculated':
+        return FinanceStrings.t(context, 'scenario_status_calculated');
+      case 'approved':
+        return FinanceStrings.t(context, 'scenario_status_approved');
+      case 'archived':
+        return FinanceStrings.t(context, 'scenario_status_archived');
+      default:
+        return status;
+    }
+  }
 }
