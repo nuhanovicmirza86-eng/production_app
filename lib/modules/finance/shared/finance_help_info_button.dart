@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../finance_assistant/finance_assistant_host.dart';
 import '../../finance_integrations/utils/finance_load_error_presenter.dart';
+import 'finance_assistant/finance_module_assistant_scope.dart';
 import 'finance_strings.dart';
 
 /// Kratko objašnjenje pojedinačnog pojma preko info ikone (BA/EN: `help_*` ključevi).
@@ -49,7 +49,13 @@ class FinanceHelpInfoButton extends StatelessWidget {
           : TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                FinanceAssistantHost.of(context)?.openAssistant(
+                final scope = FinanceModuleAssistantScope.maybeOf(context);
+                if (scope != null) {
+                  scope.openAssistant(questionKey: assistantQuestionKey);
+                  return;
+                }
+                FinanceModuleAssistantSession.currentOrNull?.openAssistant(
+                  context,
                   questionKey: assistantQuestionKey,
                 );
               },

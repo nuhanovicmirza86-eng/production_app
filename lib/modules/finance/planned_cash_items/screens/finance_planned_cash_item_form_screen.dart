@@ -9,6 +9,7 @@ import '../../cash_flow_categories/services/finance_cash_flow_categories_service
 import '../../shared/finance_date_picker_field.dart';
 import '../../shared/finance_display_labels.dart';
 import '../../shared/finance_error_mapper.dart';
+import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../models/finance_planned_cash_item.dart';
 import '../services/finance_planned_cash_items_service.dart';
@@ -196,7 +197,14 @@ class _FinancePlannedCashItemFormScreenState
             ));
 
     if (!canEdit) {
-      return Scaffold(
+      return FinanceScaffold(
+        assistantContext: FinanceAssistantContextFactory.fromCompany(
+          context: context,
+          companyData: widget.companyData,
+          screenKey: FinanceAssistantScreens.plannedItemForm,
+          tabKey: FinanceAssistantTabs.cashFlow,
+          tabLabelKey: 'help_cash_flow_tab_title',
+        ),
         appBar: AppBar(
           title: Text(FinanceStrings.t(context, 'planned_item_edit')),
         ),
@@ -209,7 +217,14 @@ class _FinancePlannedCashItemFormScreenState
       );
     }
 
-    return Scaffold(
+    return FinanceScaffold(
+      assistantContext: FinanceAssistantContextFactory.fromCompany(
+        context: context,
+        companyData: widget.companyData,
+        screenKey: FinanceAssistantScreens.plannedItemForm,
+        tabKey: FinanceAssistantTabs.cashFlow,
+        tabLabelKey: 'help_cash_flow_tab_title',
+      ),
       appBar: AppBar(
         title: Text(
           FinanceStrings.t(

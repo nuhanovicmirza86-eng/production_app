@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../../shared/finance_display_labels.dart';
 import '../../shared/finance_error_mapper.dart';
+import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../models/finance_account.dart';
 import '../services/finance_accounts_service.dart';
@@ -134,7 +135,14 @@ class _FinanceAccountFormScreenState extends State<FinanceAccountFormScreen> {
         ? FinanceStrings.t(context, 'account_edit')
         : FinanceStrings.t(context, 'account_new');
 
-    return Scaffold(
+    return FinanceScaffold(
+      assistantContext: FinanceAssistantContextFactory.fromCompany(
+        context: context,
+        companyData: widget.companyData,
+        screenKey: FinanceAssistantScreens.accountForm,
+        tabKey: FinanceAssistantTabs.cashFlow,
+        tabLabelKey: 'help_cash_flow_tab_title',
+      ),
       appBar: AppBar(title: Text(title)),
       body: Form(
         key: _formKey,

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../../shared/finance_error_mapper.dart';
+import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../models/finance_sales_invoice.dart';
 import '../services/finance_invoices_service.dart';
@@ -146,7 +147,14 @@ class _FinanceSalesInvoiceFormScreenState
     final inv = widget.invoice;
     final erpLocked = inv?.isErpSynced == true;
 
-    return Scaffold(
+    return FinanceScaffold(
+      assistantContext: FinanceAssistantContextFactory.fromCompany(
+        context: context,
+        companyData: widget.companyData,
+        screenKey: FinanceAssistantScreens.salesInvoiceForm,
+        tabKey: FinanceAssistantTabs.invoices,
+        tabLabelKey: 'help_invoices_tab_title',
+      ),
       appBar: AppBar(
         title: Text(
           widget.isEdit

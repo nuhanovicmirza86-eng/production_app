@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/company_plant_display_name.dart';
 import '../../shared/finance_display_labels.dart';
+import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../models/finance_ai_alert.dart';
@@ -423,7 +424,18 @@ class _FinanceAiAlertDetailScreenState extends State<FinanceAiAlertDetailScreen>
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) Navigator.of(context).pop(_changed);
       },
-      child: Scaffold(
+      child: FinanceScaffold(
+        assistantContext: FinanceAssistantContextFactory.fromCompany(
+          context: context,
+          companyData: widget.companyData,
+          screenKey: FinanceAssistantScreens.aiAlertDetail,
+          tabKey: FinanceAssistantTabs.aiAnalysis,
+          tabLabelKey: 'finance_ai_analysis_title',
+          entityStatus: alert == null
+              ? null
+              : FinanceDisplayLabels.advisorySeverity(context, alert.severity),
+          actions: FinanceAssistantContextFactory.refreshOnly(),
+        ),
         appBar: AppBar(
           title: Text(FinanceStrings.t(context, 'advisory_detail_title')),
         ),

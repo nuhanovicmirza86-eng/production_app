@@ -8,6 +8,7 @@ import '../../shared/finance_date_picker_field.dart';
 import '../../shared/finance_display_labels.dart';
 import '../../shared/finance_error_mapper.dart';
 import '../../shared/finance_money_format.dart';
+import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../models/finance_cash_transaction.dart';
 import '../services/finance_cash_transactions_service.dart';
@@ -187,7 +188,14 @@ class _FinanceCashTransactionsScreenState
       role: _role,
       debugUnlockModule: widget.debugUnlockModule,
     )) {
-      return Scaffold(
+      return FinanceScaffold(
+        assistantContext: FinanceAssistantContextFactory.fromCompany(
+          context: context,
+          companyData: widget.companyData,
+          screenKey: FinanceAssistantScreens.transactionsList,
+          tabKey: FinanceAssistantTabs.cashFlow,
+          tabLabelKey: 'help_cash_flow_tab_title',
+        ),
         appBar: AppBar(
           title: Text(FinanceStrings.t(context, 'transactions_title')),
         ),
@@ -195,7 +203,18 @@ class _FinanceCashTransactionsScreenState
       );
     }
 
-    return Scaffold(
+    return FinanceScaffold(
+      assistantContext: FinanceAssistantContextFactory.fromCompany(
+        context: context,
+        companyData: widget.companyData,
+        screenKey: FinanceAssistantScreens.transactionsList,
+        tabKey: FinanceAssistantTabs.cashFlow,
+        tabLabelKey: 'help_cash_flow_tab_title',
+        actions: FinanceAssistantContextFactory.createAndRefresh(
+          createKey: 'transaction_new',
+          canCreate: _canCreate,
+        ),
+      ),
       appBar: AppBar(
         title: Text(FinanceStrings.t(context, 'transactions_title')),
         actions: [

@@ -5,6 +5,7 @@ import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../../shared/finance_display_labels.dart';
 import '../../shared/finance_error_mapper.dart';
 import '../../shared/finance_money_format.dart';
+import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../models/finance_payment_allocation.dart';
 import '../services/finance_payment_allocations_service.dart';
@@ -108,7 +109,16 @@ class FinancePaymentAllocationDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final a = allocation;
-    return Scaffold(
+    return FinanceScaffold(
+      assistantContext: FinanceAssistantContextFactory.fromCompany(
+        context: context,
+        companyData: companyData,
+        screenKey: FinanceAssistantScreens.paymentAllocationDetail,
+        tabKey: FinanceAssistantTabs.invoices,
+        tabLabelKey: 'help_invoices_tab_title',
+        entityStatus: FinanceDisplayLabels.allocationStatus(context, a.status),
+        actions: FinanceAssistantContextFactory.refreshOnly(),
+      ),
       appBar: AppBar(
         title: Text(
           a.allocationCode.isNotEmpty ? a.allocationCode : a.id,

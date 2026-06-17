@@ -1,51 +1,31 @@
 import 'package:flutter/material.dart';
 
 import 'finance_assistant_context.dart';
-import 'finance_assistant_fab.dart';
-import 'finance_assistant_panel.dart';
+import 'finance_module_assistant_scope.dart';
 
-/// Omotač ekrana: plutajući Finance asistent + kontekst trenutnog ekrana.
-class FinanceAssistantHost extends StatefulWidget {
+/// Kompatibilnost za sheetove — samo registrira kontekst i otvara panel preko scope-a.
+class FinanceAssistantHost extends StatelessWidget {
   const FinanceAssistantHost({
     super.key,
     required this.contextData,
     required this.child,
-    this.showFab = true,
+    this.showFab = false,
   });
 
   final FinanceAssistantContext contextData;
   final Widget child;
   final bool showFab;
 
-  static FinanceAssistantHostState? of(BuildContext context) {
-    return context.findAncestorStateOfType<FinanceAssistantHostState>();
-  }
-
-  @override
-  State<FinanceAssistantHost> createState() => FinanceAssistantHostState();
-}
-
-class FinanceAssistantHostState extends State<FinanceAssistantHost> {
-  void openAssistant({String? questionKey}) {
-    FinanceAssistantPanel.show(
-      context,
-      contextData: widget.contextData.copyWith(
-        prefilledQuestionKey: questionKey,
-      ),
-    );
+  @Deprecated('Koristi FinanceModuleAssistantScope.maybeOf(context)')
+  static FinanceModuleAssistantScopeState? of(BuildContext context) {
+    return FinanceModuleAssistantScope.maybeOf(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        widget.child,
-        if (widget.showFab)
-          FinanceAssistantFab(
-            onPressed: () => openAssistant(),
-          ),
-      ],
+    return FinanceAssistantContextRegistrar(
+      contextData: contextData,
+      child: child,
     );
   }
 }

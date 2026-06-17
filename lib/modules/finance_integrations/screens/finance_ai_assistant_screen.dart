@@ -8,6 +8,7 @@ import '../../finance/ai_advisory/screens/finance_ai_alerts_panel.dart';
 import '../../finance/ai_kpi/screens/finance_ai_recommendation_kpi_screen.dart';
 import '../../finance/ai_notifications/screens/finance_ai_notification_inbox_screen.dart';
 import '../../finance/ai_notifications/widgets/finance_ai_notification_badge.dart';
+import '../../finance/shared/finance_scaffold.dart';
 import '../../finance/shared/finance_strings.dart';
 import '../models/finance_ai_company_memory_doc.dart';
 import '../models/finance_ai_insight_doc.dart';
@@ -889,8 +890,17 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
     final locale = Localizations.localeOf(context).toString();
 
     if (!_canAi && !_canViewAdvisory) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Finance AI asistent')),
+      return FinanceScaffold(
+        assistantContext: FinanceAssistantContextFactory.fromCompany(
+          context: context,
+          companyData: widget.companyData,
+          screenKey: FinanceAssistantScreens.aiAssistant,
+          tabKey: FinanceAssistantTabs.aiAnalysis,
+          tabLabelKey: 'finance_ai_analysis_title',
+        ),
+        appBar: AppBar(
+          title: Text(FinanceStrings.t(context, 'finance_ai_analysis_title')),
+        ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -908,8 +918,17 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
     }
 
     if (widget.businessYearId.trim().isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Finance AI asistent')),
+      return FinanceScaffold(
+        assistantContext: FinanceAssistantContextFactory.fromCompany(
+          context: context,
+          companyData: widget.companyData,
+          screenKey: FinanceAssistantScreens.aiAssistant,
+          tabKey: FinanceAssistantTabs.aiAnalysis,
+          tabLabelKey: 'finance_ai_analysis_title',
+        ),
+        appBar: AppBar(
+          title: Text(FinanceStrings.t(context, 'finance_ai_analysis_title')),
+        ),
         body: Center(
           child: Text(
             'Odaberite poslovnu godinu u zaglavlju huba.',
@@ -919,12 +938,20 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
       );
     }
 
-    return Scaffold(
+    return FinanceScaffold(
+      assistantContext: FinanceAssistantContextFactory.fromCompany(
+        context: context,
+        companyData: widget.companyData,
+        screenKey: FinanceAssistantScreens.aiAssistant,
+        tabKey: FinanceAssistantTabs.aiAnalysis,
+        tabLabelKey: 'finance_ai_analysis_title',
+        actions: FinanceAssistantContextFactory.refreshOnly(),
+      ),
       appBar: AppBar(
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Finance AI asistent'),
+            Text(FinanceStrings.t(context, 'finance_ai_analysis_title')),
             if (_canViewAdvisory) ...[
               const SizedBox(width: 8),
               FinanceAiNotificationBadge(

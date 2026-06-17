@@ -8,6 +8,7 @@ import '../../ai_advisory/screens/finance_ai_alert_detail_screen.dart';
 import '../../ai_advisory/services/finance_ai_advisory_service.dart';
 import '../../ai_advisory/widgets/finance_ai_severity_chip.dart';
 import '../../shared/finance_display_labels.dart';
+import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../models/finance_ai_notification_delivery.dart';
@@ -181,7 +182,21 @@ class _FinanceAiNotificationDeliveryDetailScreenState
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) Navigator.of(context).pop(_changed);
       },
-      child: Scaffold(
+      child: FinanceScaffold(
+        assistantContext: FinanceAssistantContextFactory.fromCompany(
+          context: context,
+          companyData: widget.companyData,
+          screenKey: FinanceAssistantScreens.aiNotificationDeliveryDetail,
+          tabKey: FinanceAssistantTabs.aiAnalysis,
+          tabLabelKey: 'finance_ai_analysis_title',
+          entityStatus: delivery == null
+              ? null
+              : FinanceDisplayLabels.notificationDeliveryStatus(
+                  context,
+                  delivery.deliveryStatus,
+                ),
+          actions: FinanceAssistantContextFactory.refreshOnly(),
+        ),
         appBar: AppBar(
           title: Text(FinanceStrings.t(context, 'notification_detail_title')),
         ),

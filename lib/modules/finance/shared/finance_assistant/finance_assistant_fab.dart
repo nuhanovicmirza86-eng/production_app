@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../finance_strings.dart';
+import '../finance_system_bottom_inset.dart';
 
 /// Diskretna plutajuća ikona — donji desni ugao Finance ekrana.
 class FinanceAssistantFab extends StatefulWidget {
@@ -62,7 +63,7 @@ class _FinanceAssistantFabState extends State<FinanceAssistantFab> {
 
     return Positioned(
       right: 16,
-      bottom: 16,
+      bottom: FinanceSystemBottomInset.fabBottom(context),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,

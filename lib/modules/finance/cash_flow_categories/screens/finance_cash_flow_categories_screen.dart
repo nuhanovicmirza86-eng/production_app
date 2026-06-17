@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../../shared/finance_display_labels.dart';
 import '../../shared/finance_error_mapper.dart';
+import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../models/finance_cash_flow_category.dart';
 import '../services/finance_cash_flow_categories_service.dart';
@@ -132,7 +133,14 @@ class _FinanceCashFlowCategoriesScreenState
       role: _role,
       debugUnlockModule: widget.debugUnlockModule,
     )) {
-      return Scaffold(
+      return FinanceScaffold(
+        assistantContext: FinanceAssistantContextFactory.fromCompany(
+          context: context,
+          companyData: widget.companyData,
+          screenKey: FinanceAssistantScreens.categoriesList,
+          tabKey: FinanceAssistantTabs.cashFlow,
+          tabLabelKey: 'help_cash_flow_tab_title',
+        ),
         appBar: AppBar(
           title: Text(FinanceStrings.t(context, 'categories_title')),
         ),
@@ -142,7 +150,18 @@ class _FinanceCashFlowCategoriesScreenState
       );
     }
 
-    return Scaffold(
+    return FinanceScaffold(
+      assistantContext: FinanceAssistantContextFactory.fromCompany(
+        context: context,
+        companyData: widget.companyData,
+        screenKey: FinanceAssistantScreens.categoriesList,
+        tabKey: FinanceAssistantTabs.cashFlow,
+        tabLabelKey: 'help_cash_flow_tab_title',
+        actions: FinanceAssistantContextFactory.createAndRefresh(
+          createKey: 'category_new',
+          canCreate: _canManage,
+        ),
+      ),
       appBar: AppBar(
         title: Text(FinanceStrings.t(context, 'categories_title')),
         actions: [

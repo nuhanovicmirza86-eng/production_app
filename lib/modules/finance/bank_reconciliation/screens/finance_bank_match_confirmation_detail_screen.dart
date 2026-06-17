@@ -4,13 +4,13 @@ import 'package:uuid/uuid.dart';
 
 import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../../shared/finance_assistant/finance_assistant_context.dart';
-import '../../shared/finance_assistant/finance_assistant_host.dart';
 import '../../shared/finance_help_info_button.dart';
 import '../../shared/finance_display_labels.dart';
 import '../../shared/finance_error_mapper.dart';
 import '../../shared/finance_money_format.dart';
 import '../../shared/finance_reason_prompt_dialog.dart';
 import '../../shared/finance_label_with_term_help.dart';
+import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../models/finance_bank_match_confirmation.dart';
 import '../services/finance_bank_reconciliation_service.dart';
@@ -153,15 +153,23 @@ class _FinanceBankMatchConfirmationDetailScreenState
   Widget build(BuildContext context) {
     final conf = _confirmation;
 
-    return FinanceAssistantHost(
-      contextData: FinanceAssistantContext(
+    return FinanceScaffold(
+      assistantContext: FinanceAssistantContext(
+        companyId: _companyId,
         screenKey: FinanceAssistantScreens.bankMatchConfirmationDetail,
+        tabKey: FinanceAssistantTabs.cashFlow,
+        tabLabelKey: 'help_cash_flow_tab_title',
         role: _role,
         entityStatus: conf == null
             ? null
             : FinanceDisplayLabels.bankMatchConfirmationStatus(context, conf),
+        availableActions: [
+          if (_canCancel) FinanceStrings.t(context, 'bank_match_cancel'),
+        ],
+        disabledActions: [
+          if (!_canCancel) FinanceStrings.t(context, 'bank_match_cancel'),
+        ],
       ),
-      child: Scaffold(
       appBar: AppBar(
         title: Text(FinanceStrings.t(context, 'bank_match_confirmation_detail')),
         actions: [
@@ -356,7 +364,6 @@ class _FinanceBankMatchConfirmationDetailScreenState
                 ],
               ],
             ),
-    ),
     );
   }
 

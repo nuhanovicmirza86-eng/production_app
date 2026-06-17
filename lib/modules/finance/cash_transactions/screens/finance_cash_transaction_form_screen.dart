@@ -9,6 +9,7 @@ import '../../cash_flow_categories/services/finance_cash_flow_categories_service
 import '../../shared/finance_date_picker_field.dart';
 import '../../shared/finance_display_labels.dart';
 import '../../shared/finance_error_mapper.dart';
+import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../models/finance_cash_transaction.dart';
 import '../services/finance_cash_transactions_service.dart';
@@ -205,13 +206,27 @@ class _FinanceCashTransactionFormScreenState
         : FinanceStrings.t(context, 'transaction_new');
 
     if (_loadingMasters) {
-      return Scaffold(
+      return FinanceScaffold(
+        assistantContext: FinanceAssistantContextFactory.fromCompany(
+          context: context,
+          companyData: widget.companyData,
+          screenKey: FinanceAssistantScreens.transactionForm,
+          tabKey: FinanceAssistantTabs.cashFlow,
+          tabLabelKey: 'help_cash_flow_tab_title',
+        ),
         appBar: AppBar(title: Text(title)),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
-    return Scaffold(
+    return FinanceScaffold(
+      assistantContext: FinanceAssistantContextFactory.fromCompany(
+        context: context,
+        companyData: widget.companyData,
+        screenKey: FinanceAssistantScreens.transactionForm,
+        tabKey: FinanceAssistantTabs.cashFlow,
+        tabLabelKey: 'help_cash_flow_tab_title',
+      ),
       appBar: AppBar(title: Text(title)),
       body: Form(
         key: _formKey,

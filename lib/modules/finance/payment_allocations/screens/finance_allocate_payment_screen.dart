@@ -13,6 +13,7 @@ import '../../invoices/services/finance_invoices_service.dart';
 import '../../shared/finance_display_labels.dart';
 import '../../shared/finance_error_mapper.dart';
 import '../../shared/finance_money_format.dart';
+import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../services/finance_payment_allocations_service.dart';
 import '../widgets/finance_allocation_amount_field.dart';
@@ -318,7 +319,14 @@ class _FinanceAllocatePaymentScreenState
       role: _role,
       debugUnlockModule: widget.debugUnlockModule,
     )) {
-      return Scaffold(
+      return FinanceScaffold(
+        assistantContext: FinanceAssistantContextFactory.fromCompany(
+          context: context,
+          companyData: widget.companyData,
+          screenKey: FinanceAssistantScreens.allocatePayment,
+          tabKey: FinanceAssistantTabs.invoices,
+          tabLabelKey: 'help_invoices_tab_title',
+        ),
         appBar: AppBar(
           title: Text(FinanceStrings.t(context, 'allocate_to_invoices')),
         ),
@@ -328,7 +336,15 @@ class _FinanceAllocatePaymentScreenState
       );
     }
 
-    return Scaffold(
+    return FinanceScaffold(
+      assistantContext: FinanceAssistantContextFactory.fromCompany(
+        context: context,
+        companyData: widget.companyData,
+        screenKey: FinanceAssistantScreens.allocatePayment,
+        tabKey: FinanceAssistantTabs.invoices,
+        tabLabelKey: 'help_invoices_tab_title',
+        actions: FinanceAssistantContextFactory.refreshOnly(),
+      ),
       appBar: AppBar(
         title: Text(FinanceStrings.t(context, 'allocate_to_invoices')),
         actions: [

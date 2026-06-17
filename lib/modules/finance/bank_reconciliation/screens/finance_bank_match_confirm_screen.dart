@@ -12,9 +12,9 @@ import '../../shared/finance_display_labels.dart';
 import '../../shared/finance_error_mapper.dart';
 import '../../shared/finance_money_format.dart';
 import '../../shared/finance_assistant/finance_assistant_context.dart';
-import '../../shared/finance_assistant/finance_assistant_host.dart';
 import '../../shared/finance_help_info_button.dart';
 import '../../shared/finance_labeled_filter_field.dart';
+import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../models/finance_bank_match_suggestion.dart';
 import '../models/finance_bank_statement_transaction.dart';
@@ -459,31 +459,39 @@ class _FinanceBankMatchConfirmScreenState
       role: _role,
       debugUnlockModule: widget.debugUnlockModule,
     )) {
-      return FinanceAssistantHost(
-        contextData: FinanceAssistantContext(
+      return FinanceScaffold(
+        assistantContext: FinanceAssistantContext(
+          companyId: _companyId,
           screenKey: FinanceAssistantScreens.bankMatchConfirm,
+          tabKey: FinanceAssistantTabs.cashFlow,
+          tabLabelKey: 'help_cash_flow_tab_title',
           role: _role,
+          disabledActions: [
+            FinanceStrings.t(context, 'bank_match_confirm'),
+          ],
         ),
-        showFab: false,
-        child: Scaffold(
         appBar: AppBar(
           title: Text(FinanceStrings.t(context, 'bank_match_confirm_title')),
         ),
         body: Center(child: Text(FinanceStrings.t(context, 'access_denied'))),
-      ),
       );
     }
 
-    return FinanceAssistantHost(
-      contextData: FinanceAssistantContext(
+    return FinanceScaffold(
+      assistantContext: FinanceAssistantContext(
+        companyId: _companyId,
         screenKey: FinanceAssistantScreens.bankMatchConfirm,
+        tabKey: FinanceAssistantTabs.cashFlow,
+        tabLabelKey: 'help_cash_flow_tab_title',
         role: _role,
         entityStatus: FinanceDisplayLabels.bankStatementStatus(
           context,
           _bank.status,
         ),
+        availableActions: [
+          FinanceStrings.t(context, 'bank_match_confirm'),
+        ],
       ),
-      child: Scaffold(
       appBar: AppBar(
         title: Text(FinanceStrings.t(context, 'bank_match_confirm_title')),
       ),
@@ -686,7 +694,6 @@ class _FinanceBankMatchConfirmScreenState
                 ],
               ),
             ),
-    ),
     );
   }
 }

@@ -17,6 +17,11 @@ import '../widgets/finance_erp_hub_tab_body.dart';
 import '../widgets/finance_screen_context_info.dart';
 import '../../finance/cash_flow/screens/finance_cash_flow_hub_tab_body.dart';
 import '../../finance/invoices/screens/finance_invoices_hub_tab_body.dart';
+import '../../finance/shared/finance_assistant/finance_assistant_hub_context.dart';
+import '../../finance/shared/finance_assistant/finance_module_assistant_scope.dart';
+import '../../finance/shared/finance_help_info_button.dart';
+import '../../finance/shared/finance_scaffold.dart';
+import '../../finance/shared/finance_strings.dart';
 import '../../finance/ai_notifications/widgets/finance_ai_notification_badge.dart';
 import 'finance_ai_assistant_screen.dart';
 import 'finance_controlling_dashboard_tab.dart';
@@ -56,6 +61,7 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
 
   @override
   void dispose() {
+    _tabController.removeListener(_onHubTabChanged);
     _aiNotificationRefresh.dispose();
     _tabController.dispose();
     super.dispose();
@@ -92,6 +98,7 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
       length: _showControlling ? 10 : 1,
       vsync: this,
     );
+    _tabController.addListener(_onHubTabChanged);
     final now = DateTime.now();
     _periodYear = now.year;
     _periodMonth = now.month;
@@ -124,15 +131,41 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
     setState(() => _businessYearId = id.trim());
   }
 
+  void _onHubTabChanged() {
+    if (_tabController.indexIsChanging) return;
+    setState(() {});
+  }
+
+  FinanceAssistantContext _hubAssistantContext(BuildContext context) {
+    if (!_showControlling) {
+      return FinanceAssistantHubContext.erpOnlyHub(
+        context: context,
+        companyData: widget.companyData,
+      );
+    }
+    return FinanceAssistantHubContext.forTab(
+      context: context,
+      companyData: widget.companyData,
+      tabIndex: _tabController.index,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    return FinanceModuleAssistantScope(
+      child: _buildHubScaffold(context),
+    );
+  }
+
+  Widget _buildHubScaffold(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
     if (!_showControlling) {
-      return Scaffold(
+      return FinanceScaffold(
         appBar: AppBar(
           title: const Text('Financije · ERP integracije'),
         ),
+        assistantContext: _hubAssistantContext(context),
         body: ListView(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
           children: [
@@ -173,10 +206,14 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
       );
     }
 
-    return Scaffold(
+    return FinanceScaffold(
       appBar: AppBar(
         title: const Text('Finance & Controlling'),
         actions: [
+          const FinanceHelpInfoButton(
+            titleKey: 'help_finance_hub_tabs_title',
+            bodyKey: 'help_finance_hub_tabs_body',
+          ),
           if (FinancePermissions.canRunFinanceControllingAiInsight(
             companyData: widget.companyData,
             role: _role,
@@ -188,14 +225,14 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
                 debugUnlockModule: widget.debugUnlockModule,
               ))
             IconButton(
-              tooltip: 'AI asistent',
+              tooltip: FinanceStrings.t(context, 'finance_ai_analysis_tooltip'),
               icon: FinanceAiNotificationBadge(
                 companyId: _companyId,
                 companyData: widget.companyData,
                 plantKey: _effectiveFinancePlantKey,
                 refreshListenable: _aiNotificationRefresh,
                 debugUnlockModule: widget.debugUnlockModule,
-                child: const Icon(Icons.smart_toy_outlined),
+                child: const Icon(Icons.insights_outlined),
               ),
               onPressed: () async {
                 if (_businessYearId.trim().isEmpty) {
@@ -242,6 +279,7 @@ class _FinanceControllingHubScreenState extends State<FinanceControllingHubScree
           ],
         ),
       ),
+      assistantContext: _hubAssistantContext(context),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

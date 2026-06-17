@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../shared/finance_assistant/finance_assistant_context.dart';
+import '../../shared/finance_assistant/finance_assistant_host.dart';
+import '../../shared/finance_assistant/finance_module_assistant_scope.dart';
+import '../../shared/finance_system_bottom_inset.dart';
 import '../../shared/finance_money_format.dart';
 import '../../shared/finance_strings.dart';
 import '../../shared/finance_label_with_term_help.dart';
@@ -10,6 +14,8 @@ import '../utils/finance_bank_match_suggestion_ui_helper.dart';
 
 Future<void> showFinanceBankMatchSuggestionDetailSheet({
   required BuildContext context,
+  required String companyId,
+  required String role,
   required FinanceBankStatementTransaction bankTransaction,
   required FinanceBankMatchSuggestion suggestion,
   required bool canManage,
@@ -22,7 +28,7 @@ Future<void> showFinanceBankMatchSuggestionDetailSheet({
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    useSafeArea: true,
+    useSafeArea: false,
     showDragHandle: true,
     builder: (ctx) => DraggableScrollableSheet(
       expand: false,
@@ -30,16 +36,47 @@ Future<void> showFinanceBankMatchSuggestionDetailSheet({
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (context, scrollController) {
-        return _FinanceBankMatchSuggestionDetailBody(
-          scrollController: scrollController,
-          bankTransaction: bankTransaction,
-          suggestion: suggestion,
-          canManage: canManage,
-          canConfirm: canConfirm,
-          dismissed: dismissed,
-          onDismiss: onDismiss,
-          onRestore: onRestore,
-          onContinueConfirm: onContinueConfirm,
+        final available = <String>[];
+        final disabled = <String>[];
+        if (!dismissed && canManage) {
+          available.add(FinanceStrings.t(context, 'bank_match_dismiss'));
+        } else if (dismissed && canManage) {
+          available.add(FinanceStrings.t(context, 'bank_match_restore_suggestion'));
+        } else {
+          disabled.add(FinanceStrings.t(context, 'bank_match_dismiss'));
+        }
+        final blocked = suggestion.isBlocked;
+        if (!dismissed && canConfirm && !blocked) {
+          available.add(FinanceStrings.t(context, 'bank_match_continue_confirm'));
+        } else {
+          disabled.add(FinanceStrings.t(context, 'bank_match_continue_confirm'));
+        }
+        return FinanceAssistantHost(
+          contextData: FinanceAssistantContext(
+            companyId: companyId,
+            screenKey: FinanceAssistantScreens.bankMatchSuggestionDetail,
+            tabKey: FinanceAssistantTabs.cashFlow,
+            tabLabelKey: 'help_cash_flow_tab_title',
+            role: role,
+            entityStatus: FinanceBankMatchSuggestionUiHelper.confidenceLabel(
+              context,
+              suggestion,
+            ),
+            availableActions: available,
+            disabledActions: disabled,
+          ),
+          showFab: false,
+          child: _FinanceBankMatchSuggestionDetailBody(
+            scrollController: scrollController,
+            bankTransaction: bankTransaction,
+            suggestion: suggestion,
+            canManage: canManage,
+            canConfirm: canConfirm,
+            dismissed: dismissed,
+            onDismiss: onDismiss,
+            onRestore: onRestore,
+            onContinueConfirm: onContinueConfirm,
+          ),
         );
       },
     ),
@@ -90,11 +127,29 @@ class _FinanceBankMatchSuggestionDetailBody extends StatelessWidget {
 
     return ListView(
       controller: scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        0,
+        16,
+        FinanceSystemBottomInset.scrollEnd(context),
+      ),
       children: [
-        Text(
-          FinanceStrings.t(context, 'bank_match_detail_title'),
-          style: theme.textTheme.titleLarge,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                FinanceStrings.t(context, 'bank_match_detail_title'),
+                style: theme.textTheme.titleLarge,
+              ),
+            ),
+            IconButton(
+              tooltip: FinanceStrings.t(context, 'finance_assistant_fab_title'),
+              icon: const Icon(Icons.chat_bubble_outline),
+              onPressed: () =>
+                  FinanceModuleAssistantScope.maybeOf(context)?.openAssistant(),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         Text(

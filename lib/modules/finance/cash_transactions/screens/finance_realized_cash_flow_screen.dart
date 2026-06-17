@@ -8,6 +8,7 @@ import '../../shared/finance_date_picker_field.dart';
 import '../../shared/finance_display_labels.dart';
 import '../../shared/finance_error_mapper.dart';
 import '../../shared/finance_money_format.dart';
+import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../models/finance_realized_cash_flow_summary.dart';
 import '../services/finance_cash_transactions_service.dart';
@@ -303,7 +304,14 @@ class _FinanceRealizedCashFlowScreenState
       role: _role,
       debugUnlockModule: widget.debugUnlockModule,
     )) {
-      return Scaffold(
+      return FinanceScaffold(
+        assistantContext: FinanceAssistantContextFactory.fromCompany(
+          context: context,
+          companyData: widget.companyData,
+          screenKey: FinanceAssistantScreens.realizedCashFlow,
+          tabKey: FinanceAssistantTabs.cashFlow,
+          tabLabelKey: 'help_cash_flow_tab_title',
+        ),
         appBar: AppBar(title: Text(FinanceStrings.t(context, 'realized_title'))),
         body: Center(child: Text(FinanceStrings.t(context, 'access_denied'))),
       );
@@ -311,7 +319,15 @@ class _FinanceRealizedCashFlowScreenState
 
     final currency = _summary?.currency;
 
-    return Scaffold(
+    return FinanceScaffold(
+      assistantContext: FinanceAssistantContextFactory.fromCompany(
+        context: context,
+        companyData: widget.companyData,
+        screenKey: FinanceAssistantScreens.realizedCashFlow,
+        tabKey: FinanceAssistantTabs.cashFlow,
+        tabLabelKey: 'help_cash_flow_tab_title',
+        actions: FinanceAssistantContextFactory.refreshOnly(),
+      ),
       appBar: AppBar(
         title: Text(FinanceStrings.t(context, 'realized_title')),
         actions: [

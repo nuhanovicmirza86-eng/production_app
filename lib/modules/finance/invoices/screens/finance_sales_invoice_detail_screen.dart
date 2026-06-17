@@ -5,6 +5,7 @@ import '../../shared/finance_date_picker_field.dart';
 import '../../shared/finance_display_labels.dart';
 import '../../shared/finance_error_mapper.dart';
 import '../../shared/finance_money_format.dart';
+import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../../payment_allocations/widgets/finance_payment_allocations_section.dart';
 import '../models/finance_sales_invoice.dart';
@@ -212,7 +213,16 @@ class _FinanceSalesInvoiceDetailScreenState
   @override
   Widget build(BuildContext context) {
     final inv = _invoice;
-    return Scaffold(
+    return FinanceScaffold(
+      assistantContext: FinanceAssistantContextFactory.fromCompany(
+        context: context,
+        companyData: widget.companyData,
+        screenKey: FinanceAssistantScreens.salesInvoiceDetail,
+        tabKey: FinanceAssistantTabs.invoices,
+        tabLabelKey: 'help_invoices_tab_title',
+        entityStatus: FinanceDisplayLabels.invoiceStatus(context, inv.status),
+        actions: FinanceAssistantContextFactory.refreshOnly(),
+      ),
       appBar: AppBar(
         title: Text(inv.invoiceNumber),
         actions: [

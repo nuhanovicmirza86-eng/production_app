@@ -10,8 +10,7 @@ import '../../shared/finance_display_labels.dart';
 import '../../shared/finance_error_mapper.dart';
 import '../../shared/finance_labeled_filter_field.dart';
 import '../../shared/finance_money_format.dart';
-import '../../shared/finance_assistant/finance_assistant_context.dart';
-import '../../shared/finance_assistant/finance_assistant_host.dart';
+import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../models/finance_bank_statement_transaction.dart';
 import '../services/finance_bank_reconciliation_service.dart';
@@ -254,7 +253,14 @@ class _FinanceBankStatementsScreenState extends State<FinanceBankStatementsScree
   @override
   Widget build(BuildContext context) {
     if (!_canView) {
-      return Scaffold(
+      return FinanceScaffold(
+        assistantContext: FinanceAssistantContext(
+          companyId: _companyId,
+          screenKey: FinanceAssistantScreens.bankStatementsList,
+          tabKey: FinanceAssistantTabs.cashFlow,
+          tabLabelKey: 'help_cash_flow_tab_title',
+          role: _role,
+        ),
         appBar: AppBar(
           title: Text(FinanceStrings.t(context, 'bank_statements_title')),
         ),
@@ -274,17 +280,21 @@ class _FinanceBankStatementsScreenState extends State<FinanceBankStatementsScree
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    return FinanceAssistantHost(
-      contextData: FinanceAssistantContext(
+    return FinanceScaffold(
+      assistantContext: FinanceAssistantContext(
+        companyId: _companyId,
         screenKey: FinanceAssistantScreens.bankStatementsList,
+        tabKey: FinanceAssistantTabs.cashFlow,
         tabLabelKey: 'help_cash_flow_tab_title',
         role: _role,
         availableActions: [
           if (_canImport) FinanceStrings.t(context, 'bank_import'),
           FinanceStrings.t(context, 'refresh'),
         ],
+        disabledActions: [
+          if (!_canImport) FinanceStrings.t(context, 'bank_import'),
+        ],
       ),
-      child: Scaffold(
       appBar: AppBar(
         title: Text(FinanceStrings.t(context, 'bank_statements_title')),
         actions: [
@@ -570,7 +580,6 @@ class _FinanceBankStatementsScreenState extends State<FinanceBankStatementsScree
                   ),
           ),
         ],
-      ),
       ),
     );
   }

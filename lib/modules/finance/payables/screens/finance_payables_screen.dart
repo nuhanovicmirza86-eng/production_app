@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../../shared/finance_error_mapper.dart';
 import '../../shared/finance_money_format.dart';
+import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../../invoices/models/finance_open_items_summary.dart';
 import '../../invoices/models/finance_purchase_invoice.dart';
@@ -91,7 +92,14 @@ class _FinancePayablesScreenState extends State<FinancePayablesScreen> {
       role: _role,
       debugUnlockModule: widget.debugUnlockModule,
     )) {
-      return Scaffold(
+      return FinanceScaffold(
+        assistantContext: FinanceAssistantContextFactory.fromCompany(
+          context: context,
+          companyData: widget.companyData,
+          screenKey: FinanceAssistantScreens.payablesList,
+          tabKey: FinanceAssistantTabs.invoices,
+          tabLabelKey: 'help_invoices_tab_title',
+        ),
         appBar: AppBar(
           title: Text(FinanceStrings.t(context, 'payables_title')),
         ),
@@ -102,7 +110,15 @@ class _FinancePayablesScreenState extends State<FinancePayablesScreen> {
     final summary = _summary;
     final currencyHint = _items.isNotEmpty ? _items.first.currency : null;
 
-    return Scaffold(
+    return FinanceScaffold(
+      assistantContext: FinanceAssistantContextFactory.fromCompany(
+        context: context,
+        companyData: widget.companyData,
+        screenKey: FinanceAssistantScreens.payablesList,
+        tabKey: FinanceAssistantTabs.invoices,
+        tabLabelKey: 'help_invoices_tab_title',
+        actions: FinanceAssistantContextFactory.refreshOnly(),
+      ),
       appBar: AppBar(
         title: Text(FinanceStrings.t(context, 'payables_title')),
         actions: [

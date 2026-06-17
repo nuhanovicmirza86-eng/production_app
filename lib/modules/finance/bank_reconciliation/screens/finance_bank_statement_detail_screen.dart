@@ -6,9 +6,9 @@ import '../../shared/finance_display_labels.dart';
 import '../../shared/finance_error_mapper.dart';
 import '../../shared/finance_money_format.dart';
 import '../../shared/finance_assistant/finance_assistant_context.dart';
-import '../../shared/finance_assistant/finance_assistant_host.dart';
 import '../../shared/finance_help_info_button.dart';
 import '../../shared/finance_reason_prompt_dialog.dart';
+import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../models/finance_bank_match_confirmation.dart';
 import '../models/finance_bank_match_suggestion.dart';
@@ -369,6 +369,8 @@ class _FinanceBankStatementDetailScreenState
     if (txn == null) return;
     showFinanceBankMatchSuggestionDetailSheet(
       context: context,
+      companyId: _companyId,
+      role: _role,
       bankTransaction: txn,
       suggestion: sug,
       canManage: _canManage,
@@ -490,20 +492,39 @@ class _FinanceBankStatementDetailScreenState
     return actions;
   }
 
+  List<String> _assistantDisabledActions(FinanceBankStatementTransaction txn) {
+    final disabled = <String>[];
+    if (!_canManage) {
+      if (txn.canGenerateSuggestions) {
+        disabled.add(FinanceStrings.t(context, 'bank_match_generate'));
+      }
+      if (txn.canIgnore) {
+        disabled.add(FinanceStrings.t(context, 'bank_ignore'));
+      }
+    }
+    if (!_canConfirm) {
+      disabled.add(FinanceStrings.t(context, 'bank_match_confirm'));
+    }
+    return disabled;
+  }
+
   @override
   Widget build(BuildContext context) {
     final txn = _txn;
 
-    return FinanceAssistantHost(
-      contextData: FinanceAssistantContext(
+    return FinanceScaffold(
+      assistantContext: FinanceAssistantContext(
+        companyId: _companyId,
         screenKey: FinanceAssistantScreens.bankStatementDetail,
+        tabKey: FinanceAssistantTabs.cashFlow,
+        tabLabelKey: 'help_cash_flow_tab_title',
         role: _role,
         entityStatus: txn == null
             ? null
             : FinanceDisplayLabels.bankStatementStatus(context, txn.status),
         availableActions: txn == null ? const [] : _assistantActions(txn),
+        disabledActions: txn == null ? const [] : _assistantDisabledActions(txn),
       ),
-      child: Scaffold(
       appBar: AppBar(
         title: Text(FinanceStrings.t(context, 'bank_detail_title')),
         actions: [
@@ -696,7 +717,6 @@ class _FinanceBankStatementDetailScreenState
                 ),
               ],
             ),
-    ),
     );
   }
 

@@ -4,6 +4,7 @@ import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../../shared/finance_display_labels.dart';
 import '../../shared/finance_error_mapper.dart';
 import '../../shared/finance_money_format.dart';
+import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../models/finance_purchase_invoice.dart';
 import '../services/finance_invoices_service.dart';
@@ -109,7 +110,14 @@ class _FinancePurchaseInvoicesScreenState
       role: _role,
       debugUnlockModule: widget.debugUnlockModule,
     )) {
-      return Scaffold(
+      return FinanceScaffold(
+        assistantContext: FinanceAssistantContextFactory.fromCompany(
+          context: context,
+          companyData: widget.companyData,
+          screenKey: FinanceAssistantScreens.purchaseInvoicesList,
+          tabKey: FinanceAssistantTabs.invoices,
+          tabLabelKey: 'help_invoices_tab_title',
+        ),
         appBar: AppBar(
           title: Text(FinanceStrings.t(context, 'purchase_invoices_title')),
         ),
@@ -117,7 +125,18 @@ class _FinancePurchaseInvoicesScreenState
       );
     }
 
-    return Scaffold(
+    return FinanceScaffold(
+      assistantContext: FinanceAssistantContextFactory.fromCompany(
+        context: context,
+        companyData: widget.companyData,
+        screenKey: FinanceAssistantScreens.purchaseInvoicesList,
+        tabKey: FinanceAssistantTabs.invoices,
+        tabLabelKey: 'help_invoices_tab_title',
+        actions: FinanceAssistantContextFactory.createAndRefresh(
+          createKey: 'purchase_invoice_new',
+          canCreate: _canCreate,
+        ),
+      ),
       appBar: AppBar(
         title: Text(FinanceStrings.t(context, 'purchase_invoices_title')),
         actions: [

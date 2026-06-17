@@ -9,6 +9,7 @@ import '../../cash_flow_categories/services/finance_cash_flow_categories_service
 import '../../shared/finance_display_labels.dart';
 import '../../shared/finance_error_mapper.dart';
 import '../../shared/finance_money_format.dart';
+import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../../payment_allocations/screens/finance_allocate_payment_screen.dart';
 import '../../payment_allocations/widgets/finance_payment_allocations_section.dart';
@@ -343,7 +344,16 @@ class _FinanceCashTransactionDetailScreenState
         ? '${_category!.categoryCode} · ${_category!.name}'
         : (_tx.cashFlowCategoryCode ?? _tx.cashFlowCategoryId);
 
-    return Scaffold(
+    return FinanceScaffold(
+      assistantContext: FinanceAssistantContextFactory.fromCompany(
+        context: context,
+        companyData: widget.companyData,
+        screenKey: FinanceAssistantScreens.transactionDetail,
+        tabKey: FinanceAssistantTabs.cashFlow,
+        tabLabelKey: 'help_cash_flow_tab_title',
+        entityStatus: FinanceDisplayLabels.transactionStatus(context, _tx.status),
+        actions: FinanceAssistantContextFactory.refreshOnly(),
+      ),
       appBar: AppBar(
         title: Text(FinanceStrings.t(context, 'transaction_detail')),
         actions: [
