@@ -400,7 +400,7 @@ class FinanceStrings {
     'bawc_plant': 'Pogon',
     'bawc_uncategorized': 'Nekategorizirano',
     'bawc_coverage_title': 'Pokrivenost podataka',
-    'bawc_coverage_compact': 'ⓘ {count} upozorenja o dostupnosti podataka',
+    'bawc_coverage_compact': '{count} upozorenja o dostupnosti podataka',
     'bawc_warn_no_budget': 'Nema odobrenog budžeta za odabrani period.',
     'bawc_warn_no_collection_payments':
         'Nema potvrđenih plaćanja za prosjek dana naplate.',
@@ -1645,7 +1645,7 @@ class FinanceStrings {
     'bawc_plant': 'Plant',
     'bawc_uncategorized': 'Uncategorized',
     'bawc_coverage_title': 'Data coverage',
-    'bawc_coverage_compact': 'ⓘ {count} data availability warnings',
+    'bawc_coverage_compact': '{count} data availability warnings',
     'bawc_warn_no_budget': 'No approved budget for the selected period.',
     'bawc_warn_no_collection_payments':
         'No confirmed payments for average collection days.',
