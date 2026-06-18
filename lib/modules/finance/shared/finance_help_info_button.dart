@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../finance_integrations/utils/finance_load_error_presenter.dart';
 import 'finance_assistant/finance_module_assistant_scope.dart';
+import 'finance_assistant/finance_module_assistant_session.dart';
 import 'finance_strings.dart';
 
 /// Kratko objašnjenje pojedinačnog pojma preko info ikone (BA/EN: `help_*` ključevi).

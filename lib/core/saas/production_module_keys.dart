@@ -34,6 +34,15 @@ abstract final class ProductionModuleKeys {
   /// Integracija s ERP-om (uža pretplata; često u paketu s [financeControlling]).
   static const String financeIntegrations = 'finance_integrations';
 
+  /// Operonix APS — napredno planiranje (P0+).
+  static const String advancedPlanning = 'advanced_planning';
+
+  /// APS P1 — scenariji i gruba kapacitetna provjera.
+  static const String apsScenarioPlanning = 'aps_scenario_planning';
+
+  /// APS P6 add-on — AI asistent za planiranje.
+  static const String apsAiAssistant = 'aps_ai_assistant';
+
   static bool hasFinanceSuite(Map<String, dynamic> companyData) {
     return hasModule(companyData, financeControlling) ||
         hasModule(companyData, financeIntegrations);
@@ -119,5 +128,17 @@ abstract final class ProductionModuleKeys {
     return hasModule(companyData, ProductionModuleKeys.aiAssistant) ||
         hasModule(companyData, ProductionModuleKeys.aiAssistantProduction) ||
         hasModule(companyData, ProductionModuleKeys.aiReports);
+  }
+
+  static bool hasAdvancedPlanningModule(Map<String, dynamic> companyData) {
+    return hasModule(companyData, advancedPlanning);
+  }
+
+  static bool hasApsScenarioPlanningModule(Map<String, dynamic> companyData) {
+    return hasModule(companyData, apsScenarioPlanning);
+  }
+
+  static bool hasApsAiAssistantModule(Map<String, dynamic> companyData) {
+    return hasModule(companyData, apsAiAssistant);
   }
 }
