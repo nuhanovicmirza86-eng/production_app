@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/company_plant_display_name.dart';
+import '../../../finance_integrations/utils/finance_load_error_presenter.dart';
 import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../../shared/finance_date_picker_field.dart';
 import '../../shared/finance_error_mapper.dart';
@@ -193,13 +194,7 @@ class _FinanceBudgetActualWorkingCapitalScreenState
     BuildContext context,
     FinanceBudgetActualBreakdownRow row,
   ) {
-    if (row.categoryName != null && row.categoryName!.isNotEmpty) {
-      return row.categoryName!;
-    }
-    if (row.key == '_uncategorized') {
-      return FinanceStrings.t(context, 'bawc_uncategorized');
-    }
-    return row.key;
+    return FinanceBawcDisplay.categoryBreakdownLabel(context, row);
   }
 
   String _plantLabel(
@@ -426,44 +421,46 @@ class _FinanceBudgetActualWorkingCapitalScreenState
     );
   }
 
-  Widget _buildCoverageBanner(
+  Widget _buildCoverageHint(
     BuildContext context,
     List<String> messages,
   ) {
     if (messages.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
-    return Card(
-      color: theme.colorScheme.errorContainer.withValues(alpha: 0.35),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              FinanceStrings.t(context, 'bawc_coverage_title'),
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
+    final label = FinanceStrings
+        .t(context, 'bawc_coverage_compact')
+        .replaceAll('{count}', '${messages.length}');
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => showFinanceTechnicalDetailDialog(
+          context,
+          title: FinanceStrings.t(context, 'bawc_coverage_title'),
+          detail: messages.map((m) => '• $m').join('\n\n'),
+          closeLabel: FinanceStrings.t(context, 'help_info_close'),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+          child: Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-            ),
-            const SizedBox(height: 8),
-            ...messages.map(
-              (m) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      size: 18,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(m)),
-                  ],
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  label,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -524,8 +521,8 @@ class _FinanceBudgetActualWorkingCapitalScreenState
                       ),
                     ),
                   ),
-                _buildCoverageBanner(context, coverage),
-                if (coverage.isNotEmpty) const SizedBox(height: 12),
+                _buildCoverageHint(context, coverage),
+                if (coverage.isNotEmpty) const SizedBox(height: 4),
                 if (_isEmptySnapshot(snap))
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),

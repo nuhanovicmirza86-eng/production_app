@@ -114,5 +114,66 @@ void main() {
         ),
       );
     });
+
+    test('category breakdown hides internal record ids', () {
+      expect(
+        FinanceBawcDisplay.looksLikeInternalRecordId('xClaWt3tvUTlkmoh1rYe'),
+        isTrue,
+      );
+      expect(FinanceBawcDisplay.looksLikeInternalRecordId('2026-06'), isFalse);
+    });
+
+    testWidgets('category breakdown label uses name or Nekategorizirano', (
+      tester,
+    ) async {
+      const totals = FinanceBudgetActualTotals(
+        plannedInflow: 0,
+        actualInflow: 100,
+        inflowVarianceAmount: 100,
+        inflowVariancePercent: null,
+        plannedOutflow: 0,
+        actualOutflow: 0,
+        outflowVarianceAmount: 0,
+        outflowVariancePercent: null,
+        plannedNetCashFlow: 0,
+        actualNetCashFlow: 100,
+        netVarianceAmount: 100,
+        netVariancePercent: null,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('bs'),
+          home: Builder(
+            builder: (context) {
+              final named = FinanceBudgetActualBreakdownRow(
+                key: 'cat1',
+                categoryName: 'Operativni priliv',
+                totals: totals,
+              );
+              expect(
+                FinanceBawcDisplay.categoryBreakdownLabel(context, named),
+                'Operativni priliv',
+              );
+
+              final idOnly = FinanceBudgetActualBreakdownRow(
+                key: 'xClaWt3tvUTlkmoh1rYe',
+                totals: totals,
+              );
+              expect(
+                FinanceBawcDisplay.categoryBreakdownLabel(context, idOnly),
+                FinanceStrings.t(context, 'bawc_uncategorized'),
+              );
+              expect(
+                FinanceBawcDisplay.categoryBreakdownLabel(context, idOnly),
+                isNot(contains('xClaWt')),
+              );
+
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+    });
   });
 }

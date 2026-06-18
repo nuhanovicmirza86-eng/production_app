@@ -49,6 +49,32 @@ abstract final class FinanceBawcDisplay {
     final prefix = amount > 0 ? '+' : '';
     return '$prefix${FinanceMoneyFormat.format(amount, currency)}';
   }
+
+  /// Ne prikazivati Firestore ID-jeve ili interne ključeve u breakdownu.
+  static bool looksLikeInternalRecordId(String value) {
+    final s = value.trim();
+    if (s.isEmpty || s == '_uncategorized' || s == '_company_wide') {
+      return true;
+    }
+    if (RegExp(r'^\d{4}-\d{2}$').hasMatch(s)) return false;
+    return RegExp(r'^[A-Za-z0-9_-]{15,}$').hasMatch(s);
+  }
+
+  static String categoryBreakdownLabel(
+    BuildContext context,
+    FinanceBudgetActualBreakdownRow row,
+  ) {
+    final uncategorized = FinanceStrings.t(context, 'bawc_uncategorized');
+    if (row.key == '_uncategorized') return uncategorized;
+
+    final name = row.categoryName?.trim();
+    if (name != null &&
+        name.isNotEmpty &&
+        !looksLikeInternalRecordId(name)) {
+      return name;
+    }
+    return uncategorized;
+  }
 }
 
 class FinanceBawcVarianceRow extends StatelessWidget {
