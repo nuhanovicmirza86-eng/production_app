@@ -46,8 +46,8 @@ class FinanceModuleAssistantScopeState extends State<FinanceModuleAssistantScope
     _session.registerContext(context);
   }
 
-  void openAssistant({String? questionKey}) {
-    _session.openAssistant(context, questionKey: questionKey);
+  Future<void> openAssistant({String? questionKey}) {
+    return _session.openAssistant(context, questionKey: questionKey);
   }
 
   @override

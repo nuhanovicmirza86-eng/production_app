@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:production_app/modules/finance/shared/finance_assistant/finance_assistant_context.dart';
-import 'package:production_app/modules/finance/shared/finance_assistant/finance_assistant_fab.dart';
+import 'package:production_app/modules/finance/shared/finance_assistant/finance_assistant_edge_handle.dart';
 import 'package:production_app/modules/finance/shared/finance_assistant/finance_assistant_hub_context.dart';
 import 'package:production_app/modules/finance/shared/finance_assistant/finance_module_assistant_scope.dart';
 import 'package:production_app/modules/finance/shared/finance_assistant/finance_module_assistant_session.dart';
@@ -18,7 +18,8 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({
-      'finance_assistant_fab_hint_seen_v1': true,
+      'finance_assistant_edge_side_v1': 'right',
+      'finance_assistant_edge_top_ratio_v1': 0.65,
     });
     FinanceModuleAssistantSession.end();
   });
@@ -42,7 +43,7 @@ void main() {
     );
   }
 
-  testWidgets('M2-G: jedan Finance asistent FAB na FinanceScaffold', (tester) async {
+  testWidgets('M2-G: jedan rubni Finance asistent na FinanceScaffold', (tester) async {
     await tester.pumpWidget(
       wrap(
         Builder(
@@ -56,7 +57,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(FinanceAssistantFab), findsOneWidget);
+    expect(find.byType(FinanceAssistantEdgeHandle), findsOneWidget);
+    expect(find.byIcon(Icons.chat_bubble_outline_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.forum_outlined), findsNothing);
     expect(find.byIcon(Icons.smart_toy_outlined), findsNothing);
   });
 
@@ -201,6 +204,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.insights_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.chat_bubble_outline_rounded), findsNothing);
     expect(find.byIcon(Icons.smart_toy_outlined), findsNothing);
     expect(find.byTooltip(tooltip), findsOneWidget);
   });

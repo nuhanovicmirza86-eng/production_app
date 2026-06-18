@@ -32,9 +32,18 @@ abstract final class FinanceSystemBottomInset {
     return EdgeInsets.fromLTRB(horizontal, top, horizontal, bottom);
   }
 
-  /// Plutajući gumb iznad sistemske trake.
+  /// Plutajući gumb iznad sistemske trake ili tastature.
   static double fabBottom(BuildContext context, {double base = 16}) {
-    return base + navigationBar(context);
+    final kb = keyboard(context);
+    final nav = navigationBar(context);
+    return base + (kb > 0 ? kb : nav);
+  }
+
+  /// Donji inset za rubni jezičak — iznad tastature, sistemske trake i app nav bara.
+  static double edgeHandleBottom(BuildContext context, {double base = 8}) {
+    final kb = keyboard(context);
+    if (kb > 0) return base + kb;
+    return base + navigationBar(context) + kBottomNavigationBarHeight;
   }
 
   /// Donji padding za scroll sadržaj (dugmad na kraju liste).

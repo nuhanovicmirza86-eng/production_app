@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'finance_assistant/finance_assistant_context.dart';
-import 'finance_assistant/finance_assistant_fab.dart';
+import 'finance_assistant/finance_assistant_edge_handle.dart';
 import 'finance_assistant/finance_module_assistant_scope.dart';
 import 'finance_assistant/finance_module_assistant_session.dart';
 import 'finance_system_bottom_inset.dart';
@@ -12,14 +12,14 @@ export 'finance_assistant/finance_assistant_hub_context.dart';
 export 'finance_assistant/finance_module_assistant_scope.dart';
 export 'finance_assistant/finance_module_assistant_session.dart';
 
-/// Finance modul — safe area, jedan plutajući Finance asistent, kontekst ekrana.
+/// Finance modul — safe area, rubni Finance asistent, kontekst ekrana.
 class FinanceScaffold extends StatelessWidget {
   const FinanceScaffold({
     super.key,
     this.appBar,
     required this.body,
     this.assistantContext,
-    this.showAssistantFab = true,
+    this.showAssistantEdgeHandle = true,
     this.floatingActionButton,
     this.floatingActionButtonLocation,
     this.persistentFooterButtons,
@@ -36,7 +36,7 @@ class FinanceScaffold extends StatelessWidget {
   final PreferredSizeWidget? appBar;
   final Widget body;
   final FinanceAssistantContext? assistantContext;
-  final bool showAssistantFab;
+  final bool showAssistantEdgeHandle;
   final Widget? floatingActionButton;
   final FloatingActionButtonLocation? floatingActionButtonLocation;
   final List<Widget>? persistentFooterButtons;
@@ -75,25 +75,73 @@ class FinanceScaffold extends StatelessWidget {
 
     return FinanceAssistantContextRegistrar(
       contextData: assistantContext!,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          scaffold,
-          if (showAssistantFab)
-            FinanceAssistantFab(
-              onPressed: () => _openAssistant(context),
-            ),
-        ],
+      child: _FinanceAssistantEdgeOverlay(
+        showHandle: showAssistantEdgeHandle,
+        onOpenAssistant: () => _openAssistant(context),
+        child: scaffold,
       ),
     );
   }
 
-  void _openAssistant(BuildContext context) {
+  Future<void> _openAssistant(BuildContext context) async {
     final scope = FinanceModuleAssistantScope.maybeOf(context);
     if (scope != null) {
-      scope.openAssistant();
+      await scope.openAssistant();
       return;
     }
-    FinanceModuleAssistantSession.currentOrNull?.openAssistant(context);
+    await FinanceModuleAssistantSession.currentOrNull?.openAssistant(context);
+  }
+}
+
+class _FinanceAssistantEdgeOverlay extends StatefulWidget {
+  const _FinanceAssistantEdgeOverlay({
+    required this.child,
+    required this.showHandle,
+    required this.onOpenAssistant,
+  });
+
+  final Widget child;
+  final bool showHandle;
+  final Future<void> Function() onOpenAssistant;
+
+  @override
+  State<_FinanceAssistantEdgeOverlay> createState() =>
+      _FinanceAssistantEdgeOverlayState();
+}
+
+class _FinanceAssistantEdgeOverlayState
+    extends State<_FinanceAssistantEdgeOverlay> {
+  DateTime? _lastScrollAt;
+
+  bool get _scrollCompact {
+    final t = _lastScrollAt;
+    if (t == null) return false;
+    return DateTime.now().difference(t) < const Duration(milliseconds: 900);
+  }
+
+  bool _onScroll(ScrollNotification notification) {
+    if (notification is ScrollUpdateNotification ||
+        notification is ScrollStartNotification) {
+      setState(() => _lastScrollAt = DateTime.now());
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NotificationListener<ScrollNotification>(
+      onNotification: _onScroll,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          widget.child,
+          if (widget.showHandle)
+            FinanceAssistantEdgeHandle(
+              scrollCompact: _scrollCompact,
+              onPressed: widget.onOpenAssistant,
+            ),
+        ],
+      ),
+    );
   }
 }

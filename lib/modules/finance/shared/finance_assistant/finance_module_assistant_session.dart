@@ -33,10 +33,10 @@ class FinanceModuleAssistantSession {
     contextNotifier.value = context;
   }
 
-  void openAssistant(
+  Future<void> openAssistant(
     BuildContext context, {
     String? questionKey,
-  }) {
+  }) async {
     final ctx = activeContext;
     if (ctx == null) return;
 
@@ -44,7 +44,7 @@ class FinanceModuleAssistantSession {
         ? ctx.copyWith(prefilledQuestionKey: questionKey)
         : ctx;
 
-    FinanceAssistantPanel.show(
+    await FinanceAssistantPanel.show(
       context,
       contextData: data,
       conversationId: conversationId,
