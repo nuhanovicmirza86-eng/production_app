@@ -1133,6 +1133,11 @@ class FinanceStrings {
     'finance_assistant_q_bank_confirm_effect': 'Šta će se desiti ako potvrdim?',
     'finance_assistant_q_bank_cancel_effect': 'Šta znači otkazivanje potvrde?',
     'finance_assistant_q_bank_next_step': 'Koji je moj sljedeći korak?',
+    'finance_assistant_q_scenario_base_vs_pessimistic':
+        'Koja je razlika između osnovnog i pesimističnog scenarija?',
+    'finance_assistant_q_scenario_types':
+        'Šta su osnovni, optimistični i pesimistični scenarij?',
+    'finance_assistant_q_scenario_approve': 'Šta znači odobriti scenarij?',
     'finance_assistant_a_bank_list_purpose':
         'Šta znači: ovdje su uvezene bankovne stavke koje treba povezati s fakturama.\n\n'
         'Šta uraditi: filtrirajte period, otvorite stavku ili pokrenite import.\n\n'
@@ -1156,6 +1161,18 @@ class FinanceStrings {
     'finance_assistant_a_bank_next_step':
         'Šta uraditi: slijedite status stavke — import → prijedlozi → potvrda → usklađivanje.\n\n'
         'Ako je akcija nedostupna, provjerite ulogu i blocking razlog na prijedlogu.',
+    'finance_assistant_a_scenario_base_vs_pessimistic':
+        'Šta znači: osnovni scenarij polazi od Cash Flow prognoze i planiranih stavaka; '
+        'pesimistični simulira kašnjenje naplate i veće odlive.\n\n'
+        'Šta uraditi: usporedite oba scenarija ili otvorite usporedbu na Naprednoj Cash Flow analizi.\n\n'
+        'Šta se dešava: razlika je vidljiva po periodu; odobreni scenarij ne mijenja transakcije.',
+    'finance_assistant_a_scenario_types':
+        'Šta znači: osnovni (referentni plan), optimistični (brža naplata), '
+        'pesimistični (kašnjenje i veći odlivi) i Šta-ako (parametarska simulacija).\n\n'
+        'Šta uraditi: kreirajte novi scenarij na Naprednoj Cash Flow analizi.',
+    'finance_assistant_a_scenario_approve':
+        'Šta znači: odobrenje znači da je scenarij prihvaćen za planiranje likvidnosti — ne knjiži transakcije.\n\n'
+        'Šta uraditi: nakon izračuna provjerite pretpostavke i dodirnite Odobri na detalju scenarija.',
     'finance_assistant_a_free_text':
         'Za detaljno pitanje koristite predložena dugmad ili kontaktirajte administratora. '
         'Ja objašnjavam tok i pojmove — ne izvršavam knjiženja umjesto vas.',
@@ -2286,6 +2303,11 @@ class FinanceStrings {
     'finance_assistant_q_bank_confirm_effect': 'What happens if I confirm?',
     'finance_assistant_q_bank_cancel_effect': 'What does cancelling a confirmation mean?',
     'finance_assistant_q_bank_next_step': 'What is my next step?',
+    'finance_assistant_q_scenario_base_vs_pessimistic':
+        'What is the difference between base and pessimistic scenario?',
+    'finance_assistant_q_scenario_types':
+        'What are base, optimistic and pessimistic scenarios?',
+    'finance_assistant_q_scenario_approve': 'What does approving a scenario mean?',
     'finance_assistant_a_bank_list_purpose':
         'What it means: imported bank lines that should be matched to invoices.\n\n'
         'What to do: filter the period, open a line or run import.\n\n'
@@ -2309,6 +2331,18 @@ class FinanceStrings {
     'finance_assistant_a_bank_next_step':
         'What to do: follow the line status — import → suggestions → confirm → reconcile.\n\n'
         'If an action is unavailable, check your role and blocking reasons on the suggestion.',
+    'finance_assistant_a_scenario_base_vs_pessimistic':
+        'What it means: the base scenario starts from the Cash Flow forecast and planned items; '
+        'the pessimistic one simulates delayed collection and higher outflows.\n\n'
+        'What to do: compare both scenarios or open comparison in Advanced Cash Flow analysis.\n\n'
+        'What happens: differences appear by period; an approved scenario does not change transactions.',
+    'finance_assistant_a_scenario_types':
+        'What it means: base (reference plan), optimistic (faster collection), '
+        'pessimistic (delays and higher outflows) and What-if (parameter simulation).\n\n'
+        'What to do: create a new scenario in Advanced Cash Flow analysis.',
+    'finance_assistant_a_scenario_approve':
+        'What it means: approval means the scenario is accepted for liquidity planning — it does not post transactions.\n\n'
+        'What to do: after calculation review assumptions and tap Approve on scenario detail.',
     'finance_assistant_a_free_text':
         'For detailed questions use the suggested chips or contact your administrator. '
         'I explain flow and terms — I do not post on your behalf.',

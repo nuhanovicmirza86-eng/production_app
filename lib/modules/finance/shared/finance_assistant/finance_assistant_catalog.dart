@@ -54,6 +54,18 @@ class FinanceAssistantCatalog {
           'finance_assistant_q_bank_cancel_effect',
           'finance_assistant_q_bank_next_step',
         ];
+      case FinanceAssistantScreens.scenariosHub:
+      case FinanceAssistantScreens.scenarioBase:
+      case FinanceAssistantScreens.scenarioOptimistic:
+      case FinanceAssistantScreens.scenarioPessimistic:
+      case FinanceAssistantScreens.scenarioDetail:
+      case FinanceAssistantScreens.advancedCashFlowHub:
+        return const [
+          'finance_assistant_q_scenario_base_vs_pessimistic',
+          'finance_assistant_q_scenario_types',
+          'finance_assistant_q_scenario_approve',
+          'finance_assistant_q_what_is_screen',
+        ];
       default:
         return const [
           'finance_assistant_q_what_is_screen',
@@ -87,6 +99,9 @@ class FinanceAssistantCatalog {
     'finance_assistant_q_bank_confirm_effect',
     'finance_assistant_q_bank_cancel_effect',
     'finance_assistant_q_bank_next_step',
+    'finance_assistant_q_scenario_base_vs_pessimistic',
+    'finance_assistant_q_scenario_types',
+    'finance_assistant_q_scenario_approve',
   ];
 
   static String answerKeyForQuestion(String questionKey) {
@@ -105,6 +120,12 @@ class FinanceAssistantCatalog {
           'finance_assistant_a_bank_cancel_effect',
       'finance_assistant_q_bank_next_step':
           'finance_assistant_a_bank_next_step',
+      'finance_assistant_q_scenario_base_vs_pessimistic':
+          'finance_assistant_a_scenario_base_vs_pessimistic',
+      'finance_assistant_q_scenario_types':
+          'finance_assistant_a_scenario_types',
+      'finance_assistant_q_scenario_approve':
+          'finance_assistant_a_scenario_approve',
     };
     return map[questionKey] ?? 'finance_assistant_a_default';
   }
