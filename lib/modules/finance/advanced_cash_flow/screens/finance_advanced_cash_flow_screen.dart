@@ -6,12 +6,14 @@ import '../../shared/finance_assistant/finance_assistant_context_factory.dart';
 import '../../shared/finance_date_picker_field.dart';
 import '../../shared/finance_display_labels.dart';
 import '../../shared/finance_error_mapper.dart';
+import '../../shared/finance_hub_entry_card.dart';
 import '../../shared/finance_scaffold.dart';
 import '../../shared/finance_strings.dart';
 import '../models/finance_cash_flow_scenario.dart';
 import '../services/finance_cash_flow_scenario_service.dart';
 import '../widgets/finance_scenario_comparison_table.dart';
 import '../widgets/finance_scenario_summary_tile.dart';
+import 'finance_budget_actual_working_capital_screen.dart';
 import 'finance_scenario_comparison_screen.dart';
 import 'finance_scenario_detail_screen.dart';
 import 'finance_scenario_form_screen.dart';
@@ -199,6 +201,12 @@ class _FinanceAdvancedCashFlowScreenState
       appBar: AppBar(
         title: Text(FinanceStrings.t(context, 'advanced_cash_flow_title')),
         actions: [
+          if (_canManage)
+            IconButton(
+              tooltip: FinanceStrings.t(context, 'scenario_new'),
+              icon: const Icon(Icons.add),
+              onPressed: _openForm,
+            ),
           IconButton(
             onPressed: _load,
             tooltip: FinanceStrings.t(context, 'refresh'),
@@ -206,19 +214,27 @@ class _FinanceAdvancedCashFlowScreenState
           ),
         ],
       ),
-      floatingActionButton: _canManage
-          ? FloatingActionButton.extended(
-              onPressed: _openForm,
-              icon: const Icon(Icons.add),
-              label: Text(FinanceStrings.t(context, 'scenario_new')),
-            )
-          : null,
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
             _buildFilters(context),
+            const SizedBox(height: 12),
+            FinanceHubEntryCard(
+              icon: Icons.compare_arrows_outlined,
+              title: FinanceStrings.t(context, 'bawc_title'),
+              helpTitleKey: 'help_card_bawc_title',
+              helpBodyKey: 'help_card_bawc_body',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => FinanceBudgetActualWorkingCapitalScreen(
+                    companyData: widget.companyData,
+                    debugUnlockModule: widget.debugUnlockModule,
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 12),
             if (_loading)
               const Center(child: Padding(

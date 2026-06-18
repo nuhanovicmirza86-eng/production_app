@@ -1,0 +1,118 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:production_app/modules/finance/advanced_cash_flow/models/finance_budget_actual_working_capital_snapshot.dart';
+import 'package:production_app/modules/finance/advanced_cash_flow/widgets/finance_bawc_display_widgets.dart';
+import 'package:production_app/modules/finance/shared/finance_operating_currencies.dart';
+import 'package:production_app/modules/finance/shared/finance_strings.dart';
+
+void main() {
+  group('FinanceBudgetActualWorkingCapitalSnapshot', () {
+    test('parses backend snapshot without local recalculation', () {
+      final snap = FinanceBudgetActualWorkingCapitalSnapshot.fromCallableMap({
+        'success': true,
+        'companyId': 'co1',
+        'period': {'from': '2026-06-01', 'to': '2026-06-30'},
+        'scope': {'plantKey': null, 'mode': 'all'},
+        'currency': 'EUR',
+        'budgetActual': {
+          'plannedInflow': 10000,
+          'actualInflow': 8300,
+          'inflowVarianceAmount': -1700,
+          'inflowVariancePercent': -17,
+          'plannedOutflow': 6000,
+          'actualOutflow': 5500,
+          'outflowVarianceAmount': -500,
+          'outflowVariancePercent': -8.33,
+          'plannedNetCashFlow': 4000,
+          'actualNetCashFlow': 2800,
+          'netVarianceAmount': -1200,
+          'netVariancePercent': -30,
+        },
+        'workingCapital': {
+          'dsoPeriodEnd': 4.55,
+          'dsoCollectionDaysAverage': 14,
+          'dpoPeriodEnd': 6.67,
+          'dpoPaymentDaysAverage': 20,
+          'dio': null,
+          'ccc': null,
+          'dioAvailability': 'unavailable_missing_inventory_cost',
+          'cccAvailability': 'unavailable_missing_dio',
+          'dsoCollectionDaysAverageReason': null,
+          'dpoPaymentDaysAverageReason': null,
+        },
+        'breakdowns': {
+          'byPeriod': [
+            {
+              'key': '2026-06',
+              'plannedInflow': 10000,
+              'actualInflow': 8300,
+              'plannedOutflow': 6000,
+              'actualOutflow': 5500,
+            },
+          ],
+          'byCategory': [],
+          'byPlant': [],
+        },
+        'sourceCoverage': {
+          'budgetLinesIncluded': 2,
+          'budgetLinesExcluded': 0,
+          'cashTransactionsIncluded': 5,
+          'salesInvoicesIncluded': 5,
+          'purchaseInvoicesIncluded': 2,
+          'allocationsIncluded': 3,
+        },
+        'warnings': [],
+        'calculationVersion': 'finance-p5-m2-v1',
+        'generatedAt': '2026-06-18T10:00:00.000Z',
+      });
+
+      expect(snap.calculationVersion, 'finance-p5-m2-v1');
+      expect(snap.currency, 'EUR');
+      expect(snap.budgetActual.inflowVariancePercent, -17);
+      expect(snap.workingCapital.ccc, isNull);
+      expect(snap.workingCapital.cccAvailability, 'unavailable_missing_dio');
+      expect(snap.breakdownByPeriod, hasLength(1));
+    });
+  });
+
+  group('FinanceOperatingCurrencies', () {
+    test('allows only EUR and BAM', () {
+      expect(FinanceOperatingCurrencies.codes, ['EUR', 'BAM']);
+      expect(FinanceOperatingCurrencies.isAllowed('EUR'), isTrue);
+      expect(FinanceOperatingCurrencies.isAllowed('BAM'), isTrue);
+      expect(FinanceOperatingCurrencies.isAllowed('USD'), isFalse);
+    });
+  });
+
+  group('FinanceBawcDisplay', () {
+    testWidgets('null variance percent shows Nije primjenjivo', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('bs'),
+          home: Builder(
+            builder: (context) {
+              final text = FinanceBawcDisplay.formatPercent(context, null);
+              expect(text, FinanceStrings.t(context, 'bawc_variance_not_applicable'));
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+    });
+
+    testWidgets('does not show 0% for null variance', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('bs'),
+          home: Builder(
+            builder: (context) {
+              final text = FinanceBawcDisplay.formatPercent(context, null);
+              expect(text.contains('0%'), isFalse);
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+    });
+  });
+}
