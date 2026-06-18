@@ -1204,6 +1204,25 @@ class FinanceStrings {
     'finance_assistant_q_scenario_types':
         'Šta su osnovni, optimistični i pesimistični scenarij?',
     'finance_assistant_q_scenario_approve': 'Šta znači odobriti scenarij?',
+    'finance_assistant_q_bawc_outflow_above_plan':
+        'Zašto je realizovani odliv veći od plana?',
+    'finance_assistant_q_bawc_unfavorable_variance':
+        'Šta znači nepovoljno odstupanje?',
+    'finance_assistant_q_bawc_variance_not_applicable':
+        'Zašto procenat odstupanja nije primjenjiv?',
+    'finance_assistant_q_bawc_net_cash_flow':
+        'Objasni mi neto Cash Flow za ovaj period.',
+    'finance_assistant_q_wc_dso_period_vs_average':
+        'Koja je razlika između DSO na kraju perioda i prosječnih dana naplate?',
+    'finance_assistant_q_wc_is_dso_good': 'Da li je 29 dana DSO dobro ili loše?',
+    'finance_assistant_q_wc_dio_ccc_unavailable': 'Zašto DIO i CCC nisu dostupni?',
+    'finance_assistant_q_wc_dpo_cash_impact': 'Kako DPO utiče na novčani tok?',
+    'finance_assistant_intro_budget_vs_actual':
+        'Objašnjavam usporedbu odobrenog budžeta s knjiženim Cash Flow transakcijama i DSO/DPO pokazatelje. '
+        'Valute su samo EUR i BAM. Ne knjižim niti mijenjam podatke umjesto vas.',
+    'finance_assistant_intro_dso_dpo_ccc':
+        'Objašnjavam periodični DSO/DPO i prosječne dane stvarne naplate/plaćanja. '
+        'DIO i CCC čekaju integraciju zaliha i COGS-a.',
     'finance_assistant_a_bank_list_purpose':
         'Šta znači: ovdje su uvezene bankovne stavke koje treba povezati s fakturama.\n\n'
         'Šta uraditi: filtrirajte period, otvorite stavku ili pokrenite import.\n\n'
@@ -1239,6 +1258,33 @@ class FinanceStrings {
     'finance_assistant_a_scenario_approve':
         'Šta znači: odobrenje znači da je scenarij prihvaćen za planiranje likvidnosti — ne knjiži transakcije.\n\n'
         'Šta uraditi: nakon izračuna provjerite pretpostavke i dodirnite Odobri na detalju scenarija.',
+    'finance_assistant_a_bawc_outflow_above_plan':
+        'Šta znači: realizovani odliv je zbroj knjiženih i usklađenih Cash Flow transakcija odliva; '
+        'plan dolazi iz odobrenog budžeta za isti period, valutu i opseg pogona.\n\n'
+        'Šta uraditi: usporedite planirani i realizovani odliv na kartici Budžet naspram realizacije.',
+    'finance_assistant_a_bawc_unfavorable_variance':
+        'Šta znači: nepovoljno odstupanje znači manji priliv, veći odliv ili slabiji neto Cash Flow u odnosu na plan.\n\n'
+        'Šta uraditi: pogledajte odstupanje po prilivu, odlivu i neto Cash Flow-u.',
+    'finance_assistant_a_bawc_variance_not_applicable':
+        'Šta znači: kad je plan nula, postotak odstupanja nema smisla — prikazuje se „Nije primjenjivo“.\n\n'
+        'Šta uraditi: provjerite ima li odobrenog budžeta za period; fokusirajte se na apsolutni iznos odstupanja.',
+    'finance_assistant_a_bawc_net_cash_flow':
+        'Šta znači: neto Cash Flow = realizovani priliv minus realizovani odliv; planirani neto = planirani priliv minus planirani odliv.\n\n'
+        'Šta uraditi: usporedite planirani i realizovani neto na kartici.',
+    'finance_assistant_a_wc_dso_period_vs_average':
+        'Šta znači: DSO na kraju perioda koristi otvorena potraživanja i kreditne prodaje; '
+        'prosječni dani naplate računaju stvarne dane do potvrđene uplate za plaćene fakture.\n\n'
+        'Šta uraditi: usporedite obje vrijednosti u dijelu Obrtni kapital.',
+    'finance_assistant_a_wc_is_dso_good':
+        'Šta znači: DSO nema univerzalni „dobar“ broj — ovisi o industriji i uvjetima plaćanja.\n\n'
+        'Šta uraditi: usporedite DSO kroz vrijeme i s internim ciljem naplate.',
+    'finance_assistant_a_wc_dio_ccc_unavailable':
+        'Šta znači: DIO zahtijeva prosječnu vrijednost zaliha i kanonski trošak prodane robe; '
+        'CCC nije dostupan bez DIO i ne smije se procijeniti samo kao DSO minus DPO.\n\n'
+        'Šta uraditi: koristite dostupne DSO i DPO metrike; DIO/CCC dolaze nakon ERP/skladište integracije.',
+    'finance_assistant_a_wc_dpo_cash_impact':
+        'Šta znači: duži DPO zadržava novac duže u kompaniji; kraći DPO znači ranija plaćanja.\n\n'
+        'Šta uraditi: usporedite obje DPO metrike s neto Cash Flow-om u dijelu Obrtni kapital.',
     'finance_assistant_a_free_text':
         'Za detaljno pitanje koristite predložena dugmad ili kontaktirajte administratora. '
         'Ja objašnjavam tok i pojmove — ne izvršavam knjiženja umjesto vas.',
@@ -2440,6 +2486,25 @@ class FinanceStrings {
     'finance_assistant_q_scenario_types':
         'What are base, optimistic and pessimistic scenarios?',
     'finance_assistant_q_scenario_approve': 'What does approving a scenario mean?',
+    'finance_assistant_q_bawc_outflow_above_plan':
+        'Why is actual outflow higher than plan?',
+    'finance_assistant_q_bawc_unfavorable_variance':
+        'What does unfavourable variance mean?',
+    'finance_assistant_q_bawc_variance_not_applicable':
+        'Why is variance percent not applicable?',
+    'finance_assistant_q_bawc_net_cash_flow':
+        'Explain net cash flow for this period.',
+    'finance_assistant_q_wc_dso_period_vs_average':
+        'What is the difference between period-end DSO and average collection days?',
+    'finance_assistant_q_wc_is_dso_good': 'Is 29 days DSO good or bad?',
+    'finance_assistant_q_wc_dio_ccc_unavailable': 'Why are DIO and CCC unavailable?',
+    'finance_assistant_q_wc_dpo_cash_impact': 'How does DPO affect cash flow?',
+    'finance_assistant_intro_budget_vs_actual':
+        'I explain approved budget versus posted cash flow transactions and DSO/DPO metrics. '
+        'Currencies are EUR and BAM only. I do not post or change data for you.',
+    'finance_assistant_intro_dso_dpo_ccc':
+        'I explain periodic DSO/DPO and average actual collection/payment days. '
+        'DIO and CCC await inventory and COGS integration.',
     'finance_assistant_a_bank_list_purpose':
         'What it means: imported bank lines that should be matched to invoices.\n\n'
         'What to do: filter the period, open a line or run import.\n\n'
@@ -2475,6 +2540,33 @@ class FinanceStrings {
     'finance_assistant_a_scenario_approve':
         'What it means: approval means the scenario is accepted for liquidity planning — it does not post transactions.\n\n'
         'What to do: after calculation review assumptions and tap Approve on scenario detail.',
+    'finance_assistant_a_bawc_outflow_above_plan':
+        'What it means: actual outflow is the sum of posted and reconciled cash outflows; '
+        'plan comes from the approved budget for the same period, currency and plant scope.\n\n'
+        'What to do: compare planned and actual outflow on the Budget vs actual card.',
+    'finance_assistant_a_bawc_unfavorable_variance':
+        'What it means: unfavourable variance means lower inflow, higher outflow or weaker net cash flow versus plan.\n\n'
+        'What to do: review variance for inflow, outflow and net cash flow.',
+    'finance_assistant_a_bawc_variance_not_applicable':
+        'What it means: when plan is zero, variance percent is meaningless — the UI shows “Not applicable”.\n\n'
+        'What to do: check whether an approved budget exists; focus on absolute variance.',
+    'finance_assistant_a_bawc_net_cash_flow':
+        'What it means: net cash flow = actual inflow minus actual outflow; planned net = planned inflow minus planned outflow.\n\n'
+        'What to do: compare planned and actual net on the card.',
+    'finance_assistant_a_wc_dso_period_vs_average':
+        'What it means: period-end DSO uses open receivables and credit sales; '
+        'average collection days use actual days to confirmed payment for paid invoices.\n\n'
+        'What to do: compare both values in Working capital.',
+    'finance_assistant_a_wc_is_dso_good':
+        'What it means: DSO has no universal “good” number — it depends on industry and payment terms.\n\n'
+        'What to do: compare DSO over time and to your internal collection target.',
+    'finance_assistant_a_wc_dio_ccc_unavailable':
+        'What it means: DIO requires average inventory and canonical COGS; '
+        'CCC is not available without DIO and must not be estimated as DSO minus DPO alone.\n\n'
+        'What to do: use available DSO and DPO metrics; DIO/CCC come after ERP/warehouse integration.',
+    'finance_assistant_a_wc_dpo_cash_impact':
+        'What it means: longer DPO usually keeps cash in the company longer; shorter DPO means earlier payments.\n\n'
+        'What to do: compare both DPO metrics with net cash flow in Working capital.',
     'finance_assistant_a_free_text':
         'For detailed questions use the suggested chips or contact your administrator. '
         'I explain flow and terms — I do not post on your behalf.',

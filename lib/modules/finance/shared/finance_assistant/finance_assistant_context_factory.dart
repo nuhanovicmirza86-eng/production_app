@@ -16,6 +16,7 @@ abstract final class FinanceAssistantContextFactory {
     String? entityStatus,
     List<({String key, bool enabled})> actions = const [],
     Map<String, String> extraFacts = const {},
+    Map<String, String> screenFacts = const {},
     String? prefilledQuestionKey,
   }) {
     final available = <String>[];
@@ -39,6 +40,7 @@ abstract final class FinanceAssistantContextFactory {
       availableActions: available,
       disabledActions: disabled,
       extraFacts: extraFacts,
+      screenFacts: screenFacts,
       prefilledQuestionKey: prefilledQuestionKey,
     );
   }

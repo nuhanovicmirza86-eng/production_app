@@ -12,6 +12,7 @@ class FinanceAssistantContext {
     this.availableActions = const [],
     this.disabledActions = const [],
     this.extraFacts = const {},
+    this.screenFacts = const {},
     this.prefilledQuestionKey,
   });
 
@@ -26,6 +27,7 @@ class FinanceAssistantContext {
   final List<String> availableActions;
   final List<String> disabledActions;
   final Map<String, String> extraFacts;
+  final Map<String, String> screenFacts;
   final String? prefilledQuestionKey;
 
   Map<String, dynamic> toCallableContext() {
@@ -37,6 +39,7 @@ class FinanceAssistantContext {
         'entityState': entityStatus,
       'availableActions': availableActions,
       'disabledActions': disabledActions,
+      if (screenFacts.isNotEmpty) 'screenFacts': screenFacts,
     };
   }
 
@@ -52,6 +55,7 @@ class FinanceAssistantContext {
     List<String>? availableActions,
     List<String>? disabledActions,
     Map<String, String>? extraFacts,
+    Map<String, String>? screenFacts,
     String? prefilledQuestionKey,
   }) {
     return FinanceAssistantContext(
@@ -66,6 +70,7 @@ class FinanceAssistantContext {
       availableActions: availableActions ?? this.availableActions,
       disabledActions: disabledActions ?? this.disabledActions,
       extraFacts: extraFacts ?? this.extraFacts,
+      screenFacts: screenFacts ?? this.screenFacts,
       prefilledQuestionKey: prefilledQuestionKey ?? this.prefilledQuestionKey,
     );
   }

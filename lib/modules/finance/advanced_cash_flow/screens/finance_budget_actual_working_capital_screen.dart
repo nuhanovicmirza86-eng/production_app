@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/company_plant_display_name.dart';
 import '../../../finance_integrations/utils/finance_load_error_presenter.dart';
 import '../../../finance_integrations/utils/finance_permissions.dart';
+import '../../shared/finance_assistant/finance_assistant_context.dart';
+import '../../shared/finance_assistant/finance_assistant_context_factory.dart';
 import '../../shared/finance_date_picker_field.dart';
 import '../../shared/finance_error_mapper.dart';
 import '../../shared/finance_operating_currencies.dart';
@@ -123,18 +125,71 @@ class _FinanceBudgetActualWorkingCapitalScreenState
     }
   }
 
-  FinanceAssistantContext _assistantContext() {
+  FinanceAssistantContext _assistantContext(BuildContext context) {
     return FinanceAssistantContextFactory.fromCompany(
       context: context,
       companyData: widget.companyData,
       screenKey: FinanceAssistantScreens.budgetVsActual,
       tabKey: FinanceAssistantTabs.advancedCashFlow,
       tabLabelKey: 'help_advanced_cash_flow_tab_title',
-      extraFacts: {
-        'workingCapitalScreenKey': FinanceAssistantScreens.dsoDpoCcc,
-      },
+      screenFacts: _assistantScreenFacts(context),
       actions: FinanceAssistantContextFactory.refreshOnly(),
     );
+  }
+
+  Map<String, String> _assistantScreenFacts(BuildContext context) {
+    final snap = _snapshot;
+    if (snap == null) return const {};
+
+    final b = snap.budgetActual;
+    final wc = snap.workingCapital;
+    final currency = snap.currency;
+    final unavailable = FinanceStrings.t(context, 'bawc_dio_ccc_unavailable');
+    final notApplicable = FinanceStrings.t(context, 'bawc_variance_not_applicable');
+
+    String plantScope = FinanceStrings.t(context, 'advisory_filter_all_plants');
+    if (_plantKey != null && _plantKey!.isNotEmpty) {
+      for (final p in _plants) {
+        if (p.plantKey == _plantKey) {
+          plantScope = p.label;
+          break;
+        }
+      }
+    }
+
+    String fmtPct(double? percent) =>
+        percent == null ? notApplicable : FinanceBawcDisplay.formatPercent(context, percent);
+
+    final coverageCount = _coverageMessages(context, snap).length;
+
+    return {
+      'periodFrom': snap.periodFrom,
+      'periodTo': snap.periodTo,
+      'currency': currency,
+      'plantScope': plantScope,
+      'plannedInflow': FinanceBawcDisplay.formatMoney(b.plannedInflow, currency),
+      'actualInflow': FinanceBawcDisplay.formatMoney(b.actualInflow, currency),
+      'plannedOutflow': FinanceBawcDisplay.formatMoney(b.plannedOutflow, currency),
+      'actualOutflow': FinanceBawcDisplay.formatMoney(b.actualOutflow, currency),
+      'inflowVarianceAmount':
+          FinanceBawcDisplay.formatVarianceAmount(b.inflowVarianceAmount, currency),
+      'outflowVarianceAmount':
+          FinanceBawcDisplay.formatVarianceAmount(b.outflowVarianceAmount, currency),
+      'netVarianceAmount':
+          FinanceBawcDisplay.formatVarianceAmount(b.netVarianceAmount, currency),
+      'inflowVariancePercent': fmtPct(b.inflowVariancePercent),
+      'outflowVariancePercent': fmtPct(b.outflowVariancePercent),
+      'netVariancePercent': fmtPct(b.netVariancePercent),
+      'dsoPeriodEnd': FinanceBawcDisplay.formatDays(context, wc.dsoPeriodEnd),
+      'dsoCollectionDaysAverage':
+          FinanceBawcDisplay.formatDays(context, wc.dsoCollectionDaysAverage),
+      'dpoPeriodEnd': FinanceBawcDisplay.formatDays(context, wc.dpoPeriodEnd),
+      'dpoPaymentDaysAverage':
+          FinanceBawcDisplay.formatDays(context, wc.dpoPaymentDaysAverage),
+      'dioStatus': unavailable,
+      'cccStatus': unavailable,
+      if (coverageCount > 0) 'coverageWarningCount': '$coverageCount',
+    };
   }
 
   List<String> _coverageMessages(
@@ -589,7 +644,7 @@ class _FinanceBudgetActualWorkingCapitalScreenState
   Widget build(BuildContext context) {
     if (!_canView) {
       return FinanceScaffold(
-        assistantContext: _assistantContext(),
+        assistantContext: _assistantContext(context),
         appBar: AppBar(
           title: Text(FinanceStrings.t(context, 'bawc_title')),
         ),
@@ -600,7 +655,7 @@ class _FinanceBudgetActualWorkingCapitalScreenState
     }
 
     return FinanceScaffold(
-      assistantContext: _assistantContext(),
+      assistantContext: _assistantContext(context),
       appBar: AppBar(
         title: Text(FinanceStrings.t(context, 'bawc_title')),
       ),
