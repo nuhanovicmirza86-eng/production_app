@@ -150,4 +150,6 @@ abstract final class FinanceAssistantScreens {
   static const scenarioPessimistic = 'finance_scenario_pessimistic';
   static const scenarioDetail = 'finance_scenario_detail';
   static const whatIf = 'finance_what_if';
+  static const budgetVsActual = 'finance_budget_vs_actual';
+  static const dsoDpoCcc = 'finance_dso_dpo_ccc';
 }
