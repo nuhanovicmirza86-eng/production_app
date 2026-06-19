@@ -80,11 +80,11 @@ void main() {
           'allocationsIncluded': 3,
         },
         'warnings': [],
-        'calculationVersion': 'finance-p5-m2-v1',
+        'calculationVersion': 'finance-p5-m3-v1',
         'generatedAt': '2026-06-18T10:00:00.000Z',
       });
 
-      expect(snap.calculationVersion, 'finance-p5-m2-v1');
+      expect(snap.calculationVersion, 'finance-p5-m3-v1');
       expect(snap.currency, 'EUR');
       expect(snap.budgetActual.inflowVariancePercent, -17);
       expect(snap.workingCapital.ccc, isNull);
