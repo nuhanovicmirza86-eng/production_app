@@ -40,6 +40,116 @@ abstract final class FinanceBawcDisplay {
     return '$aboutPrefix$n $unit';
   }
 
+  static bool isDioAvailable(FinanceWorkingCapitalMetrics wc) =>
+      wc.dioAvailability == 'available' && wc.dio != null;
+
+  static bool isCccAvailable(FinanceWorkingCapitalMetrics wc) =>
+      wc.cccAvailability == 'available' && wc.ccc != null;
+
+  static String formatDioValue(
+    BuildContext context,
+    FinanceWorkingCapitalMetrics wc,
+  ) {
+    if (isDioAvailable(wc)) {
+      return formatDays(context, wc.dio);
+    }
+    return _dioUnavailableLabel(context, wc.dioAvailability);
+  }
+
+  static String formatCccValue(
+    BuildContext context,
+    FinanceWorkingCapitalMetrics wc,
+  ) {
+    if (isCccAvailable(wc)) {
+      return formatDays(context, wc.ccc);
+    }
+    return _cccUnavailableLabel(context, wc.cccAvailability);
+  }
+
+  static String _dioUnavailableLabel(BuildContext context, String? availability) {
+    switch (availability) {
+      case 'unavailable_missing_inventory_cost':
+        return FinanceStrings.t(context, 'bawc_dio_unavailable_cogs');
+      case 'unavailable_missing_inventory_balance':
+        return FinanceStrings.t(context, 'bawc_dio_ccc_unavailable');
+      default:
+        return FinanceStrings.t(context, 'bawc_metric_unavailable');
+    }
+  }
+
+  static String _cccUnavailableLabel(BuildContext context, String? availability) {
+    switch (availability) {
+      case 'unavailable_missing_dso':
+        return FinanceStrings.t(context, 'bawc_ccc_unavailable_dso');
+      case 'unavailable_missing_dpo':
+        return FinanceStrings.t(context, 'bawc_ccc_unavailable_dpo');
+      case 'unavailable_missing_dio':
+        return FinanceStrings.t(context, 'bawc_metric_unavailable');
+      default:
+        return FinanceStrings.t(context, 'bawc_metric_unavailable');
+    }
+  }
+
+  static List<String> coverageMessages(
+    BuildContext context,
+    FinanceBudgetActualWorkingCapitalSnapshot snap,
+  ) {
+    final messages = <String>[];
+    final cov = snap.sourceCoverage;
+    final wc = snap.workingCapital;
+
+    if (cov.budgetLinesIncluded == 0) {
+      messages.add(FinanceStrings.t(context, 'bawc_warn_no_budget'));
+    }
+    if (wc.dsoCollectionDaysAverageReason == 'insufficient_paid_invoices') {
+      messages.add(
+        FinanceStrings.t(context, 'bawc_warn_no_collection_payments'),
+      );
+    }
+    if (wc.dpoPaymentDaysAverageReason == 'insufficient_paid_invoices') {
+      messages.add(
+        FinanceStrings.t(context, 'bawc_warn_no_payment_payments'),
+      );
+    }
+
+    if (!isDioAvailable(wc)) {
+      if (wc.dioAvailability == 'unavailable_missing_inventory_cost') {
+        messages.add(
+          FinanceStrings.t(context, 'bawc_warn_dio_unavailable_cogs'),
+        );
+      } else if (wc.dioAvailability == 'unavailable_missing_inventory_balance') {
+        messages.add(
+          FinanceStrings.t(context, 'bawc_warn_dio_unavailable_inventory'),
+        );
+      }
+    } else if (!isCccAvailable(wc)) {
+      messages.add(FinanceStrings.t(context, 'bawc_warn_ccc_unavailable'));
+    }
+
+    for (final w in snap.warnings) {
+      final friendly = friendlyWarningMessage(context, w.code);
+      if (friendly != null && !messages.contains(friendly)) {
+        messages.add(friendly);
+      }
+    }
+
+    return messages;
+  }
+
+  static String? friendlyWarningMessage(BuildContext context, String code) {
+    switch (code) {
+      case 'budget_line_missing_period':
+      case 'budget_line_missing_direction':
+        return FinanceStrings.t(context, 'bawc_warn_budget_incomplete');
+      case 'inventory_source_erp_preferred_over_wms':
+        return FinanceStrings.t(context, 'bawc_warn_inventory_erp_preferred');
+      case 'cogs_source_erp_preferred_over_wms':
+        return FinanceStrings.t(context, 'bawc_warn_cogs_erp_preferred');
+      default:
+        return null;
+    }
+  }
+
   static Color? varianceColor({
     required double varianceAmount,
     required bool higherIsFavorable,
@@ -239,6 +349,8 @@ class FinanceBawcMetricTile extends StatelessWidget {
             child: Text(
               value,
               textAlign: TextAlign.end,
+              maxLines: 4,
+              softWrap: true,
               style: theme.textTheme.bodyMedium,
             ),
           ),

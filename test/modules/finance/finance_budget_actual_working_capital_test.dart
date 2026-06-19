@@ -91,6 +91,62 @@ void main() {
       expect(snap.workingCapital.cccAvailability, 'unavailable_missing_dio');
       expect(snap.breakdownByPeriod, hasLength(1));
     });
+
+    test('parses DIO and CCC when backend marks them available', () {
+      final snap = FinanceBudgetActualWorkingCapitalSnapshot.fromCallableMap({
+        'success': true,
+        'companyId': 'co1',
+        'period': {'from': '2026-06-01', 'to': '2026-06-30'},
+        'scope': {'plantKey': null, 'mode': 'all'},
+        'currency': 'EUR',
+        'budgetActual': {
+          'plannedInflow': 0,
+          'actualInflow': 0,
+          'inflowVarianceAmount': 0,
+          'inflowVariancePercent': null,
+          'plannedOutflow': 0,
+          'actualOutflow': 0,
+          'outflowVarianceAmount': 0,
+          'outflowVariancePercent': null,
+          'plannedNetCashFlow': 0,
+          'actualNetCashFlow': 0,
+          'netVarianceAmount': 0,
+          'netVariancePercent': null,
+        },
+        'workingCapital': {
+          'dsoPeriodEnd': 40,
+          'dsoCollectionDaysAverage': 14,
+          'dpoPeriodEnd': 25,
+          'dpoPaymentDaysAverage': 20,
+          'dio': 37.89,
+          'ccc': 53.13,
+          'dioAvailability': 'available',
+          'cccAvailability': 'available',
+        },
+        'breakdowns': {'byPeriod': [], 'byCategory': [], 'byPlant': []},
+        'sourceCoverage': {
+          'budgetLinesIncluded': 1,
+          'budgetLinesExcluded': 0,
+          'cashTransactionsIncluded': 0,
+          'salesInvoicesIncluded': 0,
+          'purchaseInvoicesIncluded': 0,
+          'allocationsIncluded': 0,
+        },
+        'warnings': [
+          {
+            'code': 'inventory_source_erp_preferred_over_wms',
+            'message': 'ERP',
+            'severity': 'info',
+          },
+        ],
+        'calculationVersion': 'finance-p5-m3-v1',
+      });
+
+      expect(snap.workingCapital.dio, closeTo(37.89, 0.001));
+      expect(snap.workingCapital.ccc, closeTo(53.13, 0.001));
+      expect(snap.workingCapital.dioAvailability, 'available');
+      expect(snap.workingCapital.cccAvailability, 'available');
+    });
   });
 
   group('FinanceOperatingCurrencies', () {
@@ -181,6 +237,142 @@ void main() {
             },
           ),
           const Locale('en'),
+        ),
+      );
+    });
+
+    testWidgets('formatDioValue and formatCccValue use backend availability', (
+      tester,
+    ) async {
+      const unavailableWc = FinanceWorkingCapitalMetrics(
+        dsoPeriodEnd: 40,
+        dsoCollectionDaysAverage: 14,
+        dpoPeriodEnd: 25,
+        dpoPaymentDaysAverage: 20,
+        dio: null,
+        ccc: null,
+        dioAvailability: 'unavailable_missing_inventory_cost',
+        cccAvailability: 'unavailable_missing_dio',
+      );
+      const availableWc = FinanceWorkingCapitalMetrics(
+        dsoPeriodEnd: 40,
+        dsoCollectionDaysAverage: 14,
+        dpoPeriodEnd: 25,
+        dpoPaymentDaysAverage: 20,
+        dio: 37.89,
+        ccc: 53.13,
+        dioAvailability: 'available',
+        cccAvailability: 'available',
+      );
+
+      await tester.pumpWidget(
+        _wrapLocale(
+          Builder(
+            builder: (context) {
+              expect(
+                FinanceBawcDisplay.formatDioValue(context, unavailableWc),
+                FinanceStrings.t(context, 'bawc_dio_unavailable_cogs'),
+              );
+              expect(
+                FinanceBawcDisplay.formatCccValue(context, unavailableWc),
+                FinanceStrings.t(context, 'bawc_metric_unavailable'),
+              );
+              expect(
+                FinanceBawcDisplay.formatDioValue(context, availableWc),
+                'oko 38 dana',
+              );
+              expect(
+                FinanceBawcDisplay.formatCccValue(context, availableWc),
+                'oko 53 dana',
+              );
+              expect(
+                FinanceBawcDisplay.formatDioValue(context, availableWc),
+                isNot(contains('.')),
+              );
+              return const SizedBox.shrink();
+            },
+          ),
+          const Locale('hr', 'BA'),
+        ),
+      );
+    });
+
+    testWidgets('coverageMessages shows ERP preference without DIO unavailable', (
+      tester,
+    ) async {
+      const snap = FinanceBudgetActualWorkingCapitalSnapshot(
+        success: true,
+        companyId: 'co1',
+        periodFrom: '2026-06-01',
+        periodTo: '2026-06-30',
+        scopePlantKey: null,
+        scopeMode: 'all',
+        currency: 'EUR',
+        budgetActual: FinanceBudgetActualTotals(
+          plannedInflow: 100,
+          actualInflow: 100,
+          inflowVarianceAmount: 0,
+          inflowVariancePercent: null,
+          plannedOutflow: 0,
+          actualOutflow: 0,
+          outflowVarianceAmount: 0,
+          outflowVariancePercent: null,
+          plannedNetCashFlow: 100,
+          actualNetCashFlow: 100,
+          netVarianceAmount: 0,
+          netVariancePercent: null,
+        ),
+        workingCapital: FinanceWorkingCapitalMetrics(
+          dsoPeriodEnd: 40,
+          dsoCollectionDaysAverage: 14,
+          dpoPeriodEnd: 25,
+          dpoPaymentDaysAverage: 20,
+          dio: 38,
+          ccc: 53,
+          dioAvailability: 'available',
+          cccAvailability: 'available',
+        ),
+        breakdownByPeriod: const [],
+        breakdownByCategory: const [],
+        breakdownByPlant: const [],
+        sourceCoverage: FinanceBawcSourceCoverage(
+          budgetLinesIncluded: 1,
+          budgetLinesExcluded: 0,
+          cashTransactionsIncluded: 0,
+          salesInvoicesIncluded: 0,
+          purchaseInvoicesIncluded: 0,
+          allocationsIncluded: 0,
+        ),
+        warnings: const [
+          FinanceBawcWarning(
+            code: 'inventory_source_erp_preferred_over_wms',
+            message: 'ERP',
+            severity: 'info',
+          ),
+        ],
+        calculationVersion: 'finance-p5-m3-v1',
+      );
+
+      await tester.pumpWidget(
+        _wrapLocale(
+          Builder(
+            builder: (context) {
+              final messages = FinanceBawcDisplay.coverageMessages(context, snap);
+              expect(messages, hasLength(1));
+              expect(
+                messages.single,
+                FinanceStrings.t(context, 'bawc_warn_inventory_erp_preferred'),
+              );
+              expect(
+                messages,
+                isNot(contains(
+                  FinanceStrings.t(context, 'bawc_warn_dio_ccc_unavailable'),
+                )),
+              );
+              return const SizedBox.shrink();
+            },
+          ),
+          const Locale('hr', 'BA'),
         ),
       );
     });

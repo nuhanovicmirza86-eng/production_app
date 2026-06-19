@@ -144,7 +144,6 @@ class _FinanceBudgetActualWorkingCapitalScreenState
     final b = snap.budgetActual;
     final wc = snap.workingCapital;
     final currency = snap.currency;
-    final unavailable = FinanceStrings.t(context, 'bawc_dio_ccc_unavailable');
     final notApplicable = FinanceStrings.t(context, 'bawc_variance_not_applicable');
 
     String plantScope = FinanceStrings.t(context, 'advisory_filter_all_plants');
@@ -160,7 +159,8 @@ class _FinanceBudgetActualWorkingCapitalScreenState
     String fmtPct(double? percent) =>
         percent == null ? notApplicable : FinanceBawcDisplay.formatPercent(context, percent);
 
-    final coverageCount = _coverageMessages(context, snap).length;
+    final coverageCount =
+        FinanceBawcDisplay.coverageMessages(context, snap).length;
 
     return {
       'periodFrom': snap.periodFrom,
@@ -186,52 +186,10 @@ class _FinanceBudgetActualWorkingCapitalScreenState
       'dpoPeriodEnd': FinanceBawcDisplay.formatDays(context, wc.dpoPeriodEnd),
       'dpoPaymentDaysAverage':
           FinanceBawcDisplay.formatDays(context, wc.dpoPaymentDaysAverage),
-      'dioStatus': unavailable,
-      'cccStatus': unavailable,
+      'dioStatus': FinanceBawcDisplay.formatDioValue(context, wc),
+      'cccStatus': FinanceBawcDisplay.formatCccValue(context, wc),
       if (coverageCount > 0) 'coverageWarningCount': '$coverageCount',
     };
-  }
-
-  List<String> _coverageMessages(
-    BuildContext context,
-    FinanceBudgetActualWorkingCapitalSnapshot snap,
-  ) {
-    final messages = <String>[];
-    final cov = snap.sourceCoverage;
-    final wc = snap.workingCapital;
-
-    if (cov.budgetLinesIncluded == 0) {
-      messages.add(FinanceStrings.t(context, 'bawc_warn_no_budget'));
-    }
-    if (wc.dsoCollectionDaysAverageReason == 'insufficient_paid_invoices') {
-      messages.add(FinanceStrings.t(context, 'bawc_warn_no_collection_payments'));
-    }
-    if (wc.dpoPaymentDaysAverageReason == 'insufficient_paid_invoices') {
-      messages.add(FinanceStrings.t(context, 'bawc_warn_no_payment_payments'));
-    }
-    if (wc.cccAvailability == 'unavailable_missing_dio' ||
-        wc.dioAvailability == 'unavailable_missing_inventory_cost') {
-      messages.add(FinanceStrings.t(context, 'bawc_warn_dio_ccc_unavailable'));
-    }
-
-    for (final w in snap.warnings) {
-      final friendly = _friendlyWarning(context, w.code);
-      if (friendly != null && !messages.contains(friendly)) {
-        messages.add(friendly);
-      }
-    }
-
-    return messages;
-  }
-
-  String? _friendlyWarning(BuildContext context, String code) {
-    switch (code) {
-      case 'budget_line_missing_period':
-      case 'budget_line_missing_direction':
-        return FinanceStrings.t(context, 'bawc_warn_budget_incomplete');
-      default:
-        return null;
-    }
   }
 
   bool _isEmptySnapshot(FinanceBudgetActualWorkingCapitalSnapshot snap) {
@@ -418,11 +376,6 @@ class _FinanceBudgetActualWorkingCapitalScreenState
     BuildContext context,
     FinanceWorkingCapitalMetrics wc,
   ) {
-    final dioCccUnavailable = FinanceStrings.t(
-      context,
-      'bawc_dio_ccc_unavailable',
-    );
-
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -464,11 +417,11 @@ class _FinanceBudgetActualWorkingCapitalScreenState
             ),
             FinanceBawcMetricTile(
               label: FinanceStrings.t(context, 'bawc_dio'),
-              value: dioCccUnavailable,
+              value: FinanceBawcDisplay.formatDioValue(context, wc),
             ),
             FinanceBawcMetricTile(
               label: FinanceStrings.t(context, 'bawc_ccc'),
-              value: dioCccUnavailable,
+              value: FinanceBawcDisplay.formatCccValue(context, wc),
             ),
           ],
         ),
@@ -555,7 +508,7 @@ class _FinanceBudgetActualWorkingCapitalScreenState
     }
 
     final currency = snap.currency;
-    final coverage = _coverageMessages(context, snap);
+    final coverage = FinanceBawcDisplay.coverageMessages(context, snap);
 
     return Stack(
       children: [

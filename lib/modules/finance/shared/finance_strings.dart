@@ -391,6 +391,12 @@ class FinanceStrings {
     'bawc_ccc': 'CCC',
     'bawc_dio_ccc_unavailable':
         'Nije dostupno — nedostaju kanonski podaci o zalihama',
+    'bawc_dio_unavailable_cogs':
+        'Nije dostupno — nedostaje kanonski trošak prodane robe',
+    'bawc_ccc_unavailable_dso':
+        'Nije dostupno — nedostaje DSO na kraju perioda',
+    'bawc_ccc_unavailable_dpo':
+        'Nije dostupno — nedostaje DPO na kraju perioda',
     'bawc_breakdown_title': 'Raspodjela',
     'bawc_breakdown_period': 'Po periodu',
     'bawc_breakdown_category': 'Po kategoriji',
@@ -408,6 +414,16 @@ class FinanceStrings {
         'Nema potvrđenih plaćanja za prosjek dana plaćanja.',
     'bawc_warn_dio_ccc_unavailable':
         'DIO i CCC nisu dostupni jer podaci o zalihama još nisu povezani.',
+    'bawc_warn_dio_unavailable_inventory':
+        'DIO nije dostupan jer nedostaju kanonski podaci o zalihama.',
+    'bawc_warn_dio_unavailable_cogs':
+        'DIO nije dostupan jer nedostaje kanonski trošak prodane robe.',
+    'bawc_warn_ccc_unavailable':
+        'CCC nije dostupan jer nedostaju DSO ili DPO na kraju perioda.',
+    'bawc_warn_inventory_erp_preferred':
+        'Za zalihe se koristi ERP izvor jer ima prednost nad WMS.',
+    'bawc_warn_cogs_erp_preferred':
+        'Za trošak prodane robe koristi se ERP izvor jer ima prednost nad WMS.',
     'bawc_warn_budget_incomplete':
         'Neki budžetski redovi nisu uključeni jer nedostaje period ili smjer novca.',
     'bawc_empty_hint': 'Odaberite period i valutu, zatim pritisnite Osvježi.',
@@ -1708,6 +1724,12 @@ class FinanceStrings {
     'bawc_ccc': 'CCC',
     'bawc_dio_ccc_unavailable':
         'Not available — canonical inventory data is missing',
+    'bawc_dio_unavailable_cogs':
+        'Not available — canonical cost of goods sold is missing',
+    'bawc_ccc_unavailable_dso':
+        'Not available — period-end DSO is missing',
+    'bawc_ccc_unavailable_dpo':
+        'Not available — period-end DPO is missing',
     'bawc_breakdown_title': 'Breakdown',
     'bawc_breakdown_period': 'By period',
     'bawc_breakdown_category': 'By category',
@@ -1725,6 +1747,16 @@ class FinanceStrings {
         'No confirmed payments for average payment days.',
     'bawc_warn_dio_ccc_unavailable':
         'DIO and CCC are not available because inventory data is not linked yet.',
+    'bawc_warn_dio_unavailable_inventory':
+        'DIO is not available because canonical inventory data is missing.',
+    'bawc_warn_dio_unavailable_cogs':
+        'DIO is not available because canonical cost of goods sold is missing.',
+    'bawc_warn_ccc_unavailable':
+        'CCC is not available because period-end DSO or DPO is missing.',
+    'bawc_warn_inventory_erp_preferred':
+        'ERP is used for inventory because it takes precedence over WMS.',
+    'bawc_warn_cogs_erp_preferred':
+        'ERP is used for cost of goods sold because it takes precedence over WMS.',
     'bawc_warn_budget_incomplete':
         'Some budget lines were excluded because period or cash flow direction is missing.',
     'bawc_empty_hint': 'Select period and currency, then tap Refresh.',

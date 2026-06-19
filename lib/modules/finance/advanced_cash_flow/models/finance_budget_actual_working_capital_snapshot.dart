@@ -1,6 +1,6 @@
 import '../../shared/finance_callable_utils.dart';
 
-/// Odgovor Callable [getFinanceBudgetActualAndWorkingCapitalSnapshot] (finance-p5-m2-v1).
+/// Odgovor Callable [getFinanceBudgetActualAndWorkingCapitalSnapshot] (finance-p5-m3-v1).
 class FinanceBudgetActualWorkingCapitalSnapshot {
   const FinanceBudgetActualWorkingCapitalSnapshot({
     required this.success,
