@@ -29,8 +29,15 @@ abstract final class FinanceBawcDisplay {
     if (days == null) {
       return FinanceStrings.t(context, 'bawc_metric_unavailable');
     }
-    final fmt = NumberFormat('#,##0.##', 'en_US');
-    return '${fmt.format(days)} ${FinanceStrings.t(context, 'scenario_unit_days')}';
+    final rounded = days.round();
+    final hasFraction = (days - rounded).abs() > 0.05;
+    final isEn = FinanceStrings.isEnglish(context);
+    final aboutPrefix = hasFraction ? (isEn ? 'about ' : 'oko ') : '';
+    final n = rounded;
+    final unit = isEn
+        ? (n == 1 ? 'day' : 'days')
+        : (n == 1 ? 'dan' : FinanceStrings.t(context, 'scenario_unit_days'));
+    return '$aboutPrefix$n $unit';
   }
 
   static Color? varianceColor({

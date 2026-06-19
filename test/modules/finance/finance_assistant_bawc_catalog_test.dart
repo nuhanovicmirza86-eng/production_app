@@ -21,8 +21,16 @@ void main() {
       FinanceAssistantScreens.budgetVsActual,
     );
     expect(keys, contains('finance_assistant_q_bawc_outflow_above_plan'));
+    expect(keys, contains('finance_assistant_q_wc_meaning_dso'));
     expect(keys, contains('finance_assistant_q_wc_dio_ccc_unavailable'));
-    expect(keys.length, 8);
+    expect(keys.length, 14);
+
+    final wcKeys = FinanceAssistantCatalog.suggestedQuestionKeys(
+      FinanceAssistantScreens.dsoDpoCcc,
+    );
+    expect(wcKeys.first, 'finance_assistant_q_wc_meaning_dso');
+    expect(wcKeys, contains('finance_assistant_q_wc_metrics_overview'));
+    expect(wcKeys.length, 9);
 
     for (final key in keys) {
       final label = FinanceStrings.t(context, key);

@@ -1,9 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:production_app/modules/finance/advanced_cash_flow/models/finance_budget_actual_working_capital_snapshot.dart';
 import 'package:production_app/modules/finance/advanced_cash_flow/widgets/finance_bawc_display_widgets.dart';
 import 'package:production_app/modules/finance/shared/finance_operating_currencies.dart';
 import 'package:production_app/modules/finance/shared/finance_strings.dart';
+
+Widget _wrapLocale(Widget child, Locale locale) {
+  return MaterialApp(
+    locale: locale,
+    supportedLocales: const [
+      Locale('hr', 'BA'),
+      Locale('bs', 'BA'),
+      Locale('en'),
+    ],
+    localizationsDelegates: const [
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    home: child,
+  );
+}
 
 void main() {
   group('FinanceBudgetActualWorkingCapitalSnapshot', () {
@@ -87,30 +105,82 @@ void main() {
   group('FinanceBawcDisplay', () {
     testWidgets('null variance percent shows Nije primjenjivo', (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
-          locale: const Locale('bs'),
-          home: Builder(
+        _wrapLocale(
+          Builder(
             builder: (context) {
               final text = FinanceBawcDisplay.formatPercent(context, null);
               expect(text, FinanceStrings.t(context, 'bawc_variance_not_applicable'));
               return const SizedBox.shrink();
             },
           ),
+          const Locale('hr', 'BA'),
         ),
       );
     });
 
     testWidgets('does not show 0% for null variance', (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
-          locale: const Locale('bs'),
-          home: Builder(
+        _wrapLocale(
+          Builder(
             builder: (context) {
               final text = FinanceBawcDisplay.formatPercent(context, null);
               expect(text.contains('0%'), isFalse);
               return const SizedBox.shrink();
             },
           ),
+          const Locale('hr', 'BA'),
+        ),
+      );
+    });
+
+    testWidgets('formatDays rounds without decimals for users', (tester) async {
+      await tester.pumpWidget(
+        _wrapLocale(
+          Builder(
+            builder: (context) {
+              expect(
+                FinanceBawcDisplay.formatDays(context, 29.4),
+                'oko 29 dana',
+              );
+              expect(
+                FinanceBawcDisplay.formatDays(context, 30),
+                '30 dana',
+              );
+              expect(
+                FinanceBawcDisplay.formatDays(context, 1),
+                '1 dan',
+              );
+              expect(
+                FinanceBawcDisplay.formatDays(context, null),
+                FinanceStrings.t(context, 'bawc_metric_unavailable'),
+              );
+              return const SizedBox.shrink();
+            },
+          ),
+          const Locale('hr', 'BA'),
+        ),
+      );
+    });
+
+    testWidgets('formatDays English uses about prefix for fractions', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapLocale(
+          Builder(
+            builder: (context) {
+              expect(
+                FinanceBawcDisplay.formatDays(context, 29.4),
+                'about 29 days',
+              );
+              expect(
+                FinanceBawcDisplay.formatDays(context, 30),
+                '30 days',
+              );
+              return const SizedBox.shrink();
+            },
+          ),
+          const Locale('en'),
         ),
       );
     });
@@ -142,9 +212,8 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(
-          locale: const Locale('bs'),
-          home: Builder(
+        _wrapLocale(
+          Builder(
             builder: (context) {
               final named = FinanceBudgetActualBreakdownRow(
                 key: 'cat1',
@@ -172,6 +241,7 @@ void main() {
               return const SizedBox.shrink();
             },
           ),
+          const Locale('hr', 'BA'),
         ),
       );
     });

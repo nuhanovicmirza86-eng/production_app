@@ -68,6 +68,7 @@ class FinanceAssistantCatalog {
         ];
       case FinanceAssistantScreens.budgetVsActual:
         return const [
+          'finance_assistant_q_bawc_budget_vs_actual_period',
           'finance_assistant_q_bawc_outflow_above_plan',
           'finance_assistant_q_bawc_unfavorable_variance',
           'finance_assistant_q_bawc_variance_not_applicable',
@@ -76,9 +77,19 @@ class FinanceAssistantCatalog {
           'finance_assistant_q_wc_is_dso_good',
           'finance_assistant_q_wc_dio_ccc_unavailable',
           'finance_assistant_q_wc_dpo_cash_impact',
+          'finance_assistant_q_wc_meaning_dso',
+          'finance_assistant_q_wc_meaning_dpo',
+          'finance_assistant_q_wc_meaning_dio',
+          'finance_assistant_q_wc_meaning_ccc',
+          'finance_assistant_q_wc_metrics_overview',
         ];
       case FinanceAssistantScreens.dsoDpoCcc:
         return const [
+          'finance_assistant_q_wc_meaning_dso',
+          'finance_assistant_q_wc_meaning_dpo',
+          'finance_assistant_q_wc_meaning_dio',
+          'finance_assistant_q_wc_meaning_ccc',
+          'finance_assistant_q_wc_metrics_overview',
           'finance_assistant_q_wc_dso_period_vs_average',
           'finance_assistant_q_wc_is_dso_good',
           'finance_assistant_q_wc_dio_ccc_unavailable',
@@ -120,6 +131,7 @@ class FinanceAssistantCatalog {
     'finance_assistant_q_scenario_base_vs_pessimistic',
     'finance_assistant_q_scenario_types',
     'finance_assistant_q_scenario_approve',
+    'finance_assistant_q_bawc_budget_vs_actual_period',
     'finance_assistant_q_bawc_outflow_above_plan',
     'finance_assistant_q_bawc_unfavorable_variance',
     'finance_assistant_q_bawc_variance_not_applicable',
@@ -128,6 +140,11 @@ class FinanceAssistantCatalog {
     'finance_assistant_q_wc_is_dso_good',
     'finance_assistant_q_wc_dio_ccc_unavailable',
     'finance_assistant_q_wc_dpo_cash_impact',
+    'finance_assistant_q_wc_meaning_dso',
+    'finance_assistant_q_wc_meaning_dpo',
+    'finance_assistant_q_wc_meaning_dio',
+    'finance_assistant_q_wc_meaning_ccc',
+    'finance_assistant_q_wc_metrics_overview',
   ];
 
   static String answerKeyForQuestion(String questionKey) {
@@ -152,6 +169,8 @@ class FinanceAssistantCatalog {
           'finance_assistant_a_scenario_types',
       'finance_assistant_q_scenario_approve':
           'finance_assistant_a_scenario_approve',
+      'finance_assistant_q_bawc_budget_vs_actual_period':
+          'finance_assistant_a_bawc_budget_vs_actual_period',
       'finance_assistant_q_bawc_outflow_above_plan':
           'finance_assistant_a_bawc_outflow_above_plan',
       'finance_assistant_q_bawc_unfavorable_variance':
@@ -168,6 +187,16 @@ class FinanceAssistantCatalog {
           'finance_assistant_a_wc_dio_ccc_unavailable',
       'finance_assistant_q_wc_dpo_cash_impact':
           'finance_assistant_a_wc_dpo_cash_impact',
+      'finance_assistant_q_wc_meaning_dso':
+          'finance_assistant_a_wc_meaning_dso',
+      'finance_assistant_q_wc_meaning_dpo':
+          'finance_assistant_a_wc_meaning_dpo',
+      'finance_assistant_q_wc_meaning_dio':
+          'finance_assistant_a_wc_meaning_dio',
+      'finance_assistant_q_wc_meaning_ccc':
+          'finance_assistant_a_wc_meaning_ccc',
+      'finance_assistant_q_wc_metrics_overview':
+          'finance_assistant_a_wc_metrics_overview',
     };
     return map[questionKey] ?? 'finance_assistant_a_default';
   }
