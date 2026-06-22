@@ -188,6 +188,13 @@ class _FinanceBudgetActualWorkingCapitalScreenState
           FinanceBawcDisplay.formatDays(context, wc.dpoPaymentDaysAverage),
       'dioStatus': FinanceBawcDisplay.formatDioValue(context, wc),
       'cccStatus': FinanceBawcDisplay.formatCccValue(context, wc),
+      'dioAvailable': FinanceBawcDisplay.isDioAvailable(wc) ? 'true' : 'false',
+      'cccAvailable': FinanceBawcDisplay.isCccAvailable(wc) ? 'true' : 'false',
+      'coverageErpPreferred': snap.warnings.any((w) =>
+              w.code == 'inventory_source_erp_preferred_over_wms' ||
+              w.code == 'cogs_source_erp_preferred_over_wms')
+          ? 'true'
+          : 'false',
       if (coverageCount > 0) 'coverageWarningCount': '$coverageCount',
     };
   }
