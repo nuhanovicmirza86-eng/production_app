@@ -2,48 +2,52 @@ import 'dart:typed_data';
 
 /// Polja na dokumentu `companies/{id}` relevantna za logo u UI-ju.
 ///
-/// **Primarni izvor:** `websiteUrl` — javna web adresa kompanije; iz nje se gradi
-/// URL favicona (Google `faviconV2` servis).
-///
-/// **Nadjačavanje:** ako postoji izravni URL slike (`logoUrl`, …), koristi se on.
+/// **Redoslijed:** `branding.autoLogoRasterUrl` → `branding.autoLogoUrl` (samo
+/// ako nije SVG) → favicon lanac iz **`documentPdfSettings.website`**.
+/// Ručni `logoUrl` / Super Admin upload nisu dio ovog toka.
 class CompanyLogoResolver {
   CompanyLogoResolver._();
 
-  static String? _pickExplicitHttp(Map<String, dynamic> data) {
-    String? pick(String raw) {
-      final t = raw.trim();
-      if (t.isEmpty) return null;
-      if (t.startsWith('https://') || t.startsWith('http://')) return t;
-      return null;
-    }
-
-    for (final key in ['logoUrl', 'companyLogoUrl', 'brandLogoUrl']) {
-      final u = pick((data[key] ?? '').toString());
-      if (u != null) return u;
-    }
-
+  static String? _pickAutoLogoRasterUrl(Map<String, dynamic> data) {
     final branding = data['branding'];
     if (branding is Map) {
-      for (final key in ['logoUrl', 'logo', 'imageUrl', 'iconUrl']) {
-        final u = pick((branding[key] ?? '').toString());
-        if (u != null) return u;
-      }
+      final t = (branding['autoLogoRasterUrl'] ?? '').toString().trim();
+      if (t.startsWith('https://') || t.startsWith('http://')) return t;
     }
     return null;
   }
 
-  /// Službeni ključ u Firestoreu: [websiteUrl]. Prihvata i `website`, `companyWebsite`.
-  static String? _pickWebsiteRaw(Map<String, dynamic> data) {
-    for (final key in ['websiteUrl', 'website', 'companyWebsite', 'webUrl']) {
-      final t = (data[key] ?? '').toString().trim();
-      if (t.isNotEmpty) return t;
-    }
+  static String? _pickAutoLogoUrl(Map<String, dynamic> data) {
     final branding = data['branding'];
     if (branding is Map) {
-      for (final key in ['websiteUrl', 'website']) {
-        final t = (branding[key] ?? '').toString().trim();
-        if (t.isNotEmpty) return t;
-      }
+      final t = (branding['autoLogoUrl'] ?? '').toString().trim();
+      if (t.startsWith('https://') || t.startsWith('http://')) return t;
+    }
+    return null;
+  }
+
+  static bool isSvgLogoUrl(String url) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return false;
+    final uri = Uri.tryParse(trimmed);
+    final path = (uri?.path ?? trimmed).toLowerCase();
+    return path.endsWith('.svg');
+  }
+
+  /// Backend raster wordmark (Storage `companies/.../branding/logo.png`).
+  static bool isWordmarkLogoUrl(String url) {
+    final lower = url.trim().toLowerCase();
+    if (lower.isEmpty) return false;
+    return lower.contains('/branding/logo.') ||
+        lower.contains('%2fbranding%2flogo');
+  }
+
+  /// Kanonski web iz PDF — podaci kompanije (polje Web).
+  static String? _pickDocumentPdfWebsite(Map<String, dynamic> data) {
+    final pdf = data['documentPdfSettings'];
+    if (pdf is Map) {
+      final t = (pdf['website'] ?? '').toString().trim();
+      if (t.isNotEmpty) return t;
     }
     return null;
   }
@@ -60,10 +64,6 @@ class CompanyLogoResolver {
     return u;
   }
 
-  /// Kandidati za sliku loga iz [websiteUrl] (prvi koji se uspješno učita u UI-u).
-  ///
-  /// Redoslijed: Google faviconV2 → Google s2 po domenu → DuckDuckGo → `/favicon.ico`
-  /// → `/apple-touch-icon.png` (česti Next.js / marketing sajtovi).
   static List<String> faviconCandidatesFromWebsite(String rawWebsite) {
     final u = _normalizeWebsiteUri(rawWebsite);
     if (u == null) return const [];
@@ -83,62 +83,41 @@ class CompanyLogoResolver {
     ];
   }
 
-  /// Izravni `logoUrl` — jedan element; inače lista favicon kandidata s weba.
   static List<String> resolveLogoImageCandidates(Map<String, dynamic> data) {
-    final explicit = _pickExplicitHttp(data);
-    if (explicit != null) return [explicit];
+    final urls = <String>[];
+    void add(String? raw) {
+      final u = raw?.trim();
+      if (u == null || u.isEmpty) return;
+      if (!urls.contains(u)) urls.add(u);
+    }
 
-    final web = _pickWebsiteRaw(data);
-    if (web == null) return const [];
+    add(_pickAutoLogoRasterUrl(data));
 
-    return faviconCandidatesFromWebsite(web);
+    final autoUrl = _pickAutoLogoUrl(data);
+    if (autoUrl != null && !isSvgLogoUrl(autoUrl)) {
+      add(autoUrl);
+    }
+
+    final web = _pickDocumentPdfWebsite(data);
+    if (web != null) {
+      for (final fav in faviconCandidatesFromWebsite(web)) {
+        add(fav);
+      }
+    }
+
+    return urls;
   }
 
-  /// Prvi kandidat (za jednostavne slučajeve); za pouzdanije učitavanje koristi [resolveLogoImageCandidates].
   static String? resolveLogoImageUrl(Map<String, dynamic> data) {
     final list = resolveLogoImageCandidates(data);
     return list.isEmpty ? null : list.first;
   }
 
-  /// URL iz polja „logo“ u PDF postavkama: može biti **direktna slika** ili **adresa sajta**
-  /// (npr. `www.firma.ba` ili `https://firma.ba`) — tada se koriste favicon kandidati.
-  /// Redoslijed: eksplicitni logo u postavkama → kandidati s `companyData`.
+  /// PDF logo download: backend raster prvo, zatim isti lanac kao UI.
   static List<String> resolveLogoDownloadUrlsForPdf({
-    required dynamic settingsLogoUrl,
     required Map<String, dynamic> companyData,
   }) {
-    final urls = <String>[];
-    final raw = (settingsLogoUrl ?? '').toString().trim();
-    if (raw.isNotEmpty) {
-      var normalized = raw;
-      if (!normalized.contains('://')) {
-        normalized = 'https://$normalized';
-      }
-      final uri = Uri.tryParse(normalized);
-      if (uri != null && uri.hasScheme && uri.host.isNotEmpty) {
-        final schemeOk = uri.scheme == 'http' || uri.scheme == 'https';
-        if (schemeOk) {
-          final path = uri.path.toLowerCase();
-          final looksLikeRasterOrSvg =
-              path.endsWith('.png') ||
-              path.endsWith('.jpg') ||
-              path.endsWith('.jpeg') ||
-              path.endsWith('.gif') ||
-              path.endsWith('.webp') ||
-              path.endsWith('.svg') ||
-              path.endsWith('.ico');
-          if (looksLikeRasterOrSvg && path.isNotEmpty) {
-            urls.add(uri.toString());
-          } else {
-            final forFav = raw.contains('://') ? raw : normalized;
-            urls.addAll(faviconCandidatesFromWebsite(forFav));
-          }
-        }
-      }
-    }
-    urls.addAll(resolveLogoImageCandidates(companyData));
-    final seen = <String>{};
-    return urls.where((u) => seen.add(u)).toList();
+    return resolveLogoImageCandidates(companyData);
   }
 
   /// PNG, JPEG, GIF, WEBP, ICO — `package:pdf` [MemoryImage] ne koristi SVG.

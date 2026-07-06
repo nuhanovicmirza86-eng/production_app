@@ -1798,6 +1798,11 @@ class _CompanyHeaderLogoState extends State<_CompanyHeaderLogo> {
 
     final safeIndex = _candidateIndex.clamp(0, urls.length - 1);
     final u = urls[safeIndex].trim();
+    final isWordmark = CompanyLogoResolver.isWordmarkLogoUrl(u);
+    final imageFit = isWordmark ? BoxFit.contain : BoxFit.cover;
+    final imagePadding = isWordmark
+        ? const EdgeInsets.all(_CompanyHeaderLogo.size * 0.12)
+        : EdgeInsets.zero;
 
     return SizedBox(
       width: _CompanyHeaderLogo.size,
@@ -1806,38 +1811,42 @@ class _CompanyHeaderLogoState extends State<_CompanyHeaderLogo> {
         decoration: BoxDecoration(borderRadius: radius, border: border),
         child: ClipRRect(
           borderRadius: radius,
-          child: Image.network(
-            u,
-            key: ValueKey<String>(u),
-            fit: BoxFit.cover,
-            // Web: canvas/fetch traži CORS; <img> u HTML-u tipično prikaže iste favicon/logo URL-ove kao Android.
-            webHtmlElementStrategy: kIsWeb
-                ? WebHtmlElementStrategy.prefer
-                : WebHtmlElementStrategy.never,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Center(
-                child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    value: loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded /
-                              loadingProgress.expectedTotalBytes!
-                        : null,
+          child: Padding(
+            padding: imagePadding,
+            child: Image.network(
+              u,
+              key: ValueKey<String>(u),
+              fit: imageFit,
+              alignment: Alignment.center,
+              // Web: canvas/fetch traži CORS; <img> u HTML-u tipično prikaže iste favicon/logo URL-ove kao Android.
+              webHtmlElementStrategy: kIsWeb
+                  ? WebHtmlElementStrategy.prefer
+                  : WebHtmlElementStrategy.never,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Center(
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
                   ),
-                ),
-              );
-            },
-            errorBuilder: (context, error, stackTrace) {
-              if (_candidateIndex < widget.candidates.length - 1) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _tryNextCandidate();
-                });
-              }
-              return placeholder();
-            },
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                if (_candidateIndex < widget.candidates.length - 1) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _tryNextCandidate();
+                  });
+                }
+                return placeholder();
+              },
+            ),
           ),
         ),
       ),

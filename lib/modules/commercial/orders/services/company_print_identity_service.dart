@@ -96,7 +96,6 @@ class CompanyPrintIdentityService {
     FirebaseFunctions? functions,
   }) async {
     final urls = CompanyLogoResolver.resolveLogoDownloadUrlsForPdf(
-      settingsLogoUrl: settings.logoUrl,
       companyData: companyData,
     );
     if (urls.isEmpty) return null;
