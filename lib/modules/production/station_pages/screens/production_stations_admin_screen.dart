@@ -223,6 +223,12 @@ class _ProductionStationsAdminScreenState
     var packingFlowEnabled = existing?.packingFlowEnabled ?? false;
     int? legacyNavSlot = existing?.legacyOperatorNavSlot;
 
+    var controlledInputEnabled = existing?.controlledInputEnabled ?? false;
+    var controlledInputMode = existing?.controlledInputMode ?? 'off';
+    if (controlledInputEnabled && controlledInputMode == 'off') {
+      controlledInputMode = 'strict';
+    }
+
     String? inboundWhId = existing?.inboundWarehouseId;
     String? outboundWhId = existing?.outboundWarehouseId;
 
@@ -361,9 +367,87 @@ class _ProductionStationsAdminScreenState
                               )
                               .toList(),
                           onChanged: (v) {
-                            if (v != null) setLocal(() => selectedProfile = v);
+                            if (v == null) return;
+                            setLocal(() {
+                              selectedProfile = v;
+                              if (!ProductionStationConfig
+                                  .supportsControlledInputProfile(v)) {
+                                controlledInputEnabled = false;
+                                controlledInputMode = 'off';
+                              }
+                            });
                           },
                         ),
+                        if (ProductionStationConfig
+                            .supportsControlledInputProfile(selectedProfile)) ...[
+                          const Divider(height: 24),
+                          Text(
+                            'Kontrolisan unos evidencije',
+                            style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Operator bira vrijednosti iz kataloga; backend validira kombinacije pri zatvaranju sesije.',
+                            style: Theme.of(ctx).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 8),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Uključi kontrolisan unos'),
+                            value: controlledInputEnabled,
+                            onChanged: (v) => setLocal(() {
+                              controlledInputEnabled = v;
+                              if (v && controlledInputMode == 'off') {
+                                controlledInputMode = 'strict';
+                              }
+                              if (!v) {
+                                controlledInputMode = 'off';
+                              }
+                            }),
+                          ),
+                          if (controlledInputEnabled) ...[
+                            const SizedBox(height: 8),
+                            DropdownButtonFormField<String>(
+                              key: ValueKey(controlledInputMode),
+                              initialValue: controlledInputMode == 'off'
+                                  ? 'strict'
+                                  : controlledInputMode,
+                              decoration: const InputDecoration(
+                                labelText: 'Režim validacije',
+                                helperText:
+                                    'Strogo odbija nevažeće; Upozorenje zapisuje flag na sesiji.',
+                              ),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'strict',
+                                  child: Text('Strogo (odbij nevažeći unos)'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'warning',
+                                  child: Text('Upozorenje (dozvoli, zabilježi)'),
+                                ),
+                              ],
+                              onChanged: (v) {
+                                if (v != null) {
+                                  setLocal(() => controlledInputMode = v);
+                                }
+                              },
+                            ),
+                            const SizedBox(height: 8),
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Opseg'),
+                              subtitle: Text(
+                                ProductionStationConfig.controlledInputScopeLabel(
+                                  ProductionStationConfig
+                                      .controlledInputScopeWorkBath,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ],
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
@@ -621,6 +705,8 @@ class _ProductionStationsAdminScreenState
                         legacyNavSlot: legacyNavSlot,
                         inboundWhId: inboundWhId,
                         outboundWhId: outboundWhId,
+                        controlledInputEnabled: controlledInputEnabled,
+                        controlledInputMode: controlledInputMode,
                       ),
                     );
                   },
@@ -675,6 +761,27 @@ class _ProductionStationsAdminScreenState
       inboundWarehouseId: result.inboundWhId,
       outboundWarehouseId: result.outboundWhId,
       legacyOperatorNavSlot: result.legacyNavSlot,
+      controlledInputEnabled:
+          ProductionStationConfig.supportsControlledInputProfile(
+                result.selectedProfile,
+              )
+              ? result.controlledInputEnabled
+              : false,
+      controlledInputMode:
+          ProductionStationConfig.supportsControlledInputProfile(
+                result.selectedProfile,
+              ) &&
+              result.controlledInputEnabled
+          ? result.controlledInputMode
+          : 'off',
+      controlledInputScope:
+          ProductionStationConfig.supportsControlledInputProfile(
+                result.selectedProfile,
+              ) &&
+              result.controlledInputEnabled &&
+              result.controlledInputMode != 'off'
+          ? ProductionStationConfig.controlledInputScopeWorkBath
+          : null,
     );
 
     try {
@@ -803,6 +910,8 @@ class _StationEditorResult {
   final int? legacyNavSlot;
   final String? inboundWhId;
   final String? outboundWhId;
+  final bool controlledInputEnabled;
+  final String controlledInputMode;
 
   const _StationEditorResult({
     required this.displayName,
@@ -825,6 +934,8 @@ class _StationEditorResult {
     required this.legacyNavSlot,
     required this.inboundWhId,
     required this.outboundWhId,
+    required this.controlledInputEnabled,
+    required this.controlledInputMode,
   });
 }
 
@@ -948,6 +1059,12 @@ class _StationCard extends StatelessWidget {
               ),
               if (config.packingFlowEnabled)
                 const Text('Tok pakovanja: uključen'),
+              if (config.controlledInputEnabled)
+                Text(
+                  'Kontrolisan unos evidencije: '
+                  '${ProductionStationConfig.controlledInputModeLabel(config.controlledInputMode)}'
+                  '${config.controlledInputScope != null ? ' · ${ProductionStationConfig.controlledInputScopeLabel(config.controlledInputScope)}' : ''}',
+                ),
               if (config.legacyOperatorNavSlot != null)
                 Text('Navigacija: Stanica ${config.legacyOperatorNavSlot}'),
             ],

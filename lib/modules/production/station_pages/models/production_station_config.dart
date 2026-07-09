@@ -16,6 +16,22 @@ class ProductionStationConfig {
     'process_log',
   ];
 
+  /// Profili evidencije — kontrolisan unos (M1-B0).
+  static const List<String> evidenceProfileTypes = [
+    'chemical_dosing',
+    'wastewater_treatment',
+    'process_log',
+    'rework_and_painting',
+  ];
+
+  static const List<String> controlledInputModes = [
+    'off',
+    'warning',
+    'strict',
+  ];
+
+  static const String controlledInputScopeWorkBath = 'work_bath';
+
   static const List<String> productionPhaseKeys = [
     'pripremna',
     'priprema_proizvodnje',
@@ -61,6 +77,9 @@ class ProductionStationConfig {
   final String? inboundWarehouseId;
   final String? outboundWarehouseId;
   final int? legacyOperatorNavSlot;
+  final bool controlledInputEnabled;
+  final String controlledInputMode;
+  final String? controlledInputScope;
 
   const ProductionStationConfig({
     required this.id,
@@ -95,6 +114,9 @@ class ProductionStationConfig {
     this.inboundWarehouseId,
     this.outboundWarehouseId,
     this.legacyOperatorNavSlot,
+    this.controlledInputEnabled = false,
+    this.controlledInputMode = 'off',
+    this.controlledInputScope,
   });
 
   static String buildConfigId({
@@ -113,6 +135,33 @@ class ProductionStationConfig {
   }
 
   bool get isMachineStation => stationType == stationTypeMachine;
+
+  bool get supportsControlledInput =>
+      supportsControlledInputProfile(processProfileType);
+
+  static bool supportsControlledInputProfile(String profileKey) =>
+      evidenceProfileTypes.contains(profileKey.trim());
+
+  static String controlledInputModeLabel(String mode) {
+    switch (mode) {
+      case 'warning':
+        return 'Upozorenje';
+      case 'strict':
+        return 'Strogo';
+      case 'off':
+      default:
+        return 'Isključeno';
+    }
+  }
+
+  static String controlledInputScopeLabel(String? scope) {
+    switch (scope) {
+      case controlledInputScopeWorkBath:
+        return 'Radna kada';
+      default:
+        return scope ?? '—';
+    }
+  }
 
   static ProductionStationConfig fromMap(Map<String, dynamic> data) {
     final miRaw = data['machineIntegration'];
@@ -180,7 +229,16 @@ class ProductionStationConfig {
       inboundWarehouseId: _optString(data['inboundWarehouseId']),
       outboundWarehouseId: _optString(data['outboundWarehouseId']),
       legacyOperatorNavSlot: legacyNav,
+      controlledInputEnabled: data['controlledInputEnabled'] == true,
+      controlledInputMode: _controlledInputModeFromMap(data['controlledInputMode']),
+      controlledInputScope: _optString(data['controlledInputScope']),
     );
+  }
+
+  static String _controlledInputModeFromMap(dynamic raw) {
+    final mode = (raw ?? 'off').toString().trim().toLowerCase();
+    if (controlledInputModes.contains(mode)) return mode;
+    return 'off';
   }
 
   Map<String, dynamic> toUpsertPayload() {
@@ -216,6 +274,16 @@ class ProductionStationConfig {
       'inboundWarehouseId': inboundWarehouseId,
       'outboundWarehouseId': outboundWarehouseId,
       'legacyOperatorNavSlot': legacyOperatorNavSlot,
+      if (supportsControlledInput) ...{
+        'controlledInputEnabled': controlledInputEnabled,
+        'controlledInputMode': controlledInputEnabled
+            ? (controlledInputMode == 'off' ? 'strict' : controlledInputMode)
+            : 'off',
+        if (controlledInputEnabled &&
+            controlledInputMode != 'off' &&
+            controlledInputScope != null)
+          'controlledInputScope': controlledInputScope,
+      },
     };
   }
 
