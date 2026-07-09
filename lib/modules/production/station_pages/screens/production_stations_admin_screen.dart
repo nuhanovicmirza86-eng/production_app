@@ -4,6 +4,7 @@ import 'package:production_app/core/company_plant_display_name.dart';
 import '../../../logistics/inventory/services/product_warehouse_stock_service.dart';
 import '../../tracking/models/production_operator_tracking_entry.dart';
 import '../models/production_station_config.dart';
+import '../models/production_station_profile_catalog_entry.dart';
 import '../services/production_station_config_callable_service.dart';
 
 /// Admin / menadžer: konfiguracija stanica proizvodnje po kompaniji (M1).
@@ -24,6 +25,7 @@ class _ProductionStationsAdminScreenState
   bool _loading = true;
   String? _error;
   List<ProductionStationConfig> _configs = const [];
+  ProductionStationProfileCatalogResult? _profileCatalog;
   ProductionStationLimitsSummary _limits = const ProductionStationLimitsSummary(
     maxProductionStations: 3,
     maxMachineStations: 0,
@@ -53,13 +55,19 @@ class _ProductionStationsAdminScreenState
       _error = null;
     });
     try {
-      final result = await _callable.listProductionStationConfigs(
+      final configsFuture = _callable.listProductionStationConfigs(
         companyId: _companyId,
       );
+      final profilesFuture = _callable.listProductionStationProfiles(
+        companyId: _companyId,
+      );
+      final configsResult = await configsFuture;
+      final profilesResult = await profilesFuture;
       if (!mounted) return;
       setState(() {
-        _configs = result.configs;
-        _limits = result.limits;
+        _configs = configsResult.configs;
+        _limits = configsResult.limits;
+        _profileCatalog = profilesResult;
         _loading = false;
       });
     } catch (e) {
@@ -152,6 +160,30 @@ class _ProductionStationsAdminScreenState
     );
   }
 
+  List<ProductionStationProfileCatalogEntry> _productionProfileOptions(
+    String selectedProfileKey,
+  ) {
+    final catalog = _profileCatalog;
+    if (catalog == null) return const [];
+    final options = catalog.profilesForStationType(
+      ProductionStationConfig.stationTypeProduction,
+    );
+    if (options.any((p) => p.profileKey == selectedProfileKey)) {
+      return options;
+    }
+    if (selectedProfileKey.isEmpty) return options;
+    return [
+      ProductionStationProfileCatalogEntry(
+        profileKey: selectedProfileKey,
+        displayName: ProductionStationConfig.processProfileLabel(selectedProfileKey),
+        description: '',
+        stationType: ProductionStationConfig.stationTypeProduction,
+        definitionStatus: 'skeleton',
+      ),
+      ...options,
+    ];
+  }
+
   Future<void> _openEditor({
     ProductionStationConfig? existing,
     String? stationType,
@@ -202,7 +234,7 @@ class _ProductionStationsAdminScreenState
     }
 
     List<WarehouseRef> warehouses = const [];
-    if (assignedPlantKey != null && assignedPlantKey.isNotEmpty) {
+    if (assignedPlantKey.isNotEmpty) {
       try {
         warehouses = await ProductWarehouseStockService().listActiveWarehouses(
           companyId: _companyId,
@@ -215,6 +247,21 @@ class _ProductionStationsAdminScreenState
       _scheduleControllerDispose([nameCtrl, codeCtrl, descCtrl, notesCtrl]);
       return;
     }
+
+    if (_profileCatalog == null) {
+      _scheduleControllerDispose([nameCtrl, codeCtrl, descCtrl, notesCtrl]);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Katalog profila stanica nije učitan. Osvježite listu i pokušajte ponovo.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final profileOptions = _productionProfileOptions(selectedProfile);
 
     final result = await showDialog<_StationEditorResult>(
       context: context,
@@ -292,16 +339,23 @@ class _ProductionStationsAdminScreenState
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
                           key: ValueKey(selectedProfile),
-                          initialValue: selectedProfile,
+                          initialValue: profileOptions
+                                  .any((p) => p.profileKey == selectedProfile)
+                              ? selectedProfile
+                              : (profileOptions.isNotEmpty
+                                  ? profileOptions.first.profileKey
+                                  : selectedProfile),
                           decoration: const InputDecoration(
-                            labelText: 'Profil procesa',
+                            labelText: 'Profil stanice',
+                            helperText:
+                                'Spremno = puni obrazac u platformi; U pripremi = skeleton profil.',
                           ),
-                          items: ProductionStationConfig.productionProfiles
+                          items: profileOptions
                               .map(
                                 (p) => DropdownMenuItem(
-                                  value: p,
+                                  value: p.profileKey,
                                   child: Text(
-                                    ProductionStationConfig.processProfileLabel(p),
+                                    '${p.displayName} (${p.definitionStatusLabelText})',
                                   ),
                                 ),
                               )
@@ -701,7 +755,10 @@ class _ProductionStationsAdminScreenState
                       child: ListView(
                         padding: const EdgeInsets.all(16),
                         children: [
-                          _LimitsSummaryCard(limits: _limits),
+                          _LimitsSummaryCard(
+                            limits: _limits,
+                            catalogVersion: _profileCatalog?.catalogVersion,
+                          ),
                           const SizedBox(height: 16),
                           if (_configs.isEmpty)
                             const Padding(
@@ -715,6 +772,7 @@ class _ProductionStationsAdminScreenState
                             ..._configs.map((c) => _StationCard(
                                   config: c,
                                   companyId: _companyId,
+                                  profileCatalog: _profileCatalog,
                                   onTap: () => _openEditor(existing: c),
                                 )),
                         ],
@@ -772,8 +830,12 @@ class _StationEditorResult {
 
 class _LimitsSummaryCard extends StatelessWidget {
   final ProductionStationLimitsSummary limits;
+  final int? catalogVersion;
 
-  const _LimitsSummaryCard({required this.limits});
+  const _LimitsSummaryCard({
+    required this.limits,
+    this.catalogVersion,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -795,6 +857,13 @@ class _LimitsSummaryCard extends StatelessWidget {
             Text(
               'Mašinske stanice: ${limits.activeMachineStations} / ${limits.maxMachineStations}',
             ),
+            if (catalogVersion != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Katalog profila: verzija $catalogVersion',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
           ],
         ),
       ),
@@ -805,11 +874,13 @@ class _LimitsSummaryCard extends StatelessWidget {
 class _StationCard extends StatelessWidget {
   final ProductionStationConfig config;
   final String companyId;
+  final ProductionStationProfileCatalogResult? profileCatalog;
   final VoidCallback onTap;
 
   const _StationCard({
     required this.config,
     required this.companyId,
+    required this.profileCatalog,
     required this.onTap,
   });
 
@@ -850,8 +921,16 @@ class _StationCard extends StatelessWidget {
                 Text(
                   'Faza: ${ProductionStationConfig.productionPhaseLabel(config.productionPhaseKey!)}',
                 ),
-              Text(
-                'Profil: ${ProductionStationConfig.processProfileLabel(config.processProfileType)}',
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _profileLine(config.processProfileType),
+                    ),
+                  ),
+                  if (_profileStatusChip(config.processProfileType) != null)
+                    _profileStatusChip(config.processProfileType)!,
+                ],
               ),
               Text(
                 'Operativna faza: ${_ProductionStationsAdminScreenState._phaseLabel(config.phase)}',
@@ -875,6 +954,30 @@ class _StationCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  String _profileLine(String profileKey) {
+    final entry = profileCatalog?.byKey(profileKey);
+    if (entry != null) {
+      return 'Profil: ${entry.displayName}';
+    }
+    return 'Profil: ${ProductionStationConfig.processProfileLabel(profileKey)}';
+  }
+
+  Widget? _profileStatusChip(String profileKey) {
+    final entry = profileCatalog?.byKey(profileKey);
+    if (entry == null) return null;
+    final isComplete = entry.isComplete;
+    return Chip(
+      label: Text(
+        entry.definitionStatusLabelText,
+        style: const TextStyle(fontSize: 11),
+      ),
+      visualDensity: VisualDensity.compact,
+      backgroundColor: isComplete
+          ? Colors.green.withValues(alpha: 0.12)
+          : Colors.orange.withValues(alpha: 0.12),
     );
   }
 }
