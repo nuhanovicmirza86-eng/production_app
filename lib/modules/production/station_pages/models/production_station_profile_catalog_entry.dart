@@ -1,3 +1,5 @@
+import 'production_station_profile_field.dart';
+
 /// Katalog profila stanica — platformski JSON preko Callabla (M1-A).
 class ProductionStationProfileCatalogEntry {
   final String profileKey;
@@ -7,6 +9,8 @@ class ProductionStationProfileCatalogEntry {
   final String definitionStatus;
   final Map<String, dynamic> defaultFlags;
   final Map<String, dynamic> units;
+  final List<ProductionStationProfileField> fields;
+  final List<Map<String, dynamic>> validations;
 
   const ProductionStationProfileCatalogEntry({
     required this.profileKey,
@@ -16,6 +20,8 @@ class ProductionStationProfileCatalogEntry {
     required this.definitionStatus,
     this.defaultFlags = const {},
     this.units = const {},
+    this.fields = const [],
+    this.validations = const [],
   });
 
   bool get isComplete => definitionStatus == 'complete';
@@ -25,6 +31,28 @@ class ProductionStationProfileCatalogEntry {
   static ProductionStationProfileCatalogEntry fromMap(Map<String, dynamic> data) {
     final flagsRaw = data['defaultFlags'];
     final unitsRaw = data['units'];
+    final fieldsRaw = data['fields'];
+    final validationsRaw = data['validations'];
+    final fields = <ProductionStationProfileField>[];
+    if (fieldsRaw is List) {
+      for (final item in fieldsRaw) {
+        if (item is Map) {
+          fields.add(
+            ProductionStationProfileField.fromMap(
+              Map<String, dynamic>.from(item),
+            ),
+          );
+        }
+      }
+    }
+    final validations = <Map<String, dynamic>>[];
+    if (validationsRaw is List) {
+      for (final item in validationsRaw) {
+        if (item is Map) {
+          validations.add(Map<String, dynamic>.from(item));
+        }
+      }
+    }
     return ProductionStationProfileCatalogEntry(
       profileKey: (data['profileKey'] ?? '').toString().trim(),
       displayName: (data['displayName'] ?? '').toString().trim(),
@@ -35,8 +63,22 @@ class ProductionStationProfileCatalogEntry {
           ? Map<String, dynamic>.from(flagsRaw)
           : const {},
       units: unitsRaw is Map ? Map<String, dynamic>.from(unitsRaw) : const {},
+      fields: ProductionStationProfileField.sortedList(fields),
+      validations: validations,
     );
   }
+
+  List<String> get allowedUnits {
+    final raw = units['allowedUnits'];
+    if (raw is! List) return const [];
+    return raw
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  String get defaultUnit =>
+      (units['defaultUnit'] ?? '').toString().trim();
 
   static String definitionStatusLabel(String status) {
     switch (status) {

@@ -29,6 +29,7 @@ import '../../tracking/models/production_operator_tracking_entry.dart';
 import '../../tracking/screens/production_operator_tracking_screen.dart';
 import '../../tracking/screens/production_operator_tracking_station_screen.dart';
 import '../../station_pages/screens/production_stations_admin_screen.dart';
+import '../../station_pages/screens/production_profile_stations_hub_screen.dart';
 import '../../station_pages/widgets/station_page_active_gate.dart';
 import '../../station_pages/screens/station1_operator_launch_screen.dart';
 import '../../station_pages/screens/station2_operator_launch_screen.dart';
@@ -321,6 +322,15 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                 : openTrackingStation(
                     ProductionOperatorTrackingEntry.phaseFinalControl,
                   ),
+          ),
+          _DashboardActionTile(
+            icon: Icons.science_outlined,
+            title: 'Operativne stanice (profil)',
+            subtitle:
+                'Rad na stanicama prema profilu (npr. doziranje hemikalija).',
+            onTap: () => open(
+              ProductionProfileStationsHubScreen(companyData: companyData),
+            ),
           ),
         ],
         if (_canViewCard(ProductionDashboardCard.stationPages))

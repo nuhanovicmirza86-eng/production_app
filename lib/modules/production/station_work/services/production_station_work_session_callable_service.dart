@@ -2,6 +2,18 @@ import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/production_station_work_session.dart';
 
+String productionStationWorkSessionErrorMessage(Object error) {
+  if (error is FirebaseFunctionsException) {
+    final msg = (error.message ?? '').trim();
+    if (msg.isNotEmpty) return msg;
+    return error.code;
+  }
+  return error
+      .toString()
+      .replaceFirst('Exception: ', '')
+      .replaceFirst('[firebase_functions/', '');
+}
+
 class ProductionStationWorkSessionCallableService {
   ProductionStationWorkSessionCallableService({FirebaseFunctions? functions})
     : _functions =
@@ -12,15 +24,20 @@ class ProductionStationWorkSessionCallableService {
   Future<ProductionStationWorkSession> startProductionStationWorkSession({
     required String companyId,
     required int stationSlot,
-    required String productionOrderId,
+    String? productionOrderId,
   }) async {
+    final payload = <String, dynamic>{
+      'companyId': companyId.trim(),
+      'stationSlot': stationSlot,
+    };
+    final orderId = productionOrderId?.trim();
+    if (orderId != null && orderId.isNotEmpty) {
+      payload['productionOrderId'] = orderId;
+    }
+
     final res = await _functions
         .httpsCallable('startProductionStationWorkSession')
-        .call<Map<String, dynamic>>({
-          'companyId': companyId.trim(),
-          'stationSlot': stationSlot,
-          'productionOrderId': productionOrderId.trim(),
-        });
+        .call<Map<String, dynamic>>(payload);
     final data = res.data;
     if (data['success'] != true) {
       throw Exception('Pokretanje sesije nije uspjelo.');
@@ -44,6 +61,7 @@ class ProductionStationWorkSessionCallableService {
     double scrapQtyDelta = 0,
     double reworkQtyDelta = 0,
     String? comment,
+    Map<String, dynamic>? fieldValues,
   }) async {
     final payload = <String, dynamic>{
       'companyId': companyId.trim(),
@@ -57,6 +75,8 @@ class ProductionStationWorkSessionCallableService {
       payload['comment'] = (comment ?? '').trim();
     } else if (action == 'set_comment') {
       payload['comment'] = (comment ?? '').trim();
+    } else if (action == 'set_field_values') {
+      payload['fieldValues'] = fieldValues ?? const <String, dynamic>{};
     } else if (comment != null && comment.trim().isNotEmpty) {
       payload['comment'] = comment.trim();
     }
@@ -83,16 +103,36 @@ class ProductionStationWorkSessionCallableService {
     );
   }
 
+  Future<ProductionStationWorkSession> setProfileFieldValues({
+    required String companyId,
+    required String sessionId,
+    required Map<String, dynamic> fieldValues,
+  }) async {
+    final result = await updateProductionStationWorkSession(
+      companyId: companyId,
+      sessionId: sessionId,
+      action: 'set_field_values',
+      fieldValues: fieldValues,
+    );
+    return result.session;
+  }
+
   Future<ProductionStationWorkSession> finishProductionStationWorkSession({
     required String companyId,
     required String sessionId,
+    Map<String, dynamic>? fieldValues,
   }) async {
+    final payload = <String, dynamic>{
+      'companyId': companyId.trim(),
+      'sessionId': sessionId.trim(),
+    };
+    if (fieldValues != null && fieldValues.isNotEmpty) {
+      payload['fieldValues'] = fieldValues;
+    }
+
     final res = await _functions
         .httpsCallable('finishProductionStationWorkSession')
-        .call<Map<String, dynamic>>({
-          'companyId': companyId.trim(),
-          'sessionId': sessionId.trim(),
-        });
+        .call<Map<String, dynamic>>(payload);
     final data = res.data;
     if (data['success'] != true) {
       throw Exception('Završetak sesije nije uspio.');

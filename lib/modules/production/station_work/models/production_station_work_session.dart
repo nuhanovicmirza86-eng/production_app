@@ -103,8 +103,13 @@ class ProductionStationWorkSession {
     required this.productionOrderId,
     required this.operatorId,
     this.operatorEmail,
+    this.operatorDisplayName,
     this.startedAt,
     this.endedAt,
+    this.createdAt,
+    this.createdByUid,
+    this.createdByEmail,
+    this.createdByDisplayName,
     required this.status,
     required this.goodQty,
     required this.scrapQty,
@@ -112,8 +117,12 @@ class ProductionStationWorkSession {
     required this.downtimeMinutes,
     this.comment,
     this.orderSnapshot,
+    this.profileSnapshot,
+    this.fieldValues,
+    this.controlledInputWarning,
     this.updatedAt,
     this.updatedByUid,
+    this.updatedByEmail,
   });
 
   final String id;
@@ -126,8 +135,13 @@ class ProductionStationWorkSession {
   final String productionOrderId;
   final String operatorId;
   final String? operatorEmail;
+  final String? operatorDisplayName;
   final DateTime? startedAt;
   final DateTime? endedAt;
+  final DateTime? createdAt;
+  final String? createdByUid;
+  final String? createdByEmail;
+  final String? createdByDisplayName;
   final String status;
   final double goodQty;
   final double scrapQty;
@@ -135,11 +149,19 @@ class ProductionStationWorkSession {
   final double downtimeMinutes;
   final String? comment;
   final ProductionStationWorkOrderSnapshot? orderSnapshot;
+  final Map<String, dynamic>? profileSnapshot;
+  final Map<String, dynamic>? fieldValues;
+  final Map<String, dynamic>? controlledInputWarning;
   final DateTime? updatedAt;
   final String? updatedByUid;
+  final String? updatedByEmail;
 
   bool get isActive =>
       status == statusOpen || status == statusPaused;
+
+  bool get isProfileDriven =>
+      processProfileType == 'chemical_dosing' ||
+      (profileSnapshot != null && profileSnapshot!.isNotEmpty);
 
   factory ProductionStationWorkSession.fromDoc(
     DocumentSnapshot<Map<String, dynamic>> doc,
@@ -150,7 +172,24 @@ class ProductionStationWorkSession {
   factory ProductionStationWorkSession.fromMap(String id, Map<String, dynamic> m) {
     DateTime? ts(dynamic v) {
       if (v is Timestamp) return v.toDate();
+      if (v is Map) {
+        final seconds = v['seconds'];
+        if (seconds is num) {
+          return DateTime.fromMillisecondsSinceEpoch(
+            (seconds * 1000).round(),
+            isUtc: true,
+          ).toLocal();
+        }
+      }
+      if (v is String && v.trim().isNotEmpty) {
+        return DateTime.tryParse(v.trim())?.toLocal();
+      }
       return null;
+    }
+
+    Map<String, dynamic>? warningMap(dynamic raw) {
+      if (raw is! Map) return null;
+      return Map<String, dynamic>.from(raw);
     }
 
     double n(dynamic v) {
@@ -166,6 +205,18 @@ class ProductionStationWorkSession {
       );
     }
 
+    Map<String, dynamic>? profileSnapshot;
+    final profileRaw = m['profileSnapshot'];
+    if (profileRaw is Map) {
+      profileSnapshot = Map<String, dynamic>.from(profileRaw);
+    }
+
+    Map<String, dynamic>? fieldValues;
+    final fieldValuesRaw = m['fieldValues'];
+    if (fieldValuesRaw is Map) {
+      fieldValues = Map<String, dynamic>.from(fieldValuesRaw);
+    }
+
     return ProductionStationWorkSession(
       id: id,
       companyId: (m['companyId'] ?? '').toString().trim(),
@@ -179,8 +230,23 @@ class ProductionStationWorkSession {
       operatorEmail: (m['operatorEmail'] ?? '').toString().trim().isEmpty
           ? null
           : (m['operatorEmail'] ?? '').toString().trim(),
+      operatorDisplayName:
+          (m['operatorDisplayName'] ?? '').toString().trim().isEmpty
+          ? null
+          : (m['operatorDisplayName'] ?? '').toString().trim(),
       startedAt: ts(m['startedAt']),
       endedAt: ts(m['endedAt']),
+      createdAt: ts(m['createdAt']),
+      createdByUid: (m['createdByUid'] ?? '').toString().trim().isEmpty
+          ? null
+          : (m['createdByUid'] ?? '').toString().trim(),
+      createdByEmail: (m['createdByEmail'] ?? '').toString().trim().isEmpty
+          ? null
+          : (m['createdByEmail'] ?? '').toString().trim(),
+      createdByDisplayName:
+          (m['createdByDisplayName'] ?? '').toString().trim().isEmpty
+          ? null
+          : (m['createdByDisplayName'] ?? '').toString().trim(),
       status: (m['status'] ?? '').toString().trim(),
       goodQty: n(m['goodQty']),
       scrapQty: n(m['scrapQty']),
@@ -190,10 +256,16 @@ class ProductionStationWorkSession {
           ? null
           : (m['comment'] ?? '').toString().trim(),
       orderSnapshot: snap,
+      profileSnapshot: profileSnapshot,
+      fieldValues: fieldValues,
+      controlledInputWarning: warningMap(m['controlledInputWarning']),
       updatedAt: ts(m['updatedAt']),
       updatedByUid: (m['updatedByUid'] ?? '').toString().trim().isEmpty
           ? null
           : (m['updatedByUid'] ?? '').toString().trim(),
+      updatedByEmail: (m['updatedByEmail'] ?? '').toString().trim().isEmpty
+          ? null
+          : (m['updatedByEmail'] ?? '').toString().trim(),
     );
   }
 }
