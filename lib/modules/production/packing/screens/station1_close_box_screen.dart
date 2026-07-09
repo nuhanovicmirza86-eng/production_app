@@ -8,6 +8,7 @@ import '../../products/services/product_lookup_service.dart';
 import '../../station_pages/models/production_station_page.dart';
 import '../../tracking/models/production_operator_tracking_entry.dart';
 import '../../tracking/services/production_operator_tracking_service.dart';
+import '../packing_box_display_label.dart';
 import '../packing_box_label_pdf.dart';
 import '../services/packing_box_service.dart';
 
@@ -156,13 +157,15 @@ class _Station1CloseBoxScreenState extends State<Station1CloseBoxScreen> {
           ProductionStationPage.stationSlotForPhase(
             ProductionOperatorTrackingEntry.phasePreparation,
           );
-      final boxId = await _svc.createBox(
+      final created = await _svc.createBox(
         companyId: _companyId,
         plantKey: _plantKey,
         classification: widget.classification,
         lines: List<PackingBoxLine>.from(_lines),
         stationSlot: slot,
       );
+      final boxId = created.boxId;
+      final boxPlantKey = created.plantKey;
 
       final entryIds = _lines
           .map((e) => e.trackingEntryId)
@@ -172,7 +175,7 @@ class _Station1CloseBoxScreenState extends State<Station1CloseBoxScreen> {
       if (entryIds.isNotEmpty) {
         await _tracking.setPackedBoxIdForEntries(
           companyId: _companyId,
-          plantKey: _plantKey,
+          plantKey: boxPlantKey,
           entryIds: entryIds,
           packedBoxId: boxId,
         );
@@ -181,7 +184,7 @@ class _Station1CloseBoxScreenState extends State<Station1CloseBoxScreen> {
       await PackingBoxLabelPdf.printLabel(
         boxId: boxId,
         companyId: _companyId,
-        plantKey: _plantKey,
+        plantKey: boxPlantKey,
         stationKey: ProductionOperatorTrackingEntry.phasePreparation,
         classification: widget.classification,
         lines: _lines,
@@ -356,15 +359,6 @@ class _Station1CloseBoxScreenState extends State<Station1CloseBoxScreen> {
                     }
                     return Column(
                       children: boxes.map((b) {
-                        final short =
-                            b.id.length > 8 ? b.id.substring(b.id.length - 8) : b.id;
-                        final t = b.createdAt;
-                        final timeStr = t != null
-                            ? '${t.day.toString().padLeft(2, '0')}.'
-                                '${t.month.toString().padLeft(2, '0')}. '
-                                '${t.hour.toString().padLeft(2, '0')}:'
-                                '${t.minute.toString().padLeft(2, '0')}'
-                            : '—';
                         return Card(
                           margin: const EdgeInsets.only(bottom: 8),
                           child: ListTile(
@@ -372,9 +366,13 @@ class _Station1CloseBoxScreenState extends State<Station1CloseBoxScreen> {
                               Icons.local_shipping_outlined,
                               color: theme.colorScheme.primary,
                             ),
-                            title: Text('Kutija …$short'),
+                            title: Text(PackingBoxDisplayLabel.title(b)),
                             subtitle: Text(
-                              '${b.lines.length} stavki · $timeStr · ${b.classification}',
+                              [
+                                if (PackingBoxDisplayLabel.productSummary(b) != null)
+                                  PackingBoxDisplayLabel.productSummary(b)!,
+                                PackingBoxDisplayLabel.subtitle(b),
+                              ].join('\n'),
                             ),
                             trailing: Chip(
                               label: const Text('Čeka prijem'),

@@ -10,7 +10,7 @@ class PackingBoxCallableService {
 
   static String _s(dynamic v) => (v ?? '').toString().trim();
 
-  Future<String> createPackingBox({
+  Future<({String boxId, String plantKey})> createPackingBox({
     required String companyId,
     required String plantKey,
     required String classification,
@@ -32,10 +32,11 @@ class PackingBoxCallableService {
     });
     final data = res.data;
     final id = _s(data['boxId']);
+    final resolvedPlant = _s(data['plantKey']).isNotEmpty ? _s(data['plantKey']) : pk;
     if (data['success'] != true || id.isEmpty) {
       throw Exception('Kreiranje kutije nije uspjelo.');
     }
-    return id;
+    return (boxId: id, plantKey: resolvedPlant);
   }
 
   Future<void> markPackingBoxReceived({

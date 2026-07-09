@@ -163,8 +163,8 @@ class PackingBoxService {
 
   final String _stationKey = 'preparation';
 
-  /// Kreira kutiju, vraća [id] dokumenta (Callable — ne direktan Firestore write).
-  Future<String> createBox({
+  /// Kreira kutiju, vraća id dokumenta i kanonski plantKey s backend-a.
+  Future<({String boxId, String plantKey})> createBox({
     required String companyId,
     required String plantKey,
     required String classification,

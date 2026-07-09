@@ -5,6 +5,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import 'packing_box_display_label.dart';
 import 'packing_box_qr.dart';
 import 'services/packing_box_service.dart';
 
@@ -17,14 +18,15 @@ class PackingBoxLabelPdf {
 
   static Future<Uint8List> buildPdf({
     required String qrJson,
-    required String boxIdShort,
+    required String boxTitle,
+    required String boxSubtitle,
     required List<PackingBoxLine> lines,
   }) async {
     final fontR = await _font('assets/fonts/NotoSans-Regular.ttf');
     final fontB = await _font('assets/fonts/NotoSans-Bold.ttf');
 
     final doc = pw.Document(
-      title: 'Kutija $boxIdShort',
+      title: boxTitle,
       author: 'Operonix Production',
       theme: pw.ThemeData.withFont(base: fontR, bold: fontB),
     );
@@ -38,12 +40,12 @@ class PackingBoxLabelPdf {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Text(
-                'Kutija — Stanica 1 (priprema)',
+                boxTitle,
                 style: pw.TextStyle(font: fontB, fontSize: 11),
               ),
               pw.SizedBox(height: 4),
               pw.Text(
-                'ID: $boxIdShort',
+                boxSubtitle,
                 style: pw.TextStyle(
                   font: fontR,
                   fontSize: 8,
@@ -133,12 +135,25 @@ class PackingBoxLabelPdf {
       stationKey: stationKey,
       classification: classification,
     );
-    final short = boxId.length > 8 ? boxId.substring(boxId.length - 8) : boxId;
+    final pseudoBox = PackingBoxRecord(
+      id: boxId,
+      companyId: companyId,
+      plantKey: plantKey,
+      stationKey: stationKey,
+      classification: classification,
+      lines: lines,
+      status: 'closed',
+      createdByUid: '',
+      createdAt: DateTime.now(),
+    );
+    final boxTitle = PackingBoxDisplayLabel.title(pseudoBox);
+    final boxSubtitle = PackingBoxDisplayLabel.subtitle(pseudoBox);
     await Printing.layoutPdf(
-      name: 'kutija_$short',
+      name: 'kutija_${lines.first.productCode}',
       onLayout: (_) => buildPdf(
         qrJson: qr,
-        boxIdShort: short,
+        boxTitle: boxTitle,
+        boxSubtitle: boxSubtitle,
         lines: lines,
       ),
     );

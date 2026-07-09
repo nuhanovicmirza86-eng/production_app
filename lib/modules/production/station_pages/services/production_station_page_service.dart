@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../models/production_station_config.dart';
 import '../models/production_station_page.dart';
 import '../models/station_page_gate_result.dart';
 import 'production_station_page_callable_service.dart';
@@ -16,6 +17,9 @@ class ProductionStationPageService {
 
   CollectionReference<Map<String, dynamic>> get _col =>
       _firestore.collection('production_station_pages');
+
+  CollectionReference<Map<String, dynamic>> get _configCol =>
+      _firestore.collection('production_station_configs');
 
   /// Stranice stanica za odabrani tenant i pogon.
   Stream<List<ProductionStationPage>> watchPages({
@@ -55,12 +59,58 @@ class ProductionStationPageService {
     await upsertPage(page: page);
   }
 
+  /// Kanonski config po slotu (`production_station_configs/{companyId}__{slot}`).
+  Future<ProductionStationConfig?> getConfigBySlot({
+    required String companyId,
+    required int stationSlot,
+  }) async {
+    final cid = companyId.trim();
+    if (cid.isEmpty || stationSlot < 1) return null;
+    final id = ProductionStationConfig.buildConfigId(
+      companyId: cid,
+      stationSlot: stationSlot,
+    );
+    final doc = await _configCol.doc(id).get();
+    if (!doc.exists) return null;
+    return ProductionStationConfig.fromMap({
+      'id': doc.id,
+      ...?doc.data(),
+    });
+  }
+
+  ProductionStationPage _legacyPageFromConfig(ProductionStationConfig config) {
+    return ProductionStationPage(
+      id: config.id,
+      companyId: config.companyId,
+      plantKey: config.assignedPlantKey,
+      stationSlot: config.stationSlot,
+      phase: config.phase,
+      displayName: config.displayName,
+      active: config.active,
+      provisionedByUid: config.id,
+      provisionedAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      notes: config.notes,
+      inboundWarehouseId: config.inboundWarehouseId,
+      outboundWarehouseId: config.outboundWarehouseId,
+    );
+  }
+
   /// Jedna stranica stanice (npr. magacin za prijem kutije po slotu).
+  /// Dual-read: `production_station_configs` pa legacy `production_station_pages`.
   Future<ProductionStationPage?> getPage({
     required String companyId,
     required String plantKey,
     required int stationSlot,
   }) async {
+    final config = await getConfigBySlot(
+      companyId: companyId,
+      stationSlot: stationSlot,
+    );
+    if (config != null) {
+      return _legacyPageFromConfig(config);
+    }
+
     final cid = companyId.trim();
     final pk = plantKey.trim();
     if (cid.isEmpty || pk.isEmpty || stationSlot < 1 || stationSlot > 3) {
@@ -109,6 +159,17 @@ class ProductionStationPageService {
 
     try {
       final slot = ProductionStationPage.stationSlotForPhase(ph);
+      final config = await getConfigBySlot(companyId: cid, stationSlot: slot);
+      if (config != null) {
+        if (!config.active) {
+          return StationPageGateResult.blocked(
+            'Ova stanica je onemogućena u konfiguraciji (neaktivna). '
+            'Admin može uključiti je u „Stanice proizvodnje“.',
+          );
+        }
+        return StationPageGateResult.ok(_legacyPageFromConfig(config));
+      }
+
       final id = ProductionStationPage.buildPageId(
         companyId: cid,
         plantKey: pk,
@@ -122,7 +183,7 @@ class ProductionStationPageService {
       if (!page.active) {
         return StationPageGateResult.blocked(
           'Ova stanica je onemogućena u konfiguraciji (neaktivna). '
-          'Admin može uključiti je u „Stranicama stanica“.',
+          'Admin može uključiti je u „Stanice proizvodnje“.',
         );
       }
       return StationPageGateResult.ok(page);

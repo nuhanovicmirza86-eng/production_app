@@ -21,15 +21,17 @@ import '../../work_centers/screens/work_centers_list_screen.dart';
 import '../../processes/screens/production_processes_list_screen.dart';
 import '../../../logistics/receipt/screens/station1_packed_boxes_logistics_screen.dart';
 import '../../../logistics/screens/logistics_hub_entry_screen.dart';
+import '../../packing/services/packing_box_service.dart';
 import '../../../sustainability/screens/carbon_footprint_screen.dart';
 import '../../production_orders/screens/production_orders_list_screen.dart';
 import '../../planning/screens/production_planning_home_screen.dart';
 import '../../tracking/models/production_operator_tracking_entry.dart';
 import '../../tracking/screens/production_operator_tracking_screen.dart';
 import '../../tracking/screens/production_operator_tracking_station_screen.dart';
-import '../../station_pages/screens/production_station_pages_admin_screen.dart';
+import '../../station_pages/screens/production_stations_admin_screen.dart';
 import '../../station_pages/widgets/station_page_active_gate.dart';
-import '../../tracking/screens/production_preparation_station_screen.dart';
+import '../../station_pages/screens/station1_operator_launch_screen.dart';
+import '../../station_pages/screens/station2_operator_launch_screen.dart';
 import '../../ai/screens/production_ai_hub_screen.dart';
 import '../../tracking/screens/production_reports_hub_screen.dart';
 import '../../issues/screens/production_problem_reporting_screen.dart';
@@ -173,6 +175,12 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         _role == 'logistics_manager';
   }
 
+  String _packedBoxesPendingNotice(int count) {
+    if (count == 1) return '1 nova kutija čeka prijem';
+    if (count >= 2 && count <= 4) return '$count nove kutije čekaju prijem';
+    return '$count novih kutija čeka prijem';
+  }
+
   /// Postavka lokalnog uređaja (stanica nakon prijave) — samo uloga Admin (tenant),
   /// ne Super admin niti druge uloge.
   bool _canConfigureStationDevice() {
@@ -205,7 +213,9 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             phase: phase,
             stationBuilder: (_) =>
                 phase == ProductionOperatorTrackingEntry.phasePreparation
-                ? ProductionPreparationStationScreen(companyData: companyData)
+                ? Station1OperatorLaunchScreen(companyData: companyData)
+                : phase == ProductionOperatorTrackingEntry.phaseFirstControl
+                ? Station2OperatorLaunchScreen(companyData: companyData)
                 : ProductionOperatorTrackingStationScreen(
                     companyData: companyData,
                     phase: phase,
@@ -316,10 +326,11 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         if (_canViewCard(ProductionDashboardCard.stationPages))
           _DashboardActionTile(
             icon: Icons.touch_app_outlined,
-            title: 'Stranice stanica',
-            subtitle: 'Definicija stanica 1–3 za terminal (tenant + pogon).',
+            title: 'Stanice proizvodnje',
+            subtitle:
+                'Konfiguracija proizvodnih i mašinskih stanica po kompaniji.',
             onTap: () => open(
-              ProductionStationPagesAdminScreen(companyData: companyData),
+              ProductionStationsAdminScreen(companyData: companyData),
             ),
           ),
         if (_canViewCard(ProductionDashboardCard.workCenters))
@@ -504,14 +515,25 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           onTap: () => open(LogisticsHubEntryScreen(companyData: companyData)),
         ),
       if (_canAccessCentralWarehouse())
-        _DashboardActionTile(
-          icon: Icons.move_to_inbox_outlined,
-          title: 'Upakovane kutije Stanica 1',
-          subtitle:
-              'Lista zatvorenih kutija i prijem u magacin skeniranjem QR-a.',
-          onTap: () => open(
-            Station1PackedBoxesLogisticsScreen(companyData: companyData),
+        StreamBuilder<List<PackingBoxRecord>>(
+          stream: PackingBoxService().watchClosedPendingReceipt(
+            companyId: _companyId,
+            plantKey: _plantKey,
           ),
+          builder: (context, snap) {
+            final count = snap.data?.length ?? 0;
+            return _DashboardActionTile(
+              icon: Icons.move_to_inbox_outlined,
+              title: 'Upakovane kutije Stanica 1',
+              subtitle:
+                  'Lista zatvorenih kutija i prijem u magacin skeniranjem QR-a.',
+              noticeText:
+                  count > 0 ? _packedBoxesPendingNotice(count) : null,
+              onTap: () => open(
+                Station1PackedBoxesLogisticsScreen(companyData: companyData),
+              ),
+            );
+          },
         ),
     ];
 
@@ -982,8 +1004,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           builder: (_) => StationPageActiveGate(
             companyData: cd,
             phase: ProductionOperatorTrackingEntry.phasePreparation,
-            stationBuilder: (_) =>
-                ProductionPreparationStationScreen(companyData: cd),
+            stationBuilder: (_) => Station1OperatorLaunchScreen(companyData: cd),
           ),
           destination: const NavigationDestination(
             icon: Icon(Icons.fullscreen_outlined),
@@ -995,10 +1016,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           builder: (_) => StationPageActiveGate(
             companyData: cd,
             phase: ProductionOperatorTrackingEntry.phaseFirstControl,
-            stationBuilder: (_) => ProductionOperatorTrackingStationScreen(
-              companyData: cd,
-              phase: ProductionOperatorTrackingEntry.phaseFirstControl,
-            ),
+            stationBuilder: (_) => Station2OperatorLaunchScreen(companyData: cd),
           ),
           destination: const NavigationDestination(
             icon: Icon(Icons.fact_check_outlined),
@@ -1920,12 +1938,14 @@ class _DashboardActionTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+  final String? noticeText;
   final VoidCallback onTap;
 
   const _DashboardActionTile({
     required this.icon,
     required this.title,
     required this.subtitle,
+    this.noticeText,
     required this.onTap,
   });
 
@@ -1980,6 +2000,48 @@ class _DashboardActionTile extends StatelessWidget {
                       subtitle,
                       style: const TextStyle(color: Colors.black54),
                     ),
+                    if (noticeText != null && noticeText!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: kOperonixProductionBrandGreen.withValues(
+                            alpha: 0.12,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: kOperonixProductionBrandGreen.withValues(
+                              alpha: 0.35,
+                            ),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.notifications_active_outlined,
+                              size: 18,
+                              color: kOperonixProductionBrandGreen,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                noticeText!,
+                                style: TextStyle(
+                                  color: kOperonixProductionBrandGreen
+                                      .withValues(alpha: 0.95),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

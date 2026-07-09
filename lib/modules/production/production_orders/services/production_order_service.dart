@@ -296,6 +296,26 @@ class ProductionOrderService {
     return ProductionOrderModel.fromMap(doc.id, data);
   }
 
+  Stream<ProductionOrderModel?> watchById({
+    required String id,
+    required String companyId,
+    required String plantKey,
+  }) {
+    final oid = id.trim();
+    final cid = companyId.trim();
+    final pk = plantKey.trim();
+    if (oid.isEmpty || cid.isEmpty || pk.isEmpty) {
+      return Stream.value(null);
+    }
+    return _orders.doc(oid).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      final data = doc.data();
+      if (data == null) return null;
+      if (data['companyId'] != cid || data['plantKey'] != pk) return null;
+      return ProductionOrderModel.fromMap(doc.id, data);
+    });
+  }
+
   /// Učitavanje više naloga paralelno (parovi tenant provjere kao kod [getById]; pogrešan tenant = preskače se).
   Future<Map<String, ProductionOrderModel>> getByIds({
     required String companyId,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../production/packing/packing_box_display_label.dart';
 import '../../../production/packing/services/packing_box_service.dart';
 import '../../../production/production_orders/services/production_order_service.dart';
 import '../../../production/station_pages/services/production_station_page_service.dart';
@@ -87,7 +88,7 @@ class _PackingBoxReceiptScreenState extends State<PackingBoxReceiptScreen> {
         if (whId == null || whId.isEmpty) {
           err =
               'Admin nije postavio izlazni magacin za ovu stanicu '
-              '(Stranice stanica → izlazni magacin nakon stanice).';
+              '(Stanice proizvodnje → izlazni magacin nakon stanice).';
         } else {
           final warehouses = await _stockService.listActiveWarehouses(
             companyId: _companyId,
@@ -162,7 +163,9 @@ class _PackingBoxReceiptScreenState extends State<PackingBoxReceiptScreen> {
             toWarehouseId: whId,
             order: order,
             labelFields: labelFields,
-            extraNote: extra.isEmpty ? null : '$extra · kutija ${widget.boxId}',
+            extraNote: extra.isEmpty
+                ? null
+                : '$extra · ${PackingBoxDisplayLabel.title(box)}',
           );
           await _inventoryCallable.confirmInventoryMovement(
             companyId: _companyId,
@@ -235,14 +238,21 @@ class _PackingBoxReceiptScreenState extends State<PackingBoxReceiptScreen> {
                 ],
                 if (box != null) ...[
                   Text(
-                    'Kutija ${widget.boxId.length > 8 ? widget.boxId.substring(widget.boxId.length - 8) : widget.boxId}',
+                    PackingBoxDisplayLabel.title(box),
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  if (PackingBoxDisplayLabel.productSummary(box) != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      PackingBoxDisplayLabel.productSummary(box)!,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
                   const SizedBox(height: 8),
-                  Text('Stavki: ${box.lines.length} · ${box.classification}'),
+                  Text(PackingBoxDisplayLabel.subtitle(box)),
                   const SizedBox(height: 16),
                   const Text(
                     'Stavke',
@@ -254,7 +264,8 @@ class _PackingBoxReceiptScreenState extends State<PackingBoxReceiptScreen> {
                       dense: true,
                       title: Text('${l.productCode} · ${l.productName}'),
                       subtitle: Text(
-                        '${l.qtyGood} ${l.unit} · PN: ${l.productionOrderCode ?? "—"}',
+                        '${PackingBoxDisplayLabel.formatQty(l.qtyGood)} ${l.unit}'
+                        '${l.productionOrderCode?.trim().isNotEmpty == true ? ' · Nalog: ${l.productionOrderCode}' : ''}',
                       ),
                     ),
                   ),
@@ -271,16 +282,13 @@ class _PackingBoxReceiptScreenState extends State<PackingBoxReceiptScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            _warehouseLabel ??
-                                (_warehouseId != null && _warehouseId!.isNotEmpty
-                                    ? _warehouseId!
-                                    : '—'),
+                            _warehouseLabel ?? 'Nije postavljen',
                             style: Theme.of(context).textTheme.bodyLarge,
                           ),
                           const SizedBox(height: 6),
                           Text(
                             'Izlazni magacin za stanicu ${box.stationSlot} (postavlja Admin '
-                            'u „Stranice stanica“); logistika ne bira ručno.',
+                            'u „Stanice proizvodnje“); logistika ne bira ručno.',
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                   color: Theme.of(context)
                                       .colorScheme
