@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/format/ba_formatted_date.dart';
 import '../../station_pages/models/production_station_config.dart';
@@ -67,6 +68,20 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
       (widget.companyData['companyId'] ?? '').toString().trim();
 
   String get _plantKey => widget.stationConfig.assignedPlantKey.trim();
+
+  String get _userPlantKey =>
+      (widget.companyData['plantKey'] ?? '').toString().trim();
+
+  String get _userRole =>
+      ProductionAccessHelper.normalizeRole(widget.companyData['role']);
+
+  bool get _plantAccessOk {
+    if (ProductionAccessHelper.isCompanyWideContextRole(_userRole)) {
+      return true;
+    }
+    if (_userPlantKey.isEmpty || _plantKey.isEmpty) return false;
+    return _userPlantKey == _plantKey;
+  }
 
   bool get _controlledInputEnabled =>
       widget.stationConfig.controlledInputEnabled;
@@ -868,7 +883,41 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
     );
   }
 
+  Widget _buildPlantReadOnlyBanner() {
+    final label = _plantDisplayLabel.isEmpty ? _plantKey : _plantDisplayLabel;
+    if (label.trim().isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Pogon:',
+            style: TextStyle(fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(label)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlantAccessBlocked() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          'Ova evidencija pripada drugom pogonu.',
+          style: TextStyle(color: Theme.of(context).colorScheme.error),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
   Widget _buildNoSessionBody() {
+    if (!_plantAccessOk) return _buildPlantAccessBlocked();
+
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
@@ -880,11 +929,8 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
               style: Theme.of(context).textTheme.headlineSmall,
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
-            Text(
-              _plantDisplayLabel.isEmpty ? _plantKey : _plantDisplayLabel,
-              textAlign: TextAlign.center,
-            ),
+            const SizedBox(height: 12),
+            _buildPlantReadOnlyBanner(),
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: _busy || _masterLoading ? null : _startSession,
@@ -898,12 +944,15 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
   }
 
   Widget _buildActiveSessionBody(ProductionStationWorkSession session) {
+    if (!_plantAccessOk) return _buildPlantAccessBlocked();
+
     final formEnabled = session.isActive;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _buildPlantReadOnlyBanner(),
           if (_masterError != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),

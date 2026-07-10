@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/access/production_access_helper.dart';
 import '../../station_pages/models/production_station_config.dart';
 import '../../station_pages/models/production_station_profile_catalog_entry.dart';
 import '../../station_pages/screens/production_profile_station_launch_screen.dart';
@@ -30,6 +31,22 @@ class _ProductionProfileStationsHubScreenState
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
+
+  String get _userPlantKey =>
+      (widget.companyData['plantKey'] ?? '').toString().trim();
+
+  String get _userRole =>
+      ProductionAccessHelper.normalizeRole(widget.companyData['role']);
+
+  bool get _shouldFilterByUserPlant =>
+      !ProductionAccessHelper.isCompanyWideContextRole(_userRole);
+
+  bool _configVisibleToUser(ProductionStationConfig config) {
+    if (!_shouldFilterByUserPlant) return true;
+    final assigned = config.assignedPlantKey.trim();
+    if (assigned.isEmpty) return false;
+    return assigned == _userPlantKey;
+  }
 
   @override
   void initState() {
@@ -62,6 +79,7 @@ class _ProductionProfileStationsHubScreenState
 
       for (final config in configsResult.configs) {
         if (!config.active) continue;
+        if (!_configVisibleToUser(config)) continue;
         if (config.legacyOperatorNavSlot != null) continue;
         if (config.processProfileType != 'chemical_dosing') continue;
 
@@ -169,7 +187,7 @@ class _ProductionProfileStationsHubScreenState
             leading: const Icon(Icons.science_outlined),
             title: Text(config.title),
             subtitle: Text(
-              '${profile.displayName} · ${config.assignedPlantKey.isEmpty ? '—' : config.assignedPlantKey}',
+              '${profile.displayName} · Pogon: ${config.assignedPlantKey.isEmpty ? '—' : config.assignedPlantKey}',
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _openStation(config, profile),
