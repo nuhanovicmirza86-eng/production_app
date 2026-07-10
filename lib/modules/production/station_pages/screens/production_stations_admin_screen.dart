@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:production_app/core/company_plant_display_name.dart';
 
@@ -299,8 +301,11 @@ class _ProductionStationsAdminScreenState
 
             return AlertDialog(
               title: Text(existing == null ? 'Nova stanica' : 'Uredi stanicu'),
-              content: SizedBox(
-                width: 520,
+              content: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: math.min(520, MediaQuery.sizeOf(ctx).width - 40),
+                  maxHeight: MediaQuery.sizeOf(ctx).height * 0.72,
+                ),
                 child: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -324,13 +329,17 @@ class _ProductionStationsAdminScreenState
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         key: ValueKey(selectedType),
+                        isExpanded: true,
                         initialValue: selectedType,
                         decoration: const InputDecoration(labelText: 'Tip stanice'),
                         items: ProductionStationConfig.stationTypes
                             .map(
                               (t) => DropdownMenuItem(
                                 value: t,
-                                child: Text(ProductionStationConfig.stationTypeLabel(t)),
+                                child: Text(
+                                  ProductionStationConfig.stationTypeLabel(t),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             )
                             .toList(),
@@ -348,6 +357,7 @@ class _ProductionStationsAdminScreenState
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
                           key: ValueKey(selectedProfile),
+                          isExpanded: true,
                           initialValue: profileOptions
                                   .any((p) => p.profileKey == selectedProfile)
                               ? selectedProfile
@@ -359,12 +369,23 @@ class _ProductionStationsAdminScreenState
                             helperText:
                                 'Spremno = puni obrazac u platformi; U pripremi = skeleton profil.',
                           ),
+                          selectedItemBuilder: (context) => profileOptions
+                              .map(
+                                (p) => Text(
+                                  p.displayName,
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              )
+                              .toList(),
                           items: profileOptions
                               .map(
                                 (p) => DropdownMenuItem(
                                   value: p.profileKey,
                                   child: Text(
                                     '${p.displayName} (${p.definitionStatusLabelText})',
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 2,
                                   ),
                                 ),
                               )
@@ -420,6 +441,7 @@ class _ProductionStationsAdminScreenState
                             const SizedBox(height: 8),
                             DropdownButtonFormField<String>(
                               key: ValueKey(controlledInputMode),
+                              isExpanded: true,
                               initialValue: controlledInputMode == 'off'
                                   ? 'strict'
                                   : controlledInputMode,
@@ -428,6 +450,18 @@ class _ProductionStationsAdminScreenState
                                 helperText:
                                     'Strogo odbija nevažeće; Upozorenje zapisuje flag na sesiji.',
                               ),
+                              selectedItemBuilder: (context) => const [
+                                Text(
+                                  'Strogo',
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                                Text(
+                                  'Upozorenje',
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ],
                               items: const [
                                 DropdownMenuItem(
                                   value: 'strict',
@@ -523,6 +557,7 @@ class _ProductionStationsAdminScreenState
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         key: ValueKey(assignedPlantKey),
+                        isExpanded: true,
                         initialValue: assignedPlantKey,
                         decoration: const InputDecoration(labelText: 'Pogon'),
                         items: plants
@@ -544,6 +579,7 @@ class _ProductionStationsAdminScreenState
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         key: ValueKey('production_phase_$selectedPhaseKey'),
+                        isExpanded: true,
                         initialValue: ProductionStationConfig.productionPhaseKeys
                                 .contains(selectedPhaseKey)
                             ? selectedPhaseKey
@@ -568,6 +604,7 @@ class _ProductionStationsAdminScreenState
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         key: ValueKey('operational_phase_$selectedPhase'),
+                        isExpanded: true,
                         initialValue: selectedPhase,
                         decoration: const InputDecoration(
                           labelText: 'Operativna faza (legacy navigacija)',
@@ -650,6 +687,7 @@ class _ProductionStationsAdminScreenState
                       const Divider(height: 24),
                       DropdownButtonFormField<int?>(
                         key: ValueKey(legacyNavSlot),
+                        isExpanded: true,
                         initialValue: legacyNavSlot,
                         decoration: const InputDecoration(
                           labelText: 'Legacy navigacija (Stanica 1/2/3)',
