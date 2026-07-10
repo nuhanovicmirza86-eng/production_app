@@ -35,6 +35,31 @@ class ControlledInputEntityOption {
   }
 }
 
+/// Radna kada s procesnim područjem (master podatak).
+class ControlledInputWorkBathOption extends ControlledInputEntityOption {
+  const ControlledInputWorkBathOption({
+    required super.id,
+    required super.displayName,
+    super.code,
+    super.active = true,
+    this.processArea,
+  });
+
+  final String? processArea;
+
+  factory ControlledInputWorkBathOption.fromMap(Map<String, dynamic> data) {
+    final base = ControlledInputEntityOption.fromMap(data);
+    final processArea = (data['processArea'] ?? '').toString().trim();
+    return ControlledInputWorkBathOption(
+      id: base.id,
+      displayName: base.displayName,
+      code: base.code,
+      active: base.active,
+      processArea: processArea.isEmpty ? null : processArea,
+    );
+  }
+}
+
 /// Hemikalija s master allowedUnits (kontrolisan unos / unit dropdown).
 class ControlledInputChemicalOption extends ControlledInputEntityOption {
   const ControlledInputChemicalOption({
@@ -44,10 +69,12 @@ class ControlledInputChemicalOption extends ControlledInputEntityOption {
     super.active = true,
     this.allowedUnits = const [],
     this.defaultUnit,
+    this.concentrationDefault,
   });
 
   final List<String> allowedUnits;
   final String? defaultUnit;
+  final num? concentrationDefault;
 
   factory ControlledInputChemicalOption.fromMap(Map<String, dynamic> data) {
     final base = ControlledInputEntityOption.fromMap(data);
@@ -60,6 +87,13 @@ class ControlledInputChemicalOption extends ControlledInputEntityOption {
       }
     }
     final defaultUnit = (data['defaultUnit'] ?? '').toString().trim();
+    final concRaw = data['concentrationDefault'];
+    num? concentrationDefault;
+    if (concRaw is num) {
+      concentrationDefault = concRaw;
+    } else if (concRaw != null && concRaw.toString().trim().isNotEmpty) {
+      concentrationDefault = num.tryParse(concRaw.toString());
+    }
     return ControlledInputChemicalOption(
       id: base.id,
       displayName: base.displayName,
@@ -67,6 +101,7 @@ class ControlledInputChemicalOption extends ControlledInputEntityOption {
       active: base.active,
       allowedUnits: units,
       defaultUnit: defaultUnit.isEmpty ? null : defaultUnit,
+      concentrationDefault: concentrationDefault,
     );
   }
 }
@@ -89,7 +124,7 @@ class ProductionControlledInputMasterCallableService {
 
   final FirebaseFunctions _functions;
 
-  Future<List<ControlledInputEntityOption>> listProcessWorkBaths({
+  Future<List<ControlledInputWorkBathOption>> listProcessWorkBaths({
     required String companyId,
     required String plantKey,
     bool activeOnly = true,
@@ -105,7 +140,7 @@ class ProductionControlledInputMasterCallableService {
     if (data['success'] != true) {
       throw Exception('Učitavanje radnih kada nije uspjelo.');
     }
-    return _parseEntityList(data['workBaths']);
+    return _parseWorkBathList(data['workBaths']);
   }
 
   Future<List<ControlledInputChemicalOption>> listChemicals({
@@ -195,6 +230,22 @@ class ProductionControlledInputMasterCallableService {
           .toList(growable: false),
       mappingAllowedUnitsByChemicalId: mappingUnits,
     );
+  }
+
+  List<ControlledInputWorkBathOption> _parseWorkBathList(dynamic raw) {
+    if (raw is! List) return const [];
+    final out = <ControlledInputWorkBathOption>[];
+    for (final item in raw) {
+      if (item is Map) {
+        out.add(
+          ControlledInputWorkBathOption.fromMap(
+            Map<String, dynamic>.from(item),
+          ),
+        );
+      }
+    }
+    out.sort((a, b) => a.dropdownLabel.compareTo(b.dropdownLabel));
+    return out;
   }
 
   List<ControlledInputEntityOption> _parseEntityList(dynamic raw) {

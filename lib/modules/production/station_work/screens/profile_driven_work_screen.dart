@@ -45,7 +45,7 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
   final Map<String, DateTime?> _measuredAtByKey = {};
 
   List<ProductionStationProfileField> _fields = const [];
-  List<ControlledInputEntityOption> _workBaths = const [];
+  List<ControlledInputWorkBathOption> _workBaths = const [];
   List<ControlledInputChemicalOption> _chemicals = const [];
   Map<String, List<String>> _mappingAllowedUnitsByChemicalId = const {};
 
@@ -266,6 +266,55 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
       if (c.id == chemicalId) return c;
     }
     return null;
+  }
+
+  ControlledInputWorkBathOption? _selectedWorkBath() {
+    final workBathId = (_entitySelections['workBathId'] ?? '').trim();
+    if (workBathId.isEmpty) return null;
+    for (final b in _workBaths) {
+      if (b.id == workBathId) return b;
+    }
+    return null;
+  }
+
+  String _formatConcentrationPreview(num? value) {
+    if (value == null) return 'Nije definisano';
+    return '$value% prema katalogu';
+  }
+
+  String _previewProcessAreaLabel() {
+    final area = (_selectedWorkBath()?.processArea ?? '').trim();
+    return area.isEmpty ? 'Nije definisano' : area;
+  }
+
+  String _previewConcentrationLabel() {
+    return _formatConcentrationPreview(_selectedChemical()?.concentrationDefault);
+  }
+
+  Widget? _infoIcon(String? tooltip) {
+    final text = (tooltip ?? '').trim();
+    if (text.isEmpty) return null;
+    return Tooltip(
+      message: text,
+      child: Icon(
+        Icons.info_outline,
+        size: 20,
+        color: Theme.of(context).colorScheme.primary,
+      ),
+    );
+  }
+
+  InputDecoration _fieldDecoration(
+    ProductionStationProfileField field, {
+    String? helperText,
+    Widget? suffix,
+  }) {
+    return InputDecoration(
+      labelText: field.required ? '${field.label} *' : field.label,
+      border: const OutlineInputBorder(),
+      helperText: helperText ?? field.helperText,
+      suffixIcon: suffix ?? _infoIcon(field.helperText),
+    );
   }
 
   List<String> _resolveUnitOptions() {
@@ -501,9 +550,8 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
         (!dependsOnBath || bathSelected || field.key == 'workBathId');
 
     return InputDecorator(
-      decoration: InputDecoration(
-        labelText: field.required ? '${field.label} *' : field.label,
-        border: const OutlineInputBorder(),
+      decoration: _fieldDecoration(
+        field,
         helperText: field.helperText ??
             (dependsOnBath && !bathSelected && field.key == 'chemicalId'
                 ? 'Prvo odaberite radnu kadu.'
@@ -561,10 +609,7 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
     if (field.type == 'enum') {
       final options = _enumOptionsFor(field);
       return InputDecorator(
-        decoration: InputDecoration(
-          labelText: field.required ? '${field.label} *' : field.label,
-          border: const OutlineInputBorder(),
-        ),
+        decoration: _fieldDecoration(field),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<String>(
             isExpanded: true,
@@ -589,7 +634,14 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
       final dt = _measuredAtByKey[field.key];
       return ListTile(
         contentPadding: EdgeInsets.zero,
-        title: Text(field.required ? '${field.label} *' : field.label),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(field.required ? '${field.label} *' : field.label),
+            ),
+            if (_infoIcon(field.helperText) != null) _infoIcon(field.helperText)!,
+          ],
+        ),
         subtitle: Text(
           dt == null
               ? 'Nije uneseno (backend popunjava pri završetku)'
@@ -637,14 +689,88 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
             : TextInputType.text,
         maxLines: field.type == 'text' ? 3 : 1,
         maxLength: field.maxLength,
-        decoration: InputDecoration(
-          labelText: field.required ? '${field.label} *' : field.label,
-          border: const OutlineInputBorder(),
-          helperText: field.helperText,
-        ),
+        decoration: _fieldDecoration(field),
       );
     }
     return const SizedBox.shrink();
+  }
+
+  Widget _buildMasterSnapshotPreview() {
+    final bathSelected = (_entitySelections['workBathId'] ?? '').trim().isNotEmpty;
+    if (!bathSelected) return const SizedBox.shrink();
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Podaci iz master kataloga',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 12),
+            _previewInfoRow('Procesno područje', _previewProcessAreaLabel()),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'Koncentracija',
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                ),
+                Tooltip(
+                  message:
+                      'Koncentracija se ne unosi ručno. Ako je definisana u katalogu hemikalije, sistem je prikazuje automatski.',
+                  child: Icon(
+                    Icons.info_outline,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Text(_previewConcentrationLabel()),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _previewInfoRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 2,
+          child: Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+        ),
+        Expanded(
+          flex: 3,
+          child: Text(value),
+        ),
+      ],
+    );
+  }
+
+  bool _showUndefinedSnapshot(String key) =>
+      key == 'concentrationSnapshot' || key == 'processAreaNameSnapshot';
+
+  String _snapshotDisplayValue(String key, String? value) {
+    final trimmed = (value ?? '').trim();
+    if (trimmed.isNotEmpty) return trimmed;
+    if (_showUndefinedSnapshot(key)) return 'Nije definisano';
+    return '';
   }
 
   Widget _buildReadOnlyAuditSection(ProductionStationWorkSession session) {
@@ -703,7 +829,8 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
             const SizedBox(height: 12),
             ...readOnlyFields.map((field) {
               final value = _readOnlyFieldValue(field, session);
-              if (value == null || value.trim().isEmpty) {
+              final display = _snapshotDisplayValue(field.key, value);
+              if (display.isEmpty) {
                 return const SizedBox.shrink();
               }
               return Padding(
@@ -713,14 +840,23 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
                   children: [
                     Expanded(
                       flex: 2,
-                      child: Text(
-                        field.label,
-                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              field.label,
+                              style: const TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                          if (field.helperText != null &&
+                              field.helperText!.trim().isNotEmpty)
+                            _infoIcon(field.helperText)!,
+                        ],
                       ),
                     ),
                     Expanded(
                       flex: 3,
-                      child: Text(value),
+                      child: Text(display),
                     ),
                   ],
                 ),
@@ -793,6 +929,7 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
               child: _buildOperatorField(field, enabled: formEnabled),
             ),
           ),
+          _buildMasterSnapshotPreview(),
           _buildReadOnlyAuditSection(session),
           const SizedBox(height: 24),
           if (session.isActive) ...[
