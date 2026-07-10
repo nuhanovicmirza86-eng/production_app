@@ -543,7 +543,7 @@ class _ProductionStationsAdminScreenState
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        key: ValueKey(selectedPhaseKey),
+                        key: ValueKey('production_phase_$selectedPhaseKey'),
                         initialValue: ProductionStationConfig.productionPhaseKeys
                                 .contains(selectedPhaseKey)
                             ? selectedPhaseKey
@@ -567,7 +567,7 @@ class _ProductionStationsAdminScreenState
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        key: ValueKey(selectedPhase),
+                        key: ValueKey('operational_phase_$selectedPhase'),
                         initialValue: selectedPhase,
                         decoration: const InputDecoration(
                           labelText: 'Operativna faza (legacy navigacija)',
