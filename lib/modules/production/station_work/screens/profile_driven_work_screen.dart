@@ -41,6 +41,7 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
   final _masterCallables = ProductionControlledInputMasterCallableService();
 
   final Map<String, TextEditingController> _textControllers = {};
+  final Map<String, num?> _numberFieldValues = {};
   final Map<String, String?> _entitySelections = {};
   final Map<String, String?> _enumSelections = {};
   final Map<String, DateTime?> _measuredAtByKey = {};
@@ -116,15 +117,50 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
   }
 
   void _initControllers() {
+    _ensureFieldControllers();
+  }
+
+  /// Nova evidencija — sva operator-editable polja prazna (ne nastavak sesije).
+  void _resetOperatorFormForNewEvidence() {
     for (final field in _fields) {
-      if (_isTextLike(field.type)) {
-        _textControllers[field.key] = TextEditingController();
+      if (field.isEntitySelect) {
+        _entitySelections[field.key] = null;
+      } else if (field.type == 'enum') {
+        _enumSelections[field.key] = null;
+      } else if (field.type == 'number' || _isTextLike(field.type)) {
+        _textControllerFor(field.key).clear();
+      } else if (field.type == 'datetime') {
+        _measuredAtByKey[field.key] = null;
       }
     }
-    final defaultUnit = widget.profile.defaultUnit;
-    if (defaultUnit.isNotEmpty) {
-      _enumSelections['unit'] = defaultUnit;
+    _numberFieldValues.clear();
+    _lastControlledInputWarning = null;
+    if (_controlledInputEnabled) {
+      _chemicals = const [];
+      _mappingAllowedUnitsByChemicalId = const {};
     }
+  }
+
+  TextEditingController _textControllerFor(String key) {
+    return _textControllers.putIfAbsent(key, TextEditingController.new);
+  }
+
+  void _ensureFieldControllers() {
+    for (final field in _fields) {
+      if (field.type == 'number' || _isTextLike(field.type)) {
+        _textControllerFor(field.key);
+      }
+    }
+  }
+
+  num? _parseNumberFieldText(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return null;
+    return double.tryParse(trimmed.replaceAll(',', '.'));
+  }
+
+  void _rememberNumberFieldValue(String key, String text) {
+    _numberFieldValues[key] = _parseNumberFieldText(text);
   }
 
   Future<void> _loadPlantDisplayLabel() async {
@@ -376,17 +412,20 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
         _enumSelections[field.key] =
             raw == null ? null : raw.toString().trim();
       } else if (field.type == 'number') {
-        final ctrl = _textControllers[field.key];
-        if (ctrl != null) {
-          ctrl.text = raw == null ? '' : raw.toString();
+        final ctrl = _textControllerFor(field.key);
+        if (raw == null) {
+          ctrl.clear();
+          _numberFieldValues.remove(field.key);
+        } else {
+          final text = raw.toString();
+          ctrl.text = text;
+          _rememberNumberFieldValue(field.key, text);
         }
       } else if (field.type == 'datetime') {
         _measuredAtByKey[field.key] = _parseDateTime(raw);
       } else if (_isTextLike(field.type)) {
-        final ctrl = _textControllers[field.key];
-        if (ctrl != null) {
-          ctrl.text = raw == null ? '' : raw.toString();
-        }
+        final ctrl = _textControllerFor(field.key);
+        ctrl.text = raw == null ? '' : raw.toString();
       }
     }
     _lastControlledInputWarning = session.controlledInputWarning;
@@ -433,6 +472,9 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
   }
 
   Map<String, dynamic> _collectFieldValues() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    _ensureFieldControllers();
+
     final out = <String, dynamic>{};
     for (final field in _fields) {
       if (field.isEntitySelect) {
@@ -442,15 +484,15 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
         final v = _enumSelections[field.key];
         if (v != null && v.isNotEmpty) out[field.key] = v;
       } else if (field.type == 'number') {
-        final text = _textControllers[field.key]?.text.trim() ?? '';
-        if (text.isEmpty) continue;
-        final n = double.tryParse(text.replaceAll(',', '.'));
+        final text = _textControllerFor(field.key).text;
+        _rememberNumberFieldValue(field.key, text);
+        final n = _numberFieldValues[field.key] ?? _parseNumberFieldText(text);
         if (n != null) out[field.key] = n;
       } else if (field.type == 'datetime') {
         final dt = _measuredAtByKey[field.key];
         if (dt != null) out[field.key] = dt.toUtc().toIso8601String();
       } else if (_isTextLike(field.type)) {
-        final text = _textControllers[field.key]?.text.trim() ?? '';
+        final text = _textControllerFor(field.key).text.trim();
         if (text.isNotEmpty) out[field.key] = text;
       }
     }
@@ -459,7 +501,11 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
 
   Future<void> _startSession() async {
     await _runBusy(() async {
-      setState(() => _closedSession = null);
+      _resetOperatorFormForNewEvidence();
+      setState(() {
+        _closedSession = null;
+        _hydratedSessionId = null;
+      });
       await _sessionCallables.startProductionStationWorkSession(
         companyId: _companyId,
         stationSlot: widget.stationConfig.stationSlot,
@@ -509,6 +555,17 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
     if (ok != true || !mounted) return;
 
     final values = _collectFieldValues();
+    for (final field in _fields) {
+      if (!field.required) continue;
+      final value = values[field.key];
+      if (value == null || (value is String && value.trim().isEmpty)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Polje ${field.label} je obavezno.')),
+        );
+        return;
+      }
+    }
+
     await _runBusy(() async {
       await _sessionCallables.setProfileFieldValues(
         companyId: _companyId,
@@ -695,7 +752,7 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
       );
     }
     if (field.type == 'number' || _isTextLike(field.type)) {
-      final ctrl = _textControllers[field.key];
+      final ctrl = _textControllerFor(field.key);
       return TextField(
         controller: ctrl,
         enabled: enabled && !_busy,
@@ -705,6 +762,9 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
         maxLines: field.type == 'text' ? 3 : 1,
         maxLength: field.maxLength,
         decoration: _fieldDecoration(field),
+        onChanged: field.type == 'number'
+            ? (value) => _rememberNumberFieldValue(field.key, value)
+            : null,
       );
     }
     return const SizedBox.shrink();
@@ -1033,7 +1093,9 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
           }
 
           final session = snap.data ?? _closedSession;
-          if (session != null && session.id != _hydratedSessionId) {
+          if (session != null &&
+              session.id != _hydratedSessionId &&
+              session.isActive) {
             _hydratedSessionId = session.id;
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted) return;
