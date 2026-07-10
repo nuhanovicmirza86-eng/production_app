@@ -82,16 +82,6 @@ class WorkBathFilteredChemicalsResult {
   final Map<String, List<String>> mappingAllowedUnitsByChemicalId;
 }
 
-/// Prikaz jedinice u chemical_dosing operator formi.
-String chemicalDosingUnitDropdownLabel(String unit) {
-  switch (unit.trim().toLowerCase()) {
-    case 'ml':
-      return 'ml — mililitar';
-    default:
-      return unit;
-  }
-}
-
 class ProductionControlledInputMasterCallableService {
   ProductionControlledInputMasterCallableService({FirebaseFunctions? functions})
     : _functions =
