@@ -224,6 +224,7 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
         _mappingAllowedUnitsByChemicalId = const {};
       });
       _applyUnitDefaultsForSelection();
+      if (mounted) setState(() {});
     } catch (e) {
       if (!mounted) return;
       setState(() => _masterError = e);
@@ -261,6 +262,7 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
         _mappingAllowedUnitsByChemicalId = mappingUnits;
       });
       _applyUnitDefaultsForSelection();
+      if (mounted) setState(() {});
     } catch (e) {
       if (!mounted) return;
       setState(() => _masterError = e);
