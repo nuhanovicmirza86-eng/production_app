@@ -62,6 +62,7 @@ class _ProductionProfileStationsHubScreenState
     try {
       final configsFuture = _configCallables.listProductionStationConfigs(
         companyId: _companyId,
+        operatorRuntimeOnly: true,
       );
       final profilesFuture = _configCallables.listProductionStationProfiles(
         companyId: _companyId,
@@ -80,6 +81,8 @@ class _ProductionProfileStationsHubScreenState
       for (final config in configsResult.configs) {
         if (!config.active) continue;
         if (!_configVisibleToUser(config)) continue;
+        if (!config.runtimeVisible) continue;
+        if (!config.isRuntimeVisibleToRole(_userRole)) continue;
         if (config.legacyOperatorNavSlot != null) continue;
         if (config.processProfileType != 'chemical_dosing') continue;
 

@@ -1,3 +1,5 @@
+import 'package:production_app/core/access/production_access_helper.dart';
+
 /// Kanonski model stanice — `production_station_configs/{companyId}__{stationSlot}`.
 class ProductionStationConfig {
   static const String stationTypeProduction = 'production_station';
@@ -23,6 +25,10 @@ class ProductionStationConfig {
     'process_log',
     'rework_and_painting',
   ];
+
+  /// Uloge koje Admin može dodijeliti operativnoj evidenciji (runtimeAllowedRoles).
+  static List<String> get runtimeAssignableRoles =>
+      ProductionAccessHelper.profileStationRuntimeAssignableRoles;
 
   static const List<String> controlledInputModes = [
     'off',
@@ -80,6 +86,8 @@ class ProductionStationConfig {
   final bool controlledInputEnabled;
   final String controlledInputMode;
   final String? controlledInputScope;
+  final bool runtimeVisible;
+  final List<String> runtimeAllowedRoles;
 
   const ProductionStationConfig({
     required this.id,
@@ -117,6 +125,8 @@ class ProductionStationConfig {
     this.controlledInputEnabled = false,
     this.controlledInputMode = 'off',
     this.controlledInputScope,
+    this.runtimeVisible = false,
+    this.runtimeAllowedRoles = const [],
   });
 
   static String buildConfigId({
@@ -161,6 +171,20 @@ class ProductionStationConfig {
       default:
         return scope ?? '—';
     }
+  }
+
+  bool get supportsRuntimeEvidenceProfile =>
+      evidenceProfileTypes.contains(processProfileType.trim());
+
+  bool isRuntimeVisibleToRole(String roleRaw) {
+    final role = ProductionAccessHelper.normalizeRole(roleRaw);
+    if (ProductionAccessHelper.isAdminRole(role) ||
+        role == ProductionAccessHelper.roleSuperAdmin) {
+      return true;
+    }
+    if (!active || !runtimeVisible) return false;
+    if (runtimeAllowedRoles.isEmpty) return false;
+    return runtimeAllowedRoles.contains(role);
   }
 
   static ProductionStationConfig fromMap(Map<String, dynamic> data) {
@@ -232,7 +256,20 @@ class ProductionStationConfig {
       controlledInputEnabled: data['controlledInputEnabled'] == true,
       controlledInputMode: _controlledInputModeFromMap(data['controlledInputMode']),
       controlledInputScope: _optString(data['controlledInputScope']),
+      runtimeVisible: data['runtimeVisible'] == true,
+      runtimeAllowedRoles: _parseRuntimeAllowedRoles(data['runtimeAllowedRoles']),
     );
+  }
+
+  static List<String> _parseRuntimeAllowedRoles(dynamic raw) {
+    if (raw is! List) return const [];
+    final out = <String>[];
+    for (final item in raw) {
+      final role = ProductionAccessHelper.normalizeRole(item);
+      if (role.isEmpty || out.contains(role)) continue;
+      out.add(role);
+    }
+    return out;
   }
 
   static String _controlledInputModeFromMap(dynamic raw) {
@@ -284,8 +321,15 @@ class ProductionStationConfig {
             controlledInputScope != null)
           'controlledInputScope': controlledInputScope,
       },
+      if (supportsRuntimeEvidenceProfile) ...{
+        'runtimeVisible': runtimeVisible,
+        if (runtimeVisible) 'runtimeAllowedRoles': runtimeAllowedRoles,
+      },
     };
   }
+
+  static String runtimeRoleLabel(String role) =>
+      ProductionAccessHelper.displayRoleLabel(role);
 
   static String? _optString(dynamic v) {
     final s = (v ?? '').toString().trim();

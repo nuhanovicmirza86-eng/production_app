@@ -128,6 +128,25 @@ class ProductionAccessHelper {
   /// Referent računovodstva — unos/provjera (Finance & Controlling).
   static const String roleAccountingClerk = 'accounting_clerk';
 
+  /// Laboratorij / procesne evidencije — menadžer pogona (Production app).
+  static const String roleLaboratoryManager = 'laboratory_manager';
+
+  /// Laboratorij / procesne evidencije — tehničar (Production app).
+  static const String roleLaboratoryTechnician = 'laboratory_technician';
+
+  /// Uloge koje Admin može dodijeliti operativnoj evidenciji (runtimeAllowedRoles).
+  static const List<String> profileStationRuntimeAssignableRoles = [
+    roleProductionOperator,
+    roleShiftLead,
+    roleQualityControl,
+    roleProductionManager,
+    'logistics_operator',
+    roleLogisticsManager,
+    roleMaintenanceManager,
+    roleLaboratoryManager,
+    roleLaboratoryTechnician,
+  ];
+
   /// Kanonski kod uloge; legacy aliasi se mapiraju na jednu ulogu (npr. `administrator` → [roleAdmin]).
   static String normalizeRole(dynamic role) {
     var r = (role ?? '').toString().trim().toLowerCase();
@@ -202,6 +221,10 @@ class ProductionAccessHelper {
         return 'Šef računovodstva';
       case roleAccountingClerk:
         return 'Referent računovodstva';
+      case roleLaboratoryManager:
+        return 'Laboratorijski menadžer';
+      case roleLaboratoryTechnician:
+        return 'Laboratorijski tehničar';
       default:
         return r.isEmpty ? '-' : r;
     }
@@ -526,6 +549,52 @@ class ProductionAccessHelper {
       ProductionDashboardCard.advancedPlanning: ProductionAccessLevel.hidden,
     },
     roleQualityControl: _accessQualityManagerHub(),
+    roleLaboratoryManager: {
+      ProductionDashboardCard.products: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionOrders: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionTracking: ProductionAccessLevel.view,
+      ProductionDashboardCard.stationPages: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.workCenters: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionProcesses: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.shifts: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.downtime: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.ooe: ProductionAccessLevel.view,
+      ProductionDashboardCard.operonixAnalytics: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.problemReporting: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.processExecution: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.reports: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.developmentGovernance: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.qualityManagement: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
+      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.financeControlling: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.advancedPlanning: ProductionAccessLevel.hidden,
+    },
+    roleLaboratoryTechnician: {
+      ProductionDashboardCard.products: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionOrders: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionTracking: ProductionAccessLevel.view,
+      ProductionDashboardCard.stationPages: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.workCenters: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionProcesses: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.shifts: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.downtime: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.ooe: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.operonixAnalytics: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.problemReporting: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.processExecution: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.reports: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.developmentGovernance: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.qualityManagement: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.aiAssistant: ProductionAccessLevel.view,
+      ProductionDashboardCard.personalWorkTime: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.financeControlling: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.advancedPlanning: ProductionAccessLevel.hidden,
+    },
   };
 
   /// Uloge koje imaju zapis u [_roleMatrix], stabilnim redom (referentni ekrani).
@@ -540,6 +609,8 @@ class ProductionAccessHelper {
       roleManagementViewer,
       roleProductionManager,
       roleShiftLead,
+      roleLaboratoryManager,
+      roleLaboratoryTechnician,
       roleProductionOperator,
       roleQualityOperator,
       roleQualityControl,
@@ -614,6 +685,12 @@ class ProductionAccessHelper {
 
   static bool isSuperAdminFromCompanySession(Map<String, dynamic> companyData) {
     return isSuperAdminRole(rawRoleFromCompanySession(companyData));
+  }
+
+  static bool canUseProfileStationRuntime(String role) {
+    final r = normalizeRole(role);
+    if (r == roleSuperAdmin || isAdminRole(r)) return true;
+    return profileStationRuntimeAssignableRoles.contains(r);
   }
 
   static bool isMaintenanceManagerRole(String role) {

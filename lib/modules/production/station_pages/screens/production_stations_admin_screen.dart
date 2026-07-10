@@ -229,6 +229,9 @@ class _ProductionStationsAdminScreenState
       controlledInputMode = 'strict';
     }
 
+    var runtimeVisible = existing?.runtimeVisible ?? false;
+    var runtimeAllowedRoles = Set<String>.from(existing?.runtimeAllowedRoles ?? const []);
+
     String? inboundWhId = existing?.inboundWarehouseId;
     String? outboundWhId = existing?.outboundWarehouseId;
 
@@ -375,6 +378,12 @@ class _ProductionStationsAdminScreenState
                                 controlledInputEnabled = false;
                                 controlledInputMode = 'off';
                               }
+                              if (!ProductionStationConfig
+                                  .evidenceProfileTypes
+                                  .contains(v.trim())) {
+                                runtimeVisible = false;
+                                runtimeAllowedRoles = {};
+                              }
                             });
                           },
                         ),
@@ -445,6 +454,68 @@ class _ProductionStationsAdminScreenState
                                       .controlledInputScopeWorkBath,
                                 ),
                               ),
+                            ),
+                          ],
+                        ],
+                        if (ProductionStationConfig.evidenceProfileTypes
+                            .contains(selectedProfile.trim())) ...[
+                          const Divider(height: 24),
+                          Text(
+                            'Vidljivost operativne evidencije',
+                            style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Operator vidi evidenciju samo ako je uključena ovdje i njegova uloga je u dozvoljenim ulogama.',
+                            style: Theme.of(ctx).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 8),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Prikaži u Operativne stanice'),
+                            subtitle: const Text('DA / NE'),
+                            value: runtimeVisible,
+                            onChanged: (v) => setLocal(() {
+                              runtimeVisible = v;
+                              if (!v) {
+                                runtimeAllowedRoles = {};
+                              }
+                            }),
+                          ),
+                          if (runtimeVisible) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Dozvoljene uloge',
+                              style: Theme.of(ctx).textTheme.labelLarge,
+                            ),
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 4,
+                              children: ProductionStationConfig
+                                  .runtimeAssignableRoles
+                                  .map(
+                                    (role) => FilterChip(
+                                      label: Text(
+                                        ProductionStationConfig.runtimeRoleLabel(
+                                          role,
+                                        ),
+                                      ),
+                                      selected: runtimeAllowedRoles.contains(role),
+                                      onSelected: (selected) {
+                                        setLocal(() {
+                                          if (selected) {
+                                            runtimeAllowedRoles.add(role);
+                                          } else {
+                                            runtimeAllowedRoles.remove(role);
+                                          }
+                                        });
+                                      },
+                                    ),
+                                  )
+                                  .toList(),
                             ),
                           ],
                         ],
@@ -682,6 +753,19 @@ class _ProductionStationsAdminScreenState
                       );
                       return;
                     }
+                    if (ProductionStationConfig.evidenceProfileTypes
+                            .contains(selectedProfile.trim()) &&
+                        runtimeVisible &&
+                        runtimeAllowedRoles.isEmpty) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Odaberite barem jednu dozvoljenu ulogu za operativnu evidenciju.',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
                     Navigator.pop(
                       ctx,
                       _StationEditorResult(
@@ -707,6 +791,8 @@ class _ProductionStationsAdminScreenState
                         outboundWhId: outboundWhId,
                         controlledInputEnabled: controlledInputEnabled,
                         controlledInputMode: controlledInputMode,
+                        runtimeVisible: runtimeVisible,
+                        runtimeAllowedRoles: runtimeAllowedRoles.toList(),
                       ),
                     );
                   },
@@ -782,6 +868,19 @@ class _ProductionStationsAdminScreenState
               result.controlledInputMode != 'off'
           ? ProductionStationConfig.controlledInputScopeWorkBath
           : null,
+      runtimeVisible:
+          ProductionStationConfig.evidenceProfileTypes.contains(
+                result.selectedProfile.trim(),
+              )
+              ? result.runtimeVisible
+              : false,
+      runtimeAllowedRoles:
+          ProductionStationConfig.evidenceProfileTypes.contains(
+                result.selectedProfile.trim(),
+              ) &&
+              result.runtimeVisible
+          ? result.runtimeAllowedRoles
+          : const [],
     );
 
     try {
@@ -912,6 +1011,8 @@ class _StationEditorResult {
   final String? outboundWhId;
   final bool controlledInputEnabled;
   final String controlledInputMode;
+  final bool runtimeVisible;
+  final List<String> runtimeAllowedRoles;
 
   const _StationEditorResult({
     required this.displayName,
@@ -936,6 +1037,8 @@ class _StationEditorResult {
     required this.outboundWhId,
     required this.controlledInputEnabled,
     required this.controlledInputMode,
+    required this.runtimeVisible,
+    required this.runtimeAllowedRoles,
   });
 }
 
@@ -1064,6 +1167,12 @@ class _StationCard extends StatelessWidget {
                   'Kontrolisan unos evidencije: '
                   '${ProductionStationConfig.controlledInputModeLabel(config.controlledInputMode)}'
                   '${config.controlledInputScope != null ? ' · ${ProductionStationConfig.controlledInputScopeLabel(config.controlledInputScope)}' : ''}',
+                ),
+              if (config.supportsRuntimeEvidenceProfile)
+                Text(
+                  config.runtimeVisible
+                      ? 'Operativna evidencija: vidljiva (${config.runtimeAllowedRoles.length} uloga)'
+                      : 'Operativna evidencija: skrivena',
                 ),
               if (config.legacyOperatorNavSlot != null)
                 Text('Navigacija: Stanica ${config.legacyOperatorNavSlot}'),

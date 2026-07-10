@@ -323,15 +323,16 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                     ProductionOperatorTrackingEntry.phaseFinalControl,
                   ),
           ),
-          _DashboardActionTile(
-            icon: Icons.science_outlined,
-            title: 'Operativne stanice (profil)',
-            subtitle:
-                'Rad na stanicama prema profilu (npr. doziranje hemikalija).',
-            onTap: () => open(
-              ProductionProfileStationsHubScreen(companyData: companyData),
+          if (ProductionAccessHelper.canUseProfileStationRuntime(_role))
+            _DashboardActionTile(
+              icon: Icons.science_outlined,
+              title: 'Operativne stanice (profil)',
+              subtitle:
+                  'Rad na stanicama prema profilu (npr. doziranje hemikalija).',
+              onTap: () => open(
+                ProductionProfileStationsHubScreen(companyData: companyData),
+              ),
             ),
-          ),
         ],
         if (_canViewCard(ProductionDashboardCard.stationPages))
           _DashboardActionTile(

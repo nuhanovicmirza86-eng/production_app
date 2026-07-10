@@ -3,6 +3,28 @@ import 'package:cloud_functions/cloud_functions.dart';
 import '../models/production_station_config.dart';
 import '../models/production_station_profile_catalog_entry.dart';
 
+String productionStationLimitMessage(Object error) {
+  if (error is FirebaseFunctionsException) {
+    final msg = (error.message ?? '').trim();
+    if (msg.isNotEmpty) return msg;
+    return error.code;
+  }
+  return error
+      .toString()
+      .replaceFirst('Exception: ', '')
+      .replaceFirst('[firebase_functions/', '');
+}
+
+class ProductionStationConfigListResult {
+  const ProductionStationConfigListResult({
+    required this.configs,
+    required this.limits,
+  });
+
+  final List<ProductionStationConfig> configs;
+  final ProductionStationLimitsSummary limits;
+}
+
 class ProductionStationConfigCallableService {
   ProductionStationConfigCallableService({FirebaseFunctions? functions})
     : _functions =
@@ -10,27 +32,25 @@ class ProductionStationConfigCallableService {
 
   final FirebaseFunctions _functions;
 
-  Future<({
-    List<ProductionStationConfig> configs,
-    ProductionStationLimitsSummary limits,
-  })> listProductionStationConfigs({
+  Future<ProductionStationConfigListResult> listProductionStationConfigs({
     required String companyId,
+    bool operatorRuntimeOnly = false,
   }) async {
-    final cid = companyId.trim();
-    if (cid.isEmpty) {
-      throw Exception('companyId je obavezan.');
-    }
+    final payload = <String, dynamic>{
+      'companyId': companyId.trim(),
+      if (operatorRuntimeOnly) 'operatorRuntimeOnly': true,
+    };
     final res = await _functions
         .httpsCallable('listProductionStationConfigs')
-        .call<Map<String, dynamic>>({'companyId': cid});
+        .call<Map<String, dynamic>>(payload);
     final data = res.data;
     if (data['success'] != true) {
       throw Exception('Učitavanje stanica nije uspjelo.');
     }
-    final rawList = data['configs'];
+    final rawConfigs = data['configs'];
     final configs = <ProductionStationConfig>[];
-    if (rawList is List) {
-      for (final item in rawList) {
+    if (rawConfigs is List) {
+      for (final item in rawConfigs) {
         if (item is Map) {
           configs.add(
             ProductionStationConfig.fromMap(Map<String, dynamic>.from(item)),
@@ -38,42 +58,30 @@ class ProductionStationConfigCallableService {
         }
       }
     }
-    final limitsRaw = data['limits'];
-    final limits = limitsRaw is Map
-        ? ProductionStationLimitsSummary.fromMap(
-            Map<String, dynamic>.from(limitsRaw),
-          )
-        : const ProductionStationLimitsSummary(
-            maxProductionStations: 3,
-            maxMachineStations: 0,
-            activeProductionStations: 0,
-            activeMachineStations: 0,
-          );
-    return (configs: configs, limits: limits);
+    return ProductionStationConfigListResult(
+      configs: configs,
+      limits: ProductionStationLimitsSummary.fromMap(
+        data['limits'] is Map
+            ? Map<String, dynamic>.from(data['limits'] as Map)
+            : null,
+      ),
+    );
   }
 
   Future<ProductionStationProfileCatalogResult> listProductionStationProfiles({
     required String companyId,
   }) async {
-    final cid = companyId.trim();
-    if (cid.isEmpty) {
-      throw Exception('companyId je obavezan.');
-    }
     final res = await _functions
         .httpsCallable('listProductionStationProfiles')
-        .call<Map<String, dynamic>>({'companyId': cid});
+        .call<Map<String, dynamic>>({'companyId': companyId.trim()});
     final data = res.data;
     if (data['success'] != true) {
       throw Exception('Učitavanje kataloga profila nije uspjelo.');
     }
-    final versionRaw = data['catalogVersion'];
-    final catalogVersion = versionRaw is int
-        ? versionRaw
-        : int.tryParse(versionRaw?.toString() ?? '') ?? 0;
-    final rawList = data['profiles'];
+    final rawProfiles = data['profiles'];
     final profiles = <ProductionStationProfileCatalogEntry>[];
-    if (rawList is List) {
-      for (final item in rawList) {
+    if (rawProfiles is List) {
+      for (final item in rawProfiles) {
         if (item is Map) {
           profiles.add(
             ProductionStationProfileCatalogEntry.fromMap(
@@ -83,6 +91,10 @@ class ProductionStationConfigCallableService {
         }
       }
     }
+    final versionRaw = data['catalogVersion'];
+    final catalogVersion = versionRaw is int
+        ? versionRaw
+        : int.tryParse(versionRaw?.toString() ?? '') ?? 0;
     return ProductionStationProfileCatalogResult(
       catalogVersion: catalogVersion,
       profiles: profiles,
@@ -95,21 +107,9 @@ class ProductionStationConfigCallableService {
     final res = await _functions
         .httpsCallable('upsertProductionStationConfig')
         .call<Map<String, dynamic>>(config.toUpsertPayload());
-    if (res.data['success'] != true) {
+    final data = res.data;
+    if (data['success'] != true) {
       throw Exception('Spremanje stanice nije uspjelo.');
     }
   }
-}
-
-String productionStationLimitMessage(Object error) {
-  final text = error.toString();
-  if (text.contains('maksimalan broj proizvodnih stanica')) {
-    return 'Dostigli ste maksimalan broj proizvodnih stanica za vaš paket. '
-        'Za povećanje limita kontaktirajte administratora platforme.';
-  }
-  if (text.contains('maksimalan broj mašinskih stanica')) {
-    return 'Dostigli ste maksimalan broj mašinskih stanica za vaš paket. '
-        'Za dodatne mašinske stanice potrebno je proširenje paketa.';
-  }
-  return text.replaceFirst('Exception: ', '').replaceFirst('[firebase_functions/', '');
 }
