@@ -51,6 +51,20 @@ class ProductionStationConfig {
     'ostalo',
   ];
 
+  static String normalizeProductionPhaseKey(
+    dynamic raw, {
+    String fallback = 'obrada',
+  }) {
+    var key = (raw ?? '').toString().trim().toLowerCase();
+    if (key == 'preparation') key = 'pripremna';
+    if (key == 'first_control') key = 'kontrola';
+    if (key == 'final_control') key = 'zavrsna_kontrola';
+    if (productionPhaseKeys.contains(key)) return key;
+    final fb = fallback.trim().toLowerCase();
+    if (productionPhaseKeys.contains(fb)) return fb;
+    return productionPhaseKeys.first;
+  }
+
   final String id;
   final String companyId;
   final int stationSlot;
@@ -233,7 +247,10 @@ class ProductionStationConfig {
       processProfileType:
           (data['processProfileType'] ?? 'standard_production').toString().trim(),
       assignedPlantKey: (data['assignedPlantKey'] ?? '').toString().trim(),
-      productionPhaseKey: _optString(data['productionPhaseKey']),
+      productionPhaseKey: normalizeProductionPhaseKey(
+        data['productionPhaseKey'],
+        fallback: 'obrada',
+      ),
       phase: (data['phase'] ?? 'preparation').toString().trim(),
       workCenterId: _optString(data['workCenterId']),
       processId: _optString(data['processId']),

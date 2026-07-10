@@ -205,8 +205,13 @@ class _ProductionStationsAdminScreenState
     var selectedType = st;
     var selectedProfile =
         existing?.processProfileType ?? 'standard_production';
-    var selectedPhaseKey =
-        existing?.productionPhaseKey ?? 'pakovanje';
+    var selectedPhaseKey = ProductionStationConfig.normalizeProductionPhaseKey(
+      existing?.productionPhaseKey,
+      fallback: (existing?.processProfileType ?? selectedProfile) ==
+              'chemical_dosing'
+          ? 'obrada'
+          : 'pakovanje',
+    );
     var selectedPhase =
         existing?.phase ?? ProductionOperatorTrackingEntry.phasePreparation;
     String? assignedPlantKey = existing?.assignedPlantKey;
