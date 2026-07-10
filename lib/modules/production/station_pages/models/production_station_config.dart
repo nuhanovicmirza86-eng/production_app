@@ -65,6 +65,33 @@ class ProductionStationConfig {
     return productionPhaseKeys.first;
   }
 
+  static int parseStationSlotFromMap(Map<String, dynamic> data) {
+    final slotRaw = data['stationSlot'];
+    if (slotRaw is int && slotRaw > 0) return slotRaw;
+    if (slotRaw is num && slotRaw > 0) return slotRaw.toInt();
+    final parsed = int.tryParse('${slotRaw ?? ''}'.trim());
+    if (parsed != null && parsed > 0) return parsed;
+
+    final id = (data['id'] ?? '').toString();
+    final sep = id.lastIndexOf('__');
+    if (sep >= 0) {
+      final fromId = int.tryParse(id.substring(sep + 2));
+      if (fromId != null && fromId > 0) return fromId;
+    }
+    return 1;
+  }
+
+  /// Slot za Callable — uvijek iz config id ako polje nedostaje/krivo.
+  int get effectiveStationSlot {
+    if (stationSlot > 0) return stationSlot;
+    final sep = id.lastIndexOf('__');
+    if (sep >= 0) {
+      final fromId = int.tryParse(id.substring(sep + 2));
+      if (fromId != null && fromId > 0) return fromId;
+    }
+    return stationSlot > 0 ? stationSlot : 1;
+  }
+
   final String id;
   final String companyId;
   final int stationSlot;
@@ -207,10 +234,7 @@ class ProductionStationConfig {
         ? Map<String, dynamic>.from(miRaw)
         : <String, dynamic>{};
 
-    final slotRaw = data['stationSlot'];
-    final slot = slotRaw is int
-        ? slotRaw
-        : int.tryParse(slotRaw?.toString() ?? '') ?? 1;
+    final slot = parseStationSlotFromMap(data);
 
     final orderRaw = data['order'];
     final order = orderRaw is int

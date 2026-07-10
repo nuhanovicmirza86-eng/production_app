@@ -508,7 +508,7 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
       });
       await _sessionCallables.startProductionStationWorkSession(
         companyId: _companyId,
-        stationSlot: widget.stationConfig.stationSlot,
+        stationSlot: widget.stationConfig.effectiveStationSlot,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -975,29 +975,101 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
     );
   }
 
+  Widget _buildProfileLaunchHero() {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      width: 96,
+      height: 96,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.primaryContainer,
+            colorScheme.primary.withValues(alpha: 0.14),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.primary.withValues(alpha: 0.14),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Icon(
+        _profileLaunchIcon(widget.profile.profileKey),
+        size: 44,
+        color: colorScheme.primary,
+      ),
+    );
+  }
+
+  IconData _profileLaunchIcon(String profileKey) {
+    switch (profileKey.trim()) {
+      case 'chemical_dosing':
+        return Icons.science_outlined;
+      case 'wastewater_treatment':
+        return Icons.water_outlined;
+      case 'process_log':
+        return Icons.assignment_outlined;
+      case 'rework_and_painting':
+        return Icons.format_paint_outlined;
+      default:
+        return Icons.precision_manufacturing_outlined;
+    }
+  }
+
   Widget _buildNoSessionBody() {
     if (!_plantAccessOk) return _buildPlantAccessBlocked();
 
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final plantLabel =
+        _plantDisplayLabel.isEmpty ? _plantKey : _plantDisplayLabel;
+
     return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              widget.profile.displayName,
-              style: Theme.of(context).textTheme.headlineSmall,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            _buildPlantReadOnlyBanner(),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: _busy || _masterLoading ? null : _startSession,
-              icon: const Icon(Icons.play_arrow),
-              label: const Text('Pokreni evidenciju'),
-            ),
-          ],
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildProfileLaunchHero(),
+              const SizedBox(height: 24),
+              Text(
+                widget.profile.displayName,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              if (plantLabel.trim().isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Pogon: $plantLabel',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _busy || _masterLoading ? null : _startSession,
+                  icon: const Icon(Icons.play_arrow),
+                  label: const Text('Pokreni evidenciju'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1084,7 +1156,7 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
       body: StreamBuilder<ProductionStationWorkSession?>(
         stream: _sessionService.watchActiveSession(
           companyId: _companyId,
-          stationSlot: widget.stationConfig.stationSlot,
+          stationSlot: widget.stationConfig.effectiveStationSlot,
         ),
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting &&
