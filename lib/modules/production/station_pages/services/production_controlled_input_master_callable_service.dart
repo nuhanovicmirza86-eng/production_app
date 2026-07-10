@@ -35,6 +35,63 @@ class ControlledInputEntityOption {
   }
 }
 
+/// Hemikalija s master allowedUnits (kontrolisan unos / unit dropdown).
+class ControlledInputChemicalOption extends ControlledInputEntityOption {
+  const ControlledInputChemicalOption({
+    required super.id,
+    required super.displayName,
+    super.code,
+    super.active = true,
+    this.allowedUnits = const [],
+    this.defaultUnit,
+  });
+
+  final List<String> allowedUnits;
+  final String? defaultUnit;
+
+  factory ControlledInputChemicalOption.fromMap(Map<String, dynamic> data) {
+    final base = ControlledInputEntityOption.fromMap(data);
+    final unitsRaw = data['allowedUnits'];
+    final units = <String>[];
+    if (unitsRaw is List) {
+      for (final item in unitsRaw) {
+        final u = item.toString().trim();
+        if (u.isNotEmpty) units.add(u);
+      }
+    }
+    final defaultUnit = (data['defaultUnit'] ?? '').toString().trim();
+    return ControlledInputChemicalOption(
+      id: base.id,
+      displayName: base.displayName,
+      code: base.code,
+      active: base.active,
+      allowedUnits: units,
+      defaultUnit: defaultUnit.isEmpty ? null : defaultUnit,
+    );
+  }
+}
+
+/// Rezultat filtriranja hemikalija po radnoj kadi (strict kontrolisan unos).
+class WorkBathFilteredChemicalsResult {
+  const WorkBathFilteredChemicalsResult({
+    required this.chemicals,
+    required this.mappingAllowedUnitsByChemicalId,
+  });
+
+  final List<ControlledInputChemicalOption> chemicals;
+  final Map<String, List<String>> mappingAllowedUnitsByChemicalId;
+}
+
+/// Prikaz jedinice u chemical_dosing operator formi.
+String chemicalDosingUnitDropdownLabel(String unit) {
+  switch (unit.trim().toLowerCase()) {
+    case 'ml':
+      return 'ml — mililitar';
+    default:
+      return unit;
+  }
+}
+
 class ProductionControlledInputMasterCallableService {
   ProductionControlledInputMasterCallableService({FirebaseFunctions? functions})
     : _functions =
@@ -61,7 +118,7 @@ class ProductionControlledInputMasterCallableService {
     return _parseEntityList(data['workBaths']);
   }
 
-  Future<List<ControlledInputEntityOption>> listChemicals({
+  Future<List<ControlledInputChemicalOption>> listChemicals({
     required String companyId,
     String? plantKey,
     bool activeOnly = true,
@@ -81,10 +138,10 @@ class ProductionControlledInputMasterCallableService {
     if (data['success'] != true) {
       throw Exception('Učitavanje hemikalija nije uspjelo.');
     }
-    return _parseEntityList(data['chemicals']);
+    return _parseChemicalList(data['chemicals']);
   }
 
-  Future<List<ControlledInputEntityOption>> listChemicalsAllowedForWorkBath({
+  Future<WorkBathFilteredChemicalsResult> listChemicalsAllowedForWorkBath({
     required String companyId,
     required String workBathId,
     String? plantKey,
@@ -107,24 +164,47 @@ class ProductionControlledInputMasterCallableService {
       throw Exception('Učitavanje dozvoljenih hemikalija nije uspjelo.');
     }
     final allowed = data['allowedChemicals'];
-    if (allowed is! List) return const [];
+    if (allowed is! List) {
+      return const WorkBathFilteredChemicalsResult(
+        chemicals: [],
+        mappingAllowedUnitsByChemicalId: {},
+      );
+    }
 
     final chemicalIds = <String>{};
+    final mappingUnits = <String, List<String>>{};
     for (final item in allowed) {
       if (item is! Map) continue;
-      final cid = (item['chemicalId'] ?? '').toString().trim();
-      if (cid.isNotEmpty) chemicalIds.add(cid);
+      final map = Map<String, dynamic>.from(item);
+      final cid = (map['chemicalId'] ?? '').toString().trim();
+      if (cid.isEmpty) continue;
+      chemicalIds.add(cid);
+      final unitsRaw = map['allowedUnits'];
+      if (unitsRaw is List && unitsRaw.isNotEmpty) {
+        mappingUnits[cid] = unitsRaw
+            .map((e) => e.toString().trim())
+            .where((e) => e.isNotEmpty)
+            .toList(growable: false);
+      }
     }
-    if (chemicalIds.isEmpty) return const [];
+    if (chemicalIds.isEmpty) {
+      return const WorkBathFilteredChemicalsResult(
+        chemicals: [],
+        mappingAllowedUnitsByChemicalId: {},
+      );
+    }
 
     final allChemicals = await listChemicals(
       companyId: companyId,
       plantKey: plantKey,
       activeOnly: activeOnly,
     );
-    return allChemicals
-        .where((c) => chemicalIds.contains(c.id))
-        .toList(growable: false);
+    return WorkBathFilteredChemicalsResult(
+      chemicals: allChemicals
+          .where((c) => chemicalIds.contains(c.id))
+          .toList(growable: false),
+      mappingAllowedUnitsByChemicalId: mappingUnits,
+    );
   }
 
   List<ControlledInputEntityOption> _parseEntityList(dynamic raw) {
@@ -134,6 +214,22 @@ class ProductionControlledInputMasterCallableService {
       if (item is Map) {
         out.add(
           ControlledInputEntityOption.fromMap(
+            Map<String, dynamic>.from(item),
+          ),
+        );
+      }
+    }
+    out.sort((a, b) => a.dropdownLabel.compareTo(b.dropdownLabel));
+    return out;
+  }
+
+  List<ControlledInputChemicalOption> _parseChemicalList(dynamic raw) {
+    if (raw is! List) return const [];
+    final out = <ControlledInputChemicalOption>[];
+    for (final item in raw) {
+      if (item is Map) {
+        out.add(
+          ControlledInputChemicalOption.fromMap(
             Map<String, dynamic>.from(item),
           ),
         );

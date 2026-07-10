@@ -46,7 +46,8 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
 
   List<ProductionStationProfileField> _fields = const [];
   List<ControlledInputEntityOption> _workBaths = const [];
-  List<ControlledInputEntityOption> _chemicals = const [];
+  List<ControlledInputChemicalOption> _chemicals = const [];
+  Map<String, List<String>> _mappingAllowedUnitsByChemicalId = const {};
 
   bool _masterLoading = true;
   Object? _masterError;
@@ -167,7 +168,11 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
         activeOnly: true,
       );
       if (!mounted) return;
-      setState(() => _chemicals = chemicals);
+      setState(() {
+        _chemicals = chemicals;
+        _mappingAllowedUnitsByChemicalId = const {};
+      });
+      _applyUnitDefaultsForSelection();
     } catch (e) {
       if (!mounted) return;
       setState(() => _masterError = e);
@@ -176,14 +181,17 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
 
   Future<void> _reloadChemicalsForWorkBath(String workBathId) async {
     try {
-      final List<ControlledInputEntityOption> chemicals;
+      final List<ControlledInputChemicalOption> chemicals;
+      Map<String, List<String>> mappingUnits = const {};
       if (_controlledInputEnabled) {
-        chemicals = await _masterCallables.listChemicalsAllowedForWorkBath(
+        final filtered = await _masterCallables.listChemicalsAllowedForWorkBath(
           companyId: _companyId,
           workBathId: workBathId,
           plantKey: _plantKey,
           activeOnly: true,
         );
+        chemicals = filtered.chemicals;
+        mappingUnits = filtered.mappingAllowedUnitsByChemicalId;
       } else {
         chemicals = await _masterCallables.listChemicals(
           companyId: _companyId,
@@ -197,7 +205,11 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
           chemicals.every((c) => c.id != selectedChemical)) {
         _entitySelections['chemicalId'] = null;
       }
-      setState(() => _chemicals = chemicals);
+      setState(() {
+        _chemicals = chemicals;
+        _mappingAllowedUnitsByChemicalId = mappingUnits;
+      });
+      _applyUnitDefaultsForSelection();
     } catch (e) {
       if (!mounted) return;
       setState(() => _masterError = e);
@@ -242,10 +254,51 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
   List<String> _enumOptionsFor(ProductionStationProfileField field) {
     final from = field.enumFrom ?? '';
     if (from == 'units.allowedUnits') {
-      final units = widget.profile.allowedUnits;
-      if (units.isNotEmpty) return units;
+      return _resolveUnitOptions();
     }
     return const [];
+  }
+
+  ControlledInputChemicalOption? _selectedChemical() {
+    final chemicalId = (_entitySelections['chemicalId'] ?? '').trim();
+    if (chemicalId.isEmpty) return null;
+    for (final c in _chemicals) {
+      if (c.id == chemicalId) return c;
+    }
+    return null;
+  }
+
+  List<String> _resolveUnitOptions() {
+    final chemicalId = (_entitySelections['chemicalId'] ?? '').trim();
+    if (chemicalId.isNotEmpty) {
+      final mappingUnits = _mappingAllowedUnitsByChemicalId[chemicalId];
+      if (mappingUnits != null && mappingUnits.isNotEmpty) {
+        return mappingUnits;
+      }
+      final chemical = _selectedChemical();
+      if (chemical != null && chemical.allowedUnits.isNotEmpty) {
+        return chemical.allowedUnits;
+      }
+    }
+    return widget.profile.allowedUnits;
+  }
+
+  void _applyUnitDefaultsForSelection() {
+    final options = _resolveUnitOptions();
+    final current = _enumSelections['unit'];
+    if (current != null && !options.contains(current)) {
+      _enumSelections['unit'] = null;
+    }
+    final selected = _enumSelections['unit'];
+    if (selected != null && selected.isNotEmpty) return;
+
+    final chemical = _selectedChemical();
+    final defaultUnit = chemical?.defaultUnit ?? widget.profile.defaultUnit;
+    if (defaultUnit.isNotEmpty && options.contains(defaultUnit)) {
+      _enumSelections['unit'] = defaultUnit;
+    } else if (options.length == 1) {
+      _enumSelections['unit'] = options.first;
+    }
   }
 
   void _syncFormFromSession(ProductionStationWorkSession session) {
@@ -481,8 +534,15 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
                     } else if (!_controlledInputEnabled) {
                       await _reloadAllChemicals();
                     } else {
-                      setState(() => _chemicals = const []);
+                      setState(() {
+                        _chemicals = const [];
+                        _mappingAllowedUnitsByChemicalId = const {};
+                      });
+                      _applyUnitDefaultsForSelection();
                     }
+                  } else if (field.key == 'chemicalId') {
+                    _applyUnitDefaultsForSelection();
+                    setState(() {});
                   }
                 }
               : null,
@@ -512,7 +572,10 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
             hint: const Text('Odaberite…'),
             items: options
                 .map(
-                  (u) => DropdownMenuItem<String>(value: u, child: Text(u)),
+                  (u) => DropdownMenuItem<String>(
+                    value: u,
+                    child: Text(u),
+                  ),
                 )
                 .toList(growable: false),
             onChanged: enabled && !_busy
