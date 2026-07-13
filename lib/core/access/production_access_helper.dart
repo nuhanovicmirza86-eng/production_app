@@ -712,6 +712,23 @@ class ProductionAccessHelper {
     return r == roleAdmin || r == roleSuperAdmin;
   }
 
+  /// M2-C — read-only pregled zatvorenih profile-driven evidencija (supervizija).
+  static bool canViewProfileDrivenEvidence(String role) {
+    final r = normalizeRole(role);
+    return r == roleSuperAdmin ||
+        isAdminRole(r) ||
+        r == roleProductionManager ||
+        r == roleLaboratoryManager ||
+        r == roleLaboratoryTechnician ||
+        r == roleQualityControl;
+  }
+
+  /// Filter pogona na listi evidencija — samo [roleAdmin] / [roleSuperAdmin].
+  static bool canPickPlantFilterForProfileDrivenEvidence(String role) {
+    final r = normalizeRole(role);
+    return r == roleSuperAdmin || isAdminRole(r);
+  }
+
   /// APS P0+ — pregled (samo uloga; modul kompanije provjeri zasebno).
   /// Kanonske uloge: [roleAdmin], [roleSuperAdmin], [roleProductionManager].
   static bool canViewAps(String role) {

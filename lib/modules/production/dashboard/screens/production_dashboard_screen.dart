@@ -45,6 +45,7 @@ import '../../analytics/screens/operonix_analytics_dashboard_screen.dart';
 import '../../notifications/mes_inbox_screen.dart';
 import '../../downtime/screens/downtimes_screen.dart';
 import '../../execution/screens/process_execution_hub_screen.dart';
+import '../../../../features/station_evidence/screens/profile_driven_evidence_list_screen.dart';
 import '../../qr/production_qr_scan_flow.dart';
 import '../../../quality/screens/execute_inspection_screen.dart';
 import '../../../development/screens/development_projects_list_screen.dart';
@@ -331,6 +332,17 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                   'Rad na stanicama prema profilu (npr. doziranje hemikalija).',
               onTap: () => open(
                 ProductionProfileStationsHubScreen(companyData: companyData),
+              ),
+            ),
+          if (_hasModule('production') &&
+              ProductionAccessHelper.canViewProfileDrivenEvidence(_role))
+            _DashboardActionTile(
+              icon: Icons.fact_check_outlined,
+              title: 'Evidencije procesa — profile-driven',
+              subtitle:
+                  'Pregled završenih evidencija doziranja hemikalija i obrade otpadnih voda.',
+              onTap: () => open(
+                ProfileDrivenEvidenceListScreen(companyData: companyData),
               ),
             ),
         ],
