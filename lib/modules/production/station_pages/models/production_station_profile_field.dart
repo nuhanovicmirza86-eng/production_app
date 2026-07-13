@@ -9,6 +9,7 @@ class ProductionStationProfileField {
     this.min,
     this.uiOrder = 0,
     this.enumFrom,
+    this.enumValues = const [],
     this.entityCollection,
     this.entityListCallable,
     this.valueField = 'id',
@@ -30,6 +31,7 @@ class ProductionStationProfileField {
   final num? min;
   final int uiOrder;
   final String? enumFrom;
+  final List<String> enumValues;
   final String? entityCollection;
   final String? entityListCallable;
   final String valueField;
@@ -67,6 +69,7 @@ class ProductionStationProfileField {
       enumFrom: (data['enumFrom'] ?? '').toString().trim().isEmpty
           ? null
           : (data['enumFrom'] ?? '').toString().trim(),
+      enumValues: _parseEnumValues(data['enumValues']),
       entityCollection: (data['entityCollection'] ?? '').toString().trim().isEmpty
           ? null
           : (data['entityCollection'] ?? '').toString().trim(),
@@ -110,6 +113,14 @@ class ProductionStationProfileField {
           ? null
           : (data['helperText'] ?? '').toString().trim(),
     );
+  }
+
+  static List<String> _parseEnumValues(Object? raw) {
+    if (raw is! List) return const [];
+    return raw
+        .map((v) => v.toString().trim())
+        .where((v) => v.isNotEmpty)
+        .toList(growable: false);
   }
 
   static List<ProductionStationProfileField> sortedList(

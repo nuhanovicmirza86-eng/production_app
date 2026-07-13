@@ -18,7 +18,16 @@ class ProductionStationConfig {
     'process_log',
   ];
 
-  /// Profili evidencije — kontrolisan unos (M1-B0).
+  /// Profili s generic profile-driven operator runtime-om (M1-B / M1-C).
+  static const List<String> profileDrivenRuntimeProfileKeys = [
+    'chemical_dosing',
+    'wastewater_treatment',
+  ];
+
+  static bool isProfileDrivenRuntimeProfile(String profileKey) =>
+      profileDrivenRuntimeProfileKeys.contains(profileKey.trim());
+
+  /// Profili evidencije — kontrolisan unos (M1-B0 / M1-C).
   static const List<String> evidenceProfileTypes = [
     'chemical_dosing',
     'wastewater_treatment',

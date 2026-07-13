@@ -4,7 +4,7 @@ import '../../station_pages/models/production_station_config.dart';
 import '../../station_pages/models/production_station_profile_catalog_entry.dart';
 import '../../station_work/screens/profile_driven_work_screen.dart';
 
-/// M1-B — operator ulaz u profile-driven runtime (npr. `chemical_dosing`).
+/// M1-B / M1-C — operator ulaz u profile-driven runtime.
 class ProductionProfileStationLaunchScreen extends StatelessWidget {
   const ProductionProfileStationLaunchScreen({
     super.key,
@@ -39,7 +39,10 @@ class ProductionProfileStationLaunchScreen extends StatelessWidget {
       );
     }
 
-    if (profile.profileKey == 'chemical_dosing' && profile.isComplete) {
+    if (ProductionStationConfig.isProfileDrivenRuntimeProfile(
+          profile.profileKey,
+        ) &&
+        profile.isComplete) {
       return ProfileDrivenWorkScreen(
         companyData: companyData,
         stationConfig: stationConfig,

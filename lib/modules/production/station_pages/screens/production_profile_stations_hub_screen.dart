@@ -84,7 +84,11 @@ class _ProductionProfileStationsHubScreenState
         if (!config.runtimeVisible) continue;
         if (!config.isRuntimeVisibleToRole(_userRole)) continue;
         if (config.legacyOperatorNavSlot != null) continue;
-        if (config.processProfileType != 'chemical_dosing') continue;
+        if (!ProductionStationConfig.isProfileDrivenRuntimeProfile(
+          config.processProfileType,
+        )) {
+          continue;
+        }
 
         final profile = profilesResult.byKey(config.processProfileType);
         if (profile == null || !profile.isComplete) continue;
@@ -170,7 +174,7 @@ class _ProductionProfileStationsHubScreenState
           padding: EdgeInsets.all(24),
           child: Text(
             'Nema aktivnih stanica s profilom spremnim za operator unos.\n'
-            'Administrator može dodati stanicu s profilom Doziranje hemikalija.',
+            'Administrator može dodati neutralnu stanicu s profilom spremnim za operativnu evidenciju.',
             textAlign: TextAlign.center,
           ),
         ),

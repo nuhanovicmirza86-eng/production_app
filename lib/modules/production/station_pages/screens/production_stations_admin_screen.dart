@@ -207,8 +207,9 @@ class _ProductionStationsAdminScreenState
         existing?.processProfileType ?? 'standard_production';
     var selectedPhaseKey = ProductionStationConfig.normalizeProductionPhaseKey(
       existing?.productionPhaseKey,
-      fallback: (existing?.processProfileType ?? selectedProfile) ==
-              'chemical_dosing'
+      fallback: ProductionStationConfig.isProfileDrivenRuntimeProfile(
+            existing?.processProfileType ?? selectedProfile,
+          )
           ? 'obrada'
           : 'pakovanje',
     );

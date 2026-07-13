@@ -15,7 +15,7 @@ import '../models/production_station_work_session.dart';
 import '../services/production_station_work_session_callable_service.dart';
 import '../services/production_station_work_session_service.dart';
 
-/// M1-B — dinamički operator obrazac iz profila (pilot: `chemical_dosing`).
+/// M1-B / M1-C — dinamički operator obrazac iz profila (`chemical_dosing`, `wastewater_treatment`, …).
 class ProfileDrivenWorkScreen extends StatefulWidget {
   const ProfileDrivenWorkScreen({
     super.key,
@@ -84,8 +84,13 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
     return _userPlantKey == _plantKey;
   }
 
+  bool get _isChemicalDosingProfile =>
+      widget.profile.profileKey.trim() == 'chemical_dosing';
+
   bool get _controlledInputEnabled =>
       widget.stationConfig.controlledInputEnabled;
+
+  bool get _loadsChemicalMasterData => _isChemicalDosingProfile;
 
   String get _stationTitle => widget.stationConfig.title;
 
@@ -196,6 +201,11 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
         _workBaths = baths;
         _masterLoading = false;
       });
+      if (!_loadsChemicalMasterData) {
+        _applyUnitDefaultsForSelection();
+        if (mounted) setState(() {});
+        return;
+      }
       final workBathId = _entitySelections['workBathId'];
       if (workBathId != null && workBathId.isNotEmpty) {
         await _reloadChemicalsForWorkBath(workBathId);
@@ -305,6 +315,9 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
   }
 
   List<String> _enumOptionsFor(ProductionStationProfileField field) {
+    if (field.enumValues.isNotEmpty) {
+      return field.enumValues;
+    }
     final from = field.enumFrom ?? '';
     if (from == 'units.allowedUnits') {
       return _resolveUnitOptions();
@@ -321,14 +334,22 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
     return null;
   }
 
-  ControlledInputWorkBathOption? _selectedWorkBath() {
+  ControlledInputWorkBathOption? _selectedProcessWorkBath() {
     final workBathId = (_entitySelections['workBathId'] ?? '').trim();
-    if (workBathId.isEmpty) return null;
+    if (workBathId.isNotEmpty) {
+      for (final b in _workBaths) {
+        if (b.id == workBathId) return b;
+      }
+    }
+    final treatmentPointId = (_entitySelections['treatmentPointId'] ?? '').trim();
+    if (treatmentPointId.isEmpty) return null;
     for (final b in _workBaths) {
-      if (b.id == workBathId) return b;
+      if (b.id == treatmentPointId) return b;
     }
     return null;
   }
+
+  ControlledInputWorkBathOption? _selectedWorkBath() => _selectedProcessWorkBath();
 
   String _formatConcentrationPreview(num? value) {
     if (value == null) return 'Nije definisano';
@@ -606,16 +627,26 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
     });
   }
 
+  List<ControlledInputEntityOption> _entitySelectOptionsFor(
+    ProductionStationProfileField field,
+  ) {
+    switch (field.key) {
+      case 'workBathId':
+      case 'treatmentPointId':
+        return _workBaths;
+      case 'chemicalId':
+        return _chemicals;
+      default:
+        return const [];
+    }
+  }
+
   Widget _buildEntitySelectField(
     ProductionStationProfileField field, {
     required bool enabled,
   }) {
     final selected = _entitySelections[field.key];
-    final options = field.key == 'workBathId'
-        ? _workBaths
-        : field.key == 'chemicalId'
-        ? _chemicals
-        : const <ControlledInputEntityOption>[];
+    final options = _entitySelectOptionsFor(field);
 
     final dependsOnBath = field.filterDependsOn == 'workBathId';
     final bathSelected =
@@ -773,8 +804,8 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
   }
 
   Widget _buildMasterSnapshotPreview() {
-    final bathSelected = (_entitySelections['workBathId'] ?? '').trim().isNotEmpty;
-    if (!bathSelected) return const SizedBox.shrink();
+    final bath = _selectedProcessWorkBath();
+    if (bath == null) return const SizedBox.shrink();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -789,32 +820,34 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
             ),
             const SizedBox(height: 12),
             _previewInfoRow('Procesno područje', _previewProcessAreaLabel()),
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'Koncentracija',
-                    style: const TextStyle(fontWeight: FontWeight.w500),
+            if (_isChemicalDosingProfile) ...[
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      'Koncentracija',
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
                   ),
-                ),
-                Tooltip(
-                  message:
-                      'Koncentracija se ne unosi ručno. Ako je definisana u katalogu hemikalije, sistem je prikazuje automatski.',
-                  child: Icon(
-                    Icons.info_outline,
-                    size: 20,
-                    color: Theme.of(context).colorScheme.primary,
+                  Tooltip(
+                    message:
+                        'Koncentracija se ne unosi ručno. Ako je definisana u katalogu hemikalije, sistem je prikazuje automatski.',
+                    child: Icon(
+                      Icons.info_outline,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
-                ),
-                Expanded(
-                  flex: 3,
-                  child: Text(_previewConcentrationLabel()),
-                ),
-              ],
-            ),
+                  Expanded(
+                    flex: 3,
+                    child: Text(_previewConcentrationLabel()),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -841,7 +874,9 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
   }
 
   bool _showUndefinedSnapshot(String key) =>
-      key == 'concentrationSnapshot' || key == 'processAreaNameSnapshot';
+      key == 'concentrationSnapshot' ||
+      key == 'processAreaNameSnapshot' ||
+      key == 'treatmentPointNameSnapshot';
 
   String _snapshotDisplayValue(String key, String? value) {
     final trimmed = (value ?? '').trim();
@@ -1174,9 +1209,13 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted) return;
               _syncFormFromSession(session);
-              final workBathId = _entitySelections['workBathId'];
-              if (workBathId != null && workBathId.isNotEmpty) {
-                unawaited(_reloadChemicalsForWorkBath(workBathId));
+              if (_loadsChemicalMasterData) {
+                final workBathId = _entitySelections['workBathId'];
+                if (workBathId != null && workBathId.isNotEmpty) {
+                  unawaited(_reloadChemicalsForWorkBath(workBathId));
+                }
+              } else {
+                _applyUnitDefaultsForSelection();
               }
               setState(() {});
             });
