@@ -306,38 +306,11 @@ class _ProfileDrivenEvidenceRecordsScreenState
   }
 
   Widget _statusBadge(String status) {
-    final label = _statusLabel(status);
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: cs.primaryContainer.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: cs.primary.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Text(
-        label,
-        style: StandardTableMetrics.cellStyle(cs).copyWith(
-          fontWeight: FontWeight.w600,
-          fontSize: 10.5,
-        ),
-      ),
-    );
+    return StandardTableStatusBadge(label: _statusLabel(status));
   }
 
   Widget _detailButton(ProfileDrivenEvidenceListItem item) {
-    return TextButton(
-      style: TextButton.styleFrom(
-        visualDensity: VisualDensity.compact,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-      onPressed: () => _openDetail(item),
-      child: const Text('Otvori', style: TextStyle(fontSize: 12)),
-    );
+    return StandardTableOpenLink(onPressed: () => _openDetail(item));
   }
 
   List<Widget> _buildDataCells({

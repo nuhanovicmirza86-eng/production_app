@@ -52,9 +52,9 @@ class ProfileDrivenEvidenceGridTable extends StatelessWidget {
               child: Text(
                 columns[i].label,
                 textAlign: columns[i].align,
-                maxLines: 2,
+                maxLines: columns[i].label.contains('\n') ? 2 : 1,
                 overflow: TextOverflow.ellipsis,
-                softWrap: true,
+                softWrap: false,
                 style: headerStyle,
               ),
             ),

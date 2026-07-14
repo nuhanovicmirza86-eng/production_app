@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// Kanonski vizual tablica u Production appu (npr. Proizvodni nalozi → Zalihe i status).
+/// Kanonski vizual tablica u Production appu (npr. Proizvodni nalozi, evidencije).
+///
+/// Koristi [StandardTableShell], [StandardTableFlexCell], [StandardTableMetrics],
+/// [StandardTableStatusBadge] i [StandardTableOpenLink] za konzistentan izgled.
 class StandardTableMetrics {
   StandardTableMetrics._();
 
@@ -111,6 +114,70 @@ class StandardTableFlexCell extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Status pill u koloni tabele — jedan red teksta, bez lomljenja u uskim ćelijama.
+class StandardTableStatusBadge extends StatelessWidget {
+  const StandardTableStatusBadge({
+    super.key,
+    required this.label,
+  });
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: cs.primaryContainer.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: cs.primary.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          softWrap: false,
+          textAlign: TextAlign.center,
+          style: StandardTableMetrics.cellStyle(cs).copyWith(
+            fontWeight: FontWeight.w600,
+            fontSize: 10.5,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Link „Otvori“ u koloni Detalji — jedina klikabilna akcija u redu tabele.
+class StandardTableOpenLink extends StatelessWidget {
+  const StandardTableOpenLink({
+    super.key,
+    required this.onPressed,
+    this.label = 'Otvori',
+  });
+
+  final VoidCallback onPressed;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      style: TextButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      onPressed: onPressed,
+      child: Text(label, style: const TextStyle(fontSize: 12)),
     );
   }
 }
