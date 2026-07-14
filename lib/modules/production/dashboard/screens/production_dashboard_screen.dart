@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
@@ -7,51 +10,49 @@ import 'package:production_app/screens/about_screen.dart';
 
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/saas/production_module_keys.dart';
-import '../../../auth/screens/station_device_mode_screen.dart';
-import '../../../../core/access/production_maintenance_bridge.dart';
 import '../../../../core/company_logo_resolver.dart';
 import '../../../../core/company_plant_display_name.dart';
+import '../../../../core/access/production_maintenance_bridge.dart';
 import '../../../auth/shared/services/auth_service.dart';
 import '../../../auth/register/screens/pending_users_screen.dart';
-import '../../../commercial/partners/screens/partners_screen.dart';
 import '../../../commercial/orders/screens/document_pdf_settings_screen.dart';
-import '../../../commercial/orders/screens/orders_list_screen.dart';
-import '../../products/screens/products_list_screen.dart';
-import '../../work_centers/screens/work_centers_list_screen.dart';
+import '../../../personal/work_time/screens/work_time_hub_screen.dart';
+import '../../../workforce/screens/workforce_dashboard_screen.dart';
+import '../../downtime/screens/downtimes_screen.dart';
+import '../../execution/screens/process_execution_hub_screen.dart';
+import '../../issues/screens/production_problem_reporting_screen.dart';
 import '../../processes/screens/production_processes_list_screen.dart';
-import '../../../logistics/receipt/screens/station1_packed_boxes_logistics_screen.dart';
+import '../../tracking/screens/production_reports_hub_screen.dart';
+import '../../work_centers/screens/work_centers_list_screen.dart';
+import '../../../commercial/partners/screens/partners_screen.dart';
+import '../../../commercial/orders/screens/orders_list_screen.dart';
+import '../../../development/screens/development_projects_list_screen.dart';
+import '../../../finance_integrations/screens/finance_controlling_hub_screen.dart';
+import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../../../logistics/screens/logistics_hub_entry_screen.dart';
-import '../../packing/services/packing_box_service.dart';
 import '../../../sustainability/screens/carbon_footprint_screen.dart';
+import '../../ai/screens/production_ai_hub_screen.dart';
+import '../../notifications/mes_inbox_screen.dart';
+import '../../ooe/screens/ooe_dashboard_screen.dart';
+import '../../products/screens/products_list_screen.dart';
 import '../../production_orders/screens/production_orders_list_screen.dart';
 import '../../planning/screens/production_planning_home_screen.dart';
 import '../../tracking/models/production_operator_tracking_entry.dart';
 import '../../tracking/screens/production_operator_tracking_screen.dart';
 import '../../tracking/screens/production_operator_tracking_station_screen.dart';
-import '../../station_pages/screens/production_stations_admin_screen.dart';
-import '../../station_pages/screens/production_profile_stations_hub_screen.dart';
-import '../../station_pages/widgets/station_page_active_gate.dart';
 import '../../station_pages/screens/station1_operator_launch_screen.dart';
 import '../../station_pages/screens/station2_operator_launch_screen.dart';
-import '../../ai/screens/production_ai_hub_screen.dart';
-import '../../tracking/screens/production_reports_hub_screen.dart';
-import '../../issues/screens/production_problem_reporting_screen.dart';
-import '../../../workforce/screens/workforce_dashboard_screen.dart';
-import '../../../personal/work_time/screens/work_time_hub_screen.dart';
-import '../../ooe/screens/factory_performance_dashboard_screen.dart';
-import '../../ooe/screens/ooe_dashboard_screen.dart';
-import '../../ooe/screens/teep_analysis_screen.dart';
-import '../../analytics/screens/operonix_analytics_dashboard_screen.dart';
-import '../../notifications/mes_inbox_screen.dart';
-import '../../downtime/screens/downtimes_screen.dart';
-import '../../execution/screens/process_execution_hub_screen.dart';
-import '../../../../features/station_evidence/screens/profile_driven_evidence_list_screen.dart';
+import '../../station_pages/widgets/station_page_active_gate.dart';
 import '../../qr/production_qr_scan_flow.dart';
-import '../../../quality/screens/execute_inspection_screen.dart';
-import '../../../development/screens/development_projects_list_screen.dart';
-import '../../../finance_integrations/screens/finance_controlling_hub_screen.dart';
-import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../../../quality/screens/quality_hub_screen.dart';
+import '../models/production_dashboard_layout.dart';
+import '../models/production_dashboard_module.dart';
+import '../production_dashboard_access.dart';
+import '../production_dashboard_module_catalog.dart';
+import '../services/production_dashboard_layout_preference.dart';
+import '../widgets/production_dashboard_action_tile.dart';
+import '../widgets/production_dashboard_home_modules_view.dart';
+import '../widgets/production_dashboard_layout_selector.dart';
 
 class _ProdNavItem {
   final WidgetBuilder builder;
@@ -78,6 +79,10 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
 
   final GlobalKey<ScaffoldState> _shellScaffoldKey = GlobalKey<ScaffoldState>();
 
+  ProductionDashboardLayout _dashboardLayout =
+      ProductionDashboardLayout.standard;
+  StreamSubscription<ProductionDashboardLayout>? _dashboardLayoutSub;
+
   Map<String, dynamic> get companyData => widget.companyData;
 
   String get _companyId => (companyData['companyId'] ?? '').toString().trim();
@@ -92,6 +97,35 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
   }
 
   String get _role => ProductionAccessHelper.normalizeRole(companyData['role']);
+
+  ProductionDashboardAccess get _dashboardAccess =>
+      ProductionDashboardAccess.fromCompanyData(companyData);
+
+  @override
+  void initState() {
+    super.initState();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      _dashboardLayoutSub =
+          ProductionDashboardLayoutPreference.watch(uid).listen((layout) {
+        if (!mounted) return;
+        setState(() => _dashboardLayout = layout);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _dashboardLayoutSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _setDashboardLayout(ProductionDashboardLayout layout) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    setState(() => _dashboardLayout = layout);
+    await ProductionDashboardLayoutPreference.save(uid: uid, layout: layout);
+  }
 
   List<String> get _enabledModules {
     final raw = companyData['enabledModules'];
@@ -177,497 +211,6 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         _role == 'logistics_manager';
   }
 
-  String _packedBoxesPendingNotice(int count) {
-    if (count == 1) return '1 nova kutija čeka prijem';
-    if (count >= 2 && count <= 4) return '$count nove kutije čekaju prijem';
-    return '$count novih kutija čeka prijem';
-  }
-
-  /// Postavka lokalnog uređaja (stanica nakon prijave) — samo uloga Admin (tenant),
-  /// ne Super admin niti druge uloge.
-  bool _canConfigureStationDevice() {
-    return ProductionAccessHelper.isAdminRole(_role);
-  }
-
-  static const double _tileGap = 10;
-
-  String _logisticsSectionSubtitle() {
-    if (_hasModule('logistics')) {
-      return 'Pretplata uključuje modul „logistics“. Centralni hub, skladište, prijem kutija (ovisno o ulozi).';
-    }
-    return 'Centralni magacin / Hub nije dostupan bez modula „logistics“ u pretplati. Ostale kartice ovise o ulozi.';
-  }
-
-  List<Widget> _buildProductionActions(BuildContext context) {
-    if (!_hasModule('production') && !_hasModule('quality')) return [];
-
-    void open(Widget screen) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
-    }
-
-    void openTrackingStation(String phase) {
-      Navigator.push<void>(
-        context,
-        MaterialPageRoute<void>(
-          fullscreenDialog: true,
-          builder: (_) => StationPageActiveGate(
-            companyData: companyData,
-            phase: phase,
-            stationBuilder: (_) =>
-                phase == ProductionOperatorTrackingEntry.phasePreparation
-                ? Station1OperatorLaunchScreen(companyData: companyData)
-                : phase == ProductionOperatorTrackingEntry.phaseFirstControl
-                ? Station2OperatorLaunchScreen(companyData: companyData)
-                : ProductionOperatorTrackingStationScreen(
-                    companyData: companyData,
-                    phase: phase,
-                  ),
-          ),
-        ),
-      );
-    }
-
-    /// U QMS pretplati prva/završna kontrola vodi na izvršenje kontrole (IATF); inače stanica praćenja.
-    void openQmsInspectionForStationPhase(String phase) {
-      final pref = phase == ProductionOperatorTrackingEntry.phaseFirstControl
-          ? 'IN_PROCESS'
-          : 'FINAL';
-      Navigator.push<void>(
-        context,
-        MaterialPageRoute<void>(
-          builder: (_) => ExecuteInspectionScreen(
-            companyData: companyData,
-            preferredInspectionType: pref,
-          ),
-        ),
-      );
-    }
-
-    final productionTiles = <Widget>[
-      if (_hasModule('production')) ...[
-        if (_canConfigureStationDevice())
-          _DashboardActionTile(
-            icon: Icons.display_settings_outlined,
-            title: 'Način rada na ovom uređaju',
-            subtitle:
-                'Cijela aplikacija ili jedna stanica nakon prijave (samo uloga Admin).',
-            onTap: () => open(const StationDeviceModeScreen()),
-          ),
-        if (_canViewCard(ProductionDashboardCard.products))
-          _DashboardActionTile(
-            icon: Icons.inventory_2_outlined,
-            title: 'Proizvodi',
-            subtitle: 'Pregled i upravljanje proizvodima.',
-            onTap: () => open(ProductsListScreen(companyData: companyData)),
-          ),
-        if (_canViewCard(ProductionDashboardCard.productionOrders))
-          _DashboardActionTile(
-            icon: Icons.assignment,
-            title: 'Proizvodni nalozi',
-            subtitle: 'Lista naloga, detalji i statusi.',
-            onTap: () =>
-                open(ProductionOrdersListScreen(companyData: companyData)),
-          ),
-        if (_canViewCard(ProductionDashboardCard.productionOrders))
-          _DashboardActionTile(
-            icon: Icons.view_timeline_outlined,
-            title: 'Planiranje proizvodnje',
-            subtitle:
-                'Nalozi → Raspored → Provedba → Kapacitet; isti kontekst plana.',
-            onTap: () =>
-                open(ProductionPlanningHomeScreen(companyData: companyData)),
-          ),
-        if (_canViewCard(ProductionDashboardCard.productionTracking)) ...[
-          _DashboardActionTile(
-            icon: Icons.play_circle_outline,
-            title: 'Praćenje proizvodnje (tabovi)',
-            subtitle:
-                'Pregled KPI i trendova, zatim tri faze unosa u jednom ekranu.',
-            onTap: () => open(
-              ProductionOperatorTrackingScreen(companyData: companyData),
-            ),
-          ),
-          _DashboardActionTile(
-            icon: Icons.fullscreen_outlined,
-            title: 'Stanica: pripremna',
-            subtitle:
-                'Puni zaslon — pripremna + traka prijave (QR uskoro). Jedan monitor.',
-            onTap: () => openTrackingStation(
-              ProductionOperatorTrackingEntry.phasePreparation,
-            ),
-          ),
-          _DashboardActionTile(
-            icon: Icons.fact_check_outlined,
-            title: 'Stanica: prva kontrola',
-            subtitle: _hasModule('quality')
-                ? 'Kontrola kvaliteta u tijeku obrade. Seriju unosite u „Praćenje proizvodnje“.'
-                : 'Puni zaslon — faza u izradi (placeholder do punog unosa).',
-            onTap: () => _hasModule('quality')
-                ? openQmsInspectionForStationPhase(
-                    ProductionOperatorTrackingEntry.phaseFirstControl,
-                  )
-                : openTrackingStation(
-                    ProductionOperatorTrackingEntry.phaseFirstControl,
-                  ),
-          ),
-          _DashboardActionTile(
-            icon: Icons.verified_outlined,
-            title: 'Stanica: završna kontrola',
-            subtitle: _hasModule('quality')
-                ? 'Završna kontrola kvalitete. Seriju unosite u „Praćenje proizvodnje“.'
-                : 'Puni zaslon — faza u izradi (placeholder do punog unosa).',
-            onTap: () => _hasModule('quality')
-                ? openQmsInspectionForStationPhase(
-                    ProductionOperatorTrackingEntry.phaseFinalControl,
-                  )
-                : openTrackingStation(
-                    ProductionOperatorTrackingEntry.phaseFinalControl,
-                  ),
-          ),
-          if (ProductionAccessHelper.canUseProfileStationRuntime(_role))
-            _DashboardActionTile(
-              icon: Icons.science_outlined,
-              title: 'Operativne stanice (profil)',
-              subtitle:
-                  'Rad na stanicama prema profilu (npr. doziranje hemikalija).',
-              onTap: () => open(
-                ProductionProfileStationsHubScreen(companyData: companyData),
-              ),
-            ),
-          if (_hasModule('production') &&
-              ProductionAccessHelper.canViewProfileDrivenEvidence(_role))
-            _DashboardActionTile(
-              icon: Icons.fact_check_outlined,
-              title: 'Evidencije procesa — profile-driven',
-              subtitle:
-                  'Pregled završenih evidencija doziranja hemikalija i obrade otpadnih voda.',
-              onTap: () => open(
-                ProfileDrivenEvidenceListScreen(companyData: companyData),
-              ),
-            ),
-        ],
-        if (_canViewCard(ProductionDashboardCard.stationPages))
-          _DashboardActionTile(
-            icon: Icons.touch_app_outlined,
-            title: 'Stanice proizvodnje',
-            subtitle:
-                'Konfiguracija proizvodnih i mašinskih stanica po kompaniji.',
-            onTap: () => open(
-              ProductionStationsAdminScreen(companyData: companyData),
-            ),
-          ),
-        if (_canViewCard(ProductionDashboardCard.workCenters))
-          _DashboardActionTile(
-            icon: Icons.precision_manufacturing_outlined,
-            title: 'Radni centri',
-            subtitle:
-                'Strojevi i linije: kapacitet, tip, povezivanje s učinkom i imovinom.',
-            onTap: () => open(WorkCentersListScreen(companyData: companyData)),
-          ),
-        if (_canViewCard(ProductionDashboardCard.productionProcesses))
-          _DashboardActionTile(
-            icon: Icons.account_tree_outlined,
-            title: 'Procesi',
-            subtitle:
-                'Definicije procesa: tip aktivnosti, kvaliteta, sljedljivost, povezani radni centri; rutiranje bira redoslijed.',
-            onTap: () =>
-                open(ProductionProcessesListScreen(companyData: companyData)),
-          ),
-        if (_canViewCard(ProductionDashboardCard.shifts))
-          _DashboardActionTile(
-            icon: Icons.groups_2_outlined,
-            title: 'Radna snaga',
-            subtitle:
-                'F1: profil, smjene, prisutnost, tko smije raditi na kojem mjestu.',
-            onTap: () =>
-                open(WorkforceDashboardScreen(companyData: companyData)),
-          ),
-        if (_canAccessPersonalWorkTime())
-          _DashboardActionTile(
-            icon: Icons.access_time_filled,
-            title: 'Obračun radnog vremena',
-            subtitle:
-                'Prisutnost, dnevna i mjesečna slaganja, korekcije (modul Osobno).',
-            onTap: () => open(WorkTimeHubScreen(companyData: companyData)),
-          ),
-        if (_canViewCard(ProductionDashboardCard.downtime))
-          _DashboardActionTile(
-            icon: Icons.warning_amber_outlined,
-            title: 'Zastoji',
-            subtitle:
-                'Vrijeme zastoja, povezivanje s nalogom i centrom, utjecaj na učinak, audit.',
-            onTap: () => open(DowntimesScreen(companyData: companyData)),
-          ),
-        if (_canViewCard(ProductionDashboardCard.ooe))
-          _DashboardActionTile(
-            icon: Icons.dashboard_customize_outlined,
-            title: 'OOE — učinak pogona',
-            subtitle:
-                'Iskoristivost, gubici, raspoloživost u jednom pregledu (isti raspored, tamna tema).',
-            onTap: () => open(
-              FactoryPerformanceDashboardScreen(companyData: companyData),
-            ),
-          ),
-        if (_canViewCard(ProductionDashboardCard.ooe))
-          _DashboardActionTile(
-            icon: Icons.speed_outlined,
-            title: 'OOE — praćenje uživo',
-            subtitle: 'Trenutno stanje, gubici i sažetak smjene iz zabilježenih događaja.',
-            onTap: () => open(OoeDashboardScreen(companyData: companyData)),
-          ),
-        if (_canViewCard(ProductionDashboardCard.ooe))
-          _DashboardActionTile(
-            icon: Icons.percent_outlined,
-            title: 'TEEP i kapacitet',
-            subtitle:
-                'Kalendar, iskorištenje, TEEP (dan / tjedan / mjesec, pogon ili stroj).',
-            onTap: () => open(TeepAnalysisScreen(companyData: companyData)),
-          ),
-        if (_canViewCard(ProductionDashboardCard.operonixAnalytics))
-          _DashboardActionTile(
-            icon: Icons.hub_outlined,
-            title: 'Operonix Analytics',
-            subtitle:
-                'Pregled učinkovitosti, Pareto, trendovi, smjene, sažetak s asistentom, detalji po centrima.',
-            onTap: () => open(
-              OperonixAnalyticsDashboardScreen(companyData: companyData),
-            ),
-          ),
-        if (_canAccessMaintenanceFaultBridge() &&
-            _canViewCard(ProductionDashboardCard.problemReporting))
-          _DashboardActionTile(
-            icon: Icons.report_problem_outlined,
-            title: 'Prijava problema',
-            subtitle: 'Prijava kvara + pregled mojih prijava.',
-            onTap: () => open(
-              ProductionProblemReportingScreen(companyData: companyData),
-            ),
-          ),
-        if (_canViewCard(ProductionDashboardCard.processExecution))
-          _DashboardActionTile(
-            icon: Icons.science_outlined,
-            title: 'Evidencija procesa',
-            subtitle:
-                'Procesi u šifrarniku, nalozi i praćenje — IATF i izvršenje koraka.',
-            onTap: () =>
-                open(ProcessExecutionHubScreen(companyData: companyData)),
-          ),
-        if (_canShowReportsCard())
-          _DashboardActionTile(
-            icon: Icons.assessment_outlined,
-            title: 'Izvještaji',
-            subtitle: 'Otpad, dnevna proizvodnja, IATF / CAPA.',
-            onTap: () =>
-                open(ProductionReportsHubScreen(companyData: companyData)),
-          ),
-      ],
-    ];
-
-    final qualityTiles = <Widget>[
-      if (_hasModule('quality') &&
-          _canViewCard(ProductionDashboardCard.qualityManagement))
-        _DashboardActionTile(
-          icon: Icons.assignment_turned_in_outlined,
-          title: 'Kvalitet — središnji izbornik',
-          subtitle: 'Kontrolni planovi, kontrole (sken), neslaganja, CAPA, IATF 16949.',
-          onTap: () => open(QualityHubScreen(companyData: companyData)),
-        ),
-    ];
-
-    final developmentTiles = <Widget>[
-      if (ProductionModuleKeys.hasModule(companyData, ProductionModuleKeys.development) &&
-          _canViewCard(ProductionDashboardCard.developmentGovernance))
-        _DashboardActionTile(
-          icon: Icons.account_tree_outlined,
-          title: 'Razvoj / NPI / Projekti',
-          subtitle:
-              'Portfolio, Stage-Gate, KPI i veza prema proizvodnji i kvalitetu (pretplata „development“).',
-          onTap: () =>
-              open(DevelopmentProjectsListScreen(companyData: companyData)),
-        ),
-    ];
-
-    final financeIntegrationTiles = <Widget>[
-      if (_canAccessFinanceIntegrations())
-        _DashboardActionTile(
-          icon: Icons.account_balance_outlined,
-          title: 'Financije · ERP integracije',
-          subtitle:
-              'Operativna finansijska istina, KPI, troškovi i ERP sync (pretplata Finance & Controlling).',
-          onTap: () => open(
-            FinanceControllingHubScreen(
-              companyData: companyData,
-              debugUnlockModule: kDebugMode,
-            ),
-          ),
-        ),
-    ];
-
-    final commercialTiles = <Widget>[
-      if (_canAccessOrders())
-        _DashboardActionTile(
-          icon: Icons.receipt_long_outlined,
-          title: 'Narudžbe',
-          subtitle: 'Pregled i rad s narudžbama.',
-          onTap: () => open(OrdersListScreen(companyData: companyData)),
-        ),
-      if (_canAccessOrders())
-        _DashboardActionTile(
-          icon: Icons.picture_as_pdf_outlined,
-          title: 'Podaci za ispis PDF',
-          subtitle: 'Zaglavlje, logo i podaci kompanije na dokumentima.',
-          onTap: () =>
-              open(DocumentPdfSettingsScreen(companyData: companyData)),
-        ),
-      if (_canAccessPartners())
-        _DashboardActionTile(
-          icon: Icons.groups_outlined,
-          title: 'Kupci / dobavljači',
-          subtitle: 'Partneri i poslovne veze.',
-          onTap: () => open(PartnersScreen(companyData: companyData)),
-        ),
-    ];
-
-    final logisticsTiles = <Widget>[
-      if (_canAccessCentralWarehouse() && _hasModule('logistics'))
-        _DashboardActionTile(
-          icon: Icons.hub_outlined,
-          title: 'Centralni magacin / Hub',
-          subtitle:
-              'Pregled zona, master MAG_*, WMS (prijem, kvaliteta, putaway, FIFO, otpremna), evidencija, QR.',
-          onTap: () => open(LogisticsHubEntryScreen(companyData: companyData)),
-        ),
-      if (_canAccessCentralWarehouse())
-        StreamBuilder<List<PackingBoxRecord>>(
-          stream: PackingBoxService().watchClosedPendingReceipt(
-            companyId: _companyId,
-            plantKey: _plantKey,
-          ),
-          builder: (context, snap) {
-            final count = snap.data?.length ?? 0;
-            return _DashboardActionTile(
-              icon: Icons.move_to_inbox_outlined,
-              title: 'Upakovane kutije Stanica 1',
-              subtitle:
-                  'Lista zatvorenih kutija i prijem u magacin skeniranjem QR-a.',
-              noticeText:
-                  count > 0 ? _packedBoxesPendingNotice(count) : null,
-              onTap: () => open(
-                Station1PackedBoxesLogisticsScreen(companyData: companyData),
-              ),
-            );
-          },
-        ),
-    ];
-
-    final sustainabilityTiles = <Widget>[
-      if (_canViewCard(ProductionDashboardCard.carbonFootprint))
-        _DashboardActionTile(
-          icon: Icons.eco_outlined,
-          title: 'Karbonski otisak',
-          subtitle: 'Praćenje i evidencija utjecaja.',
-          onTap: () => open(CarbonFootprintScreen(companyData: companyData)),
-        ),
-    ];
-
-    final aiTiles = <Widget>[
-      if (_hasAiProductionAiHubAccess() &&
-          _canViewCard(ProductionDashboardCard.aiAssistant))
-        _DashboardActionTile(
-          icon: Icons.smart_toy_outlined,
-          title: kOperonixAiAssistantTitle,
-          subtitle: 'Chat, analitika i izvještaji (SaaS AI paketi).',
-          onTap: () => open(ProductionAiHubScreen(companyData: companyData)),
-        ),
-    ];
-
-    const sectionGap = 18.0;
-    const afterHeader = 8.0;
-
-    final out = <Widget>[];
-
-    void addModuleSection({
-      required String title,
-      required String subtitle,
-      required IconData icon,
-      required List<Widget> tiles,
-    }) {
-      if (tiles.isEmpty) return;
-      if (out.isNotEmpty) out.add(const SizedBox(height: sectionGap));
-      out.add(_ModuleGroupHeader(title: title, subtitle: subtitle, icon: icon));
-      out.add(const SizedBox(height: afterHeader));
-      out.addAll(_withTileGaps(tiles));
-    }
-
-    addModuleSection(
-      title: 'Proizvodnja',
-      subtitle:
-          'SaaS modul „production“: proizvodi, proizvodni nalozi, praćenje, stanice, izvještaji.',
-      icon: Icons.precision_manufacturing_outlined,
-      tiles: productionTiles,
-    );
-    addModuleSection(
-      title: 'Kvalitet',
-      subtitle:
-          'SaaS modul „quality“: IATF-friendly kontrola — plan, izvršenje, neskladi, CAPA.',
-      icon: Icons.fact_check_outlined,
-      tiles: qualityTiles,
-    );
-    addModuleSection(
-      title: 'Razvoj i projekti',
-      subtitle:
-          'SaaS modul „development“: NPI, Stage-Gate, portfolio po poslovnoj godini i pogonu.',
-      icon: Icons.account_tree_outlined,
-      tiles: developmentTiles,
-    );
-    addModuleSection(
-      title: 'Finance & Controlling',
-      subtitle:
-          'Modul „finance_controlling“ / „finance_integrations“: troškovi, KPI, budžeti, ERP.',
-      icon: Icons.account_balance_outlined,
-      tiles: financeIntegrationTiles,
-    );
-    addModuleSection(
-      title: 'Komercijalno',
-      subtitle:
-          'Narudžbe i partneri u ovoj aplikaciji — dio iste „production“ pretplate (nije zaseban modul).',
-      icon: Icons.storefront_outlined,
-      tiles: commercialTiles,
-    );
-    addModuleSection(
-      title: 'Logistika i magacin',
-      subtitle: _logisticsSectionSubtitle(),
-      icon: Icons.local_shipping_outlined,
-      tiles: logisticsTiles,
-    );
-    addModuleSection(
-      title: 'Održivost',
-      subtitle:
-          'Karbonski otisak uz proizvodnju (isti tenant; ovisi o uključenim izvještajima).',
-      icon: Icons.eco_outlined,
-      tiles: sustainabilityTiles,
-    );
-    addModuleSection(
-      title: kOperonixAiShortLabel,
-      subtitle:
-          'Dodatni SaaS paketi (npr. ai_assistant_production, ai_reports) uz osnovnu pretplatu.',
-      icon: Icons.smart_toy_outlined,
-      tiles: aiTiles,
-    );
-
-    return out;
-  }
-
-  List<Widget> _withTileGaps(List<Widget> tiles) {
-    if (tiles.isEmpty) return const [];
-    final out = <Widget>[];
-    for (var i = 0; i < tiles.length; i++) {
-      if (i > 0) out.add(const SizedBox(height: _tileGap));
-      out.add(tiles[i]);
-    }
-    return out;
-  }
-
   /// Ista logika širine kao maintenance `HomeScreen` (web / Windows / ≥900 px).
   bool _isWideLayout(BuildContext context) {
     final w = MediaQuery.sizeOf(context).width;
@@ -675,183 +218,37 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     return isWin || w >= 900;
   }
 
-  List<Widget> _buildHomeQuickActions(BuildContext context) {
-    const sectionGap = 18.0;
-    const afterHeader = 8.0;
-    final tiles = <Widget>[];
-
-    if (_canViewCard(ProductionDashboardCard.registrations)) {
-      tiles.add(
-        const _ModuleGroupHeader(
-          title: 'Korisnici',
-          subtitle: 'Administracija tenant računa (odobravanje novih prijava).',
-          icon: Icons.manage_accounts_outlined,
-        ),
-      );
-      tiles.add(const SizedBox(height: afterHeader));
-      tiles.add(
-        _DashboardActionTile(
-          icon: Icons.person_add_alt_1,
-          title: 'Registracije',
-          subtitle: 'Odobri nove korisnike (pending).',
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (_) => const PendingUsersScreen(),
-              ),
-            );
-          },
-        ),
-      );
-      tiles.add(const SizedBox(height: sectionGap));
-    }
-
-    tiles.addAll(_buildProductionActions(context));
-
-    if (_hasModule('quality') &&
-        _canViewCard(ProductionDashboardCard.qualityManagement)) {
-      if (tiles.isNotEmpty) {
-        tiles.add(const SizedBox(height: sectionGap));
-      }
-      tiles.add(
-        const _ModuleGroupHeader(
-          title: 'Kvalitet',
-          subtitle:
-              'Pretplata uključuje modul „quality“: kontrolni plan, kontrole, NCR, CAPA.',
-          icon: Icons.assignment_turned_in_outlined,
-        ),
-      );
-      tiles.add(const SizedBox(height: afterHeader));
-      tiles.add(
-        _DashboardActionTile(
-          icon: Icons.dashboard_customize_outlined,
-          title: 'Kvalitet — središnji izbornik',
-          subtitle: 'Dashboard, planovi, izvršenje kontrole (sken), NCR, CAPA.',
-          onTap: () {
-            Navigator.push<void>(
-              context,
-              MaterialPageRoute<void>(
-                builder: (_) => QualityHubScreen(companyData: companyData),
-              ),
-            );
-          },
-        ),
-      );
-    }
-
-    if (ProductionModuleKeys.hasModule(companyData, ProductionModuleKeys.development) &&
-        _canViewCard(ProductionDashboardCard.developmentGovernance)) {
-      if (tiles.isNotEmpty) {
-        tiles.add(const SizedBox(height: sectionGap));
-      }
-      tiles.add(
-        const _ModuleGroupHeader(
-          title: 'Razvoj i projekti',
-          subtitle:
-              'Pretplata uključuje modul „development“: portfolio, NPI, Stage-Gate.',
-          icon: Icons.account_tree_outlined,
-        ),
-      );
-      tiles.add(const SizedBox(height: afterHeader));
-      tiles.add(
-        _DashboardActionTile(
-          icon: Icons.account_tree_outlined,
-          title: 'Razvoj / NPI / Projekti',
-          subtitle: 'Lista projekata za odabrani pogon i poslovnu godinu.',
-          onTap: () {
-            Navigator.push<void>(
-              context,
-              MaterialPageRoute<void>(
-                builder: (_) =>
-                    DevelopmentProjectsListScreen(companyData: companyData),
-              ),
-            );
-          },
-        ),
-      );
-    }
-
-    if (_canAccessFinanceIntegrations()) {
-      if (tiles.isNotEmpty) {
-        tiles.add(const SizedBox(height: sectionGap));
-      }
-      tiles.add(
-        const _ModuleGroupHeader(
-          title: 'Financije i ERP',
-          subtitle:
-              'Finance & Controlling — poslovna godina, KPI, troškovi, ERP.',
-          icon: Icons.account_balance_outlined,
-        ),
-      );
-      tiles.add(const SizedBox(height: afterHeader));
-      tiles.add(
-        _DashboardActionTile(
-          icon: Icons.hub_outlined,
-          title: 'Financije · integracije',
-          subtitle: 'ERP veze, sync poslovi, mapiranja.',
-          onTap: () {
-            Navigator.push<void>(
-              context,
-              MaterialPageRoute<void>(
-                builder: (_) => FinanceControllingHubScreen(
-                  companyData: companyData,
-                  debugUnlockModule: kDebugMode,
-                ),
-              ),
-            );
-          },
-        ),
-      );
-    }
-
-    if (tiles.isNotEmpty) {
-      tiles.add(const SizedBox(height: sectionGap));
-    }
-    tiles.add(
-      const _ModuleGroupHeader(
-        title: 'Općenito',
-        subtitle: 'Informacije o aplikaciji.',
-        icon: Icons.info_outline,
-      ),
-    );
-    tiles.add(const SizedBox(height: afterHeader));
-    tiles.add(
-      _DashboardActionTile(
-        icon: Icons.article_outlined,
-        title: 'O aplikaciji',
-        subtitle: 'Verzija, autor, informacije.',
-        onTap: () {
-          Navigator.push<void>(
-            context,
-            MaterialPageRoute<void>(builder: (_) => const AboutScreen()),
-          );
-        },
-      ),
-    );
-    return tiles;
-  }
-
   List<_ProdNavItem> _buildFullNav(BuildContext context) {
     final cd = companyData;
 
     final items = <_ProdNavItem>[
       _ProdNavItem(
-        builder: (ctx) => _ProductionHomePage(
-          companyData: cd,
-          roleLabel: ProductionAccessHelper.displayRoleLabel(
-            companyData['role'],
-          ),
-          companyId: _companyId,
-          plantKey: _plantKey,
-          companyLine: _companyDisplayName,
-          showQrScanAction:
-              _hasModule('production') &&
-              (_canViewCard(ProductionDashboardCard.productionOrders) ||
-                  _canAccessCentralWarehouse()),
-          onOpenQrScan: _openProductionQrScan,
-          quickActionChildren: _withTileGaps(_buildHomeQuickActions(ctx)),
-        ),
+        builder: (ctx) {
+          final access = _dashboardAccess;
+          final sections = ProductionDashboardModuleCatalog(
+            access: access,
+            companyData: cd,
+            debugUnlockFinanceModule: kDebugMode,
+          ).buildSections(ctx);
+          return _ProductionHomePage(
+            companyData: cd,
+            roleLabel: ProductionAccessHelper.displayRoleLabel(
+              companyData['role'],
+            ),
+            companyId: _companyId,
+            plantKey: _plantKey,
+            companyLine: _companyDisplayName,
+            showQrScanAction:
+                _hasModule('production') &&
+                (_canViewCard(ProductionDashboardCard.productionOrders) ||
+                    _canAccessCentralWarehouse()),
+            onOpenQrScan: _openProductionQrScan,
+            dashboardLayout: _dashboardLayout,
+            onDashboardLayoutChanged: _setDashboardLayout,
+            moduleSections: sections,
+            dashboardAccess: access,
+          );
+        },
         destination: const NavigationDestination(
           icon: Icon(Icons.home_outlined),
           selectedIcon: Icon(Icons.home),
@@ -1268,7 +665,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                   if (_hasModule('production')) ...[
                     if (_canAccessOrders()) ...[
                       const SizedBox(height: 10),
-                      _DashboardActionTile(
+                      ProductionDashboardActionTile(
                         icon: Icons.receipt_long_outlined,
                         title: 'Narudžbe',
                         subtitle: 'Pregled i rad s narudžbama',
@@ -1283,7 +680,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                         },
                       ),
                       const SizedBox(height: 10),
-                      _DashboardActionTile(
+                      ProductionDashboardActionTile(
                         icon: Icons.picture_as_pdf_outlined,
                         title: 'Podaci za ispis PDF',
                         subtitle:
@@ -1302,7 +699,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                     ],
                     if (_canAccessPartners()) ...[
                       const SizedBox(height: 10),
-                      _DashboardActionTile(
+                      ProductionDashboardActionTile(
                         icon: Icons.groups_outlined,
                         title: 'Kupci / dobavljači',
                         subtitle: 'Partneri i poslovne veze',
@@ -1320,7 +717,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                     if (_canAccessCentralWarehouse() &&
                         _hasModule('logistics')) ...[
                       const SizedBox(height: 10),
-                      _DashboardActionTile(
+                      ProductionDashboardActionTile(
                         icon: Icons.hub_outlined,
                         title: 'Centralni magacin / Hub',
                         subtitle: 'Pregled, master, WMS, QR',
@@ -1341,7 +738,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                           ProductionDashboardCard.qualityManagement,
                         )) ...[
                       const SizedBox(height: 10),
-                      _DashboardActionTile(
+                      ProductionDashboardActionTile(
                         icon: Icons.assignment_turned_in_outlined,
                         title: 'Kvalitet — središnji izbornik',
                         subtitle: 'Kontrolni plan, kontrole, NCR, CAPA',
@@ -1361,7 +758,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                           ProductionDashboardCard.developmentGovernance,
                         )) ...[
                       const SizedBox(height: 10),
-                      _DashboardActionTile(
+                      ProductionDashboardActionTile(
                         icon: Icons.account_tree_outlined,
                         title: 'Razvoj / NPI / Projekti',
                         subtitle: 'Portfolio i projekti',
@@ -1379,7 +776,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                     ],
                     if (_canAccessFinanceIntegrations()) ...[
                       const SizedBox(height: 10),
-                      _DashboardActionTile(
+                      ProductionDashboardActionTile(
                         icon: Icons.account_balance_outlined,
                         title: 'Financije · integracije',
                         subtitle: 'ERP veze i sync',
@@ -1399,7 +796,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                     ],
                   ],
                   const SizedBox(height: 10),
-                  _DashboardActionTile(
+                  ProductionDashboardActionTile(
                     icon: Icons.article_outlined,
                     title: 'O aplikaciji',
                     subtitle: 'Verzija, autor, informacije',
@@ -1533,7 +930,10 @@ class _ProductionHomePage extends StatelessWidget {
   /// Brzi QR sken (nalog / naljepnica) — ikona u AppBar umjesto velike kartice.
   final bool showQrScanAction;
   final Future<void> Function(BuildContext context)? onOpenQrScan;
-  final List<Widget> quickActionChildren;
+  final ProductionDashboardLayout dashboardLayout;
+  final ValueChanged<ProductionDashboardLayout> onDashboardLayoutChanged;
+  final List<ProductionDashboardModuleSection> moduleSections;
+  final ProductionDashboardAccess dashboardAccess;
 
   const _ProductionHomePage({
     required this.companyData,
@@ -1543,7 +943,10 @@ class _ProductionHomePage extends StatelessWidget {
     required this.companyLine,
     this.showQrScanAction = false,
     this.onOpenQrScan,
-    required this.quickActionChildren,
+    required this.dashboardLayout,
+    required this.onDashboardLayoutChanged,
+    required this.moduleSections,
+    required this.dashboardAccess,
   });
 
   @override
@@ -1592,7 +995,16 @@ class _ProductionHomePage extends StatelessWidget {
             ),
           ),
           SizedBox(height: gap * 0.75),
-          ...quickActionChildren,
+          ProductionDashboardLayoutSelector(
+            value: dashboardLayout,
+            onChanged: onDashboardLayoutChanged,
+          ),
+          SizedBox(height: gap * 0.75),
+          ProductionDashboardHomeModulesView(
+            layout: dashboardLayout,
+            sections: moduleSections,
+            access: dashboardAccess,
+          ),
         ],
       ),
     );
@@ -1905,177 +1317,6 @@ class _SectionTitle extends StatelessWidget {
     return Text(
       title,
       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
-    );
-  }
-}
-
-/// Naslov bloka na početnoj: koji SaaS / poslovni modul pokriva kartice ispod.
-class _ModuleGroupHeader extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-
-  const _ModuleGroupHeader({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 22, color: kOperonixProductionBrandGreen),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.35,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Kartica prečice kao maintenance [_HomeDashboardScreenState._actionButton].
-class _DashboardActionTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final String? noticeText;
-  final VoidCallback onTap;
-
-  const _DashboardActionTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.noticeText,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(
-          color: kOperonixProductionBrandGreen,
-          width: 1.5,
-        ),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: kOperonixProductionBrandGreen.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: kOperonixProductionBrandGreen.withValues(
-                      alpha: 0.45,
-                    ),
-                  ),
-                ),
-                child: Icon(icon, color: kOperonixProductionBrandGreen),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(color: Colors.black54),
-                    ),
-                    if (noticeText != null && noticeText!.trim().isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: kOperonixProductionBrandGreen.withValues(
-                            alpha: 0.12,
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: kOperonixProductionBrandGreen.withValues(
-                              alpha: 0.35,
-                            ),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.notifications_active_outlined,
-                              size: 18,
-                              color: kOperonixProductionBrandGreen,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                noticeText!,
-                                style: TextStyle(
-                                  color: kOperonixProductionBrandGreen
-                                      .withValues(alpha: 0.95),
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.chevron_right,
-                color: kOperonixProductionBrandGreen.withValues(alpha: 0.55),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

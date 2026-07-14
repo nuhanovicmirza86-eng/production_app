@@ -40,6 +40,9 @@ abstract final class ProductionModuleKeys {
   /// APS P1 — scenariji i gruba kapacitetna provjera.
   static const String apsScenarioPlanning = 'aps_scenario_planning';
 
+  /// APS P2/P5 — heuristička optimizacija rasporeda.
+  static const String apsOptimization = 'aps_optimization';
+
   /// APS P6 add-on — AI asistent za planiranje.
   static const String apsAiAssistant = 'aps_ai_assistant';
 
@@ -136,6 +139,10 @@ abstract final class ProductionModuleKeys {
 
   static bool hasApsScenarioPlanningModule(Map<String, dynamic> companyData) {
     return hasModule(companyData, apsScenarioPlanning);
+  }
+
+  static bool hasApsOptimizationModule(Map<String, dynamic> companyData) {
+    return hasModule(companyData, apsOptimization);
   }
 
   static bool hasApsAiAssistantModule(Map<String, dynamic> companyData) {
