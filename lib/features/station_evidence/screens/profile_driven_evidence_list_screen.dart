@@ -322,25 +322,64 @@ class _ProfileDrivenEvidenceListScreenState
     );
   }
 
-  Widget _cardMetaRow(String label, String value) {
+  IconData _profileIcon(String processProfileType) {
+    switch (processProfileType) {
+      case 'chemical_dosing':
+        return Icons.science_outlined;
+      case 'wastewater_treatment':
+        return Icons.water_drop_outlined;
+      default:
+        return Icons.assignment_outlined;
+    }
+  }
+
+  Color _profileAccentColor(String processProfileType, ColorScheme cs) {
+    switch (processProfileType) {
+      case 'chemical_dosing':
+        return cs.tertiary;
+      case 'wastewater_treatment':
+        return cs.primary;
+      default:
+        return cs.secondary;
+    }
+  }
+
+  Widget _infoChip({
+    required String label,
+    required ColorScheme cs,
+    Color? background,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: background ?? cs.surfaceContainerHighest.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6)),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _cardMetaLine(IconData icon, String text) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 110,
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
+          Icon(icon, size: 16, color: cs.onSurfaceVariant),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
-              value,
-              style: Theme.of(context).textTheme.bodyMedium,
+              text,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                height: 1.35,
+              ),
             ),
           ),
         ],
@@ -350,6 +389,8 @@ class _ProfileDrivenEvidenceListScreenState
 
   Widget _buildEvidenceCard(ProfileDrivenEvidenceHubEntry entry) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final accent = _profileAccentColor(entry.processProfileType, cs);
     final lastLabel = entry.lastEndedAt == null
         ? '—'
         : formatEvidenceDateOnly(entry.lastEndedAt);
@@ -358,43 +399,105 @@ class _ProfileDrivenEvidenceListScreenState
         : '—';
 
     return Card(
-      elevation: 1,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.55)),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
         onTap: entry.supportsRecordsView ? () => _openRecords(entry) : null,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                entry.profileDisplayName,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: 4,
+              color: accent.withValues(alpha: 0.85),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          _profileIcon(entry.processProfileType),
+                          color: accent,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              entry.profileDisplayName,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                _infoChip(
+                                  label: entry.profileDisplayName,
+                                  cs: cs,
+                                  background: accent.withValues(alpha: 0.12),
+                                ),
+                                _infoChip(
+                                  label: _plantLabel(entry.plantKey),
+                                  cs: cs,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  if (entry.stationDisplayLabel.trim().isNotEmpty)
+                    _cardMetaLine(
+                      Icons.precision_manufacturing_outlined,
+                      'Stanica: ${entry.stationDisplayLabel}',
+                    ),
+                  _cardMetaLine(
+                    Icons.event_outlined,
+                    'Zadnji zapis: $lastLabel',
+                  ),
+                  _cardMetaLine(
+                    Icons.format_list_numbered_outlined,
+                    'Broj zapisa: $countLabel',
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              _cardMetaRow('Pogon', _plantLabel(entry.plantKey)),
-              _cardMetaRow('Profil', entry.profileDisplayName),
-              if (entry.stationDisplayLabel.trim().isNotEmpty)
-                _cardMetaRow('Stanica', entry.stationDisplayLabel),
-              _cardMetaRow('Zadnji zapis', lastLabel),
-              _cardMetaRow('Broj zapisa', countLabel),
-              const SizedBox(height: 12),
-              Align(
+            ),
+            Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.45)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+              child: Align(
                 alignment: Alignment.centerRight,
-                child: FilledButton.tonal(
+                child: FilledButton.icon(
                   onPressed: () => _openRecords(entry),
-                  child: const Text('Otvori'),
+                  icon: const Icon(Icons.arrow_forward, size: 18),
+                  label: const Text('Otvori'),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -411,10 +514,10 @@ class _ProfileDrivenEvidenceListScreenState
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.symmetric(vertical: 8),
               gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 420,
-                mainAxisExtent: 260,
-                crossAxisSpacing: 0,
-                mainAxisSpacing: 0,
+                maxCrossAxisExtent: 440,
+                mainAxisExtent: 340,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 4,
               ),
               itemCount: _entries.length,
               itemBuilder: (_, i) => _buildEvidenceCard(_entries[i]),
@@ -422,6 +525,7 @@ class _ProfileDrivenEvidenceListScreenState
           }
           return ListView.builder(
             physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 16),
             itemCount: _entries.length,
             itemBuilder: (_, i) => _buildEvidenceCard(_entries[i]),
           );

@@ -8,10 +8,120 @@ import '../services/profile_driven_evidence_hub_access.dart';
 import '../models/profile_driven_evidence_hub_entry.dart';
 import '../models/profile_driven_evidence_session.dart';
 import '../services/profile_driven_evidence_callable_service.dart';
+import '../../../core/ui/standard_table_components.dart';
+import '../widgets/profile_driven_evidence_grid.dart';
 import 'profile_driven_evidence_detail_screen.dart';
 
 const _profileWastewaterTreatment = 'wastewater_treatment';
 const _pageSizeOptions = [10, 20, 50, 100];
+
+const _wastewaterColumns = [
+  ProfileDrivenEvidenceGridColumn(id: 'date', label: 'Datum', flex: 8),
+  ProfileDrivenEvidenceGridColumn(id: 'time', label: 'Vrijeme', flex: 7),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'reactor',
+    label: 'Reaktor',
+    flex: 7,
+    align: TextAlign.center,
+  ),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'treatment_point',
+    label: 'Procesna tačka',
+    flex: 12,
+  ),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'quantity',
+    label: 'Tretirana\nkoličina',
+    flex: 9,
+    align: TextAlign.right,
+    numeric: true,
+  ),
+  ProfileDrivenEvidenceGridColumn(id: 'unit', label: 'Jedinica', flex: 7),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'lime',
+    label: 'Kreč',
+    flex: 6,
+    align: TextAlign.right,
+    numeric: true,
+  ),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'metabisulfite',
+    label: 'Metabisulfit',
+    flex: 8,
+    align: TextAlign.right,
+    numeric: true,
+  ),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'naoh',
+    label: 'NaOH',
+    flex: 6,
+    align: TextAlign.right,
+    numeric: true,
+  ),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'heavy_metals',
+    label: 'Teški\nmetali',
+    flex: 8,
+    align: TextAlign.center,
+  ),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'ph',
+    label: 'pH',
+    flex: 5,
+    align: TextAlign.right,
+    numeric: true,
+  ),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'temperature',
+    label: 'Temperatura',
+    flex: 8,
+    align: TextAlign.right,
+    numeric: true,
+  ),
+  ProfileDrivenEvidenceGridColumn(id: 'operator', label: 'Operater', flex: 10),
+  ProfileDrivenEvidenceGridColumn(id: 'status', label: 'Status', flex: 8),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'details',
+    label: 'Detalji',
+    flex: 8,
+    align: TextAlign.center,
+  ),
+];
+
+const _chemicalColumns = [
+  ProfileDrivenEvidenceGridColumn(id: 'date', label: 'Datum', flex: 7),
+  ProfileDrivenEvidenceGridColumn(id: 'time', label: 'Vrijeme', flex: 6),
+  ProfileDrivenEvidenceGridColumn(id: 'work_bath', label: 'Radna kada', flex: 10),
+  ProfileDrivenEvidenceGridColumn(id: 'chemical', label: 'Hemikalija', flex: 10),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'quantity',
+    label: 'Količina',
+    flex: 7,
+    align: TextAlign.right,
+    numeric: true,
+  ),
+  ProfileDrivenEvidenceGridColumn(id: 'unit', label: 'Jedinica', flex: 6),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'process_area',
+    label: 'Procesno\npodručje',
+    flex: 10,
+  ),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'concentration',
+    label: 'Koncentracija',
+    flex: 8,
+  ),
+  ProfileDrivenEvidenceGridColumn(id: 'lot', label: 'Lot / šarža', flex: 8),
+  ProfileDrivenEvidenceGridColumn(id: 'reason', label: 'Razlog', flex: 10),
+  ProfileDrivenEvidenceGridColumn(id: 'operator', label: 'Operater', flex: 10),
+  ProfileDrivenEvidenceGridColumn(id: 'status', label: 'Status', flex: 7),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'details',
+    label: 'Detalji',
+    flex: 7,
+    align: TextAlign.center,
+  ),
+];
 
 /// M2-C — tabelarni pregled zapisa jedne evidencije (profil + pogon).
 class ProfileDrivenEvidenceRecordsScreen extends StatefulWidget {
@@ -36,10 +146,7 @@ class ProfileDrivenEvidenceRecordsScreen extends StatefulWidget {
 class _ProfileDrivenEvidenceRecordsScreenState
     extends State<ProfileDrivenEvidenceRecordsScreen> {
   final _service = ProfileDrivenEvidenceCallableService();
-  late final ScrollController _horizontalHeaderController;
-  late final ScrollController _horizontalBodyController;
   late final ScrollController _verticalBodyController;
-  bool _syncingHorizontalScroll = false;
 
   bool _loading = true;
   Object? _error;
@@ -56,44 +163,22 @@ class _ProfileDrivenEvidenceRecordsScreenState
 
   String get _plantKey => widget.hubEntry.plantKey;
 
-  double get _tableMinWidth =>
-      _processProfileType == _profileWastewaterTreatment ? 2280 : 2040;
+  List<ProfileDrivenEvidenceGridColumn> get _columns =>
+      _processProfileType == _profileWastewaterTreatment
+      ? _wastewaterColumns
+      : _chemicalColumns;
 
   @override
   void initState() {
     super.initState();
-    _horizontalHeaderController = ScrollController();
-    _horizontalBodyController = ScrollController();
     _verticalBodyController = ScrollController();
-    _horizontalHeaderController.addListener(_syncHeaderToBody);
-    _horizontalBodyController.addListener(_syncBodyToHeader);
     _load();
   }
 
   @override
   void dispose() {
-    _horizontalHeaderController.removeListener(_syncHeaderToBody);
-    _horizontalBodyController.removeListener(_syncBodyToHeader);
-    _horizontalHeaderController.dispose();
-    _horizontalBodyController.dispose();
     _verticalBodyController.dispose();
     super.dispose();
-  }
-
-  void _syncHeaderToBody() {
-    if (_syncingHorizontalScroll) return;
-    if (!_horizontalBodyController.hasClients) return;
-    _syncingHorizontalScroll = true;
-    _horizontalBodyController.jumpTo(_horizontalHeaderController.offset);
-    _syncingHorizontalScroll = false;
-  }
-
-  void _syncBodyToHeader() {
-    if (_syncingHorizontalScroll) return;
-    if (!_horizontalHeaderController.hasClients) return;
-    _syncingHorizontalScroll = true;
-    _horizontalHeaderController.jumpTo(_horizontalBodyController.offset);
-    _syncingHorizontalScroll = false;
   }
 
   String _formatApiDate(DateTime d) {
@@ -220,42 +305,182 @@ class _ProfileDrivenEvidenceRecordsScreenState
     return status;
   }
 
-  Widget _statusCell(String status, {required double width}) {
+  Widget _statusBadge(String status) {
     final label = _statusLabel(status);
-    return SizedBox(
-      width: width,
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primaryContainer.withValues(
-              alpha: 0.55,
-            ),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall,
-          ),
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: cs.primaryContainer.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: cs.primary.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Text(
+        label,
+        style: StandardTableMetrics.cellStyle(cs).copyWith(
+          fontWeight: FontWeight.w600,
+          fontSize: 10.5,
         ),
       ),
     );
   }
 
-  Widget _detailCell(ProfileDrivenEvidenceListItem item, {required double width}) {
-    return SizedBox(
-      width: width,
-      child: Center(
-        child: TextButton(
-          style: TextButton.styleFrom(
-            visualDensity: VisualDensity.compact,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-          ),
-          onPressed: () => _openDetail(item),
-          child: const Text('Otvori'),
-        ),
+  Widget _detailButton(ProfileDrivenEvidenceListItem item) {
+    return TextButton(
+      style: TextButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
+      onPressed: () => _openDetail(item),
+      child: const Text('Otvori', style: TextStyle(fontSize: 12)),
+    );
+  }
+
+  List<Widget> _buildDataCells({
+    required ProfileDrivenEvidenceListItem item,
+    required List<ProfileDrivenEvidenceGridColumn> cols,
+    required Color borderColor,
+    required Color rowBackground,
+    required TextStyle cellStyle,
+    required String? Function(String columnId) valueFor,
+  }) {
+    final cells = <Widget>[];
+    for (var i = 0; i < cols.length; i++) {
+      final col = cols[i];
+      final isLast = i == cols.length - 1;
+      if (col.id == 'status') {
+        cells.add(
+          profileEvidenceGridWidgetCell(
+            column: col,
+            borderColor: borderColor,
+            rowBackground: rowBackground,
+            isLast: isLast,
+            child: _statusBadge(item.status),
+          ),
+        );
+      } else if (col.id == 'details') {
+        cells.add(
+          profileEvidenceGridWidgetCell(
+            column: col,
+            borderColor: borderColor,
+            rowBackground: rowBackground,
+            isLast: isLast,
+            child: _detailButton(item),
+          ),
+        );
+      } else {
+        cells.add(
+          profileEvidenceGridTextCell(
+            column: col,
+            text: valueFor(col.id) ?? '—',
+            borderColor: borderColor,
+            rowBackground: rowBackground,
+            cellStyle: cellStyle,
+            isLast: isLast,
+          ),
+        );
+      }
+    }
+    return cells;
+  }
+
+  List<Widget> _wastewaterCells(
+    ProfileDrivenEvidenceListItem item,
+    List<ProfileDrivenEvidenceGridColumn> cols,
+    Color borderColor,
+    Color rowBackground,
+    TextStyle cellStyle,
+  ) {
+    final s = item.summaryFields;
+    return _buildDataCells(
+      item: item,
+      cols: cols,
+      borderColor: borderColor,
+      rowBackground: rowBackground,
+      cellStyle: cellStyle,
+      valueFor: (id) {
+        switch (id) {
+          case 'date':
+            return formatEvidenceDateShort(item.endedAt);
+          case 'time':
+            return formatEvidenceTime(item.endedAt);
+          case 'reactor':
+            return s.reactorNumber;
+          case 'treatment_point':
+            return s.treatmentPointName;
+          case 'quantity':
+            return formatFieldValue(s.quantity);
+          case 'unit':
+            return s.unit;
+          case 'lime':
+            return formatFieldValue(s.limeQuantity);
+          case 'metabisulfite':
+            return formatFieldValue(s.sodiumMetabisulfiteQuantity);
+          case 'naoh':
+            return formatFieldValue(s.sodiumHydroxideQuantity);
+          case 'heavy_metals':
+            return formatHeavyMetalsLabel(s.heavyMetalsPresent);
+          case 'ph':
+            return formatFieldValue(s.phValue);
+          case 'temperature':
+            return s.temperatureC == null
+                ? null
+                : '${formatFieldValue(s.temperatureC)} °C';
+          case 'operator':
+            return _operatorLabel(item);
+          default:
+            return null;
+        }
+      },
+    );
+  }
+
+  List<Widget> _chemicalCells(
+    ProfileDrivenEvidenceListItem item,
+    List<ProfileDrivenEvidenceGridColumn> cols,
+    Color borderColor,
+    Color rowBackground,
+    TextStyle cellStyle,
+  ) {
+    final s = item.summaryFields;
+    return _buildDataCells(
+      item: item,
+      cols: cols,
+      borderColor: borderColor,
+      rowBackground: rowBackground,
+      cellStyle: cellStyle,
+      valueFor: (id) {
+        switch (id) {
+          case 'date':
+            return formatEvidenceDateShort(item.endedAt);
+          case 'time':
+            return formatEvidenceTime(item.endedAt);
+          case 'work_bath':
+            return s.workBathName;
+          case 'chemical':
+            return s.chemicalName;
+          case 'quantity':
+            return formatFieldValue(s.quantity);
+          case 'unit':
+            return s.unit;
+          case 'process_area':
+            return s.processAreaName;
+          case 'concentration':
+            return s.concentrationSnapshot;
+          case 'lot':
+            return s.chemicalLot;
+          case 'reason':
+            return s.dosingReason;
+          case 'operator':
+            return _operatorLabel(item);
+          default:
+            return null;
+        }
+      },
     );
   }
 
@@ -335,159 +560,41 @@ class _ProfileDrivenEvidenceRecordsScreenState
     );
   }
 
-  TextStyle _cellStyle({bool header = false}) {
-    final theme = Theme.of(context);
-    return (header ? theme.textTheme.labelMedium : theme.textTheme.bodySmall)!
-        .copyWith(fontWeight: header ? FontWeight.w600 : FontWeight.w400);
-  }
-
-  Widget _cell(
-    String text, {
-    required double width,
-    TextAlign align = TextAlign.left,
-    bool header = false,
-  }) {
-    return SizedBox(
-      width: width,
-      child: Text(
-        text,
-        textAlign: align,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: _cellStyle(header: header),
-      ),
-    );
-  }
-
-  Widget _headerRow() {
-    if (_processProfileType == _profileWastewaterTreatment) {
-      return Row(
-        children: [
-          _cell('Datum', width: 88, header: true),
-          _cell('Vrijeme', width: 56, header: true),
-          _cell('Reaktor', width: 64, header: true, align: TextAlign.center),
-          _cell('Procesna tačka', width: 160, header: true),
-          _cell('Tretirana količina', width: 96, header: true, align: TextAlign.right),
-          _cell('Jedinica', width: 72, header: true),
-          _cell('Kreč', width: 64, header: true, align: TextAlign.right),
-          _cell('Natrijum metabisulfit', width: 104, header: true, align: TextAlign.right),
-          _cell('NaOH', width: 64, header: true, align: TextAlign.right),
-          _cell('Teški metali', width: 88, header: true, align: TextAlign.center),
-          _cell('pH', width: 48, header: true, align: TextAlign.center),
-          _cell('Temperatura', width: 88, header: true, align: TextAlign.right),
-          _cell('Operater', width: 120, header: true),
-          _cell('Status', width: 88, header: true),
-          _cell('Detalji', width: 88, header: true, align: TextAlign.center),
-        ],
-      );
-    }
-    return Row(
-      children: [
-        _cell('Datum', width: 88, header: true),
-        _cell('Vrijeme', width: 56, header: true),
-        _cell('Radna kada', width: 140, header: true),
-        _cell('Hemikalija', width: 140, header: true),
-        _cell('Količina', width: 72, header: true, align: TextAlign.right),
-        _cell('Jedinica', width: 72, header: true),
-        _cell('Procesno područje', width: 140, header: true),
-        _cell('Koncentracija', width: 120, header: true),
-        _cell('Lot / šarža', width: 120, header: true),
-        _cell('Razlog', width: 120, header: true),
-        _cell('Operater', width: 120, header: true),
-        _cell('Status', width: 88, header: true),
-        _cell('Detalji', width: 88, header: true, align: TextAlign.center),
-      ],
-    );
-  }
-
-  Widget _dataRow(ProfileDrivenEvidenceListItem item, int index) {
-    final theme = Theme.of(context);
-    final s = item.summaryFields;
-    final bg = index.isEven
-        ? theme.colorScheme.surface
-        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35);
-
-    Widget rowContent;
-    if (_processProfileType == _profileWastewaterTreatment) {
-      rowContent = Row(
-        children: [
-          _cell(formatEvidenceDateShort(item.endedAt), width: 88),
-          _cell(formatEvidenceTime(item.endedAt), width: 56),
-          _cell(s.reactorNumber ?? '—', width: 64, align: TextAlign.center),
-          _cell(s.treatmentPointName ?? '—', width: 160),
-          _cell(formatFieldValue(s.quantity), width: 96, align: TextAlign.right),
-          _cell(s.unit ?? '—', width: 72),
-          _cell(formatFieldValue(s.limeQuantity), width: 64, align: TextAlign.right),
-          _cell(
-            formatFieldValue(s.sodiumMetabisulfiteQuantity),
-            width: 104,
-            align: TextAlign.right,
-          ),
-          _cell(
-            formatFieldValue(s.sodiumHydroxideQuantity),
-            width: 64,
-            align: TextAlign.right,
-          ),
-          _cell(
-            formatHeavyMetalsLabel(s.heavyMetalsPresent),
-            width: 88,
-            align: TextAlign.center,
-          ),
-          _cell(formatFieldValue(s.phValue), width: 48, align: TextAlign.center),
-          _cell(
-            s.temperatureC == null
-                ? '—'
-                : '${formatFieldValue(s.temperatureC)} °C',
-            width: 88,
-            align: TextAlign.right,
-          ),
-          _cell(_operatorLabel(item), width: 120),
-          _statusCell(item.status, width: 88),
-          _detailCell(item, width: 88),
-        ],
-      );
-    } else {
-      rowContent = Row(
-        children: [
-          _cell(formatEvidenceDateShort(item.endedAt), width: 88),
-          _cell(formatEvidenceTime(item.endedAt), width: 56),
-          _cell(s.workBathName ?? '—', width: 140),
-          _cell(s.chemicalName ?? '—', width: 140),
-          _cell(formatFieldValue(s.quantity), width: 72, align: TextAlign.right),
-          _cell(s.unit ?? '—', width: 72),
-          _cell(s.processAreaName ?? '—', width: 140),
-          _cell(s.concentrationSnapshot ?? '—', width: 120),
-          _cell(s.chemicalLot ?? '—', width: 120),
-          _cell(s.dosingReason ?? '—', width: 120),
-          _cell(_operatorLabel(item), width: 120),
-          _statusCell(item.status, width: 88),
-          _detailCell(item, width: 88),
-        ],
-      );
-    }
-
-    return Material(
-      color: bg,
-      child: InkWell(
-        onTap: () => _openDetail(item),
-        child: Container(
-          height: 44,
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: theme.dividerColor.withValues(alpha: 0.6),
-              ),
-            ),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: rowContent,
-        ),
-      ),
-    );
-  }
-
   Widget _buildTable() {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final borderColor = StandardTableMetrics.borderColor(cs);
+    final rowBackground = StandardTableMetrics.rowBackground(cs);
+    final cellStyle = StandardTableMetrics.cellStyle(cs);
+    final cols = _columns;
+    final isWastewater = _processProfileType == _profileWastewaterTreatment;
+
+    Widget dataRow(int index) {
+      final item = _items[index];
+      final cells = isWastewater
+          ? _wastewaterCells(
+              item,
+              cols,
+              borderColor,
+              rowBackground,
+              cellStyle,
+            )
+          : _chemicalCells(
+              item,
+              cols,
+              borderColor,
+              rowBackground,
+              cellStyle,
+            );
+
+      return IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: cells,
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -497,52 +604,34 @@ class _ProfileDrivenEvidenceRecordsScreenState
             child: Text(
               '${_items.length} zapisa',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+                color: cs.onSurfaceVariant,
               ),
             ),
           ),
-        Material(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
-          child: Container(
-            decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: theme.dividerColor)),
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              controller: _horizontalHeaderController,
-              child: SizedBox(
-                width: _tableMinWidth,
-                height: 46,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: _headerRow(),
-                ),
-              ),
-            ),
-          ),
-        ),
         Expanded(
-          child: RefreshIndicator(
-            onRefresh: _load,
-            child: Scrollbar(
-              controller: _verticalBodyController,
-              thumbVisibility: true,
-              child: SingleChildScrollView(
-                controller: _verticalBodyController,
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  controller: _horizontalBodyController,
-                  child: SizedBox(
-                    width: _tableMinWidth,
-                    child: Column(
-                      children: [
-                        for (var i = 0; i < _items.length; i++)
-                          _dataRow(_items[i], i),
-                      ],
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: StandardTableShell(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ProfileDrivenEvidenceGridTable(columns: cols),
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: _load,
+                      child: Scrollbar(
+                        controller: _verticalBodyController,
+                        thumbVisibility: true,
+                        child: ListView.builder(
+                          controller: _verticalBodyController,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: _items.length,
+                          itemBuilder: (_, index) => dataRow(index),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
