@@ -10,9 +10,11 @@ import '../models/profile_driven_evidence_session.dart';
 import '../services/profile_driven_evidence_callable_service.dart';
 import '../../../core/ui/standard_table_components.dart';
 import '../widgets/profile_driven_evidence_grid.dart';
+import '../utils/profile_driven_evidence_rework_labels.dart';
 import 'profile_driven_evidence_detail_screen.dart';
 
 const _profileWastewaterTreatment = 'wastewater_treatment';
+const _profileReworkAndPainting = 'rework_and_painting';
 const _pageSizeOptions = [10, 20, 50, 100];
 
 const _wastewaterColumns = [
@@ -123,6 +125,62 @@ const _chemicalColumns = [
   ),
 ];
 
+const _reworkColumns = [
+  ProfileDrivenEvidenceGridColumn(id: 'date', label: 'Datum', flex: 7),
+  ProfileDrivenEvidenceGridColumn(id: 'time', label: 'Vrijeme', flex: 6),
+  ProfileDrivenEvidenceGridColumn(id: 'operation_type', label: 'Tip obrade', flex: 9),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'station',
+    label: 'Stanica',
+    flex: 10,
+  ),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'processed',
+    label: 'Obrađeno',
+    flex: 7,
+    align: TextAlign.right,
+    numeric: true,
+  ),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'ok',
+    label: 'OK',
+    flex: 6,
+    align: TextAlign.right,
+    numeric: true,
+  ),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'scrap',
+    label: 'Škart',
+    flex: 6,
+    align: TextAlign.right,
+    numeric: true,
+  ),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'rework',
+    label: 'Ponovna\ndorada',
+    flex: 7,
+    align: TextAlign.right,
+    numeric: true,
+  ),
+  ProfileDrivenEvidenceGridColumn(id: 'materials', label: 'Materijali', flex: 12),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'duration',
+    label: 'Vrijeme\nrada',
+    flex: 7,
+    align: TextAlign.right,
+    numeric: true,
+  ),
+  ProfileDrivenEvidenceGridColumn(id: 'operators', label: 'Operateri', flex: 10),
+  ProfileDrivenEvidenceGridColumn(id: 'result', label: 'Rezultat', flex: 8),
+  ProfileDrivenEvidenceGridColumn(id: 'status', label: 'Status', flex: 7),
+  ProfileDrivenEvidenceGridColumn(
+    id: 'details',
+    label: 'Detalji',
+    flex: 7,
+    align: TextAlign.center,
+  ),
+];
+
 /// M2-C — tabelarni pregled zapisa jedne evidencije (profil + pogon).
 class ProfileDrivenEvidenceRecordsScreen extends StatefulWidget {
   const ProfileDrivenEvidenceRecordsScreen({
@@ -163,10 +221,16 @@ class _ProfileDrivenEvidenceRecordsScreenState
 
   String get _plantKey => widget.hubEntry.plantKey;
 
-  List<ProfileDrivenEvidenceGridColumn> get _columns =>
-      _processProfileType == _profileWastewaterTreatment
-      ? _wastewaterColumns
-      : _chemicalColumns;
+  List<ProfileDrivenEvidenceGridColumn> get _columns {
+    switch (_processProfileType) {
+      case _profileWastewaterTreatment:
+        return _wastewaterColumns;
+      case _profileReworkAndPainting:
+        return _reworkColumns;
+      default:
+        return _chemicalColumns;
+    }
+  }
 
   @override
   void initState() {
@@ -296,6 +360,15 @@ class _ProfileDrivenEvidenceRecordsScreenState
     final name = (item.operatorDisplayName ?? '').trim();
     if (name.isNotEmpty) return name;
     return (item.operatorEmail ?? '—').trim();
+  }
+
+  String? _reworkStationLabel(ProfileDrivenEvidenceListItem item) {
+    final name = (item.stationDisplayName ?? '').trim();
+    if (name.isNotEmpty) return name;
+    if (item.stationSlot != null) {
+      return 'Stanica ${item.stationSlot}';
+    }
+    return null;
   }
 
   String _statusLabel(String status) {
@@ -533,6 +606,53 @@ class _ProfileDrivenEvidenceRecordsScreenState
     );
   }
 
+  List<Widget> _reworkCells(
+    ProfileDrivenEvidenceListItem item,
+    List<ProfileDrivenEvidenceGridColumn> cols,
+    Color borderColor,
+    Color rowBackground,
+    TextStyle cellStyle,
+  ) {
+    final s = item.summaryFields;
+    return _buildDataCells(
+      item: item,
+      cols: cols,
+      borderColor: borderColor,
+      rowBackground: rowBackground,
+      cellStyle: cellStyle,
+      valueFor: (id) {
+        switch (id) {
+          case 'date':
+            return formatEvidenceDateShort(item.endedAt);
+          case 'time':
+            return formatEvidenceTime(item.endedAt);
+          case 'operation_type':
+            return formatReworkOperationTypeLabel(s.operationType);
+          case 'station':
+            return _reworkStationLabel(item);
+          case 'processed':
+            return formatFieldValue(s.processedTotalQty);
+          case 'ok':
+            return formatFieldValue(s.okTotalQty);
+          case 'scrap':
+            return formatFieldValue(s.scrapTotalQty);
+          case 'rework':
+            return formatFieldValue(s.reworkAgainTotalQty);
+          case 'materials':
+            return s.materialSummary;
+          case 'duration':
+            return formatReworkDurationMinutes(s.durationMinutes);
+          case 'operators':
+            return s.operatorSummary ?? _operatorLabel(item);
+          case 'result':
+            return formatReworkResultStatusLabel(s.resultStatus);
+          default:
+            return null;
+        }
+      },
+    );
+  }
+
   Widget _buildTable() {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
@@ -540,25 +660,36 @@ class _ProfileDrivenEvidenceRecordsScreenState
     final rowBackground = StandardTableMetrics.rowBackground(cs);
     final cellStyle = StandardTableMetrics.cellStyle(cs);
     final cols = _columns;
-    final isWastewater = _processProfileType == _profileWastewaterTreatment;
 
     Widget dataRow(int index) {
       final item = _items[index];
-      final cells = isWastewater
-          ? _wastewaterCells(
-              item,
-              cols,
-              borderColor,
-              rowBackground,
-              cellStyle,
-            )
-          : _chemicalCells(
-              item,
-              cols,
-              borderColor,
-              rowBackground,
-              cellStyle,
-            );
+      final List<Widget> cells;
+      switch (_processProfileType) {
+        case _profileWastewaterTreatment:
+          cells = _wastewaterCells(
+            item,
+            cols,
+            borderColor,
+            rowBackground,
+            cellStyle,
+          );
+        case _profileReworkAndPainting:
+          cells = _reworkCells(
+            item,
+            cols,
+            borderColor,
+            rowBackground,
+            cellStyle,
+          );
+        default:
+          cells = _chemicalCells(
+            item,
+            cols,
+            borderColor,
+            rowBackground,
+            cellStyle,
+          );
+      }
 
       return IntrinsicHeight(
         child: Row(

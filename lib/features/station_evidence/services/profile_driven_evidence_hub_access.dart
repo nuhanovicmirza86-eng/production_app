@@ -84,6 +84,8 @@ class ProfileDrivenEvidenceHubAccess {
         return 'Doziranje hemikalija';
       case 'wastewater_treatment':
         return 'Obrada otpadnih voda';
+      case 'rework_and_painting':
+        return 'Dorada i površinska obrada';
       default:
         return processProfileType;
     }

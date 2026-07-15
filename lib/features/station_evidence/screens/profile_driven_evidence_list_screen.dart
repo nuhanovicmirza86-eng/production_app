@@ -328,6 +328,8 @@ class _ProfileDrivenEvidenceListScreenState
         return Icons.science_outlined;
       case 'wastewater_treatment':
         return Icons.water_drop_outlined;
+      case 'rework_and_painting':
+        return Icons.format_paint_outlined;
       default:
         return Icons.assignment_outlined;
     }
@@ -339,6 +341,8 @@ class _ProfileDrivenEvidenceListScreenState
         return cs.tertiary;
       case 'wastewater_treatment':
         return cs.primary;
+      case 'rework_and_painting':
+        return cs.secondary;
       default:
         return cs.secondary;
     }

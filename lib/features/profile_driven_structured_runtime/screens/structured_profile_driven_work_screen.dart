@@ -87,6 +87,122 @@ class _StructuredProfileDrivenWorkScreenState
     return _userPlantKey == _plantKey;
   }
 
+  bool get _needsProcessWorkBaths => widget.profile.structuredHeaderFields.any(
+    (f) =>
+        f.isEntitySelect &&
+        (f.entityCollection ?? '').trim() == 'process_work_baths',
+  );
+
+  String get _stationContextLabel => widget.stationConfig.title;
+
+  String get _plantContextLabel {
+    final label = _plantDisplayLabel.trim();
+    if (label.isNotEmpty) return label;
+    final key = _plantKey.trim();
+    return key.isNotEmpty ? key : '—';
+  }
+
+  Widget _buildCompactContextLabel(
+    BuildContext context, {
+    required String label,
+    required String value,
+  }) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.55),
+      ),
+      child: Text.rich(
+        TextSpan(
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: cs.onSurfaceVariant,
+          ),
+          children: [
+            TextSpan(
+              text: '$label: ',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface.withValues(alpha: 0.85),
+              ),
+            ),
+            TextSpan(text: value),
+          ],
+        ),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  Widget _buildSessionActionsRow(
+    BuildContext context,
+    ProductionStationWorkSession? session,
+  ) {
+    final active = session?.isActive == true;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Flexible(
+          fit: FlexFit.loose,
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (session == null || !active)
+                FilledButton.icon(
+                  onPressed: _busy || !_plantAccessOk ? null : _startSession,
+                  icon: const Icon(Icons.play_arrow),
+                  label: const Text('Pokreni evidenciju'),
+                ),
+              if (active) ...[
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : () => _saveSession(session!),
+                  icon: const Icon(Icons.save_outlined),
+                  label: const Text('Sačuvaj'),
+                ),
+                FilledButton.icon(
+                  onPressed: _busy ? null : () => _finishSession(session!),
+                  icon: const Icon(Icons.check_circle_outline),
+                  label: const Text('Završi evidenciju'),
+                ),
+              ],
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _closeStation,
+                icon: const Icon(Icons.close),
+                label: const Text('Zatvori stanicu'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 6,
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _buildCompactContextLabel(
+                context,
+                label: 'Pogon',
+                value: _plantContextLabel,
+              ),
+              _buildCompactContextLabel(
+                context,
+                label: 'Stanica',
+                value: _stationContextLabel,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   List<StructuredRepeatableTableDefinition> get _tables =>
       widget.profile.repeatableTableDefinitions;
 
@@ -148,6 +264,14 @@ class _StructuredProfileDrivenWorkScreenState
   }
 
   Future<void> _loadMasterData() async {
+    if (!_needsProcessWorkBaths) {
+      setState(() {
+        _workBaths = const [];
+        _masterLoading = false;
+        _masterError = null;
+      });
+      return;
+    }
     if (_plantKey.isEmpty) {
       setState(() {
         _masterLoading = false;
@@ -229,26 +353,11 @@ class _StructuredProfileDrivenWorkScreenState
           continue;
         }
         final id = raw.toString().trim();
-        if (field.key == 'workAreaId') {
-          ControlledInputWorkBathOption? bath;
-          for (final b in _workBaths) {
-            if (b.id == id) {
-              bath = b;
-              break;
-            }
-          }
-          _headerEntitySelections[field.key] = StructuredEntitySelection(
-            fieldKey: field.key,
-            entityId: id,
-            displayLabel: bath?.dropdownLabel ?? id,
-          );
-        } else {
-          _headerEntitySelections[field.key] = StructuredEntitySelection(
-            fieldKey: field.key,
-            entityId: id,
-            displayLabel: id,
-          );
-        }
+        _headerEntitySelections[field.key] = StructuredEntitySelection(
+          fieldKey: field.key,
+          entityId: id,
+          displayLabel: id,
+        );
       } else if (field.type == 'enum') {
         _headerEnumSelections[field.key] = raw?.toString();
       } else if (field.type == 'datetime') {
@@ -451,39 +560,6 @@ class _StructuredProfileDrivenWorkScreenState
     }
   }
 
-  Widget _buildSessionActions(ProductionStationWorkSession? session) {
-    final active = session?.isActive == true;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        if (session == null || !active)
-          FilledButton.icon(
-            onPressed: _busy || !_plantAccessOk ? null : _startSession,
-            icon: const Icon(Icons.play_arrow),
-            label: const Text('Pokreni evidenciju'),
-          ),
-        if (active) ...[
-          OutlinedButton.icon(
-            onPressed: _busy ? null : () => _saveSession(session!),
-            icon: const Icon(Icons.save_outlined),
-            label: const Text('Sačuvaj'),
-          ),
-          FilledButton.icon(
-            onPressed: _busy ? null : () => _finishSession(session!),
-            icon: const Icon(Icons.check_circle_outline),
-            label: const Text('Završi evidenciju'),
-          ),
-        ],
-        OutlinedButton.icon(
-          onPressed: _busy ? null : _closeStation,
-          icon: const Icon(Icons.close),
-          label: const Text('Zatvori stanicu'),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (!_plantAccessOk) {
@@ -511,18 +587,6 @@ class _StructuredProfileDrivenWorkScreenState
         return Scaffold(
           appBar: AppBar(
             title: Text(widget.stationConfig.title),
-            actions: [
-              if (_plantDisplayLabel.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: Center(
-                    child: Text(
-                      _plantDisplayLabel,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                ),
-            ],
           ),
           body: AbsorbPointer(
             absorbing: _busy,
@@ -544,7 +608,7 @@ class _StructuredProfileDrivenWorkScreenState
                           : 'Evidencija zatvorena.',
                     ),
                     const SizedBox(height: 16),
-                    _buildSessionActions(session),
+                    _buildSessionActionsRow(context, session),
                     const SizedBox(height: 16),
                     StructuredHeaderSection(
                       profile: widget.profile,

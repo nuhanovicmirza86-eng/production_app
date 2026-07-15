@@ -4,6 +4,7 @@ import '../../../modules/production/station_pages/models/production_station_conf
 const profileDrivenEvidenceReadSupportedProfiles = {
   'chemical_dosing',
   'wastewater_treatment',
+  'rework_and_painting',
 };
 
 /// Jedna kartica na hub ekranu — tip evidencije po pogonu (ne pojedinačni zapis).

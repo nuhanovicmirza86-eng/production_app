@@ -4,6 +4,8 @@ import '../../../core/company_plant_display_name.dart';
 import '../../../modules/production/station_pages/models/production_station_profile_field.dart';
 import '../models/profile_driven_evidence_session.dart';
 import '../services/profile_driven_evidence_callable_service.dart';
+import '../utils/profile_driven_evidence_rework_labels.dart';
+import '../widgets/profile_driven_evidence_structured_table.dart';
 
 /// M2-C — read-only detalj zatvorene profile-driven evidencije.
 class ProfileDrivenEvidenceDetailScreen extends StatefulWidget {
@@ -160,6 +162,13 @@ class _ProfileDrivenEvidenceDetailScreenState
   }
 
   Widget _buildBody(ProfileDrivenEvidenceSessionDetail session) {
+    if (session.isReworkAndPainting) {
+      return _buildReworkBody(session);
+    }
+    return _buildFlatProfileBody(session);
+  }
+
+  Widget _buildFlatProfileBody(ProfileDrivenEvidenceSessionDetail session) {
     final station =
         (session.stationDisplayName ?? '').trim().isNotEmpty
             ? session.stationDisplayName!
@@ -210,6 +219,212 @@ class _ProfileDrivenEvidenceDetailScreenState
               return _kvRow(e.key, formatFieldValue(e.value));
             }).toList(),
           ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _buildReworkBody(ProfileDrivenEvidenceSessionDetail session) {
+    final station =
+        (session.stationDisplayName ?? '').trim().isNotEmpty
+            ? session.stationDisplayName!
+            : (session.stationSlot != null
+                  ? 'Stanica ${session.stationSlot}'
+                  : '—');
+    final operatorName =
+        (session.operatorDisplayName ?? session.operatorEmail ?? '—').trim();
+    final createdBy =
+        (session.createdByDisplayName ?? session.createdByEmail ?? '—').trim();
+    final s = session.summaryFields;
+
+    return ListView(
+      children: [
+        _sectionCard(
+          title: 'Osnovni podaci',
+          children: [
+            _kvRow('Profil', session.profileDisplayName),
+            _kvRow('Stanica', station),
+            _kvRow('Pogon', _plantLabel ?? session.plantKey),
+            _kvRow('Status', session.status == 'closed' ? 'Završeno' : session.status),
+            _kvRow('Početak', formatEvidenceDateTime(session.startedAt)),
+            _kvRow('Završetak', formatEvidenceDateTime(session.endedAt)),
+            if (session.catalogVersion != null)
+              _kvRow('Verzija kataloga profila', '${session.catalogVersion}'),
+          ],
+        ),
+        _sectionCard(
+          title: 'Zaglavlje operacije',
+          children: [
+            _kvRow('Tip obrade', formatReworkOperationTypeLabel(s.operationType)),
+            _kvRow('Rezultat obrade', formatReworkResultStatusLabel(s.resultStatus)),
+            _kvRow('Trajanje operacije', formatReworkDurationMinutes(s.durationMinutes)),
+            ..._operatorFields.map((field) {
+              final raw = session.fieldValues[field.key];
+              return _kvRow(
+                field.label.isNotEmpty ? field.label : field.key,
+                _displayValue(field.key, raw),
+              );
+            }),
+          ],
+        ),
+        _sectionCard(
+          title: 'Komadi / proizvodi',
+          children: [
+            ProfileDrivenEvidenceStructuredTable(
+              columns: const [
+                ProfileDrivenEvidenceStructuredColumn('Šifra', 'productCode'),
+                ProfileDrivenEvidenceStructuredColumn('Naziv', 'productName'),
+                ProfileDrivenEvidenceStructuredColumn('Tip komada', 'pieceType'),
+                ProfileDrivenEvidenceStructuredColumn('Količina', 'quantity'),
+                ProfileDrivenEvidenceStructuredColumn('Jedinica', 'unit'),
+                ProfileDrivenEvidenceStructuredColumn('Lot / serija', 'lotOrSerial'),
+              ],
+              rows: session.processedItems,
+              cellBuilder: (row, key) {
+                switch (key) {
+                  case 'productCode':
+                    return evidenceRowText(row['productCodeSnapshot']);
+                  case 'productName':
+                    return evidenceRowText(row['productNameSnapshot']);
+                  case 'pieceType':
+                    return evidenceRowText(row['pieceType']);
+                  case 'quantity':
+                    return evidenceRowText(row['processedQuantity']);
+                  case 'unit':
+                    return evidenceRowText(row['unit']);
+                  case 'lotOrSerial':
+                    return evidenceRowText(row['lotOrSerial']);
+                  default:
+                    return '—';
+                }
+              },
+            ),
+          ],
+        ),
+        _sectionCard(
+          title: 'Utrošeni materijali',
+          children: [
+            ProfileDrivenEvidenceStructuredTable(
+              columns: const [
+                ProfileDrivenEvidenceStructuredColumn('Šifra', 'materialCode'),
+                ProfileDrivenEvidenceStructuredColumn('Naziv', 'materialName'),
+                ProfileDrivenEvidenceStructuredColumn('Tip', 'materialType'),
+                ProfileDrivenEvidenceStructuredColumn('Količina', 'quantity'),
+                ProfileDrivenEvidenceStructuredColumn('Jedinica', 'unit'),
+                ProfileDrivenEvidenceStructuredColumn('Lot / serija', 'lotOrBatch'),
+              ],
+              rows: session.materialConsumptions,
+              cellBuilder: (row, key) {
+                switch (key) {
+                  case 'materialCode':
+                    return evidenceRowText(row['materialCodeSnapshot']);
+                  case 'materialName':
+                    return evidenceRowText(row['materialNameSnapshot']);
+                  case 'materialType':
+                    return evidenceRowText(
+                      row['materialTypeSnapshot'] ?? row['materialType'],
+                    );
+                  case 'quantity':
+                    return evidenceRowText(row['consumedQuantity']);
+                  case 'unit':
+                    return evidenceRowText(row['unit']);
+                  case 'lotOrBatch':
+                    return evidenceRowText(row['lotOrBatch']);
+                  default:
+                    return '—';
+                }
+              },
+            ),
+          ],
+        ),
+        _sectionCard(
+          title: 'Rad operatera',
+          children: [
+            ProfileDrivenEvidenceStructuredTable(
+              columns: const [
+                ProfileDrivenEvidenceStructuredColumn('Operater', 'operator'),
+                ProfileDrivenEvidenceStructuredColumn('Početak', 'startedAt'),
+                ProfileDrivenEvidenceStructuredColumn('Kraj', 'finishedAt'),
+                ProfileDrivenEvidenceStructuredColumn('OK', 'okQty'),
+                ProfileDrivenEvidenceStructuredColumn('Neispravni', 'scrapQty'),
+                ProfileDrivenEvidenceStructuredColumn('Ponovna dorada', 'reworkAgainQty'),
+                ProfileDrivenEvidenceStructuredColumn('Ukupno', 'processedQty'),
+              ],
+              rows: session.operatorWorkLogs,
+              cellBuilder: (row, key) {
+                switch (key) {
+                  case 'operator':
+                    return evidenceRowText(row['operatorDisplayNameSnapshot']);
+                  case 'startedAt':
+                    return evidenceRowDateTime(row['startedAt']);
+                  case 'finishedAt':
+                    return evidenceRowDateTime(row['finishedAt']);
+                  case 'okQty':
+                    return evidenceRowText(row['okQty']);
+                  case 'scrapQty':
+                    return evidenceRowText(row['scrapQty']);
+                  case 'reworkAgainQty':
+                    return evidenceRowText(row['reworkAgainQty']);
+                  case 'processedQty':
+                    return evidenceRowText(row['processedQty']);
+                  default:
+                    return '—';
+                }
+              },
+            ),
+          ],
+        ),
+        _sectionCard(
+          title: 'Škartni komadi',
+          children: [
+            ProfileDrivenEvidenceStructuredTable(
+              columns: const [
+                ProfileDrivenEvidenceStructuredColumn('Šifra', 'productCode'),
+                ProfileDrivenEvidenceStructuredColumn('Naziv', 'productName'),
+                ProfileDrivenEvidenceStructuredColumn('Količina škarta', 'scrapQuantity'),
+                ProfileDrivenEvidenceStructuredColumn('Jedinica', 'unit'),
+                ProfileDrivenEvidenceStructuredColumn('Razlog škarta', 'scrapReason'),
+                ProfileDrivenEvidenceStructuredColumn('Faza škarta', 'scrapStage'),
+                ProfileDrivenEvidenceStructuredColumn('Operater', 'operator'),
+              ],
+              rows: session.scrapItems,
+              cellBuilder: (row, key) {
+                switch (key) {
+                  case 'productCode':
+                    return evidenceRowText(row['productCodeSnapshot']);
+                  case 'productName':
+                    return evidenceRowText(row['productNameSnapshot']);
+                  case 'scrapQuantity':
+                    return evidenceRowText(row['scrapQuantity']);
+                  case 'unit':
+                    return evidenceRowText(row['unit']);
+                  case 'scrapReason':
+                    return evidenceRowText(row['scrapReason']);
+                  case 'scrapStage':
+                    return evidenceRowText(row['scrapStage']);
+                  case 'operator':
+                    return evidenceRowText(row['operatorDisplayNameSnapshot']);
+                  default:
+                    return '—';
+                }
+              },
+            ),
+          ],
+        ),
+        _sectionCard(
+          title: 'Operator audit',
+          children: [
+            _kvRow('Operater', operatorName),
+            if (session.operatorEmail != null &&
+                session.operatorEmail!.trim().isNotEmpty)
+              _kvRow('E-mail operatera', session.operatorEmail!),
+            _kvRow('Sesiju otvorio', createdBy),
+            if (session.createdByEmail != null &&
+                session.createdByEmail!.trim().isNotEmpty)
+              _kvRow('E-mail (otvaranje)', session.createdByEmail!),
+            _kvRow('Kreirano', formatEvidenceDateTime(session.createdAt)),
+          ],
+        ),
         const SizedBox(height: 24),
       ],
     );

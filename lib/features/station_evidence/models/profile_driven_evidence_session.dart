@@ -16,6 +16,16 @@ class ProfileDrivenEvidenceSummaryFields {
     this.concentrationSnapshot,
     this.chemicalLot,
     this.dosingReason,
+    this.operationType,
+    this.workAreaNameSnapshot,
+    this.resultStatus,
+    this.durationMinutes,
+    this.processedTotalQty,
+    this.okTotalQty,
+    this.scrapTotalQty,
+    this.reworkAgainTotalQty,
+    this.materialSummary,
+    this.operatorSummary,
   });
 
   final String? workBathName;
@@ -34,6 +44,16 @@ class ProfileDrivenEvidenceSummaryFields {
   final String? concentrationSnapshot;
   final String? chemicalLot;
   final String? dosingReason;
+  final String? operationType;
+  final String? workAreaNameSnapshot;
+  final String? resultStatus;
+  final double? durationMinutes;
+  final double? processedTotalQty;
+  final double? okTotalQty;
+  final double? scrapTotalQty;
+  final double? reworkAgainTotalQty;
+  final String? materialSummary;
+  final String? operatorSummary;
 
   factory ProfileDrivenEvidenceSummaryFields.fromMap(Map<String, dynamic>? raw) {
     final m = raw ?? const <String, dynamic>{};
@@ -60,6 +80,16 @@ class ProfileDrivenEvidenceSummaryFields {
       concentrationSnapshot: _s(m['concentrationSnapshot']),
       chemicalLot: _s(m['chemicalLot']),
       dosingReason: _s(m['dosingReason']),
+      operationType: _s(m['operationType']),
+      workAreaNameSnapshot: _s(m['workAreaNameSnapshot']),
+      resultStatus: _s(m['resultStatus']),
+      durationMinutes: n(m['durationMinutes']),
+      processedTotalQty: n(m['processedTotalQty']),
+      okTotalQty: n(m['okTotalQty']),
+      scrapTotalQty: n(m['scrapTotalQty']),
+      reworkAgainTotalQty: n(m['reworkAgainTotalQty']),
+      materialSummary: _s(m['materialSummary']),
+      operatorSummary: _s(m['operatorSummary']),
     );
   }
 
@@ -123,6 +153,16 @@ class ProfileDrivenEvidenceListItem {
       ];
       return parts.join(' · ');
     }
+    if (processProfileType == 'rework_and_painting') {
+      final station = (stationDisplayName ?? '').trim();
+      final parts = <String>[
+        if (s.operationType != null) 'Tip: ${s.operationType}',
+        if (station.isNotEmpty) 'Stanica: $station',
+        if (s.processedTotalQty != null) 'Obrađeno: ${formatFieldValue(s.processedTotalQty)}',
+        if (s.resultStatus != null) 'Rezultat: ${s.resultStatus}',
+      ];
+      return parts.join(' · ');
+    }
     return '';
   }
 
@@ -173,6 +213,10 @@ class ProfileDrivenEvidenceSessionDetail {
     required this.fieldValues,
     required this.summaryFields,
     this.controlledInputWarning,
+    this.processedItems = const [],
+    this.materialConsumptions = const [],
+    this.operatorWorkLogs = const [],
+    this.scrapItems = const [],
   });
 
   final String sessionId;
@@ -196,6 +240,12 @@ class ProfileDrivenEvidenceSessionDetail {
   final Map<String, dynamic> fieldValues;
   final ProfileDrivenEvidenceSummaryFields summaryFields;
   final Map<String, dynamic>? controlledInputWarning;
+  final List<Map<String, dynamic>> processedItems;
+  final List<Map<String, dynamic>> materialConsumptions;
+  final List<Map<String, dynamic>> operatorWorkLogs;
+  final List<Map<String, dynamic>> scrapItems;
+
+  bool get isReworkAndPainting => processProfileType == 'rework_and_painting';
 
   int? get catalogVersion {
     final v = profileSnapshot?['catalogVersion'];
@@ -258,6 +308,10 @@ class ProfileDrivenEvidenceSessionDetail {
             : null,
       ),
       controlledInputWarning: warning,
+      processedItems: _parseRowList(m['processed_items']),
+      materialConsumptions: _parseRowList(m['material_consumptions']),
+      operatorWorkLogs: _parseRowList(m['operator_work_logs']),
+      scrapItems: _parseRowList(m['scrap_items']),
     );
   }
 }
@@ -283,6 +337,14 @@ DateTime? _ts(dynamic v) {
 String? _opt(dynamic v) {
   final t = (v ?? '').toString().trim();
   return t.isEmpty ? null : t;
+}
+
+List<Map<String, dynamic>> _parseRowList(dynamic raw) {
+  if (raw is! List) return const [];
+  return raw
+      .whereType<Map>()
+      .map((e) => Map<String, dynamic>.from(e))
+      .toList(growable: false);
 }
 
 String formatEvidenceDateTime(DateTime? dt) {
