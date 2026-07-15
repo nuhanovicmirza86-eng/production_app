@@ -778,4 +778,10 @@ class ProductionAccessHelper {
     final r = normalizeRole(role);
     return r == roleSuperAdmin || r == roleAdmin || r == roleProductionManager;
   }
+
+  /// M2-G2 — administracija normativa učinka (Workforce).
+  static bool canManageWorkforcePerformanceNorms(String role) {
+    final r = normalizeRole(role);
+    return r == roleSuperAdmin || r == roleAdmin || r == roleProductionManager;
+  }
 }

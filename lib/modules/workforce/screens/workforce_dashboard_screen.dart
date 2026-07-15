@@ -10,6 +10,7 @@ import '../compliance_documents/compliance_list_screen.dart';
 import '../employee_profiles/employee_list_screen.dart';
 import '../employee_profiles/workforce_employee_qr_scan_screen.dart';
 import '../leave_management/leave_operational_screen.dart';
+import '../../../features/workforce_performance_norms/screens/workforce_performance_norms_list_screen.dart';
 import '../performance_feedback/employee_kpi_dashboard_screen.dart';
 import '../performance_feedback/feedback_list_screen.dart';
 import '../../../features/worker_ai_planning/screens/worker_performance_ai_planning_screen.dart';
@@ -40,6 +41,9 @@ class WorkforceDashboardScreen extends StatelessWidget {
         role: _role,
         card: ProductionDashboardCard.shifts,
       );
+
+  bool get _canManageNorms =>
+      ProductionAccessHelper.canManageWorkforcePerformanceNorms(_role);
 
   bool get _canViewEvidenceAiPlanning =>
       ProductionAccessHelper.canViewProfileDrivenEvidence(_role);
@@ -166,6 +170,17 @@ class WorkforceDashboardScreen extends StatelessWidget {
               FeedbackListScreen(companyData: companyData),
             ),
           ),
+          if (_canManageNorms)
+            _tile(
+              context,
+              icon: Icons.rule_outlined,
+              title: 'Normativi rada',
+              subtitle: 'Unos, verzionisanje i test match-a normativa učinka',
+              onTap: () => _open(
+                context,
+                WorkforcePerformanceNormsListScreen(companyData: companyData),
+              ),
+            ),
           if (_canViewEvidenceAiPlanning)
             _tile(
               context,
