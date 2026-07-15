@@ -1,12 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../../../features/process_evidence_analytics/models/process_evidence_analytics_models.dart';
+import '../../../features/process_evidence_analytics/services/process_evidence_analytics_callable_service.dart';
 import '../../production/ooe/models/machine_state_event.dart';
 import '../../production/tracking/models/production_operator_tracking_entry.dart';
 import '../models/workforce_employee.dart';
 import '../workforce_date_key.dart';
+import 'workforce_evidence_kpi_section.dart';
 
-/// F3: objektivni KPI iz operativnog praćenja (output/škart) i MES stanja (događaji vezani uz UID).
+/// F3: objektivni KPI — legacy (operativno praćenje / MES) + M2-F profile-driven evidencije.
 class EmployeeKpiDashboardScreen extends StatefulWidget {
   const EmployeeKpiDashboardScreen({super.key, required this.companyData});
 
@@ -18,17 +21,23 @@ class EmployeeKpiDashboardScreen extends StatefulWidget {
 }
 
 class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen> {
+  final _analyticsService = ProcessEvidenceAnalyticsCallableService();
+
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
   String get _plantKey =>
       (widget.companyData['plantKey'] ?? '').toString().trim();
 
-  int _periodDays = 30;
   WorkforceEmployee? _employee;
   List<WorkforceEmployee> _employees = [];
   bool _loadingEmployees = true;
-  bool _loadingKpi = false;
-  String? _kpiError;
+  bool _loadingLegacyKpi = false;
+  bool _loadingEvidenceKpi = false;
+  String? _legacyKpiError;
+  Object? _evidenceKpiError;
+
+  late DateTime _dateFrom;
+  late DateTime _dateTo;
 
   int _trackingMatchCount = 0;
   double _totalGood = 0;
@@ -36,10 +45,37 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
   int _machineEventMatchCount = 0;
   int _downtimeSecondsAttributed = 0;
 
+  WorkerPerformanceKpiRow? _evidenceKpiRow;
+  Map<String, List<ProcessEvidenceBreakdownRow>> _evidenceBreakdowns = const {};
+  String? _normativeComparisonNote;
+
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _dateTo = DateTime(now.year, now.month, now.day);
+    _dateFrom = _dateTo.subtract(const Duration(days: 30));
     _loadEmployees();
+  }
+
+  String _formatDisplayDate(DateTime d) {
+    return '${d.day.toString().padLeft(2, '0')}.'
+        '${d.month.toString().padLeft(2, '0')}.'
+        '${d.year}';
+  }
+
+  ProcessEvidenceAnalyticsFilters get _evidenceFilters =>
+      ProcessEvidenceAnalyticsFilters(
+        dateFrom: _dateFrom,
+        dateTo: _dateTo,
+        plantKey: _plantKey.isEmpty ? null : _plantKey,
+      );
+
+  Set<String> _candidateOperatorIds(WorkforceEmployee emp) {
+    final ids = <String>{emp.id.trim()};
+    final uid = emp.linkedUserUid?.trim() ?? '';
+    if (uid.isNotEmpty) ids.add(uid);
+    return ids;
   }
 
   Future<void> _loadEmployees() async {
@@ -59,17 +95,54 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
         _employee = list.isEmpty ? null : list.first;
         _loadingEmployees = false;
       });
-      await _loadKpi();
+      await _loadAllKpi();
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loadingEmployees = false;
-        _kpiError = '$e';
+        _legacyKpiError = '$e';
       });
     }
   }
 
-  Future<void> _loadKpi() async {
+  Future<void> _loadAllKpi() async {
+    await Future.wait([
+      _loadLegacyKpi(),
+      _loadEvidenceKpi(),
+    ]);
+  }
+
+  Future<void> _pickDate({required bool isFrom}) async {
+    final initial = isFrom ? _dateFrom : _dateTo;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      if (isFrom) {
+        _dateFrom = picked;
+        if (_dateTo.isBefore(_dateFrom)) _dateTo = _dateFrom;
+      } else {
+        _dateTo = picked;
+        if (_dateFrom.isAfter(_dateTo)) _dateFrom = _dateTo;
+      }
+    });
+    await _loadAllKpi();
+  }
+
+  void _applyPeriodDays(int days) {
+    final end = DateTime.now();
+    setState(() {
+      _dateTo = DateTime(end.year, end.month, end.day);
+      _dateFrom = _dateTo.subtract(Duration(days: days));
+    });
+    _loadAllKpi();
+  }
+
+  Future<void> _loadLegacyKpi() async {
     final emp = _employee;
     if (emp == null || _companyId.isEmpty || _plantKey.isEmpty) {
       setState(() {
@@ -83,19 +156,17 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
     }
 
     setState(() {
-      _loadingKpi = true;
-      _kpiError = null;
+      _loadingLegacyKpi = true;
+      _legacyKpiError = null;
     });
 
-    final end = DateTime.now();
-    final start = end.subtract(Duration(days: _periodDays));
-    final startKey = workforceDateKey(start);
-    final endKey = workforceDateKey(end);
+    final startKey = workforceDateKey(_dateFrom);
+    final endKey = workforceDateKey(_dateTo);
     final startTs = Timestamp.fromDate(
-      DateTime(start.year, start.month, start.day),
+      DateTime(_dateFrom.year, _dateFrom.month, _dateFrom.day),
     );
     final endTs = Timestamp.fromDate(
-      DateTime(end.year, end.month, end.day, 23, 59, 59),
+      DateTime(_dateTo.year, _dateTo.month, _dateTo.day, 23, 59, 59),
     );
 
     try {
@@ -148,13 +219,110 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
         _totalScrap = scrap;
         _machineEventMatchCount = mCount;
         _downtimeSecondsAttributed = downSec;
-        _loadingKpi = false;
+        _loadingLegacyKpi = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _loadingKpi = false;
-        _kpiError = '$e';
+        _loadingLegacyKpi = false;
+        _legacyKpiError = '$e';
+      });
+    }
+  }
+
+  Future<void> _loadEvidenceKpi() async {
+    final emp = _employee;
+    if (emp == null || _companyId.isEmpty) {
+      setState(() {
+        _evidenceKpiRow = null;
+        _evidenceBreakdowns = const {};
+        _normativeComparisonNote = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _loadingEvidenceKpi = true;
+      _evidenceKpiError = null;
+    });
+
+    try {
+      final candidates = _candidateOperatorIds(emp);
+      WorkerPerformanceKpiRow? matched;
+      String? matchedOperatorId;
+
+      for (final operatorId in candidates) {
+        final filters = ProcessEvidenceAnalyticsFilters(
+          dateFrom: _dateFrom,
+          dateTo: _dateTo,
+          plantKey: _plantKey.isEmpty ? null : _plantKey,
+          operatorId: operatorId,
+        );
+        final snapshot = await _analyticsService.getWorkerPerformanceKpiSnapshot(
+          companyId: _companyId,
+          filters: filters,
+        );
+        for (final row in snapshot.operators) {
+          if (candidates.contains(row.operatorId.trim())) {
+            matched = row;
+            matchedOperatorId = row.operatorId.trim();
+            _normativeComparisonNote = snapshot.normativeComparisonNote;
+            break;
+          }
+        }
+        if (matched != null) break;
+      }
+
+      if (matched == null) {
+        final snapshot = await _analyticsService.getWorkerPerformanceKpiSnapshot(
+          companyId: _companyId,
+          filters: _evidenceFilters,
+        );
+        _normativeComparisonNote = snapshot.normativeComparisonNote;
+        for (final row in snapshot.operators) {
+          if (candidates.contains(row.operatorId.trim())) {
+            matched = row;
+            matchedOperatorId = row.operatorId.trim();
+            break;
+          }
+        }
+      }
+
+      final breakdowns = <String, List<ProcessEvidenceBreakdownRow>>{};
+      if (matchedOperatorId != null) {
+        final breakdownFilters = ProcessEvidenceAnalyticsFilters(
+          dateFrom: _dateFrom,
+          dateTo: _dateTo,
+          plantKey: _plantKey.isEmpty ? null : _plantKey,
+          operatorId: matchedOperatorId,
+        );
+        for (final dimension in const [
+          'profile',
+          'operation_type',
+          'product',
+          'scrap_reason',
+        ]) {
+          breakdowns[dimension] = await _analyticsService.getBreakdown(
+            companyId: _companyId,
+            filters: breakdownFilters,
+            dimension: dimension,
+          );
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _evidenceKpiRow = matched;
+        _evidenceBreakdowns = breakdowns;
+        _loadingEvidenceKpi = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadingEvidenceKpi = false;
+        _evidenceKpiError = e;
+        _evidenceKpiRow = null;
+        _evidenceBreakdowns = const {};
       });
     }
   }
@@ -184,6 +352,8 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
     return (ev.createdBy ?? '').trim() == link;
   }
 
+  bool get _loadingKpi => _loadingLegacyKpi || _loadingEvidenceKpi;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -192,7 +362,7 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadingKpi ? null : _loadKpi,
+            onPressed: _loadingKpi ? null : _loadAllKpi,
           ),
         ],
       ),
@@ -202,11 +372,13 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
               padding: const EdgeInsets.all(16),
               children: [
                 Text(
-                  'Agregacija iz operativnog praćenja (output/škart) i događaja stanja stroja '
-                  'gdje je [createdBy] jednak [linkedUserUid] radnika. '
-                  'Za pouzdaniju vezu poveži radnika s Firebase korisnikom u profilu.',
+                  'Objektivni KPI iz više izvora: profile-driven evidencije procesa (M2-F) '
+                  'i legacy agregati iz operativnog praćenja te MES događaja stanja stroja. '
+                  'Subjektivni feedback rukovodioca je u kartici '
+                  '„Performanse i povratne informacije“.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        height: 1.35,
                       ),
                 ),
                 const SizedBox(height: 16),
@@ -235,33 +407,75 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
                         _employee =
                             _employees.firstWhere((e) => e.id == v);
                       });
-                      _loadKpi();
+                      _loadAllKpi();
                     },
                   ),
                   const SizedBox(height: 12),
                   Wrap(
-                    spacing: 8,
-                    children: [7, 30, 90].map((d) {
-                      final sel = _periodDays == d;
-                      return ChoiceChip(
-                        label: Text('$d d'),
-                        selected: sel,
-                        onSelected: (_) {
-                          setState(() => _periodDays = d);
-                          _loadKpi();
-                        },
-                      );
-                    }).toList(),
+                    spacing: 12,
+                    runSpacing: 12,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _dateField(
+                        label: 'Period od',
+                        value: _formatDisplayDate(_dateFrom),
+                        onTap: () => _pickDate(isFrom: true),
+                      ),
+                      _dateField(
+                        label: 'Period do',
+                        value: _formatDisplayDate(_dateTo),
+                        onTap: () => _pickDate(isFrom: false),
+                      ),
+                      Wrap(
+                        spacing: 8,
+                        children: [7, 30, 90].map((d) {
+                          final days = _dateTo.difference(_dateFrom).inDays;
+                          final sel = days == d;
+                          return ChoiceChip(
+                            label: Text('$d d'),
+                            selected: sel,
+                            onSelected: (_) => _applyPeriodDays(d),
+                          );
+                        }).toList(),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 24),
-                  if (_kpiError != null)
+                  WorkforceEvidenceKpiSection(
+                    kpiRow: _evidenceKpiRow,
+                    breakdowns: _evidenceBreakdowns,
+                    loading: _loadingEvidenceKpi,
+                    error: _evidenceKpiError != null
+                        ? processEvidenceAnalyticsErrorMessage(
+                            _evidenceKpiError!,
+                          )
+                        : null,
+                    normativeComparisonNote: _normativeComparisonNote,
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Legacy KPI (operativno praćenje i MES)',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Agregacija iz operativnog praćenja (output/škart) i događaja stanja stroja '
+                    'gdje je [createdBy] jednak [linkedUserUid] radnika.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_legacyKpiError != null)
                     Text(
-                      _kpiError!,
+                      _legacyKpiError!,
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.error,
                       ),
                     ),
-                  if (_loadingKpi)
+                  if (_loadingLegacyKpi)
                     const Padding(
                       padding: EdgeInsets.all(24),
                       child: Center(child: CircularProgressIndicator()),
@@ -291,6 +505,29 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
                 ],
               ],
             ),
+    );
+  }
+
+  Widget _dateField({
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      width: 160,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(4),
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: label,
+            isDense: true,
+            border: const OutlineInputBorder(),
+            suffixIcon: const Icon(Icons.calendar_today_outlined, size: 18),
+          ),
+          child: Text(value),
+        ),
+      ),
     );
   }
 
