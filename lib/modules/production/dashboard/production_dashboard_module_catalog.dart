@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/access/production_access_helper.dart';
 import '../../../core/branding/operonix_ai_branding.dart';
 import '../../../core/saas/production_module_keys.dart';
+import '../../../features/process_evidence_analytics/screens/process_evidence_analytics_screen.dart';
 import '../../../features/station_evidence/screens/profile_driven_evidence_list_screen.dart';
 import '../../../screens/about_screen.dart';
 import '../../auth/register/screens/pending_users_screen.dart';
@@ -248,11 +249,23 @@ class ProductionDashboardModuleCatalog {
             ProductionDashboardModuleEntry(
               id: 'production.profile_evidence',
               icon: Icons.fact_check_outlined,
-              title: 'Evidencije procesa — profile-driven',
+              title: 'Evidencije procesa',
               subtitle:
-                  'Pregled završenih evidencija doziranja hemikalija i obrade otpadnih voda.',
+                  'Pregled završenih profile-driven evidencija (supervision).',
               onTap: () => open(
                 ProfileDrivenEvidenceListScreen(companyData: companyData),
+              ),
+            ),
+          );
+          productionEntries.add(
+            ProductionDashboardModuleEntry(
+              id: 'production.process_evidence_analytics',
+              icon: Icons.analytics_outlined,
+              title: 'Analitika evidencija procesa',
+              subtitle:
+                  'KPI, breakdown i učinak radnika iz zatvorenih evidencija.',
+              onTap: () => open(
+                ProcessEvidenceAnalyticsScreen(companyData: companyData),
               ),
             ),
           );
@@ -397,9 +410,9 @@ class ProductionDashboardModuleCatalog {
             ProductionDashboardModuleEntry(
               id: 'production.process_execution',
               icon: Icons.science_outlined,
-              title: 'Evidencija procesa',
+              title: 'Izvršenje proizvodnje',
               subtitle:
-                  'Procesi u šifrarniku, nalozi i praćenje — IATF i izvršenje koraka.',
+                  'Procesi, proizvodni nalozi i praćenje izvršenja proizvodnje.',
               onTap: () =>
                   open(ProcessExecutionHubScreen(companyData: companyData)),
             ),

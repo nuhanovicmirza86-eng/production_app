@@ -5,7 +5,7 @@ import '../../processes/screens/production_processes_list_screen.dart';
 import '../../production_orders/screens/production_orders_list_screen.dart';
 import '../../tracking/screens/production_operator_tracking_screen.dart';
 
-/// Ulaz za **evidenciju procesa**: master procesi, nalozi (routing / izvršenje), operativno praćenje.
+/// Ulaz za **izvršenje proizvodnje**: master procesi, nalozi (routing / izvršenje), operativno praćenje.
 ///
 /// Zamjenjuje placeholder „Uskoro”; ne uvodi novi backend — grupira postojeće MES tokove.
 class ProcessExecutionHubScreen extends StatelessWidget {
@@ -18,7 +18,7 @@ class ProcessExecutionHubScreen extends StatelessWidget {
     final t = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Evidencija procesa'),
+        title: const Text('Izvršenje proizvodnje'),
         actions: [
           IconButton(
             tooltip: 'Odjava',
@@ -31,8 +31,8 @@ class ProcessExecutionHubScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            'Procesi u šifrarniku, vezani nalozi i operativni unos moraju biti dosljedni '
-            '(IATF, interni audit). Odaberi sljedeći korak prema ulozi.',
+            'Procesi, proizvodni nalozi i praćenje izvršenja proizvodnje. '
+            'Odaberi sljedeći korak prema ulozi.',
             style: t.textTheme.bodyMedium?.copyWith(
               color: t.colorScheme.onSurfaceVariant,
               height: 1.35,
