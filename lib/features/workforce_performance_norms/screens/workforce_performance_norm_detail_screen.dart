@@ -1047,8 +1047,25 @@ class _HeaderCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            SelectableText('normGroupId: ${norm.normGroupId}'),
-            SelectableText('normId: ${norm.normId}'),
+            Text(
+              'Grupa verzija',
+              style: t.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(
+              'Automatski ID koji povezuje sve verzije istog normativa. Ne unosi se ručno.',
+              style: t.textTheme.bodySmall,
+            ),
+            SelectableText(norm.normGroupId),
+            const SizedBox(height: 8),
+            Text(
+              'ID ove verzije',
+              style: t.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            SelectableText(norm.normId),
             if ((norm.validFrom ?? '').isNotEmpty)
               Text(
                 'Vrijedi: ${norm.validFrom}'

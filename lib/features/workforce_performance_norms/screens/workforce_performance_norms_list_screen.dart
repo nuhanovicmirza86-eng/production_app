@@ -7,7 +7,7 @@ import '../models/workforce_performance_norm_models.dart';
 import '../services/workforce_performance_norms_callable_service.dart';
 import 'workforce_performance_norm_detail_screen.dart';
 
-/// M2-G2 — administracija normativa učinka (lista + filteri).
+/// M2-G2 — administracija normativa učinka (filteri + odabir s liste).
 class WorkforcePerformanceNormsListScreen extends StatefulWidget {
   const WorkforcePerformanceNormsListScreen({
     super.key,
@@ -24,7 +24,6 @@ class WorkforcePerformanceNormsListScreen extends StatefulWidget {
 class _WorkforcePerformanceNormsListScreenState
     extends State<WorkforcePerformanceNormsListScreen> {
   final _service = WorkforcePerformanceNormsCallableService();
-  final _normGroupIdController = TextEditingController();
 
   bool _loading = false;
   Object? _error;
@@ -32,6 +31,9 @@ class _WorkforcePerformanceNormsListScreenState
 
   String? _statusFilter;
   String? _plantKeyFilter;
+  String? _profileFilter;
+  String? _selectedNormId;
+
   List<({String plantKey, String label})> _plantOptions = const [];
   String? _fixedPlantLabel;
 
@@ -52,6 +54,39 @@ class _WorkforcePerformanceNormsListScreenState
         _userRole,
       );
 
+  List<WorkforcePerformanceNorm> get _filteredNorms {
+    if (_profileFilter == null) return _norms;
+    return _norms
+        .where((n) => n.processProfileType == _profileFilter)
+        .toList(growable: false);
+  }
+
+  WorkforcePerformanceNorm? get _selectedNorm {
+    final id = _selectedNormId;
+    if (id == null) return null;
+    for (final norm in _filteredNorms) {
+      if (norm.normId == id) return norm;
+    }
+    return null;
+  }
+
+  static String _normOptionLabel(WorkforcePerformanceNorm norm) {
+    final name = (norm.displayName ?? '').trim();
+    final title = name.isNotEmpty ? name : 'Normativ v${norm.version}';
+    final profile = workforceNormProfileLabels[norm.processProfileType ?? ''] ??
+        norm.processProfileType ??
+        '';
+    final plant = (norm.plantKey ?? '').trim();
+    final parts = <String>[
+      title,
+      'v${norm.version}',
+      workforceNormStatusLabel(norm.status),
+      if (profile.isNotEmpty) profile,
+      if (plant.isNotEmpty) plant,
+    ];
+    return parts.join(' · ');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -61,12 +96,6 @@ class _WorkforcePerformanceNormsListScreenState
     if (_canManage) {
       _bootstrap();
     }
-  }
-
-  @override
-  void dispose() {
-    _normGroupIdController.dispose();
-    super.dispose();
   }
 
   Future<void> _bootstrap() async {
@@ -112,22 +141,39 @@ class _WorkforcePerformanceNormsListScreenState
         companyId: _companyId,
         status: _statusFilter,
         plantKey: _plantKeyFilter,
-        normGroupId: _normGroupIdController.text.trim().isEmpty
-            ? null
-            : _normGroupIdController.text.trim(),
       );
       if (!mounted) return;
       setState(() {
         _norms = norms;
         _loading = false;
+        _selectedNormId = _syncSelectedNormId(norms);
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = workforcePerformanceNormsErrorMessage(e);
         _loading = false;
+        _selectedNormId = null;
       });
     }
+  }
+
+  String? _syncSelectedNormId(List<WorkforcePerformanceNorm> norms) {
+    final current = _selectedNormId;
+    if (current == null) return null;
+    final stillVisible = norms.any((n) {
+      if (n.normId != current) return false;
+      if (_profileFilter == null) return true;
+      return n.processProfileType == _profileFilter;
+    });
+    return stillVisible ? current : null;
+  }
+
+  void _onProfileChanged(String? value) {
+    setState(() {
+      _profileFilter = value;
+      _selectedNormId = _syncSelectedNormId(_norms);
+    });
   }
 
   Future<void> _openCreate() async {
@@ -153,6 +199,12 @@ class _WorkforcePerformanceNormsListScreenState
     if (changed == true) await _loadNorms();
   }
 
+  Future<void> _openSelectedNorm() async {
+    final norm = _selectedNorm;
+    if (norm == null) return;
+    await _openDetail(norm);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_canManage) {
@@ -165,12 +217,19 @@ class _WorkforcePerformanceNormsListScreenState
     }
 
     final t = Theme.of(context);
+    final options = _filteredNorms;
+    final selected = _selectedNorm;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Normativi rada')),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _loading ? null : _openCreate,
-        icon: const Icon(Icons.add),
-        label: const Text('Novi nacrt'),
+      appBar: AppBar(
+        title: const Text('Normativi rada'),
+        actions: [
+          IconButton(
+            onPressed: _loading ? null : _openCreate,
+            icon: const Icon(Icons.add),
+            tooltip: 'Novi nacrt',
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: _loadNorms,
@@ -190,150 +249,181 @@ class _WorkforcePerformanceNormsListScreenState
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Odaberite vrijednosti s liste — ništa se ne upisuje ručno.',
+                      style: t.textTheme.bodySmall?.copyWith(
+                        color: t.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                     const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 180,
-                          child: DropdownButtonFormField<String?>(
-                            value: _statusFilter,
-                            decoration: const InputDecoration(
-                              labelText: 'Status',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                            items: [
-                              const DropdownMenuItem<String?>(
-                                value: null,
-                                child: Text('Svi statusi'),
-                              ),
-                              ...workforceNormStatuses.map(
-                                (s) => DropdownMenuItem<String?>(
-                                  value: s,
-                                  child: Text(workforceNormStatusLabel(s)),
-                                ),
-                              ),
-                            ],
-                            onChanged: (v) => setState(() => _statusFilter = v),
-                          ),
+                    DropdownButtonFormField<String?>(
+                      value: _statusFilter,
+                      decoration: const InputDecoration(
+                        labelText: 'Status',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Svi statusi'),
                         ),
-                        if (_canPickPlant)
-                          SizedBox(
-                            width: 220,
-                            child: DropdownButtonFormField<String?>(
-                              value: _plantKeyFilter,
-                              decoration: const InputDecoration(
-                                labelText: 'Pogon',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                              items: [
-                                const DropdownMenuItem<String?>(
-                                  value: null,
-                                  child: Text('Svi pogoni'),
-                                ),
-                                ..._plantOptions.map(
-                                  (p) => DropdownMenuItem<String?>(
-                                    value: p.plantKey,
-                                    child: Text(p.label),
-                                  ),
-                                ),
-                              ],
-                              onChanged: (v) =>
-                                  setState(() => _plantKeyFilter = v),
-                            ),
-                          )
-                        else if (_fixedPlantLabel != null)
-                          Chip(label: Text('Pogon: $_fixedPlantLabel')),
-                        SizedBox(
-                          width: 260,
-                          child: TextField(
-                            controller: _normGroupIdController,
-                            decoration: const InputDecoration(
-                              labelText: 'normGroupId',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
+                        ...workforceNormStatuses.map(
+                          (s) => DropdownMenuItem<String?>(
+                            value: s,
+                            child: Text(workforceNormStatusLabel(s)),
                           ),
-                        ),
-                        FilledButton.icon(
-                          onPressed: _loading ? null : _loadNorms,
-                          icon: const Icon(Icons.search),
-                          label: const Text('Primijeni'),
                         ),
                       ],
+                      onChanged: _loading
+                          ? null
+                          : (v) {
+                              setState(() => _statusFilter = v);
+                              _loadNorms();
+                            },
                     ),
+                    const SizedBox(height: 12),
+                    if (_canPickPlant)
+                      DropdownButtonFormField<String?>(
+                        value: _plantKeyFilter,
+                        decoration: const InputDecoration(
+                          labelText: 'Pogon',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        items: [
+                          const DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text('Svi pogoni'),
+                          ),
+                          ..._plantOptions.map(
+                            (p) => DropdownMenuItem<String?>(
+                              value: p.plantKey,
+                              child: Text(p.label),
+                            ),
+                          ),
+                        ],
+                        onChanged: _loading
+                            ? null
+                            : (v) {
+                                setState(() => _plantKeyFilter = v);
+                                _loadNorms();
+                              },
+                      )
+                    else if (_fixedPlantLabel != null)
+                      InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Pogon',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        child: Text(_fixedPlantLabel!),
+                      ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String?>(
+                      value: _profileFilter,
+                      decoration: const InputDecoration(
+                        labelText: 'Profil procesa',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Svi profili'),
+                        ),
+                        ...workforceNormProfileLabels.entries.map(
+                          (e) => DropdownMenuItem<String?>(
+                            value: e.key,
+                            child: Text(e.value),
+                          ),
+                        ),
+                      ],
+                      onChanged: _loading ? null : _onProfileChanged,
+                    ),
+                    const SizedBox(height: 16),
+                    if (_loading)
+                      const Center(child: CircularProgressIndicator())
+                    else if (options.isEmpty)
+                      Text(
+                        'Nema normativa za odabrane filtere.',
+                        style: t.textTheme.bodyMedium,
+                      )
+                    else ...[
+                      DropdownButtonFormField<String?>(
+                        value: _selectedNormId,
+                        decoration: const InputDecoration(
+                          labelText: 'Normativ',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        isExpanded: true,
+                        items: options
+                            .map(
+                              (norm) => DropdownMenuItem<String?>(
+                                value: norm.normId,
+                                child: Text(
+                                  _normOptionLabel(norm),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
+                            .toList(growable: false),
+                        onChanged: (v) => setState(() => _selectedNormId = v),
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        onPressed: selected == null ? null : _openSelectedNorm,
+                        icon: const Icon(Icons.open_in_new),
+                        label: const Text('Otvori normativ'),
+                      ),
+                    ],
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 16),
             if (_error != null)
               Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.only(top: 12),
                 child: Text(
                   _error.toString(),
                   style: TextStyle(color: t.colorScheme.error),
                 ),
               ),
-            if (_loading && _norms.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(32),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_norms.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(24),
-                child: Center(
-                  child: Text('Nema normativa za odabrane filtere.'),
-                ),
-              )
-            else
-              ..._norms.map((norm) {
-                final profileLabel = workforceNormProfileLabels[
-                        norm.processProfileType ?? ''] ??
-                    norm.processProfileType ??
-                    '—';
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  child: ListTile(
-                    title: Text(
-                      (norm.displayName ?? '').trim().isNotEmpty
-                          ? norm.displayName!.trim()
-                          : 'Normativ v${norm.version}',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 4),
-                        Text(
-                          'v${norm.version} · ${workforceNormStatusLabel(norm.status)} · $profileLabel',
+            if (selected != null) ...[
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        (selected.displayName ?? '').trim().isNotEmpty
+                            ? selected.displayName!.trim()
+                            : 'Normativ v${selected.version}',
+                        style: t.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
                         ),
-                        if ((norm.plantKey ?? '').isNotEmpty)
-                          Text('Pogon: ${norm.plantKey}'),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Verzija ${selected.version} · '
+                        '${workforceNormStatusLabel(selected.status)}',
+                      ),
+                      if ((selected.plantKey ?? '').isNotEmpty)
+                        Text('Pogon: ${selected.plantKey}'),
+                      if ((selected.validFrom ?? '').isNotEmpty)
                         Text(
-                          'Grupa: ${norm.normGroupId}',
-                          style: t.textTheme.bodySmall,
+                          'Vrijedi od: ${selected.validFrom}'
+                          '${(selected.validTo ?? '').isNotEmpty ? ' do ${selected.validTo}' : ''}',
                         ),
-                        if ((norm.validFrom ?? '').isNotEmpty)
-                          Text(
-                            'Vrijedi od: ${norm.validFrom}'
-                            '${(norm.validTo ?? '').isNotEmpty ? ' do ${norm.validTo}' : ''}',
-                            style: t.textTheme.bodySmall,
-                          ),
-                      ],
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    isThreeLine: true,
-                    onTap: () => _openDetail(norm),
+                    ],
                   ),
-                );
-              }),
-            const SizedBox(height: 72),
+                ),
+              ),
+            ],
           ],
         ),
       ),
