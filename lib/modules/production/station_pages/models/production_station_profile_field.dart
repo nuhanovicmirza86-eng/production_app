@@ -21,6 +21,11 @@ class ProductionStationProfileField {
     this.operatorEditable,
     this.scope,
     this.helperText,
+    this.entitySearchCallable,
+    this.minSearchChars = 2,
+    this.labelFields = const [],
+    this.enumLabels = const {},
+    this.scanEnabled = false,
   });
 
   final String key;
@@ -43,8 +48,15 @@ class ProductionStationProfileField {
   final bool? operatorEditable;
   final String? scope;
   final String? helperText;
+  final String? entitySearchCallable;
+  final int minSearchChars;
+  final List<String> labelFields;
+  final Map<String, String> enumLabels;
+  final bool scanEnabled;
 
   bool get isEntitySelect => type == 'entity_select';
+
+  bool get isEntitySearchSelect => type == 'entity_search_select';
 
   bool get isBackendPopulated => populatedBy == 'backend';
 
@@ -112,7 +124,42 @@ class ProductionStationProfileField {
       helperText: (data['helperText'] ?? '').toString().trim().isEmpty
           ? null
           : (data['helperText'] ?? '').toString().trim(),
+      entitySearchCallable: (data['entitySearchCallable'] ?? '')
+          .toString()
+          .trim()
+          .isEmpty
+          ? null
+          : (data['entitySearchCallable'] ?? '').toString().trim(),
+      minSearchChars: (data['minSearchChars'] as num?)?.toInt() ?? 2,
+      labelFields: _parseStringList(data['labelFields']),
+      enumLabels: _parseEnumLabels(data['enumLabels']),
+      scanEnabled: data['scanEnabled'] == true,
     );
+  }
+
+  static List<String> _parseStringList(Object? raw) {
+    if (raw is! List) return const [];
+    return raw
+        .map((v) => v.toString().trim())
+        .where((v) => v.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  static Map<String, String> _parseEnumLabels(Object? raw) {
+    if (raw is! Map) return const {};
+    final out = <String, String>{};
+    raw.forEach((key, value) {
+      final k = key.toString().trim();
+      final v = value.toString().trim();
+      if (k.isNotEmpty && v.isNotEmpty) out[k] = v;
+    });
+    return out;
+  }
+
+  String enumLabelFor(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return trimmed;
+    return enumLabels[trimmed] ?? trimmed;
   }
 
   static List<String> _parseEnumValues(Object? raw) {

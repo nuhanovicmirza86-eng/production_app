@@ -11,6 +11,8 @@ class ProductionStationProfileCatalogEntry {
   final Map<String, dynamic> units;
   final List<ProductionStationProfileField> fields;
   final List<Map<String, dynamic>> validations;
+  final Map<String, dynamic> sessionBehavior;
+  final List<Map<String, dynamic>> repeatableTables;
 
   const ProductionStationProfileCatalogEntry({
     required this.profileKey,
@@ -22,6 +24,8 @@ class ProductionStationProfileCatalogEntry {
     this.units = const {},
     this.fields = const [],
     this.validations = const [],
+    this.sessionBehavior = const {},
+    this.repeatableTables = const [],
   });
 
   bool get isComplete => definitionStatus == 'complete';
@@ -53,6 +57,16 @@ class ProductionStationProfileCatalogEntry {
         }
       }
     }
+    final sessionBehaviorRaw = data['sessionBehavior'];
+    final repeatableTablesRaw = data['repeatableTables'];
+    final repeatableTables = <Map<String, dynamic>>[];
+    if (repeatableTablesRaw is List) {
+      for (final item in repeatableTablesRaw) {
+        if (item is Map) {
+          repeatableTables.add(Map<String, dynamic>.from(item));
+        }
+      }
+    }
     return ProductionStationProfileCatalogEntry(
       profileKey: (data['profileKey'] ?? '').toString().trim(),
       displayName: (data['displayName'] ?? '').toString().trim(),
@@ -65,6 +79,10 @@ class ProductionStationProfileCatalogEntry {
       units: unitsRaw is Map ? Map<String, dynamic>.from(unitsRaw) : const {},
       fields: ProductionStationProfileField.sortedList(fields),
       validations: validations,
+      sessionBehavior: sessionBehaviorRaw is Map
+          ? Map<String, dynamic>.from(sessionBehaviorRaw)
+          : const {},
+      repeatableTables: repeatableTables,
     );
   }
 

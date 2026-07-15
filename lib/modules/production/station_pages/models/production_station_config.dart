@@ -24,8 +24,20 @@ class ProductionStationConfig {
     'wastewater_treatment',
   ];
 
+  /// Profili sa structured profile-driven runtime-om (M1-D).
+  static const List<String> structuredProfileDrivenRuntimeProfileKeys = [
+    'rework_and_painting',
+  ];
+
   static bool isProfileDrivenRuntimeProfile(String profileKey) =>
       profileDrivenRuntimeProfileKeys.contains(profileKey.trim());
+
+  static bool isStructuredProfileDrivenRuntimeProfile(String profileKey) =>
+      structuredProfileDrivenRuntimeProfileKeys.contains(profileKey.trim());
+
+  static bool isOperatorProfileRuntimeProfile(String profileKey) =>
+      isProfileDrivenRuntimeProfile(profileKey) ||
+      isStructuredProfileDrivenRuntimeProfile(profileKey);
 
   /// Profili evidencije — kontrolisan unos (M1-B0 / M1-C).
   static const List<String> evidenceProfileTypes = [

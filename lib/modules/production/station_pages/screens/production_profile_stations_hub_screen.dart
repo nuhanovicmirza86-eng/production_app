@@ -84,7 +84,7 @@ class _ProductionProfileStationsHubScreenState
         if (!config.runtimeVisible) continue;
         if (!config.isRuntimeVisibleToRole(_userRole)) continue;
         if (config.legacyOperatorNavSlot != null) continue;
-        if (!ProductionStationConfig.isProfileDrivenRuntimeProfile(
+        if (!ProductionStationConfig.isOperatorProfileRuntimeProfile(
           config.processProfileType,
         )) {
           continue;
