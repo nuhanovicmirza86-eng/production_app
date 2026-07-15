@@ -12,6 +12,7 @@ import '../employee_profiles/workforce_employee_qr_scan_screen.dart';
 import '../leave_management/leave_operational_screen.dart';
 import '../performance_feedback/employee_kpi_dashboard_screen.dart';
 import '../performance_feedback/feedback_list_screen.dart';
+import '../../../features/worker_ai_planning/screens/worker_performance_ai_planning_screen.dart';
 import '../recommendations/workforce_recommendations_screen.dart';
 import '../shift_planning/shift_planning_screen.dart';
 import '../skills_matrix/skills_matrix_screen.dart';
@@ -40,7 +41,9 @@ class WorkforceDashboardScreen extends StatelessWidget {
         card: ProductionDashboardCard.shifts,
       );
 
-  /// Isto kao [ProductionDashboardScreen._canAccessPersonalWorkTime]: uloga + modul Osobno.
+  bool get _canViewEvidenceAiPlanning =>
+      ProductionAccessHelper.canViewProfileDrivenEvidence(_role);
+
   bool get _canAccessPersonalWorkTime {
     if (!WorkTimeAccess.canOpenHub(_role)) return false;
     if (kDebugMode) return true;
@@ -163,6 +166,18 @@ class WorkforceDashboardScreen extends StatelessWidget {
               FeedbackListScreen(companyData: companyData),
             ),
           ),
+          if (_canViewEvidenceAiPlanning)
+            _tile(
+              context,
+              icon: Icons.auto_awesome_outlined,
+              title: 'AI preporuke za planiranje rada',
+              subtitle:
+                  'Savjetodavne preporuke iz evidencija procesa (read-only)',
+              onTap: () => _open(
+                context,
+                WorkerPerformanceAiPlanningScreen(companyData: companyData),
+              ),
+            ),
           _phase(context, 'F4'),
           if (_canCompliance)
             _tile(
