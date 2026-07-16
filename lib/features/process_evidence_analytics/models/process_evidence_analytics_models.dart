@@ -1,3 +1,5 @@
+import 'normative_comparison_models.dart';
+
 class ProcessEvidenceAnalyticsFilters {
   const ProcessEvidenceAnalyticsFilters({
     required this.dateFrom,
@@ -74,7 +76,7 @@ class ProcessEvidenceAnalyticsSummary {
     required this.averagePiecesPerHour,
     required this.materialConsumption,
     required this.activitySourcesIncluded,
-    required this.normativeReady,
+    required this.normativeComparison,
     this.scrapRatePercent,
     this.reworkRatePercent,
     this.truncated = false,
@@ -90,11 +92,13 @@ class ProcessEvidenceAnalyticsSummary {
   final num? averagePiecesPerHour;
   final List<ProcessEvidenceMaterialConsumptionRow> materialConsumption;
   final List<String> activitySourcesIncluded;
-  final bool normativeReady;
+  final NormativeComparisonData normativeComparison;
   final num? scrapRatePercent;
   final num? reworkRatePercent;
   final bool truncated;
   final int? sessionCountAnalyzed;
+
+  bool get normativeReady => normativeComparison.normativeReady;
 
   factory ProcessEvidenceAnalyticsSummary.fromMap(Map<String, dynamic> m) {
     final rawMaterials = m['materialConsumption'];
@@ -130,9 +134,11 @@ class ProcessEvidenceAnalyticsSummary {
       averagePiecesPerHour: _num(m['averagePiecesPerHour']),
       materialConsumption: materials,
       activitySourcesIncluded: sources,
-      normativeReady: m['normativeReady'] == true,
+      normativeComparison: NormativeComparisonData.fromMap(m),
       scrapRatePercent: _num(m['scrapRatePercent']),
       reworkRatePercent: _num(m['reworkRatePercent']),
+      truncated: m['truncated'] == true,
+      sessionCountAnalyzed: _intOrNull(m['sessionCountAnalyzed']),
     );
   }
 }
@@ -182,6 +188,7 @@ class WorkerPerformanceKpiRow {
   const WorkerPerformanceKpiRow({
     required this.operatorId,
     required this.operatorDisplayName,
+    required this.normativeComparison,
     this.processedQty,
     this.okQty,
     this.scrapQty,
@@ -193,11 +200,11 @@ class WorkerPerformanceKpiRow {
     this.bestOperationTypes = const [],
     this.riskOperationTypes = const [],
     this.activitySource,
-    this.normativeReady = false,
   });
 
   final String operatorId;
   final String operatorDisplayName;
+  final NormativeComparisonData normativeComparison;
   final num? processedQty;
   final num? okQty;
   final num? scrapQty;
@@ -209,12 +216,14 @@ class WorkerPerformanceKpiRow {
   final List<String> bestOperationTypes;
   final List<String> riskOperationTypes;
   final String? activitySource;
-  final bool normativeReady;
+
+  bool get normativeReady => normativeComparison.normativeReady;
 
   factory WorkerPerformanceKpiRow.fromMap(Map<String, dynamic> m) {
     return WorkerPerformanceKpiRow(
       operatorId: _str(m['operatorId']) ?? '—',
       operatorDisplayName: _str(m['operatorDisplayName']) ?? '—',
+      normativeComparison: NormativeComparisonData.fromMap(m),
       processedQty: _num(m['processedQty']),
       okQty: _num(m['okQty']),
       scrapQty: _num(m['scrapQty']),
@@ -226,7 +235,6 @@ class WorkerPerformanceKpiRow {
       bestOperationTypes: _strList(m['bestOperationTypes']),
       riskOperationTypes: _strList(m['riskOperationTypes']),
       activitySource: _str(m['activitySource']),
-      normativeReady: m['normativeReady'] == true,
     );
   }
 }
@@ -237,14 +245,12 @@ class ProcessEvidenceAnalyticsLoadResult {
     required this.breakdowns,
     required this.operators,
     this.summaryTruncated = false,
-    this.normativeComparisonNote,
   });
 
   final ProcessEvidenceAnalyticsSummary summary;
   final Map<String, List<ProcessEvidenceBreakdownRow>> breakdowns;
   final List<WorkerPerformanceKpiRow> operators;
   final bool summaryTruncated;
-  final String? normativeComparisonNote;
 }
 
 String? _str(dynamic v) {

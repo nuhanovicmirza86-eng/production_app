@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../features/process_evidence_analytics/models/process_evidence_analytics_models.dart';
+import '../../../features/process_evidence_analytics/widgets/normative_comparison_panel.dart';
 import '../../../features/process_evidence_analytics/widgets/process_evidence_breakdown_tables.dart';
 import '../../../features/station_evidence/utils/profile_driven_evidence_rework_labels.dart';
 
@@ -12,14 +13,12 @@ class WorkforceEvidenceKpiSection extends StatelessWidget {
     required this.breakdowns,
     required this.loading,
     this.error,
-    this.normativeComparisonNote,
   });
 
   final WorkerPerformanceKpiRow? kpiRow;
   final Map<String, List<ProcessEvidenceBreakdownRow>> breakdowns;
   final bool loading;
   final String? error;
-  final String? normativeComparisonNote;
 
   @override
   Widget build(BuildContext context) {
@@ -44,40 +43,6 @@ class WorkforceEvidenceKpiSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        Card(
-          color: cs.surfaceContainerHighest,
-          margin: EdgeInsets.zero,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Status izvora podataka',
-                  style: t.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text('Izvor podataka: profile_driven_evidence'),
-                Text(
-                  'Normativi: nisu aktivni u ovoj fazi (normativeReady: false)',
-                  style: TextStyle(color: cs.onSurfaceVariant),
-                ),
-                if ((normativeComparisonNote ?? '').isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    normativeComparisonNote!,
-                    style: t.textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
         if (loading)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
@@ -94,6 +59,8 @@ class WorkforceEvidenceKpiSection extends StatelessWidget {
             style: t.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
           )
         else ...[
+          NormativeComparisonPanel(comparison: kpiRow!.normativeComparison),
+          const SizedBox(height: 12),
           _metricsWrap(context, kpiRow!),
           const SizedBox(height: 12),
           _operationLists(context, kpiRow!),

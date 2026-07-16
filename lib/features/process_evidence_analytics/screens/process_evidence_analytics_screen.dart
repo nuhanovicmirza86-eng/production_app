@@ -288,7 +288,6 @@ class _ProcessEvidenceAnalyticsScreenState
                 ProcessEvidenceKpiCards(
                   summary: _result!.summary,
                   truncated: _result!.summaryTruncated,
-                  normativeComparisonNote: _result!.normativeComparisonNote,
                 ),
                 const SizedBox(height: 24),
                 WorkerPerformanceKpiTable(operators: _result!.operators),

@@ -47,7 +47,6 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
 
   WorkerPerformanceKpiRow? _evidenceKpiRow;
   Map<String, List<ProcessEvidenceBreakdownRow>> _evidenceBreakdowns = const {};
-  String? _normativeComparisonNote;
 
   @override
   void initState() {
@@ -236,7 +235,6 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
       setState(() {
         _evidenceKpiRow = null;
         _evidenceBreakdowns = const {};
-        _normativeComparisonNote = null;
       });
       return;
     }
@@ -266,7 +264,6 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
           if (candidates.contains(row.operatorId.trim())) {
             matched = row;
             matchedOperatorId = row.operatorId.trim();
-            _normativeComparisonNote = snapshot.normativeComparisonNote;
             break;
           }
         }
@@ -278,7 +275,6 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
           companyId: _companyId,
           filters: _evidenceFilters,
         );
-        _normativeComparisonNote = snapshot.normativeComparisonNote;
         for (final row in snapshot.operators) {
           if (candidates.contains(row.operatorId.trim())) {
             matched = row;
@@ -450,7 +446,6 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
                             _evidenceKpiError!,
                           )
                         : null,
-                    normativeComparisonNote: _normativeComparisonNote,
                   ),
                   const SizedBox(height: 24),
                   Text(

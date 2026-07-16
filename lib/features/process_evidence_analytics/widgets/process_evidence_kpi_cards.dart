@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../models/process_evidence_analytics_models.dart';
+import 'normative_comparison_panel.dart';
 
 class ProcessEvidenceKpiCards extends StatelessWidget {
   const ProcessEvidenceKpiCards({
     super.key,
     required this.summary,
     this.truncated = false,
-    this.normativeComparisonNote,
   });
 
   final ProcessEvidenceAnalyticsSummary summary;
   final bool truncated;
-  final String? normativeComparisonNote;
 
   @override
   Widget build(BuildContext context) {
@@ -110,6 +109,8 @@ class ProcessEvidenceKpiCards extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
+        NormativeComparisonPanel(comparison: summary.normativeComparison),
+        const SizedBox(height: 10),
         Card(
           margin: EdgeInsets.zero,
           color: cs.surfaceContainerHighest,
@@ -129,24 +130,6 @@ class ProcessEvidenceKpiCards extends StatelessWidget {
                   'Izvori: ${sourceLabels.isEmpty ? '—' : sourceLabels}',
                   style: t.textTheme.bodyMedium,
                 ),
-                Text(
-                  'Normativi: ${summary.normativeReady ? 'povezani' : 'nisu još povezani (M2-F1)'}',
-                  style: t.textTheme.bodyMedium?.copyWith(
-                    color: summary.normativeReady
-                        ? cs.primary
-                        : cs.onSurfaceVariant,
-                  ),
-                ),
-                if ((normativeComparisonNote ?? '').isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    normativeComparisonNote!,
-                    style: t.textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
                 if (truncated) ...[
                   const SizedBox(height: 8),
                   Text(

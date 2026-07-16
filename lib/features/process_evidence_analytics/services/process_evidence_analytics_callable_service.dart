@@ -48,27 +48,12 @@ class ProcessEvidenceAnalyticsCallableService {
     if (rawSummary is! Map) {
       throw Exception('Nepotpun odgovor servera (summary).');
     }
-    final summary = ProcessEvidenceAnalyticsSummary.fromMap(
-      Map<String, dynamic>.from(rawSummary),
-    );
-    return ProcessEvidenceAnalyticsSummary(
-      evidenceCount: summary.evidenceCount,
-      processedTotalQty: summary.processedTotalQty,
-      okTotalQty: summary.okTotalQty,
-      scrapTotalQty: summary.scrapTotalQty,
-      reworkAgainTotalQty: summary.reworkAgainTotalQty,
-      durationMinutesTotal: summary.durationMinutesTotal,
-      averagePiecesPerHour: summary.averagePiecesPerHour,
-      materialConsumption: summary.materialConsumption,
-      activitySourcesIncluded: summary.activitySourcesIncluded,
-      normativeReady: summary.normativeReady,
-      scrapRatePercent: summary.scrapRatePercent,
-      reworkRatePercent: summary.reworkRatePercent,
-      truncated: data['truncated'] == true,
-      sessionCountAnalyzed: data['sessionCountAnalyzed'] is int
-          ? data['sessionCountAnalyzed'] as int
-          : int.tryParse('${data['sessionCountAnalyzed']}'),
-    );
+    return ProcessEvidenceAnalyticsSummary.fromMap({
+      ...Map<String, dynamic>.from(rawSummary),
+      'truncated': data['truncated'] == true,
+      if (data['sessionCountAnalyzed'] != null)
+        'sessionCountAnalyzed': data['sessionCountAnalyzed'],
+    });
   }
 
   Future<List<ProcessEvidenceBreakdownRow>> getBreakdown({
@@ -168,7 +153,6 @@ class ProcessEvidenceAnalyticsCallableService {
       breakdowns: breakdowns,
       operators: worker.operators,
       summaryTruncated: summary.truncated,
-      normativeComparisonNote: worker.normativeComparisonNote,
     );
   }
 }
