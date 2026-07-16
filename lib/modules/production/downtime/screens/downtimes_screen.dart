@@ -134,21 +134,6 @@ class _DowntimesScreenState extends State<DowntimesScreen>
           ),
         ],
       ),
-      floatingActionButton: _canManage
-          ? FloatingActionButton.extended(
-              onPressed: () async {
-                await Navigator.of(context).push<void>(
-                  MaterialPageRoute<void>(
-                    builder: (_) => DowntimeCreateScreen(
-                      companyData: widget.companyData,
-                    ),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Prijavi'),
-            )
-          : null,
     );
   }
 }
