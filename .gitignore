@@ -59,3 +59,4 @@ app.*.map.json
 # ================= LOCAL / CI =================
 .firebase/
 Operonix-Production-local.url
+web/qa-auth.html
