@@ -8,6 +8,7 @@ import '../../../modules/production/station_pages/models/production_station_conf
 import '../../../modules/production/station_pages/services/production_station_config_callable_service.dart';
 import '../models/worker_performance_ai_signals_models.dart';
 import '../services/worker_performance_ai_signals_callable_service.dart';
+import '../../../modules/workforce/widgets/workforce_screen_help.dart';
 
 /// M2-F4-F1 — read-only AI preporuke za planiranje rada (savjetodavno).
 class WorkerPerformanceAiPlanningScreen extends StatefulWidget {
@@ -194,7 +195,17 @@ class _WorkerPerformanceAiPlanningScreenState
       appBar: AppBar(
         title: const Text('AI preporuke za planiranje rada'),
         actions: [
+          const WorkforceScreenHelpIcon(
+            title: WorkforceHelpTexts.aiPlanningTitle,
+            message: WorkforceHelpTexts.aiPlanningMessage,
+          ),
           IconButton(
+            tooltip: 'Generiši preporuke',
+            icon: const Icon(Icons.auto_awesome_outlined),
+            onPressed: _loading ? null : _loadSignals,
+          ),
+          IconButton(
+            tooltip: 'Osvježi',
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : _loadSignals,
           ),
@@ -203,8 +214,6 @@ class _WorkerPerformanceAiPlanningScreenState
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _disclaimerCard(context),
-          const SizedBox(height: 12),
           ProcessEvidenceAnalyticsFiltersPanel(
             dateFrom: _dateFrom,
             dateTo: _dateTo,
@@ -246,15 +255,6 @@ class _WorkerPerformanceAiPlanningScreenState
               border: OutlineInputBorder(),
             ),
             onSubmitted: (_) => _loadSignals(),
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: _loading ? null : _loadSignals,
-              icon: const Icon(Icons.auto_awesome_outlined),
-              label: const Text('Generiši preporuke'),
-            ),
           ),
           const SizedBox(height: 16),
           if (_loading)
@@ -299,35 +299,6 @@ class _WorkerPerformanceAiPlanningScreenState
     );
   }
 
-  Widget _disclaimerCard(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Card(
-      color: cs.errorContainer.withValues(alpha: 0.35),
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Savjetodavni AI sloj — nije HR odluka',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'AI preporuke su informativne i služe planiranju rada. '
-              'Odluku uvijek donosi odgovorna osoba. '
-              'AI ne ocjenjuje radnika i ne kreira disciplinske / HR zapise. '
-              'Normativi nisu aktivni u ovoj fazi.',
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _statusCard(BuildContext context, WorkerPerformanceAiSignalsResult r) {
     final cs = Theme.of(context).colorScheme;
     return Card(
@@ -343,11 +314,7 @@ class _WorkerPerformanceAiPlanningScreenState
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 8),
-            Text('Izvor: ${r.activitySourcesIncluded.join(", ")}'),
-            Text(
-              'Normativi: nisu aktivni (normativeReady: false)',
-              style: TextStyle(color: cs.onSurfaceVariant),
-            ),
+            Text('Izvor: evidencije procesa'),
             if (r.sessionCountAnalyzed != null)
               Text('Analizirano evidencija: ${r.sessionCountAnalyzed}'),
             if (r.aiUsed)
