@@ -9,6 +9,7 @@ import '../../../modules/production/station_pages/services/production_station_co
 import '../models/worker_performance_ai_signals_models.dart';
 import '../services/worker_performance_ai_signals_callable_service.dart';
 import '../widgets/worker_ai_normative_context_card.dart';
+import '../worker_ai_planning_help.dart';
 import '../../../modules/workforce/widgets/workforce_screen_help.dart';
 
 /// M2-F4-F1 — read-only AI preporuke za planiranje rada (savjetodavno).
@@ -197,8 +198,8 @@ class _WorkerPerformanceAiPlanningScreenState
         title: const Text('AI preporuke za planiranje rada'),
         actions: [
           const WorkforceScreenHelpIcon(
-            title: WorkforceHelpTexts.aiPlanningTitle,
-            message: WorkforceHelpTexts.aiPlanningMessage,
+            title: WorkerAiPlanningHelpTexts.title,
+            message: WorkerAiPlanningHelpTexts.message,
           ),
           IconButton(
             tooltip: 'Generiši preporuke',
