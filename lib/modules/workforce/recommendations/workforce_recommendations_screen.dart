@@ -2,6 +2,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../services/workforce_callable_service.dart';
+import '../widgets/workforce_screen_help.dart';
 
 /// F5 — server-side preporuke (smjene, kvalifikacije, obuke, odsustva).
 class WorkforceRecommendationsScreen extends StatefulWidget {
@@ -61,13 +62,46 @@ class _WorkforceRecommendationsScreenState
     return out;
   }
 
+  static String _categoryLabel(String code) {
+    switch (code.trim()) {
+      case 'qualification':
+        return 'Kvalifikacije';
+      case 'shift':
+        return 'Smjene';
+      case 'training':
+        return 'Obuke';
+      case 'leave':
+        return 'Odsustva';
+      default:
+        return code.trim().isEmpty ? '' : code.trim();
+    }
+  }
+
+  static String _severityLabel(String code) {
+    switch (code.trim()) {
+      case 'high':
+        return 'Visok';
+      case 'medium':
+        return 'Srednji';
+      case 'low':
+        return 'Nizak';
+      default:
+        return code.trim().isEmpty ? '' : code.trim();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Preporuke i rizik'),
         actions: [
+          const WorkforceScreenHelpIcon(
+            title: WorkforceHelpTexts.recommendationsTitle,
+            message: WorkforceHelpTexts.recommendationsMessage,
+          ),
           IconButton(
+            tooltip: 'Osvježi',
             icon: const Icon(Icons.refresh),
             onPressed: _reload,
           ),
@@ -77,22 +111,12 @@ class _WorkforceRecommendationsScreenState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Text(
-              'Sažetak iz matrice kvalifikacija, rasporeda, obuka i operativnih odsustava. '
-              'Nije pravni savjet — provjeri prije odluke.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             child: Wrap(
               spacing: 8,
               children: [7, 14, 30].map((d) {
                 return ChoiceChip(
-                  label: Text('$d d'),
+                  label: Text('$d dana'),
                   selected: _horizon == d,
                   onSelected: (_) {
                     setState(() => _horizon = d);
@@ -171,9 +195,12 @@ class _WorkforceRecommendationsScreenState
                               ),
                               subtitle: Text(
                                 [
-                                  if (cat.isNotEmpty) '[$cat]',
+                                  if (cat.isNotEmpty)
+                                    _categoryLabel(cat),
+                                  if (_severityLabel(sev).isNotEmpty)
+                                    'Prioritet: ${_severityLabel(sev)}',
                                   (it['detail'] ?? '').toString(),
-                                ].join(' '),
+                                ].where((s) => s.isNotEmpty).join(' · '),
                               ),
                               isThreeLine: true,
                             ),

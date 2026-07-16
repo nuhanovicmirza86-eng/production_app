@@ -31,10 +31,6 @@ class ProcessEvidenceKpiCards extends StatelessWidget {
               })
               .join('\n');
 
-    final sourceLabels = summary.activitySourcesIncluded
-        .map(formatActivitySourceLabel)
-        .join(', ');
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -110,39 +106,13 @@ class ProcessEvidenceKpiCards extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         NormativeComparisonPanel(comparison: summary.normativeComparison),
-        const SizedBox(height: 10),
-        Card(
-          margin: EdgeInsets.zero,
-          color: cs.surfaceContainerHighest,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Status izvora podataka',
-                  style: t.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Izvori: ${sourceLabels.isEmpty ? '—' : sourceLabels}',
-                  style: t.textTheme.bodyMedium,
-                ),
-                if (truncated) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Rezultat je skraćen na maksimalan broj sesija u periodu.',
-                    style: t.textTheme.bodySmall?.copyWith(
-                      color: cs.error,
-                    ),
-                  ),
-                ],
-              ],
-            ),
+        if (truncated) ...[
+          const SizedBox(height: 10),
+          Text(
+            'Rezultat je skraćen na maksimalan broj evidencija u periodu.',
+            style: t.textTheme.bodySmall?.copyWith(color: cs.error),
           ),
-        ),
+        ],
       ],
     );
   }

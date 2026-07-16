@@ -6,6 +6,9 @@ import '../../../../core/access/production_access_helper.dart';
 import '../models/workforce_compliance_document.dart';
 import '../models/workforce_employee.dart';
 import '../services/workforce_callable_service.dart';
+import '../widgets/workforce_form_dialog.dart';
+import '../widgets/workforce_screen_help.dart';
+import '../workforce_compliance_labels.dart';
 import '../workforce_date_key.dart';
 
 /// F4 — compliance / employee file; **Firestore read samo tenant admin** (vidi rules).
@@ -60,7 +63,7 @@ class _ComplianceListScreenState extends State<ComplianceListScreen> {
     if (docId == null || docId.isEmpty) return 'Opće / kompanija';
     final n = _employeeNames[docId];
     if (n != null && n.isNotEmpty) return n;
-    return docId;
+    return 'Radnik nije pronađen';
   }
 
   Future<void> _addDocument() async {
@@ -90,12 +93,13 @@ class _ComplianceListScreenState extends State<ComplianceListScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSt) {
-          return AlertDialog(
-            title: const Text('Novi compliance zapis (F4)'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+          return WorkforceFormDialog(
+            title: 'Novi zapis usklađenosti',
+            onCancel: () => Navigator.pop(ctx, false),
+            onSave: () => Navigator.pop(ctx, true),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
                   DropdownButtonFormField<String?>(
                     initialValue: empId,
                     decoration: const InputDecoration(
@@ -222,24 +226,28 @@ class _ComplianceListScreenState extends State<ComplianceListScreen> {
                   ),
                 ],
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Odustani'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Spremi'),
-              ),
-            ],
-          );
+            );
         },
       ),
     );
 
-    if (ok != true) return;
-    if (title.text.trim().isEmpty || version.text.trim().isEmpty) return;
+    if (ok != true) {
+      title.dispose();
+      version.dispose();
+      attach.dispose();
+      notes.dispose();
+      return;
+    }
+    final titleText = title.text.trim();
+    final versionText = version.text.trim();
+    final attachText = attach.text.trim();
+    final notesText = notes.text.trim();
+    title.dispose();
+    version.dispose();
+    attach.dispose();
+    notes.dispose();
+
+    if (titleText.isEmpty || versionText.isEmpty) return;
 
     try {
       await _svc.upsertComplianceDocument(
@@ -247,17 +255,17 @@ class _ComplianceListScreenState extends State<ComplianceListScreen> {
         plantKey: _plantKey,
         employeeDocId: empId ?? '',
         docType: docType,
-        title: title.text.trim(),
-        version: version.text.trim(),
+        title: titleText,
+        version: versionText,
         effectiveFrom: workforceDateKey(effective),
         validUntil: validUntil != null ? workforceDateKey(validUntil!) : '',
         status: status,
-        attachmentUrl: attach.text.trim(),
-        notesShort: notes.text.trim(),
+        attachmentUrl: attachText,
+        notesShort: notesText,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Compliance zapis spremljen.')),
+          const SnackBar(content: Text('Zapis usklađenosti spremljen.')),
         );
       }
     } on FirebaseFunctionsException catch (e) {
@@ -273,13 +281,12 @@ class _ComplianceListScreenState extends State<ComplianceListScreen> {
   Widget build(BuildContext context) {
     if (!_canAccess) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Compliance')),
+        appBar: AppBar(title: const Text('Dokumenti usklađenosti')),
         body: const Center(
           child: Padding(
             padding: EdgeInsets.all(24),
             child: Text(
-              'Pristup compliance dokumentima imaju samo administratori kompanije '
-              '(ne proizvodni supervizori).',
+              'Pristup dokumentima usklađenosti imaju samo administratori kompanije.',
               textAlign: TextAlign.center,
             ),
           ),
@@ -295,10 +302,19 @@ class _ComplianceListScreenState extends State<ComplianceListScreen> {
         .limit(200);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Compliance dokumenti')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addDocument,
-        child: const Icon(Icons.add),
+      appBar: AppBar(
+        title: const Text('Dokumenti usklađenosti'),
+        actions: [
+          const WorkforceScreenHelpIcon(
+            title: WorkforceHelpTexts.complianceTitle,
+            message: WorkforceHelpTexts.complianceMessage,
+          ),
+          IconButton(
+            tooltip: 'Novi zapis',
+            icon: const Icon(Icons.add),
+            onPressed: _addDocument,
+          ),
+        ],
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: q.snapshots(),
@@ -312,7 +328,7 @@ class _ComplianceListScreenState extends State<ComplianceListScreen> {
           final docs = snap.data!.docs;
           if (docs.isEmpty) {
             return const Center(
-              child: Text('Nema zapisa. Dodaj prvi (+).'),
+              child: Text('Nema zapisa usklađenosti.'),
             );
           }
           final rows = docs.map(WorkforceComplianceDocument.fromDoc).toList();
@@ -324,9 +340,9 @@ class _ComplianceListScreenState extends State<ComplianceListScreen> {
               return ListTile(
                 title: Text(r.title, maxLines: 2, overflow: TextOverflow.ellipsis),
                 subtitle: Text(
-                  '${r.docType} · v${r.version} · od ${r.effectiveFrom}'
+                  '${WorkforceComplianceLabels.docTypeLabel(r.docType)} · v${r.version} · od ${r.effectiveFrom}'
                   '${r.validUntil != null && r.validUntil!.isNotEmpty ? " do ${r.validUntil}" : ""}\n'
-                  '${_employeeLabel(r.employeeDocId)} · ${r.status}',
+                  '${_employeeLabel(r.employeeDocId)} · ${WorkforceComplianceLabels.statusLabel(r.status)}',
                 ),
               );
             },

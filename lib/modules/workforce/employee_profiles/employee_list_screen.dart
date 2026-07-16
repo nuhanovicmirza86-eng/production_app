@@ -6,6 +6,7 @@ import '../../../../core/company_plant_display_name.dart';
 import '../models/workforce_employee.dart';
 import 'employee_edit_screen.dart';
 import 'workforce_employee_qr_scan_screen.dart';
+import '../widgets/workforce_screen_help.dart';
 
 /// Lista radnika. Admin / super admin u kompaniji: pregled svih pogona, filtar pogona,
 /// novi radnik dobiva odabrani pogon (vidi i [EmployeeEditScreen]).
@@ -131,6 +132,10 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
       appBar: AppBar(
         title: const Text('Operativni profil radnika'),
         actions: [
+          const WorkforceScreenHelpIcon(
+            title: WorkforceHelpTexts.employeeProfileTitle,
+            message: WorkforceHelpTexts.employeeProfileMessage,
+          ),
           if (_canManage)
             IconButton(
               tooltip: 'Skeniraj bedž radnika',
@@ -145,10 +150,10 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
                 );
               },
             ),
-        ],
-      ),
-      floatingActionButton: _canManage
-          ? FloatingActionButton(
+          if (_canManage)
+            IconButton(
+              tooltip: 'Novi radnik',
+              icon: const Icon(Icons.person_add_outlined),
               onPressed: () async {
                 await Navigator.of(context).push<void>(
                   MaterialPageRoute<void>(
@@ -159,9 +164,9 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
                   ),
                 );
               },
-              child: const Icon(Icons.person_add_outlined),
-            )
-          : null,
+            ),
+        ],
+      ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -187,16 +192,6 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
                   ),
                 ],
                 onChanged: (v) => setState(() => _filterPlantKey = v),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: Text(
-                'Kao Admin vidiš radnike u cijeloj kompaniji. Za novog radnika koristi filtar pogona '
-                '(ili odabir u formi) da ga vežeš na ispravan pogon.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
               ),
             ),
           ],

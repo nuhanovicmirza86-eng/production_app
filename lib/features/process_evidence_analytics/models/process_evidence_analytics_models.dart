@@ -301,7 +301,7 @@ String formatProcessEvidenceProfileLabel(String? profileKey) {
 String formatActivitySourceLabel(String source) {
   switch (source.trim()) {
     case 'profile_driven_evidence':
-      return 'Profile-driven evidencije';
+      return 'Evidencije procesa';
     default:
       return source;
   }

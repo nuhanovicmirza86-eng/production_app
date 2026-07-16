@@ -1,20 +1,61 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
+import '../models/workforce_employee.dart';
 import '../models/workforce_qualification.dart';
+import '../widgets/workforce_screen_help.dart';
+import '../workforce_qualification_labels.dart';
 
-/// F2: pregled kvalifikacija s rokom važenja — istekle ili u narednih 30 dana.
-class QualificationExpiryScreen extends StatelessWidget {
+/// Pregled kvalifikacija s rokom važenja — istekle ili u narednih 30 dana.
+class QualificationExpiryScreen extends StatefulWidget {
   const QualificationExpiryScreen({super.key, required this.companyData});
 
   final Map<String, dynamic> companyData;
 
+  @override
+  State<QualificationExpiryScreen> createState() =>
+      _QualificationExpiryScreenState();
+}
+
+class _QualificationExpiryScreenState extends State<QualificationExpiryScreen> {
+  Map<String, String> _employeeNames = const {};
+
   String get _companyId =>
-      (companyData['companyId'] ?? '').toString().trim();
+      (widget.companyData['companyId'] ?? '').toString().trim();
   String get _plantKey =>
-      (companyData['plantKey'] ?? '').toString().trim();
+      (widget.companyData['plantKey'] ?? '').toString().trim();
 
   static const _horizonDays = 30;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEmployeeNames();
+  }
+
+  Future<void> _loadEmployeeNames() async {
+    final snap = await FirebaseFirestore.instance
+        .collection('workforce_employees')
+        .where('companyId', isEqualTo: _companyId)
+        .where('plantKey', isEqualTo: _plantKey)
+        .limit(300)
+        .get();
+    if (!mounted) return;
+    setState(() {
+      _employeeNames = {
+        for (final doc in snap.docs)
+          doc.id: WorkforceEmployee.fromDoc(doc).displayName,
+      };
+    });
+  }
+
+  String _employeeLabel(String employeeDocId) {
+    final name = (_employeeNames[employeeDocId] ?? '').trim();
+    return name.isEmpty ? 'Radnik nije pronađen' : name;
+  }
+
+  String _fmt(DateTime d) => DateFormat('d. M. yyyy.', 'bs').format(d);
 
   @override
   Widget build(BuildContext context) {
@@ -27,12 +68,20 @@ class QualificationExpiryScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Istek i revalidacija'),
+        actions: const [
+          WorkforceScreenHelpIcon(
+            title: WorkforceHelpTexts.qualificationExpiryTitle,
+            message: WorkforceHelpTexts.qualificationExpiryMessage,
+          ),
+        ],
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: q.snapshots(),
         builder: (context, snap) {
           if (snap.hasError) {
-            return Center(child: Text('Greška: ${snap.error}'));
+            return const Center(
+              child: Text('Učitavanje nije uspjelo. Pokušajte ponovo.'),
+            );
           }
           if (!snap.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -60,8 +109,7 @@ class QualificationExpiryScreen extends StatelessWidget {
               child: Padding(
                 padding: EdgeInsets.all(24),
                 child: Text(
-                  'Nema kvalifikacija s rokom u narednih $_horizonDays dana '
-                  'niti isteklih (s validUntil u matrici).',
+                  'Nema kvalifikacija s rokom u narednih 30 dana niti isteklih.',
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -82,11 +130,13 @@ class QualificationExpiryScreen extends StatelessWidget {
                       ? Theme.of(context).colorScheme.error
                       : Theme.of(context).colorScheme.primary,
                 ),
-                title: Text('${r.dimensionType}:${r.dimensionId}'),
+                title: Text(
+                  '${WorkforceQualificationLabels.dimensionTypeLabel(r.dimensionType)}: ${r.dimensionId}',
+                ),
                 subtitle: Text(
-                  'Radnik ${r.employeeDocId} · '
-                  '${expired ? "ISTEKLO" : "Ističe"} ${_fmt(v)} · '
-                  'odobrenje: ${r.effectiveApproval}',
+                  '${_employeeLabel(r.employeeDocId)} · '
+                  '${expired ? 'Isteklo' : 'Ističe'} ${_fmt(v)} · '
+                  '${WorkforceQualificationLabels.approvalLabel(r.effectiveApproval)}',
                 ),
               );
             },
@@ -95,7 +145,4 @@ class QualificationExpiryScreen extends StatelessWidget {
       ),
     );
   }
-
-  String _fmt(DateTime d) =>
-      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 }

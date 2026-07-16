@@ -4,8 +4,9 @@ import '../../../features/process_evidence_analytics/models/process_evidence_ana
 import '../../../features/process_evidence_analytics/widgets/normative_comparison_panel.dart';
 import '../../../features/process_evidence_analytics/widgets/process_evidence_breakdown_tables.dart';
 import '../../../features/station_evidence/utils/profile_driven_evidence_rework_labels.dart';
+import '../widgets/workforce_screen_help.dart';
 
-/// M2-F3-F1 — objektivni KPI iz profile-driven evidencija (read-only blok na KPI radnika).
+/// Objektivni KPI iz evidencija procesa (read-only blok na KPI radnika).
 class WorkforceEvidenceKpiSection extends StatelessWidget {
   const WorkforceEvidenceKpiSection({
     super.key,
@@ -28,19 +29,21 @@ class WorkforceEvidenceKpiSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Objektivni KPI iz evidencija procesa',
-          style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Podaci iz zatvorenih profile-driven evidencija (M2-F). '
-          'Ovo nije subjektivna ocjena rukovodioca — vidi karticu '
-          '„Performanse i povratne informacije“ u modulu Radna snaga.',
-          style: t.textTheme.bodyMedium?.copyWith(
-            color: cs.onSurfaceVariant,
-            height: 1.35,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Objektivni KPI iz evidencija procesa',
+                style: t.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const WorkforceScreenHelpIcon(
+              title: WorkforceHelpTexts.evidenceKpiSectionTitle,
+              message: WorkforceHelpTexts.evidenceKpiSectionMessage,
+            ),
+          ],
         ),
         const SizedBox(height: 12),
         if (loading)
@@ -55,7 +58,7 @@ class WorkforceEvidenceKpiSection extends StatelessWidget {
           )
         else if (kpiRow == null)
           Text(
-            'Nema profile-driven evidencija za odabranog radnika u periodu.',
+            'Nema evidencija procesa za odabranog radnika u periodu.',
             style: t.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
           )
         else ...[

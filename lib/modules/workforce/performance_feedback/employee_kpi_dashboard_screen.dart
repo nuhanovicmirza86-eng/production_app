@@ -7,6 +7,7 @@ import '../../production/ooe/models/machine_state_event.dart';
 import '../../production/tracking/models/production_operator_tracking_entry.dart';
 import '../models/workforce_employee.dart';
 import '../workforce_date_key.dart';
+import '../widgets/workforce_screen_help.dart';
 import 'workforce_evidence_kpi_section.dart';
 
 /// F3: objektivni KPI — legacy (operativno praćenje / MES) + M2-F profile-driven evidencije.
@@ -354,9 +355,14 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('KPI radnika (F3)'),
+        title: const Text('KPI radnika'),
         actions: [
+          const WorkforceScreenHelpIcon(
+            title: WorkforceHelpTexts.employeeKpiTitle,
+            message: WorkforceHelpTexts.employeeKpiMessage,
+          ),
           IconButton(
+            tooltip: 'Osvježi',
             icon: const Icon(Icons.refresh),
             onPressed: _loadingKpi ? null : _loadAllKpi,
           ),
@@ -367,17 +373,6 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                Text(
-                  'Objektivni KPI iz više izvora: profile-driven evidencije procesa (M2-F) '
-                  'i legacy agregati iz operativnog praćenja te MES događaja stanja stroja. '
-                  'Subjektivni feedback rukovodioca je u kartici '
-                  '„Performanse i povratne informacije“.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        height: 1.35,
-                      ),
-                ),
-                const SizedBox(height: 16),
                 if (_employees.isEmpty)
                   const Text('Nema radnika u pogonu.')
                 else ...[
@@ -391,7 +386,7 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
                           (e) => DropdownMenuItem(
                             value: e.id,
                             child: Text(
-                              '${e.displayName} (${e.employeeCode})',
+                              e.displayName,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -428,7 +423,7 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
                           final days = _dateTo.difference(_dateFrom).inDays;
                           final sel = days == d;
                           return ChoiceChip(
-                            label: Text('$d d'),
+                            label: Text('$d dana'),
                             selected: sel,
                             onSelected: (_) => _applyPeriodDays(d),
                           );
@@ -448,19 +443,21 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
                         : null,
                   ),
                   const SizedBox(height: 24),
-                  Text(
-                    'Legacy KPI (operativno praćenje i MES)',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Operativno praćenje i stanje stroja',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Agregacija iz operativnog praćenja (output/škart) i događaja stanja stroja '
-                    'gdje je [createdBy] jednak [linkedUserUid] radnika.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                      ),
+                      const WorkforceScreenHelpIcon(
+                        title: WorkforceHelpTexts.legacyKpiSectionTitle,
+                        message: WorkforceHelpTexts.legacyKpiSectionMessage,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
                   if (_legacyKpiError != null)
@@ -490,10 +487,10 @@ class _EmployeeKpiDashboardScreenState extends State<EmployeeKpiDashboardScreen>
                     const SizedBox(height: 12),
                     _kpiCard(
                       context,
-                      title: 'MES — događaji stanja (uz UID)',
+                      title: 'Stanje stroja (povezani događaji)',
                       lines: [
                         'Povezani događaji: $_machineEventMatchCount',
-                        'Zbir trajanja zatvorenih segm. (ne running): ${_fmtDuration(_downtimeSecondsAttributed)}',
+                        'Zbir trajanja zastoja: ${_fmtDuration(_downtimeSecondsAttributed)}',
                       ],
                     ),
                   ],

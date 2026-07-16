@@ -6,6 +6,10 @@ import '../../../../core/access/production_access_helper.dart';
 import '../models/workforce_employee.dart';
 import '../models/workforce_training_record.dart';
 import '../services/workforce_callable_service.dart';
+import '../widgets/workforce_form_dialog.dart';
+import '../widgets/workforce_screen_help.dart';
+import '../workforce_qualification_labels.dart';
+import '../workforce_training_labels.dart';
 
 class TrainingListScreen extends StatefulWidget {
   const TrainingListScreen({super.key, required this.companyData});
@@ -18,6 +22,7 @@ class TrainingListScreen extends StatefulWidget {
 
 class _TrainingListScreenState extends State<TrainingListScreen> {
   final _svc = WorkforceCallableService();
+  Map<String, String> _employeeNames = const {};
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -30,6 +35,34 @@ class _TrainingListScreenState extends State<TrainingListScreen> {
         role: _role,
         card: ProductionDashboardCard.shifts,
       );
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEmployeeNames();
+  }
+
+  Future<void> _loadEmployeeNames() async {
+    final snap = await FirebaseFirestore.instance
+        .collection('workforce_employees')
+        .where('companyId', isEqualTo: _companyId)
+        .where('plantKey', isEqualTo: _plantKey)
+        .orderBy('displayName')
+        .limit(200)
+        .get();
+    if (!mounted) return;
+    setState(() {
+      _employeeNames = {
+        for (final doc in snap.docs)
+          doc.id: WorkforceEmployee.fromDoc(doc).displayName,
+      };
+    });
+  }
+
+  String _employeeLabel(String employeeDocId) {
+    final name = (_employeeNames[employeeDocId] ?? '').trim();
+    return name.isEmpty ? 'Radnik nije pronađen' : name;
+  }
 
   String _isoDate(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
@@ -57,10 +90,10 @@ class _TrainingListScreenState extends State<TrainingListScreen> {
     final title = TextEditingController();
     final trainer = TextEditingController();
     final notes = TextEditingController();
-    final linkedDimType = TextEditingController();
     final linkedDimId = TextEditingController();
     String trainingType = 'classroom';
     String status = 'planned';
+    String linkedType = WorkforceQualificationLabels.machine;
     DateTime? scheduled;
     DateTime? completed;
 
@@ -68,28 +101,29 @@ class _TrainingListScreenState extends State<TrainingListScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSt) {
-          return AlertDialog(
-            title: const Text('Nova evidencija obuke (F2)'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<String>(
-                    initialValue: empId,
-                    decoration: const InputDecoration(labelText: 'Radnik'),
-                    items: employees
-                        .map(
-                          (e) => DropdownMenuItem(
-                            value: e.id,
-                            child: Text(
-                              '${e.displayName} (${e.employeeCode})',
-                              overflow: TextOverflow.ellipsis,
-                            ),
+          return WorkforceFormDialog(
+            title: 'Nova evidencija obuke',
+            onCancel: () => Navigator.pop(ctx, false),
+            onSave: () => Navigator.pop(ctx, true),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: empId,
+                  decoration: const InputDecoration(labelText: 'Radnik'),
+                  items: employees
+                      .map(
+                        (e) => DropdownMenuItem(
+                          value: e.id,
+                          child: Text(
+                            e.displayName,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        )
-                        .toList(),
-                    onChanged: (v) => setSt(() => empId = v),
-                  ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setSt(() => empId = v),
+                ),
                   TextFormField(
                     controller: title,
                     decoration: const InputDecoration(
@@ -184,16 +218,20 @@ class _TrainingListScreenState extends State<TrainingListScreen> {
                     ),
                   ),
                   TextFormField(
-                    controller: linkedDimType,
-                    decoration: const InputDecoration(
-                      labelText: 'Povezana dimenzija — tip (npr. machine)',
-                    ),
-                  ),
-                  TextFormField(
                     controller: linkedDimId,
                     decoration: const InputDecoration(
-                      labelText: 'Povezana dimenzija — ID',
+                      labelText: 'Oznaka veze (opcionalno)',
                     ),
+                  ),
+                  DropdownButtonFormField<String>(
+                    initialValue: linkedType,
+                    decoration: const InputDecoration(
+                      labelText: 'Vrsta veze (opcionalno)',
+                    ),
+                    items: WorkforceQualificationLabels.dimensionTypeItems(),
+                    onChanged: (v) {
+                      if (v != null) setSt(() => linkedType = v);
+                    },
                   ),
                   TextFormField(
                     controller: notes,
@@ -202,41 +240,51 @@ class _TrainingListScreenState extends State<TrainingListScreen> {
                   ),
                 ],
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Odustani'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Spremi'),
-              ),
-            ],
-          );
+            );
         },
       ),
     );
 
-    if (ok != true) return;
+    if (ok != true) {
+      title.dispose();
+      trainer.dispose();
+      notes.dispose();
+      linkedDimId.dispose();
+      return;
+    }
     final employeeDocId = empId;
-    if (employeeDocId == null) return;
-    if (title.text.trim().isEmpty) return;
+    if (employeeDocId == null) {
+      title.dispose();
+      trainer.dispose();
+      notes.dispose();
+      linkedDimId.dispose();
+      return;
+    }
+    final titleText = title.text.trim();
+    final trainerText = trainer.text.trim();
+    final notesText = notes.text.trim();
+    final linkedIdText = linkedDimId.text.trim();
+    title.dispose();
+    trainer.dispose();
+    notes.dispose();
+    linkedDimId.dispose();
+
+    if (titleText.isEmpty) return;
 
     try {
       await _svc.upsertTrainingRecord(
         companyId: _companyId,
         plantKey: _plantKey,
         employeeDocId: employeeDocId,
-        title: title.text.trim(),
+        title: titleText,
         trainingType: trainingType,
         status: status,
-        trainerName: trainer.text.trim(),
+        trainerName: trainerText,
         scheduledAtIso: scheduled != null ? scheduled!.toUtc().toIso8601String() : '',
         completedAtIso: completed != null ? completed!.toUtc().toIso8601String() : '',
-        notesShort: notes.text.trim(),
-        linkedDimensionType: linkedDimType.text.trim(),
-        linkedDimensionId: linkedDimId.text.trim(),
+        notesShort: notesText,
+        linkedDimensionType: linkedIdText.isEmpty ? '' : linkedType,
+        linkedDimensionId: linkedIdText,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -262,13 +310,21 @@ class _TrainingListScreenState extends State<TrainingListScreen> {
         .limit(200);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Evidencija obuka')),
-      floatingActionButton: _canManage
-          ? FloatingActionButton(
+      appBar: AppBar(
+        title: const Text('Evidencija obuka'),
+        actions: [
+          const WorkforceScreenHelpIcon(
+            title: WorkforceHelpTexts.trainingTitle,
+            message: WorkforceHelpTexts.trainingMessage,
+          ),
+          if (_canManage)
+            IconButton(
+              tooltip: 'Nova evidencija obuke',
+              icon: const Icon(Icons.add),
               onPressed: _addRecord,
-              child: const Icon(Icons.add),
-            )
-          : null,
+            ),
+        ],
+      ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: q.snapshots(),
         builder: (context, snap) {
@@ -281,7 +337,7 @@ class _TrainingListScreenState extends State<TrainingListScreen> {
           final docs = snap.data!.docs;
           if (docs.isEmpty) {
             return const Center(
-              child: Text('Nema zapisa obuka. Dodaj prvi (+).'),
+              child: Text('Nema zapisa obuka.'),
             );
           }
           final rows = docs.map(WorkforceTrainingRecord.fromDoc).toList();
@@ -294,8 +350,9 @@ class _TrainingListScreenState extends State<TrainingListScreen> {
                 title: Text(r.title, maxLines: 2, overflow: TextOverflow.ellipsis),
                 subtitle: Text(
                   [
-                    'Radnik: ${r.employeeDocId}',
-                    'Status: ${r.status}',
+                    _employeeLabel(r.employeeDocId),
+                    WorkforceTrainingLabels.statusLabel(r.status),
+                    WorkforceTrainingLabels.typeLabel(r.trainingType),
                     if (r.trainerName != null && r.trainerName!.isNotEmpty)
                       'Trener: ${r.trainerName}',
                   ].join(' · '),

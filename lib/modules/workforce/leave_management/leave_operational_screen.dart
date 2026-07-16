@@ -6,7 +6,10 @@ import '../../../../core/access/production_access_helper.dart';
 import '../models/workforce_employee.dart';
 import '../models/workforce_leave_operational.dart';
 import '../services/workforce_callable_service.dart';
+import '../widgets/workforce_form_dialog.dart';
+import '../widgets/workforce_screen_help.dart';
 import '../workforce_date_key.dart';
+import '../workforce_leave_labels.dart';
 
 /// F4 — operativna dostupnost / odsustvo za planiranje (bez medicinskih detalja).
 class LeaveOperationalScreen extends StatefulWidget {
@@ -60,8 +63,8 @@ class _LeaveOperationalScreenState extends State<LeaveOperationalScreen> {
 
   String _employeeLabel(String docId) {
     final n = _employeeNames[docId];
-    if (n != null && n.isNotEmpty) return '$n · $docId';
-    return docId;
+    if (n != null && n.isNotEmpty) return n;
+    return 'Radnik nije pronađen';
   }
 
   Future<void> _addLeave() async {
@@ -94,21 +97,15 @@ class _LeaveOperationalScreenState extends State<LeaveOperationalScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSt) {
-          return AlertDialog(
-            title: const Text('Operativno odsustvo (F4)'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Ne unositi zdravstvene ili osobne osjetljive podatke u napomenu.',
-                    style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(ctx).colorScheme.error,
-                        ),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
+          return WorkforceFormDialog(
+            title: 'Operativno odsustvo',
+            onCancel: () => Navigator.pop(ctx, false),
+            onSave: () => Navigator.pop(ctx, true),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DropdownButtonFormField<String>(
                     initialValue: empId,
                     decoration: const InputDecoration(labelText: 'Radnik'),
                     items: employees
@@ -116,7 +113,7 @@ class _LeaveOperationalScreenState extends State<LeaveOperationalScreen> {
                           (e) => DropdownMenuItem(
                             value: e.id,
                             child: Text(
-                              '${e.displayName} (${e.employeeCode})',
+                              e.displayName,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -214,25 +211,22 @@ class _LeaveOperationalScreenState extends State<LeaveOperationalScreen> {
                   ),
                 ],
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Odustani'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Spremi'),
-              ),
-            ],
-          );
+            );
         },
       ),
     );
 
-    if (ok != true) return;
+    if (ok != true) {
+      notes.dispose();
+      return;
+    }
     final employeeDocId = empId;
-    if (employeeDocId == null) return;
+    if (employeeDocId == null) {
+      notes.dispose();
+      return;
+    }
+    final notesText = notes.text.trim();
+    notes.dispose();
 
     final startKey = workforceDateKey(start);
     final endKey = workforceDateKey(end);
@@ -254,7 +248,7 @@ class _LeaveOperationalScreenState extends State<LeaveOperationalScreen> {
         dateKeyEnd: endKey,
         operationalAvailability: availability,
         leaveCategoryOperational: category,
-        notesShort: notes.text.trim(),
+        notesShort: notesText,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -281,14 +275,20 @@ class _LeaveOperationalScreenState extends State<LeaveOperationalScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Odsustva — operativni sloj'),
-      ),
-      floatingActionButton: _canManage
-          ? FloatingActionButton(
+        title: const Text('Odsustva (operativno)'),
+        actions: [
+          const WorkforceScreenHelpIcon(
+            title: WorkforceHelpTexts.leaveTitle,
+            message: WorkforceHelpTexts.leaveMessage,
+          ),
+          if (_canManage)
+            IconButton(
+              tooltip: 'Novo operativno odsustvo',
+              icon: const Icon(Icons.add),
               onPressed: _addLeave,
-              child: const Icon(Icons.add),
-            )
-          : null,
+            ),
+        ],
+      ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: q.snapshots(),
         builder: (context, snap) {
@@ -304,8 +304,7 @@ class _LeaveOperationalScreenState extends State<LeaveOperationalScreen> {
               child: Padding(
                 padding: EdgeInsets.all(24),
                 child: Text(
-                  'Nema operativnih zapisa odsustva. '
-                  'Ovo nije HR dosije — samo dostupnost za planiranje.',
+                  'Nema operativnih zapisa odsustva.',
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -324,7 +323,8 @@ class _LeaveOperationalScreenState extends State<LeaveOperationalScreen> {
                 ),
                 subtitle: Text(
                   '${_employeeLabel(r.employeeDocId)}\n'
-                  '${r.operationalAvailability} · ${r.leaveCategoryOperational}'
+                  '${WorkforceLeaveLabels.availabilityLabel(r.operationalAvailability)} · '
+                  '${WorkforceLeaveLabels.categoryLabel(r.leaveCategoryOperational)}'
                   '${(r.notesShort ?? '').isNotEmpty ? " · ${r.notesShort}" : ""}',
                 ),
               );

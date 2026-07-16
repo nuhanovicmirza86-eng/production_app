@@ -19,7 +19,7 @@ import '../shift_planning/shift_planning_screen.dart';
 import '../skills_matrix/skills_matrix_screen.dart';
 import '../training_records/training_list_screen.dart';
 
-/// Radna snaga — F1–F5 (direktni importi: stabilnije na webu od deferred chunkova).
+/// Radna snaga — operativni modul radnika (direktni importi: stabilnije na webu).
 class WorkforceDashboardScreen extends StatelessWidget {
   const WorkforceDashboardScreen({super.key, required this.companyData});
 
@@ -74,7 +74,6 @@ class WorkforceDashboardScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _phase(context, 'F1'),
           _tile(
             context,
             icon: Icons.badge_outlined,
@@ -138,7 +137,6 @@ class WorkforceDashboardScreen extends StatelessWidget {
               SkillsMatrixScreen(companyData: companyData),
             ),
           ),
-          _phase(context, 'F2'),
           _tile(
             context,
             icon: Icons.school_outlined,
@@ -149,7 +147,6 @@ class WorkforceDashboardScreen extends StatelessWidget {
               TrainingListScreen(companyData: companyData),
             ),
           ),
-          _phase(context, 'F3'),
           _tile(
             context,
             icon: Icons.insights_outlined,
@@ -164,7 +161,7 @@ class WorkforceDashboardScreen extends StatelessWidget {
             context,
             icon: Icons.feedback_outlined,
             title: 'Performanse i povratne informacije',
-            subtitle: 'Coaching i povratne informacije',
+            subtitle: 'Savjetovanje, priznanje i evidencija ocjena',
             onTap: () => _open(
               context,
               FeedbackListScreen(companyData: companyData),
@@ -186,14 +183,12 @@ class WorkforceDashboardScreen extends StatelessWidget {
               context,
               icon: Icons.auto_awesome_outlined,
               title: 'AI preporuke za planiranje rada',
-              subtitle:
-                  'Savjetodavne preporuke iz evidencija procesa (read-only)',
+              subtitle: 'Savjetodavne preporuke iz evidencija procesa',
               onTap: () => _open(
                 context,
                 WorkerPerformanceAiPlanningScreen(companyData: companyData),
               ),
             ),
-          _phase(context, 'F4'),
           if (_canCompliance)
             _tile(
               context,
@@ -215,7 +210,6 @@ class WorkforceDashboardScreen extends StatelessWidget {
               LeaveOperationalScreen(companyData: companyData),
             ),
           ),
-          _phase(context, 'F5'),
           _tile(
             context,
             icon: Icons.auto_awesome_motion_outlined,
@@ -228,20 +222,6 @@ class WorkforceDashboardScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
         ],
-      ),
-    );
-  }
-
-  Widget _phase(BuildContext context, String label) {
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: EdgeInsets.only(top: label == 'F1' ? 0 : 18, bottom: 8),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: cs.primary,
-            ),
       ),
     );
   }

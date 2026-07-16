@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/access/production_access_helper.dart';
 import '../../../core/company_plant_display_name.dart';
 import '../../../features/process_evidence_analytics/widgets/process_evidence_analytics_filters.dart';
+import '../../../modules/workforce/widgets/workforce_screen_help.dart';
 import '../models/workforce_performance_norm_models.dart';
 import '../services/workforce_performance_norms_callable_service.dart';
 import 'workforce_performance_norm_detail_screen.dart';
@@ -224,6 +225,10 @@ class _WorkforcePerformanceNormsListScreenState
       appBar: AppBar(
         title: const Text('Normativi rada'),
         actions: [
+          const WorkforceScreenHelpIcon(
+            title: WorkforceHelpTexts.normsListTitle,
+            message: WorkforceHelpTexts.normsListMessage,
+          ),
           IconButton(
             onPressed: _loading ? null : _openCreate,
             icon: const Icon(Icons.add),
@@ -247,13 +252,6 @@ class _WorkforcePerformanceNormsListScreenState
                       'Filteri',
                       style: t.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Odaberite vrijednosti s liste — ništa se ne upisuje ručno.',
-                      style: t.textTheme.bodySmall?.copyWith(
-                        color: t.colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: 12),

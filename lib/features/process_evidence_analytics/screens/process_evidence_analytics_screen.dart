@@ -11,6 +11,7 @@ import '../widgets/process_evidence_analytics_filters.dart';
 import '../widgets/process_evidence_breakdown_tables.dart';
 import '../widgets/process_evidence_kpi_cards.dart';
 import '../widgets/worker_performance_kpi_table.dart';
+import '../../../modules/workforce/widgets/workforce_screen_help.dart';
 
 /// M2-F2 — read-only analitika profile-driven evidencija procesa.
 class ProcessEvidenceAnalyticsScreen extends StatefulWidget {
@@ -215,6 +216,10 @@ class _ProcessEvidenceAnalyticsScreenState
       appBar: AppBar(
         title: const Text('Analitika evidencija procesa'),
         actions: [
+          const WorkforceScreenHelpIcon(
+            title: WorkforceHelpTexts.processEvidenceAnalyticsTitle,
+            message: WorkforceHelpTexts.processEvidenceAnalyticsMessage,
+          ),
           IconButton(
             tooltip: 'Osvježi',
             icon: const Icon(Icons.refresh),
@@ -236,15 +241,6 @@ class _ProcessEvidenceAnalyticsScreenState
             controller: _scrollController,
             padding: const EdgeInsets.all(16),
             children: [
-              Text(
-                'Agregirani KPI, breakdown i učinak radnika iz zatvorenih '
-                'profile-driven evidencija. Read-only — ne mijenja unos operatera.',
-                style: t.textTheme.bodyMedium?.copyWith(
-                  color: t.colorScheme.onSurfaceVariant,
-                  height: 1.35,
-                ),
-              ),
-              const SizedBox(height: 16),
               ProcessEvidenceAnalyticsFiltersPanel(
                 dateFrom: _dateFrom,
                 dateTo: _dateTo,

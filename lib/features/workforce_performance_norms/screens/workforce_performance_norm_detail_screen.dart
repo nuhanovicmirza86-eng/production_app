@@ -5,6 +5,7 @@ import '../../../core/company_plant_display_name.dart';
 import '../../../features/process_evidence_analytics/widgets/process_evidence_analytics_filters.dart';
 import '../../../modules/production/station_pages/models/production_station_config.dart';
 import '../../../modules/production/station_pages/services/production_station_config_callable_service.dart';
+import '../../../modules/workforce/widgets/workforce_screen_help.dart';
 import '../models/workforce_performance_norm_models.dart';
 import '../services/workforce_performance_norms_callable_service.dart';
 
@@ -273,8 +274,9 @@ class _WorkforcePerformanceNormDetailScreenState
   void _showAuditSnack(String action, String? auditLogId) {
     final id = (auditLogId ?? '').trim();
     final msg = id.isEmpty
-        ? '$action — audit zapis kreiran.'
-        : '$action — auditLogId: $id';
+        ? '$action — zabilježeno u audit trag.'
+        : '$action — zabilježeno u audit trag.';
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
@@ -325,7 +327,7 @@ class _WorkforcePerformanceNormDetailScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Za aktivaciju unesi validFrom (YYYY-MM-DD) i razlog promjene.',
+            'Za aktivaciju unesite datum važenja i razlog promjene.',
           ),
         ),
       );
@@ -436,7 +438,7 @@ class _WorkforcePerformanceNormDetailScreenState
     final plantKey = (_matchPlantKey ?? '').trim();
     if (plantKey.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Za match test odaberi pogon.')),
+        const SnackBar(content: Text('Za probu odaberite pogon.')),
       );
       return;
     }
@@ -517,7 +519,50 @@ class _WorkforcePerformanceNormDetailScreenState
               : 'Normativ rada');
 
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          const WorkforceScreenHelpIcon(
+            title: WorkforceHelpTexts.normDetailTitle,
+            message: WorkforceHelpTexts.normDetailMessage,
+          ),
+          if (_isEditable)
+            IconButton(
+              tooltip: widget.isCreate ? 'Kreiraj nacrt' : 'Spremi nacrt',
+              icon: _saving
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined),
+              onPressed: _saving ? null : _saveDraft,
+            ),
+          if (!widget.isCreate && _norm?.isDraft == true)
+            IconButton(
+              tooltip: 'Aktiviraj normativ',
+              icon: const Icon(Icons.check_circle_outline),
+              onPressed: _saving ? null : _activate,
+            ),
+          if (_norm != null && (_norm!.isActive || _norm!.isDraft))
+            IconButton(
+              tooltip: 'Arhiviraj',
+              icon: const Icon(Icons.archive_outlined),
+              onPressed: _saving ? null : _archive,
+            ),
+          IconButton(
+            tooltip: 'Probno podudaranje',
+            icon: _matchLoading
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.search),
+            onPressed: _matchLoading ? null : _runMatchTest,
+          ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -531,17 +576,7 @@ class _WorkforcePerformanceNormDetailScreenState
                       style: TextStyle(color: t.colorScheme.error),
                     ),
                   ),
-                if (_norm != null) ...[
-                  _HeaderCard(norm: _norm!),
-                  if ((_lastAuditLogId ?? '').isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        'Zadnji auditLogId: $_lastAuditLogId',
-                        style: t.textTheme.bodySmall,
-                      ),
-                    ),
-                ],
+                if (_norm != null) _HeaderCard(norm: _norm!),
                 _FormSection(
                   title: 'Osnovno',
                   children: [
@@ -566,7 +601,7 @@ class _WorkforcePerformanceNormDetailScreenState
                   ],
                 ),
                 _FormSection(
-                  title: 'Opseg (match dimenzije)',
+                  title: 'Opseg primjene',
                   children: [
                     if (_canPickPlant)
                       DropdownButtonFormField<String?>(
@@ -668,7 +703,7 @@ class _WorkforcePerformanceNormDetailScreenState
                       controller: _productIdController,
                       enabled: _isEditable && !_saving,
                       decoration: const InputDecoration(
-                        labelText: 'productId (opcionalno)',
+                        labelText: 'Identifikator proizvoda (opcionalno)',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -677,7 +712,7 @@ class _WorkforcePerformanceNormDetailScreenState
                       controller: _productCodeController,
                       enabled: _isEditable && !_saving,
                       decoration: const InputDecoration(
-                        labelText: 'productCode (opcionalno)',
+                        labelText: 'Šifra proizvoda (opcionalno)',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -686,7 +721,7 @@ class _WorkforcePerformanceNormDetailScreenState
                       controller: _pieceTypeController,
                       enabled: _isEditable && !_saving,
                       decoration: const InputDecoration(
-                        labelText: 'pieceType (opcionalno)',
+                        labelText: 'Tip komada (opcionalno)',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -790,7 +825,7 @@ class _WorkforcePerformanceNormDetailScreenState
                             enabled: _isEditable && !_saving,
                             readOnly: true,
                             decoration: const InputDecoration(
-                              labelText: 'validFrom (YYYY-MM-DD)',
+                              labelText: 'Važi od',
                               border: OutlineInputBorder(),
                             ),
                             onTap: _isEditable && !_saving
@@ -805,7 +840,7 @@ class _WorkforcePerformanceNormDetailScreenState
                             enabled: _isEditable && !_saving,
                             readOnly: true,
                             decoration: const InputDecoration(
-                              labelText: 'validTo (opcionalno)',
+                              labelText: 'Važi do (opcionalno)',
                               border: OutlineInputBorder(),
                             ),
                             onTap: _isEditable && !_saving
@@ -827,37 +862,7 @@ class _WorkforcePerformanceNormDetailScreenState
                     ),
                   ],
                 ),
-                if (_isEditable) ...[
-                  const SizedBox(height: 8),
-                  FilledButton.icon(
-                    onPressed: _saving ? null : _saveDraft,
-                    icon: _saving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.save),
-                    label: Text(widget.isCreate ? 'Kreiraj nacrt' : 'Spremi nacrt'),
-                  ),
-                  if (!widget.isCreate && _norm?.isDraft == true) ...[
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: _saving ? null : _activate,
-                      icon: const Icon(Icons.check_circle_outline),
-                      label: const Text('Aktiviraj normativ'),
-                    ),
-                  ],
-                ],
-                if (_norm != null &&
-                    (_norm!.isActive || _norm!.isDraft)) ...[
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: _saving ? null : _archive,
-                    icon: const Icon(Icons.archive_outlined),
-                    label: const Text('Arhiviraj'),
-                  ),
-                ],
+                if (_isEditable) const SizedBox(height: 8),
                 if (_versions.length > 1) ...[
                   const SizedBox(height: 24),
                   Text(
@@ -884,16 +889,13 @@ class _WorkforcePerformanceNormDetailScreenState
                 const SizedBox(height: 24),
                 ExpansionTile(
                   initiallyExpanded: !widget.isCreate,
-                  title: const Text('Test match normativa'),
-                  subtitle: const Text(
-                    'Provjera hijerarhije match-a (normativeReady ostaje false u M2-F dok G3 nije aktivan).',
-                  ),
+                  title: const Text('Probno podudaranje'),
                   children: [
                     if (_canPickPlant)
                       DropdownButtonFormField<String?>(
                         value: _matchPlantKey,
                         decoration: const InputDecoration(
-                          labelText: 'Pogon (match)',
+                          labelText: 'Pogon',
                           border: OutlineInputBorder(),
                         ),
                         items: _plantOptions
@@ -919,7 +921,7 @@ class _WorkforcePerformanceNormDetailScreenState
                     DropdownButtonFormField<String?>(
                       value: _matchProfileType,
                       decoration: const InputDecoration(
-                        labelText: 'Profil procesa (match)',
+                        labelText: 'Profil procesa',
                         border: OutlineInputBorder(),
                       ),
                       items: [
@@ -943,7 +945,7 @@ class _WorkforcePerformanceNormDetailScreenState
                     DropdownButtonFormField<String?>(
                       value: _matchStationConfigId,
                       decoration: const InputDecoration(
-                        labelText: 'Stanica (match)',
+                        labelText: 'Stanica',
                         border: OutlineInputBorder(),
                       ),
                       items: [
@@ -970,7 +972,7 @@ class _WorkforcePerformanceNormDetailScreenState
                     TextField(
                       controller: _matchOperationTypeController,
                       decoration: const InputDecoration(
-                        labelText: 'Tip operacije (match)',
+                        labelText: 'Tip operacije',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -978,7 +980,7 @@ class _WorkforcePerformanceNormDetailScreenState
                     TextField(
                       controller: _matchProductIdController,
                       decoration: const InputDecoration(
-                        labelText: 'productId (match)',
+                        labelText: 'Identifikator proizvoda',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -986,7 +988,7 @@ class _WorkforcePerformanceNormDetailScreenState
                     TextField(
                       controller: _matchProductCodeController,
                       decoration: const InputDecoration(
-                        labelText: 'productCode (match)',
+                        labelText: 'Šifra proizvoda',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -995,23 +997,12 @@ class _WorkforcePerformanceNormDetailScreenState
                       controller: _matchAsOfDateController,
                       readOnly: true,
                       decoration: const InputDecoration(
-                        labelText: 'asOfDate (YYYY-MM-DD, opcionalno)',
+                        labelText: 'Datum provjere (opcionalno)',
                         border: OutlineInputBorder(),
                       ),
                       onTap: () => _pickIsoDate(_matchAsOfDateController),
                     ),
                     const SizedBox(height: 12),
-                    FilledButton.icon(
-                      onPressed: _matchLoading ? null : _runMatchTest,
-                      icon: _matchLoading
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.search),
-                      label: const Text('Pokreni match'),
-                    ),
                     if (_matchResult != null) ...[
                       const SizedBox(height: 16),
                       _MatchResultCard(result: _matchResult!),
@@ -1046,30 +1037,13 @@ class _HeaderCard extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Grupa verzija',
-              style: t.textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            Text(
-              'Automatski ID koji povezuje sve verzije istog normativa. Ne unosi se ručno.',
-              style: t.textTheme.bodySmall,
-            ),
-            SelectableText(norm.normGroupId),
-            const SizedBox(height: 8),
-            Text(
-              'ID ove verzije',
-              style: t.textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            SelectableText(norm.normId),
             if ((norm.validFrom ?? '').isNotEmpty)
-              Text(
-                'Vrijedi: ${norm.validFrom}'
-                '${(norm.validTo ?? '').isNotEmpty ? ' — ${norm.validTo}' : ''}',
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Vrijedi: ${norm.validFrom}'
+                  '${(norm.validTo ?? '').isNotEmpty ? ' — ${norm.validTo}' : ''}',
+                ),
               ),
           ],
         ),
@@ -1127,26 +1101,25 @@ class _MatchResultCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'normativeReady: ${result.normativeReady}',
+              result.normativeReady ? 'Normativ pronađen' : 'Normativ nije pronađen',
               style: t.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
             ),
-            Text('matchLevel: ${result.matchLevel ?? '—'}'),
+            Text('Razina podudaranja: ${result.matchLevel ?? '—'}'),
             if (matched != null) ...[
               const Divider(),
               Text(
                 matched.displayName ?? matched.normId ?? '—',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-              Text('normId: ${matched.normId ?? '—'}'),
-              Text('v${matched.version ?? '—'} · grupa ${matched.normGroupId ?? '—'}'),
+              Text('Verzija ${matched.version ?? '—'} · grupa ${matched.normGroupId ?? '—'}'),
               if (matched.targetPiecesPerHour != null)
                 Text('Cilj kom/sat: ${matched.targetPiecesPerHour}'),
               if (matched.allowedScrapRatePercent != null)
                 Text('Škart %: ${matched.allowedScrapRatePercent}'),
             ] else
-              const Text('matchedNorm: null'),
+              const Text('Nema podudarajućeg normativa.'),
           ],
         ),
       ),

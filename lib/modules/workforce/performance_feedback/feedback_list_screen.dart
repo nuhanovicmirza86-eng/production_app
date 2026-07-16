@@ -12,6 +12,8 @@ import '../models/workforce_employee.dart';
 import '../models/workforce_evaluation_record.dart';
 import '../models/workforce_performance_feedback.dart';
 import '../services/workforce_callable_service.dart';
+import '../widgets/workforce_form_dialog.dart';
+import '../widgets/workforce_screen_help.dart';
 
 /// F3: strukturirani feedback + evidencija ocjena (KPI).
 class FeedbackListScreen extends StatefulWidget {
@@ -83,7 +85,7 @@ class _FeedbackListScreenState extends State<FeedbackListScreen>
   String _feedbackCategoryLabel(String category) {
     switch (category) {
       case 'coaching':
-        return 'Coaching';
+        return 'Savjetovanje';
       case 'recognition':
         return 'Priznanje';
       case 'improvement_needed':
@@ -126,65 +128,44 @@ class _FeedbackListScreenState extends State<FeedbackListScreen>
     return null;
   }
 
-  /// Bez povezanog mrežnog naloga, MES unosi se ne mogu atributirati imenu (niti OperonixAI u punom opsegu).
-  Widget _noLinkedUserAccountBanner(
-    BuildContext context,
-    WorkforceEmployee? employee, {
+  /// Kratka ikona umjesto bannera u formi kad nema povezanog naloga.
+  Widget? _linkedAccountHelpAction(
+    BuildContext dialogContext,
+    List<WorkforceEmployee> employees,
+    String? empId, {
     VoidCallback? onOpenProfile,
   }) {
-    final u = employee?.linkedUserUid?.trim();
-    if (u != null && u.isNotEmpty) {
-      return const SizedBox.shrink();
-    }
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(top: 6, bottom: 4),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: scheme.primaryContainer.withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 20,
-                    color: scheme.onPrimaryContainer,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Korisnički nalog nije povezan s ovim radničkim profilom. '
-                      'Pouzdano povezivanje MES unosa i zastoja s ovom osobom (uključujući OperonixAI) '
-                      'moguće je nakon povezivanja u operativnom profilu radnika.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurface,
-                          ),
-                    ),
-                  ),
-                ],
-              ),
-              if (onOpenProfile != null) ...[
-                const SizedBox(height: 4),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: onOpenProfile,
-                    child: const Text('Otvori profil'),
-                  ),
+    final emp = _employeeOrNull(employees, empId);
+    final u = emp?.linkedUserUid?.trim();
+    if (u != null && u.isNotEmpty) return null;
+    return IconButton(
+      tooltip: 'Povezivanje mrežnog naloga',
+      icon: const Icon(Icons.link_off_outlined),
+      onPressed: () {
+        showDialog<void>(
+          context: dialogContext,
+          builder: (ctx) => AlertDialog(
+            title: const Text(WorkforceHelpTexts.linkedAccountTitle),
+            content: SingleChildScrollView(
+              child: SelectableText(WorkforceHelpTexts.linkedAccountMessage),
+            ),
+            actions: [
+              if (onOpenProfile != null)
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    onOpenProfile();
+                  },
+                  child: const Text('Otvori profil'),
                 ),
-              ],
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Zatvori'),
+              ),
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -309,134 +290,140 @@ class _FeedbackListScreenState extends State<FeedbackListScreen>
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSt) {
-          return AlertDialog(
-            title: const Text('Novi feedback (F3)'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<String>(
-                    initialValue: empId,
-                    decoration: const InputDecoration(labelText: 'Radnik'),
-                    items: employees
-                        .map(
-                          (e) => DropdownMenuItem(
-                            value: e.id,
-                            child: Text(
-                              e.displayName,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) => setSt(() => empId = v),
-                  ),
-                  _noLinkedUserAccountBanner(
+          return WorkforceFormDialog(
+            title: 'Nova povratna informacija',
+            onCancel: () => Navigator.pop(ctx, false),
+            onSave: () => Navigator.pop(ctx, true),
+            extraActions: [
+              if (_linkedAccountHelpAction(
                     ctx,
-                    _employeeOrNull(employees, empId),
-                    onOpenProfile: _openLinkedProfileFromDialog(ctx, employees, empId),
-                  ),
-                  DropdownButtonFormField<String>(
-                    initialValue: category,
-                    decoration: const InputDecoration(labelText: 'Kategorija'),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'coaching',
-                        child: Text('Coaching'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'recognition',
-                        child: Text('Priznanje'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'improvement_needed',
-                        child: Text('Potrebno poboljšanje'),
-                      ),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) setSt(() => category = v);
-                    },
-                  ),
-                  TextFormField(
-                    controller: title,
-                    decoration: const InputDecoration(
-                      labelText: 'Naslov *',
-                    ),
-                  ),
-                  TextFormField(
-                    controller: body,
-                    decoration: const InputDecoration(labelText: 'Tekst'),
-                    maxLines: 4,
-                  ),
-                  DropdownButtonFormField<int?>(
-                    initialValue: score,
-                    decoration: const InputDecoration(
-                      labelText: 'Opc. ocjena 1–5',
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: null, child: Text('—')),
-                      DropdownMenuItem(value: 1, child: Text('1')),
-                      DropdownMenuItem(value: 2, child: Text('2')),
-                      DropdownMenuItem(value: 3, child: Text('3')),
-                      DropdownMenuItem(value: 4, child: Text('4')),
-                      DropdownMenuItem(value: 5, child: Text('5')),
-                    ],
-                    onChanged: (v) => setSt(() => score = v),
-                  ),
-                  const SizedBox(height: 4),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('KPI period (mjesec, opcionalno)'),
-                    subtitle: Text(
-                      kpiOptionalMonth == null
-                          ? 'Nije odabran mjesec'
-                          : _formatMonthYearForUi(ctx, kpiOptionalMonth!),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (kpiOptionalMonth != null)
-                          IconButton(
-                            icon: const Icon(Icons.clear),
-                            tooltip: 'Ukloni period',
-                            onPressed: () {
-                              setSt(() => kpiOptionalMonth = null);
-                            },
+                    employees,
+                    empId,
+                    onOpenProfile:
+                        _openLinkedProfileFromDialog(ctx, employees, empId),
+                  ) !=
+                  null)
+                _linkedAccountHelpAction(
+                  ctx,
+                  employees,
+                  empId,
+                  onOpenProfile:
+                      _openLinkedProfileFromDialog(ctx, employees, empId),
+                )!,
+            ],
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: empId,
+                  decoration: const InputDecoration(labelText: 'Radnik'),
+                  items: employees
+                      .map(
+                        (e) => DropdownMenuItem(
+                          value: e.id,
+                          child: Text(
+                            e.displayName,
+                            overflow: TextOverflow.ellipsis,
                           ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setSt(() => empId = v),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: category,
+                  decoration: const InputDecoration(labelText: 'Kategorija'),
+                  items: [
+                    DropdownMenuItem(
+                      value: 'coaching',
+                      child: Text(_feedbackCategoryLabel('coaching')),
+                    ),
+                    DropdownMenuItem(
+                      value: 'recognition',
+                      child: Text(_feedbackCategoryLabel('recognition')),
+                    ),
+                    DropdownMenuItem(
+                      value: 'improvement_needed',
+                      child: Text(_feedbackCategoryLabel('improvement_needed')),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setSt(() => category = v);
+                  },
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: title,
+                  decoration: const InputDecoration(
+                    labelText: 'Naslov *',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: body,
+                  decoration: const InputDecoration(labelText: 'Tekst'),
+                  maxLines: 4,
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int?>(
+                  initialValue: score,
+                  decoration: const InputDecoration(
+                    labelText: 'Opcionalna ocjena (1–5)',
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text('—')),
+                    DropdownMenuItem(value: 1, child: Text('1')),
+                    DropdownMenuItem(value: 2, child: Text('2')),
+                    DropdownMenuItem(value: 3, child: Text('3')),
+                    DropdownMenuItem(value: 4, child: Text('4')),
+                    DropdownMenuItem(value: 5, child: Text('5')),
+                  ],
+                  onChanged: (v) => setSt(() => score = v),
+                ),
+                const SizedBox(height: 4),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('KPI period (mjesec, opcionalno)'),
+                  subtitle: Text(
+                    kpiOptionalMonth == null
+                        ? 'Nije odabran mjesec'
+                        : _formatMonthYearForUi(ctx, kpiOptionalMonth!),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (kpiOptionalMonth != null)
                         IconButton(
-                          icon: const Icon(Icons.calendar_month_outlined),
-                          tooltip: 'Odaberi mjesec u kalendaru',
-                          onPressed: () async {
-                            final now = DateTime.now();
-                            final init = kpiOptionalMonth ??
-                                DateTime(now.year, now.month, 1);
-                            final m = await _pickMonthInDialog(ctx, init);
-                            if (m != null) setSt(() => kpiOptionalMonth = m);
+                          icon: const Icon(Icons.clear),
+                          tooltip: 'Ukloni period',
+                          onPressed: () {
+                            setSt(() => kpiOptionalMonth = null);
                           },
                         ),
-                      ],
-                    ),
-                    onTap: () async {
-                      final now = DateTime.now();
-                      final init = kpiOptionalMonth ??
-                          DateTime(now.year, now.month, 1);
-                      final m = await _pickMonthInDialog(ctx, init);
-                      if (m != null) setSt(() => kpiOptionalMonth = m);
-                    },
+                      IconButton(
+                        icon: const Icon(Icons.calendar_month_outlined),
+                        tooltip: 'Odaberi mjesec',
+                        onPressed: () async {
+                          final now = DateTime.now();
+                          final init = kpiOptionalMonth ??
+                              DateTime(now.year, now.month, 1);
+                          final m = await _pickMonthInDialog(ctx, init);
+                          if (m != null) setSt(() => kpiOptionalMonth = m);
+                        },
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                  onTap: () async {
+                    final now = DateTime.now();
+                    final init = kpiOptionalMonth ??
+                        DateTime(now.year, now.month, 1);
+                    final m = await _pickMonthInDialog(ctx, init);
+                    if (m != null) setSt(() => kpiOptionalMonth = m);
+                  },
+                ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Odustani'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Spremi'),
-              ),
-            ],
           );
         },
       ),
@@ -462,7 +449,7 @@ class _FeedbackListScreenState extends State<FeedbackListScreen>
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Feedback spremljen.')),
+          const SnackBar(content: Text('Povratna informacija spremljena.')),
         );
       }
     } on FirebaseFunctionsException catch (e) {
@@ -509,50 +496,69 @@ class _FeedbackListScreenState extends State<FeedbackListScreen>
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSt) {
-          return AlertDialog(
-            title: const Text('Evidencija ocjena'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<String>(
-                    initialValue: empId,
-                    decoration: const InputDecoration(labelText: 'Radnik'),
-                    items: employees
-                        .map(
-                          (e) => DropdownMenuItem(
-                            value: e.id,
-                            child: Text(
-                              e.displayName,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) => setSt(() => empId = v),
-                  ),
-                  _noLinkedUserAccountBanner(
+          return WorkforceFormDialog(
+            title: 'Evidencija ocjena',
+            onCancel: () => Navigator.pop(ctx),
+            onSave: () => Navigator.pop(ctx, 'save'),
+            extraActions: [
+              IconButton(
+                tooltip: 'OperonixAI — pomoć pri ocjeni',
+                icon: const Icon(Icons.psychology_outlined),
+                onPressed: () => Navigator.pop(ctx, 'ai'),
+              ),
+              if (_linkedAccountHelpAction(
                     ctx,
-                    _employeeOrNull(employees, empId),
-                    onOpenProfile: _openLinkedProfileFromDialog(ctx, employees, empId),
+                    employees,
+                    empId,
+                    onOpenProfile:
+                        _openLinkedProfileFromDialog(ctx, employees, empId),
+                  ) !=
+                  null)
+                _linkedAccountHelpAction(
+                  ctx,
+                  employees,
+                  empId,
+                  onOpenProfile:
+                      _openLinkedProfileFromDialog(ctx, employees, empId),
+                )!,
+            ],
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: empId,
+                  decoration: const InputDecoration(labelText: 'Radnik'),
+                  items: employees
+                      .map(
+                        (e) => DropdownMenuItem(
+                          value: e.id,
+                          child: Text(
+                            e.displayName,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setSt(() => empId = v),
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Period (mjesec) *'),
+                  subtitle: Text(
+                    _formatMonthYearForUi(ctx, evalPeriodStart),
                   ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Period (mjesec) *'),
-                    subtitle: Text(
-                      _formatMonthYearForUi(ctx, evalPeriodStart),
-                    ),
-                    trailing: const Icon(Icons.calendar_month_outlined),
-                    onTap: () async {
-                      final m = await _pickMonthInDialog(ctx, evalPeriodStart);
-                      if (m != null) setSt(() => evalPeriodStart = m);
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Osnovne odgovornosti (1–3)',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
+                  trailing: const Icon(Icons.calendar_month_outlined),
+                  onTap: () async {
+                    final m = await _pickMonthInDialog(ctx, evalPeriodStart);
+                    if (m != null) setSt(() => evalPeriodStart = m);
+                  },
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Osnovne odgovornosti (1–3)',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
                   DropdownButtonFormField<int>(
                     key: ValueKey<int>(house),
                     initialValue: house,
@@ -616,23 +622,7 @@ class _FeedbackListScreenState extends State<FeedbackListScreen>
                     maxLines: 2,
                   ),
                 ],
-              ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Odustani'),
-              ),
-              TextButton.icon(
-                onPressed: () => Navigator.pop(ctx, 'ai'),
-                icon: const Icon(Icons.psychology_outlined),
-                label: const Text('OperonixAI'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, 'save'),
-                child: const Text('Spremi'),
-              ),
-            ],
           );
         },
       ),
@@ -867,33 +857,39 @@ class _FeedbackListScreenState extends State<FeedbackListScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Performanse i feedback'),
+        title: const Text('Performanse i povratne informacije'),
         bottom: TabBar(
           controller: _tab,
           tabs: const [
-            Tab(text: 'Feedback'),
+            Tab(text: 'Povratne informacije'),
             Tab(text: 'Evidencija ocjena'),
           ],
         ),
         actions: [
+          const WorkforceScreenHelpIcon(
+            title: WorkforceHelpTexts.feedbackTitle,
+            message: WorkforceHelpTexts.feedbackMessage,
+          ),
           if (_tab.index == 1)
             IconButton(
               icon: const Icon(Icons.psychology_outlined),
-              tooltip: 'OperonixAI — efikasnost i efektivnost',
+              tooltip: 'OperonixAI — pomoć pri ocjeni',
               onPressed: () => _openWorkforceAssistant(context),
             ),
-        ],
-      ),
-      floatingActionButton: _canManage
-          ? FloatingActionButton(
-              onPressed: _tab.index == 0 ? _addFeedback : _addEvaluation,
-              child: Icon(
+          if (_canManage)
+            IconButton(
+              tooltip: _tab.index == 0
+                  ? 'Nova povratna informacija'
+                  : 'Nova evidencija ocjena',
+              icon: Icon(
                 _tab.index == 0
                     ? Icons.add_comment_outlined
                     : Icons.fact_check_outlined,
               ),
-            )
-          : null,
+              onPressed: _tab.index == 0 ? _addFeedback : _addEvaluation,
+            ),
+        ],
+      ),
       body: TabBarView(
         controller: _tab,
         children: [
