@@ -1,3 +1,59 @@
+import '../../process_evidence_analytics/models/normative_comparison_models.dart';
+
+class WorkerPerformanceAiNormativeRef {
+  const WorkerPerformanceAiNormativeRef({
+    this.normName,
+    this.normVersion,
+    this.normativeStatus,
+  });
+
+  final String? normName;
+  final int? normVersion;
+  final String? normativeStatus;
+
+  factory WorkerPerformanceAiNormativeRef.fromMap(Map<String, dynamic> m) {
+    return WorkerPerformanceAiNormativeRef(
+      normName: _str(m['normName']) ??
+          _str(m['displayName']),
+      normVersion: m['normVersion'] is int
+          ? m['normVersion'] as int
+          : int.tryParse('${m['normVersion'] ?? ''}'),
+      normativeStatus: _str(m['normativeStatus']),
+    );
+  }
+
+  String get statusLabel => normativeStatusLabel(normativeStatus ?? 'no_norm');
+
+  String get referenceLabel {
+    final name = (normName ?? '').trim();
+    if (name.isEmpty && normVersion == null) return '—';
+    if (name.isEmpty) return 'Verzija $normVersion';
+    if (normVersion == null) return name;
+    return '$name · verzija $normVersion';
+  }
+}
+
+class WorkerPerformanceAiNormativeContext {
+  const WorkerPerformanceAiNormativeContext({
+    required this.normativeReady,
+    required this.primaryComparison,
+  });
+
+  final bool normativeReady;
+  final NormativeComparisonData primaryComparison;
+
+  factory WorkerPerformanceAiNormativeContext.fromMap(Map<String, dynamic> m) {
+    final primaryRaw = m['primaryComparison'];
+    final primaryMap = primaryRaw is Map
+        ? Map<String, dynamic>.from(primaryRaw)
+        : Map<String, dynamic>.from(m);
+    return WorkerPerformanceAiNormativeContext(
+      normativeReady: m['normativeReady'] == true,
+      primaryComparison: NormativeComparisonData.fromMap(primaryMap),
+    );
+  }
+}
+
 class WorkerPerformanceAiEvidenceRef {
   const WorkerPerformanceAiEvidenceRef({
     this.source,
@@ -174,6 +230,9 @@ class WorkerPerformanceAiSignalsResult {
   const WorkerPerformanceAiSignalsResult({
     required this.disclaimer,
     required this.normativeReady,
+    required this.normativeSummary,
+    required this.normativeContext,
+    required this.normativeRefs,
     required this.activitySourcesIncluded,
     required this.recommendations,
     required this.warnings,
@@ -189,6 +248,9 @@ class WorkerPerformanceAiSignalsResult {
 
   final String disclaimer;
   final bool normativeReady;
+  final String normativeSummary;
+  final WorkerPerformanceAiNormativeContext? normativeContext;
+  final List<WorkerPerformanceAiNormativeRef> normativeRefs;
   final List<String> activitySourcesIncluded;
   final List<WorkerPerformanceAiRecommendation> recommendations;
   final List<WorkerPerformanceAiWarning> warnings;
@@ -202,9 +264,23 @@ class WorkerPerformanceAiSignalsResult {
   final int? sessionCountAnalyzed;
 
   factory WorkerPerformanceAiSignalsResult.fromMap(Map<String, dynamic> m) {
+    WorkerPerformanceAiNormativeContext? normativeContext;
+    final rawContext = m['normativeContext'];
+    if (rawContext is Map) {
+      normativeContext = WorkerPerformanceAiNormativeContext.fromMap(
+        Map<String, dynamic>.from(rawContext),
+      );
+    }
+
     return WorkerPerformanceAiSignalsResult(
       disclaimer: _str(m['disclaimer']) ?? '',
       normativeReady: m['normativeReady'] == true,
+      normativeSummary: _str(m['normativeSummary']) ?? '',
+      normativeContext: normativeContext,
+      normativeRefs: _list(
+        m['normativeRefs'],
+        WorkerPerformanceAiNormativeRef.fromMap,
+      ),
       activitySourcesIncluded: _strList(m['activitySourcesIncluded']),
       recommendations: _list(m['recommendations'], WorkerPerformanceAiRecommendation.fromMap),
       warnings: _list(m['warnings'], WorkerPerformanceAiWarning.fromMap),

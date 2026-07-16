@@ -8,6 +8,7 @@ import '../../../modules/production/station_pages/models/production_station_conf
 import '../../../modules/production/station_pages/services/production_station_config_callable_service.dart';
 import '../models/worker_performance_ai_signals_models.dart';
 import '../services/worker_performance_ai_signals_callable_service.dart';
+import '../widgets/worker_ai_normative_context_card.dart';
 import '../../../modules/workforce/widgets/workforce_screen_help.dart';
 
 /// M2-F4-F1 — read-only AI preporuke za planiranje rada (savjetodavno).
@@ -268,6 +269,8 @@ class _WorkerPerformanceAiPlanningScreenState
               style: TextStyle(color: cs.error),
             )
           else if (_result != null) ...[
+            WorkerAiNormativeContextCard(result: _result!),
+            const SizedBox(height: 16),
             _statusCard(context, _result!),
             const SizedBox(height: 16),
             _sectionTitle(context, 'Preporuke'),
