@@ -29,11 +29,10 @@ abstract final class OoeHelpTexts {
   static const dailyOverviewTooltip = 'Kako čitati dnevni pregled';
   static const dailyOverviewTitle = 'Dnevni pregled OOE';
   static const dailyOverviewBody =
-      'Za odabrani kalendarski dan možeš gledati jedan stroj (šifra) ili '
-      '„Sav pogon“ — tada se učitaju svi sažeci za taj dan u pogonu '
-      '(ooe_shift_summaries). Isti kalendarski dan kao u „Sažetak smjene“. '
-      'Ponderirani OOE množi OOE s operativnim vremenom po smjeni ili stroju, '
-      'ovisno o prikazu. Pareto po smjeni kao na sažetku smjene.';
+      'Ovaj ekran prikazuje dnevni OOE pregled za jedan stroj ili cijeli pogon.\n\n'
+      'Stroj možeš odabrati iz liste strojeva odabranog pogona. '
+      'Na mobilnoj aplikaciji možeš skenirati QR ili barkod stroja.\n\n'
+      'Ako izabereš „Sav pogon”, prikazuje se pregled za cijeli odabrani pogon.';
 
   static const lossAnalysisTooltip = 'Kako čitati Pareto';
   static const lossAnalysisTitle = 'Analiza gubitaka';

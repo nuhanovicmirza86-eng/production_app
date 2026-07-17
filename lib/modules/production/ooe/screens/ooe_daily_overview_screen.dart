@@ -10,6 +10,7 @@ import '../services/ooe_loss_reason_service.dart';
 import '../services/ooe_summary_service.dart';
 import '../widgets/ooe_info_icon.dart';
 import '../widgets/ooe_loss_pareto_card.dart';
+import '../widgets/ooe_plant_machine_picker_field.dart';
 
 enum _DailyScope { oneMachine, wholePlant }
 
@@ -31,13 +32,14 @@ class OoeDailyOverviewScreen extends StatefulWidget {
 }
 
 class _OoeDailyOverviewScreenState extends State<OoeDailyOverviewScreen> {
-  final _machineCtrl = TextEditingController();
   final _summary = OoeSummaryService();
   final _reasonSvc = OoeLossReasonService();
   late DateTime _day;
   late final Future<ProductionPlantAssetsSnapshot> _assetsFuture;
   _DailyScope _scope = _DailyScope.oneMachine;
   OperationalFyBounds? _fyBounds;
+  String? _selectedMachineId;
+  String? _selectedMachineTitle;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -64,7 +66,7 @@ class _OoeDailyOverviewScreenState extends State<OoeDailyOverviewScreen> {
     _assetsFuture = ProductionTrackingAssetsService().loadForPlant(
       companyId: _companyId,
       plantKey: _plantKey,
-      limit: 128,
+      limit: 500,
     );
     // ignore: discarded_futures
     _loadOperationalFyBounds();
@@ -82,12 +84,6 @@ class _OoeDailyOverviewScreenState extends State<OoeDailyOverviewScreen> {
         _day = OperationalBusinessYearContext.clampLocalCalendarDay(_day, b);
       }
     });
-  }
-
-  @override
-  void dispose() {
-    _machineCtrl.dispose();
-    super.dispose();
   }
 
   Future<void> _pickDay() async {
@@ -296,14 +292,17 @@ class _OoeDailyOverviewScreenState extends State<OoeDailyOverviewScreen> {
         }
       }
     } else {
-      final mid = _machineCtrl.text.trim();
+      final mid = (_selectedMachineId ?? '').trim();
       final disp = machineTitles[mid];
-      if (disp != null && disp.isNotEmpty) {
+      final heading = (disp != null && disp.isNotEmpty)
+          ? disp
+          : (_selectedMachineTitle ?? '').trim();
+      if (heading.isNotEmpty) {
         out.add(
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              disp,
+              heading,
               style: Theme.of(context).textTheme.titleMedium,
             ),
           ),
@@ -335,7 +334,7 @@ class _OoeDailyOverviewScreenState extends State<OoeDailyOverviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final mid = _machineCtrl.text.trim();
+    final mid = (_selectedMachineId ?? '').trim();
 
     return Scaffold(
       appBar: AppBar(
@@ -409,14 +408,18 @@ class _OoeDailyOverviewScreenState extends State<OoeDailyOverviewScreen> {
                       ),
                       const SizedBox(height: 12),
                       if (_scope == _DailyScope.oneMachine) ...[
-                        TextField(
-                          controller: _machineCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Šifra stroja',
-                            helperText:
-                                'Isti stroj kao u izvršenju i u imovini pogona (assets).',
-                          ),
-                          onChanged: (_) => setState(() {}),
+                        OoePlantMachinePickerField(
+                          companyId: _companyId,
+                          plantKey: _plantKey,
+                          machines: assetSnap.data!.machines,
+                          selectedMachineId: _selectedMachineId,
+                          selectedTitleOverride: _selectedMachineTitle,
+                          onSelected: (id, title) {
+                            setState(() {
+                              _selectedMachineId = id;
+                              _selectedMachineTitle = title;
+                            });
+                          },
                         ),
                       ] else
                         Text(
@@ -484,7 +487,7 @@ class _OoeDailyOverviewScreenState extends State<OoeDailyOverviewScreen> {
                     icon: Icons.precision_manufacturing_outlined,
                     title: 'Odaberi stroj',
                     subtitle:
-                        'Upiši šifru stroja ili prebaci na „Sav pogon“ za cijeli pogon.',
+                        'Odaberi stroj iz liste ili prebaci na „Sav pogon“ za cijeli pogon.',
                   ),
                 )
               else

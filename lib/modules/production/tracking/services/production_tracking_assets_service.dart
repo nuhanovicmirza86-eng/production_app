@@ -84,6 +84,14 @@ class ProductionTrackingAssetsService {
       final loc = _s(data['locationPath']);
       final subtitle = loc.isNotEmpty ? loc : _s(data['type']);
 
+      final codeParts = <String>[
+        _s(data['pantheonCode']),
+        _s(data['assetTag']),
+        _s(data['code']),
+        _s(data['assetCode']),
+      ].where((e) => e.isNotEmpty).toSet().toList(growable: false);
+      final codeLine = codeParts.join(' · ');
+
       ProductionMachineStatus st;
       String detail;
       if (rt == _runtimeRunning) {
@@ -103,6 +111,7 @@ class ProductionTrackingAssetsService {
           title: name,
           status: st,
           detail: detail,
+          codeLine: codeLine,
         ),
       );
 
@@ -136,12 +145,21 @@ class ProductionMachineOverview {
     required this.title,
     required this.status,
     required this.detail,
+    this.codeLine = '',
   });
 
   final String id;
   final String title;
   final ProductionMachineStatus status;
   final String detail;
+
+  /// Poslovna šifra / oznaka za pretragu i prikaz (npr. pantheonCode), ne Firestore ID.
+  final String codeLine;
+
+  String get searchHaystack {
+    final parts = <String>[title, codeLine, detail, id];
+    return parts.map((e) => e.toLowerCase()).join(' ');
+  }
 }
 
 class ProductionPlantAssetsSnapshot {
