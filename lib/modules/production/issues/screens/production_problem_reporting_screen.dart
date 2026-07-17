@@ -7,15 +7,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/access/production_maintenance_bridge.dart';
 import '../../../../core/plant/production_plant_context_resolver.dart';
-import '../../qr/screens/production_qr_scan_screen.dart';
-import '../../qr/production_qr_resolver.dart';
-import '../../tracking/screens/production_operator_tracking_screen.dart';
 import '../../tracking/services/production_asset_display_lookup.dart';
 import '../services/production_fault_photo_storage.dart';
 import 'production_fault_asset_qr_scan_screen.dart';
-import 'production_fault_detail_screen.dart';
 
 class ProductionProblemReportingScreen extends StatefulWidget {
   const ProductionProblemReportingScreen({super.key, required this.companyData});
@@ -38,109 +35,85 @@ class _ProductionProblemReportingScreenState
     'Ostalo',
   ];
 
-  static const String _statusOpen = 'open';
-  static const String _statusInProgress = 'in_progress';
-  static const String _statusClosed = 'closed';
-  static const String _statusCancelled = 'cancelled';
-
-  static const List<String> _activeStatuses = <String>[
-    _statusOpen,
-    _statusInProgress,
-  ];
-
-  static const List<String> _archivedStatuses = <String>[
-    _statusClosed,
-    _statusCancelled,
-  ];
-
   final TextEditingController _descriptionCtrl = TextEditingController();
 
-  String _statusFilter = 'active';
   bool _submitting = false;
   bool _faultPhotoLoading = false;
   String? _selectedAssetId;
   String? _selectedFaultType;
   bool _isRunningReported = false;
 
-  /// Kad je uređaj odabran skeniranjem QR-a a nije u trenutnoj stream listi.
   Map<String, dynamic>? _assetPayloadOverride;
   XFile? _faultPhoto;
   Uint8List? _faultPhotoPreview;
 
   static final ImagePicker _imagePicker = ImagePicker();
 
-  /// QR skeniranje + kamera za sliku — samo Android/iOS (kao Maintenance prijava kvara).
-  /// Web i desktop (Windows, macOS, Linux): bez QR-a; samo upload slike (galerija / datoteka).
   bool get _isAndroidOrIos {
     if (kIsWeb) return false;
     return defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS;
   }
 
-  /// Canonical key za faults / prikaz (Maintenance `report_fault` semantika).
-  String? _resolvedAssetPlantKey;
+  String _queryPlantKey = '';
   bool _resolvingPlant = true;
 
   List<String> _mergedPlantKeys = const [];
   List<String> _mergedPlantIds = const [];
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>? _assetsListStream;
 
-  /// Isti kanonski id kao u Firestore pravilima (`users.companyId` string ili DocumentReference.id).
-  String _faultsQueryCompanyId = '';
-
   @override
   void initState() {
     super.initState();
-    _faultsQueryCompanyId = _s(widget.companyData['companyId']);
-    unawaited(_loadFaultsQueryCompanyId());
-    _loadResolvedPlantKeyForAssets();
+    unawaited(_loadPlantScopeForAssets());
   }
 
-  String _companyIdFromUserField(dynamic raw) {
-    if (raw is DocumentReference) return raw.id.trim();
-    return _s(raw);
+  @override
+  void dispose() {
+    _descriptionCtrl.dispose();
+    super.dispose();
   }
 
-  /// Osigurava da `faults` upit koristi isti tenant string kao pravila (ne zastarjeli session map).
-  Future<void> _loadFaultsQueryCompanyId() async {
-    final u = FirebaseAuth.instance.currentUser;
-    if (u == null) return;
-    try {
-      final snap =
-          await FirebaseFirestore.instance.collection('users').doc(u.uid).get();
-      if (!snap.exists || !mounted) return;
-      final d = snap.data() ?? <String, dynamic>{};
-      final merged = Map<String, dynamic>.from(d);
-      final acc = d['appAccess'];
-      if (acc is Map<String, dynamic>) {
-        acc.forEach((k, v) {
-          if (!merged.containsKey(k) || merged[k] == null) merged[k] = v;
-        });
-      }
-      final cid = _companyIdFromUserField(merged['companyId']);
-      if (cid.isNotEmpty && cid != _faultsQueryCompanyId) {
-        setState(() => _faultsQueryCompanyId = cid);
-      }
-    } catch (_) {
-      // ostaje widget.companyData
+  String _s(dynamic v) => (v ?? '').toString().trim();
+
+  String get _companyId => _s(widget.companyData['companyId']);
+
+  String get _sessionPlantKey => _s(widget.companyData['plantKey']);
+
+  String get _role =>
+      ProductionAccessHelper.normalizeRole(widget.companyData['role']);
+
+  /// Admin / super_admin: session pogon (kao Zastoji, Procesi, Radni centri).
+  bool get _usesSessionPlant =>
+      ProductionAccessHelper.isAdminRole(_role) ||
+      ProductionAccessHelper.isSuperAdminRole(_role);
+
+  String get _uid {
+    final authUid = _s(FirebaseAuth.instance.currentUser?.uid);
+    if (authUid.isNotEmpty) return authUid;
+    return _s(widget.companyData['userId']);
+  }
+
+  bool get _canSubmit {
+    return !_submitting &&
+        !_faultPhotoLoading &&
+        _companyId.isNotEmpty &&
+        _queryPlantKey.isNotEmpty &&
+        _uid.isNotEmpty;
+  }
+
+  List<String> _distinctNonEmptyUpTo10(Iterable<String> raw) {
+    final out = <String>[];
+    for (final e in raw) {
+      final v = e.trim();
+      if (v.isEmpty || out.contains(v)) continue;
+      out.add(v);
+      if (out.length >= 10) break;
     }
+    return out;
   }
 
-  Future<void> _loadResolvedPlantKeyForAssets() async {
-    final cid = _companyId;
-    if (cid.isEmpty ||
-        !maintenanceFaultBridgeEnabled(widget.companyData)) {
-      if (mounted) {
-        setState(() {
-          _resolvingPlant = false;
-          _assetsListStream = null;
-          _mergedPlantKeys = const [];
-          _mergedPlantIds = const [];
-        });
-      }
-      return;
-    }
-
+  Future<Map<String, dynamic>> _loadUserLikeForPlant() async {
     String coalesce(String a, String b) => a.isNotEmpty ? a : b;
 
     var userLike = <String, dynamic>{
@@ -157,110 +130,111 @@ class _ProductionProblemReportingScreenState
             await FirebaseFirestore.instance.collection('users').doc(u.uid).get();
         final d = snap.data() ?? <String, dynamic>{};
         userLike = <String, dynamic>{
-          'homePlantKey': coalesce(_s(d['homePlantKey']), _s(userLike['homePlantKey'])),
+          'homePlantKey': coalesce(
+            _s(d['homePlantKey']),
+            _s(userLike['homePlantKey']),
+          ),
           'plantKey': coalesce(_s(d['plantKey']), _s(userLike['plantKey'])),
-          'homePlantId': coalesce(_s(d['homePlantId']), _s(userLike['homePlantId'])),
+          'homePlantId': coalesce(
+            _s(d['homePlantId']),
+            _s(userLike['homePlantId']),
+          ),
           'plantId': coalesce(_s(d['plantId']), _s(userLike['plantId'])),
         };
       } catch (_) {
-        // keep session-based userLike
+        // ostaje session-based userLike
       }
     }
+    return userLike;
+  }
 
-    try {
-      final k = await ProductionPlantContextResolver.resolvePlantKeyOrFallback(
+  Future<List<String>> _legacyPlantIdsForKeys(
+    String companyId,
+    List<String> plantKeys,
+  ) async {
+    final ids = <String>[];
+    for (final pk in plantKeys) {
+      if (pk.isEmpty) continue;
+      try {
+        final byId = await FirebaseFirestore.instance
+            .collection('company_plants')
+            .doc('${companyId}_$pk')
+            .get();
+        if (byId.exists) {
+          final lid = _s(byId.data()?['legacyPlantId']);
+          if (lid.isNotEmpty && !ids.contains(lid)) ids.add(lid);
+          continue;
+        }
+        final q = await FirebaseFirestore.instance
+            .collection('company_plants')
+            .where('companyId', isEqualTo: companyId)
+            .where('plantKey', isEqualTo: pk)
+            .limit(1)
+            .get();
+        if (q.docs.isNotEmpty) {
+          final lid = _s(q.docs.first.data()['legacyPlantId']);
+          if (lid.isNotEmpty && !ids.contains(lid)) ids.add(lid);
+        }
+      } catch (_) {
+        // preskoči pojedinačni pogon
+      }
+    }
+    return ids;
+  }
+
+  Future<void> _loadPlantScopeForAssets() async {
+    final cid = _companyId;
+    if (cid.isEmpty || !maintenanceFaultBridgeEnabled(widget.companyData)) {
+      if (mounted) {
+        setState(() {
+          _resolvingPlant = false;
+          _assetsListStream = null;
+          _queryPlantKey = '';
+        });
+      }
+      return;
+    }
+
+    String primaryKey;
+    List<String> plantKeys;
+    List<String> plantIds;
+
+    if (_usesSessionPlant) {
+      primaryKey = _sessionPlantKey;
+      plantKeys = _distinctNonEmptyUpTo10([primaryKey]);
+      plantIds = await _legacyPlantIdsForKeys(cid, plantKeys);
+    } else {
+      final userLike = await _loadUserLikeForPlant();
+      primaryKey = await ProductionPlantContextResolver.resolvePlantKeyOrFallback(
         companyId: cid,
         userData: userLike,
       );
-      if (!mounted) return;
-      final resolvedK = k.trim();
-      final plantKeys = _distinctNonEmptyUpTo10([
-        resolvedK,
+      plantKeys = _distinctNonEmptyUpTo10([
+        primaryKey,
         _s(userLike['plantKey']),
         _s(userLike['homePlantKey']),
       ]);
-      final plantIds = _distinctNonEmptyUpTo10([
+      plantIds = _distinctNonEmptyUpTo10([
         _s(userLike['plantId']),
         _s(userLike['homePlantId']),
-        _s(userLike['plantKey']),
-        resolvedK,
+        ...(await _legacyPlantIdsForKeys(cid, plantKeys)),
       ]);
-      setState(() {
-        _resolvedAssetPlantKey = resolvedK.isNotEmpty ? resolvedK : null;
-        _mergedPlantKeys = plantKeys;
-        _mergedPlantIds = plantIds;
-        _resolvingPlant = false;
-        _assetsListStream = _mergedAssetsStreamFromStoredCandidates();
-      });
-    } catch (_) {
-      if (!mounted) return;
-      final plantKeys = _distinctNonEmptyUpTo10([
-        _plantKey,
-        _s(widget.companyData['userHomePlantKey']),
-      ]);
-      final plantIds = _distinctNonEmptyUpTo10([
-        _s(widget.companyData['userLegacyPlantId']),
-        _s(widget.companyData['userHomePlantId']),
-        _plantKey,
-      ]);
-      setState(() {
-        _resolvedAssetPlantKey = _plantKey;
-        _mergedPlantKeys = plantKeys;
-        _mergedPlantIds = plantIds;
-        _resolvingPlant = false;
-        _assetsListStream = _mergedAssetsStreamFromStoredCandidates();
-      });
     }
+
+    if (!mounted) return;
+    setState(() {
+      _queryPlantKey = primaryKey;
+      _mergedPlantKeys = plantKeys;
+      _mergedPlantIds = plantIds;
+      _resolvingPlant = false;
+      _assetsListStream = plantKeys.isEmpty
+          ? Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>.value(
+              const [],
+            )
+          : _mergedAssetsStreamFromStoredCandidates();
+    });
   }
 
-  /// Same key Maintenance koristi za listu uređaja na prijavi kvara.
-  String get _queryPlantKey {
-    final r = _s(_resolvedAssetPlantKey);
-    return r.isNotEmpty ? r : _plantKey;
-  }
-
-  @override
-  void dispose() {
-    _descriptionCtrl.dispose();
-    super.dispose();
-  }
-
-  String _s(dynamic v) => (v ?? '').toString().trim();
-
-  String get _companyId => _s(widget.companyData['companyId']);
-  String get _companyIdForFaultsQuery =>
-      _faultsQueryCompanyId.isNotEmpty ? _faultsQueryCompanyId : _companyId;
-  String get _plantKey => _s(widget.companyData['plantKey']);
-
-  /// Usklađeno s Firestore pravilima (`request.auth.uid` + `createdByUid` na dokumentu).
-  /// `companyData['userId']` može biti zastario ili pogrešan — ne koristiti za faults upite.
-  String get _uid {
-    final authUid = _s(FirebaseAuth.instance.currentUser?.uid);
-    if (authUid.isNotEmpty) return authUid;
-    return _s(widget.companyData['userId']);
-  }
-
-  bool get _canSubmit {
-    return !_submitting &&
-        !_faultPhotoLoading &&
-        _companyId.isNotEmpty &&
-        _plantKey.isNotEmpty &&
-        _uid.isNotEmpty;
-  }
-
-  List<String> _distinctNonEmptyUpTo10(Iterable<String> raw) {
-    final out = <String>[];
-    for (final e in raw) {
-      final v = e.trim();
-      if (v.isEmpty || out.contains(v)) continue;
-      out.add(v);
-      if (out.length >= 10) break;
-    }
-    return out;
-  }
-
-  /// Uređaji mogu biti vezani na `plantKey` **ili** (legacy) na `plantId`
-  /// kao u Maintenance `AssetsService.streamAssets`.
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
       _mergedAssetsStreamFromStoredCandidates() {
     final cid = _companyId;
@@ -350,18 +324,6 @@ class _ProductionProblemReportingScreenState
     );
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> _myFaultsStream() {
-    final cid = _companyIdForFaultsQuery;
-    if (cid.isEmpty) {
-      return const Stream<QuerySnapshot<Map<String, dynamic>>>.empty();
-    }
-    return FirebaseFirestore.instance
-        .collection('faults')
-        .where('companyId', isEqualTo: cid)
-        .where('createdByUid', isEqualTo: _uid)
-        .snapshots();
-  }
-
   Map<String, dynamic> _resolveAssetData(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) {
@@ -433,39 +395,6 @@ class _ProductionProblemReportingScreenState
     _showSnack('Uređaj postavljen iz QR koda.');
   }
 
-  Future<void> _openProductQrAppendDescription() async {
-    if (!_isAndroidOrIos) return;
-    final res = await Navigator.push<ProductionQrScanResolution>(
-      context,
-      MaterialPageRoute<ProductionQrScanResolution>(
-        builder: (_) => ProductionQrScanScreen(companyData: widget.companyData),
-      ),
-    );
-    if (!mounted || res == null) return;
-    if (!res.isKnown) {
-      _showSnack('QR nije prepoznat kao proizvodni format.');
-      return;
-    }
-    var line = '';
-    if (res.intent == ProductionQrIntent.printedClassificationLabelV1) {
-      final f = res.labelFields ?? <String, dynamic>{};
-      final pn = _s(res.productionOrderCode).isNotEmpty
-          ? _s(res.productionOrderCode)
-          : _s(f['pn']);
-      final sku = _s(f['sku']);
-      line =
-          '[QR proizvod] PN: $pn${sku.isNotEmpty ? '; SKU: $sku' : ''}';
-    } else if (res.intent == ProductionQrIntent.productionOrderReferenceV1) {
-      line =
-          '[QR nalog] ${_s(res.productionOrderCode)} (id: ${_s(res.productionOrderId)})';
-    }
-    if (line.isEmpty) return;
-    final cur = _descriptionCtrl.text.trim();
-    _descriptionCtrl.text = cur.isEmpty ? line : '$line\n$cur';
-    setState(() {});
-    _showSnack('Tekst iz QR-a dodan u opis.');
-  }
-
   Future<void> _pickFaultPhoto(ImageSource source) async {
     setState(() => _faultPhotoLoading = true);
     try {
@@ -482,7 +411,7 @@ class _ProductionProblemReportingScreenState
         _faultPhotoPreview = bytes;
       });
     } catch (e) {
-      if (mounted) _showSnack('Slika: $e');
+      if (mounted) _showSnack('Slika nije učitana. Pokušaj ponovo.');
     } finally {
       if (mounted) setState(() => _faultPhotoLoading = false);
     }
@@ -497,63 +426,6 @@ class _ProductionProblemReportingScreenState
 
   String _assetLabel(Map<String, dynamic> d) =>
       ProductionAssetDisplayLookup.labelFromAssetData(d);
-
-  /// Naslov u listi kvarova — bez Firestore ID-a uređaja.
-  String _faultDeviceTitle(Map<String, dynamic> d) {
-    final primary = _s(d['assetPrimaryName']);
-    final secondary = _s(d['assetSecondaryName']);
-    final dn = _s(d['deviceName']);
-    if (primary.isNotEmpty && secondary.isNotEmpty) {
-      return '$primary — $secondary';
-    }
-    if (primary.isNotEmpty) return primary;
-    if (secondary.isNotEmpty) return secondary;
-    if (dn.isNotEmpty) return dn;
-    return 'Uređaj (naziv nije u šifrarniku)';
-  }
-
-  Color _statusColor(String status) {
-    switch (status.trim().toLowerCase()) {
-      case _statusOpen:
-        return Colors.red;
-      case _statusInProgress:
-        return Colors.orange;
-      case _statusClosed:
-        return Colors.green;
-      case _statusCancelled:
-        return Colors.grey;
-      default:
-        return Colors.blueGrey;
-    }
-  }
-
-  String _statusLabel(String status) {
-    switch (status.trim().toLowerCase()) {
-      case _statusOpen:
-        return 'OTVOREN';
-      case _statusInProgress:
-        return 'U TOKU';
-      case _statusClosed:
-        return 'ZATVOREN';
-      case _statusCancelled:
-        return 'OTKAZAN';
-      default:
-        return status.trim().isEmpty ? '-' : status.toUpperCase();
-    }
-  }
-
-  bool _statusAllowedByFilter(String statusCode) {
-    final s = statusCode.trim().toLowerCase();
-    switch (_statusFilter) {
-      case 'active':
-        return _activeStatuses.contains(s);
-      case 'archived':
-        return _archivedStatuses.contains(s);
-      case 'all':
-      default:
-        return true;
-    }
-  }
 
   Future<void> _submitFault(Map<String, dynamic> assetData) async {
     final assetId = (_selectedAssetId ?? '').trim();
@@ -603,7 +475,7 @@ class _ProductionProblemReportingScreenState
         }
       }
       if (faultId.isEmpty) {
-        throw Exception('Neočekivani odgovor servera (createFaultReport).');
+        throw Exception('Neočekivani odgovor servera.');
       }
 
       final hadPhoto = _faultPhoto != null;
@@ -616,10 +488,10 @@ class _ProductionProblemReportingScreenState
             preloadedBytes: _faultPhotoPreview,
           );
           photoLinked = true;
-        } catch (e) {
+        } catch (_) {
           if (mounted) {
             _showSnack(
-              'Kvar je kreiran, ali upload ili povezivanje slike (Firestore) nije uspjelo: $e',
+              'Kvar je prijavljen, ali slika nije spremljena. Pokušaj ponovo s detalja prijave.',
             );
           }
         }
@@ -644,10 +516,10 @@ class _ProductionProblemReportingScreenState
     } on FirebaseFunctionsException catch (e) {
       final msg = (e.message != null && e.message!.trim().isNotEmpty)
           ? e.message!.trim()
-          : e.code;
-      _showSnack('Greška pri prijavi kvara: $msg');
-    } catch (e) {
-      _showSnack('Greška pri prijavi kvara: $e');
+          : 'Prijava nije uspjela. Pokušaj ponovo.';
+      _showSnack(msg);
+    } catch (_) {
+      _showSnack('Prijava nije uspjela. Pokušaj ponovo.');
     } finally {
       if (mounted) {
         setState(() => _submitting = false);
@@ -660,451 +532,245 @@ class _ProductionProblemReportingScreenState
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  void _showInfoDialog() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Prijava problema'),
+        content: const Text(
+          'Ovdje možeš prijaviti kvar na uređaju iz odabranog proizvodnog pogona. '
+          'Prijava se evidentira u Maintenance modulu.\n\n'
+          'Za prijavu kvara mora postojati evidentiran uređaj u odabranom pogonu.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Zatvori'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!maintenanceFaultBridgeEnabled(widget.companyData)) {
-      return const Scaffold(
-        body: _MissingMaintenanceModuleMessage(),
+      return Scaffold(
+        appBar: AppBar(title: const Text('Prijava problema')),
+        body: const _MissingMaintenanceModuleMessage(),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Prijava problema')),
-      body: (_companyId.isEmpty || _plantKey.isEmpty || _uid.isEmpty)
+      appBar: AppBar(
+        title: const Text('Prijava problema'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            tooltip: 'Informacije',
+            onPressed: _showInfoDialog,
+          ),
+        ],
+      ),
+      body: (_companyId.isEmpty ||
+              _uid.isEmpty ||
+              (!_resolvingPlant && _queryPlantKey.isEmpty))
           ? const _MissingContextMessage()
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _sectionTitle(context, 'Maintenance kvarovi'),
-                const SizedBox(height: 10),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+          : _resolvingPlant
+          ? const Center(child: CircularProgressIndicator())
+          : _assetsListStream == null
+          ? const Center(child: _MissingContextMessage())
+          : StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+              stream: _assetsListStream,
+              builder: (context, snap) {
+                if (snap.hasError) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'Učitavanje uređaja nije uspjelo. Pokušaj osvježiti stranicu.',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
+                }
+
+                if (!snap.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final docs = List<QueryDocumentSnapshot<Map<String, dynamic>>>.from(
+                  snap.data!,
+                );
+
+                if (docs.isEmpty) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'Nema evidentiranih uređaja za odabrani pogon.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    ),
+                  );
+                }
+
+                if (_selectedAssetId == null ||
+                    (!docs.any((d) => d.id == _selectedAssetId) &&
+                        _assetPayloadOverride == null)) {
+                  _selectedAssetId = docs.first.id;
+                }
+
+                final assetData = _resolveAssetData(docs);
+
+                return ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    if (_isAndroidOrIos) ...[
+                      OutlinedButton.icon(
+                        onPressed: _submitting ? null : _openDeviceQrAndAssign,
+                        icon: const Icon(Icons.qr_code_scanner),
+                        label: const Text('Skeniraj QR uređaja'),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    DropdownButtonFormField<String>(
+                      key: ValueKey<String>('asset_${_selectedAssetId ?? 'none'}'),
+                      isExpanded: true,
+                      initialValue: _selectedAssetId,
+                      items: _assetDropdownItems(docs),
+                      onChanged: _submitting
+                          ? null
+                          : (v) {
+                              if (v == null) return;
+                              setState(() {
+                                _selectedAssetId = v;
+                                _assetPayloadOverride = null;
+                              });
+                            },
+                      decoration: const InputDecoration(
+                        labelText: 'Uređaj',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      key: ValueKey<String>('ftype_${_selectedFaultType ?? 'none'}'),
+                      isExpanded: true,
+                      initialValue: _selectedFaultType,
+                      items: _faultTypes
+                          .map(
+                            (t) => DropdownMenuItem<String>(
+                              value: t,
+                              child: Text(t),
+                            ),
+                          )
+                          .toList(growable: false),
+                      onChanged: _submitting
+                          ? null
+                          : (v) => setState(() => _selectedFaultType = v),
+                      decoration: const InputDecoration(
+                        labelText: 'Tip kvara',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _descriptionCtrl,
+                      minLines: 3,
+                      maxLines: 6,
+                      enabled: !_submitting,
+                      decoration: const InputDecoration(
+                        labelText: 'Opis',
+                        hintText: 'Šta se desilo, kada i koji su simptomi...',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: _isRunningReported,
+                      onChanged: (_submitting || _faultPhotoLoading)
+                          ? null
+                          : (v) => setState(() => _isRunningReported = v),
+                      title: const Text('Uređaj radi'),
+                      subtitle: const Text(
+                        'Ako je isključeno, prijava ide kao „Ne radi”.',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _isAndroidOrIos
+                          ? 'Slika (opcionalno)'
+                          : 'Priloži sliku (opcionalno)',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
-                        const Text(
-                          'Prijava kvara ide u Maintenance domenu, a ostaje dostupna iz Production aplikacije.',
+                        if (_isAndroidOrIos)
+                          OutlinedButton.icon(
+                            onPressed: (_submitting || _faultPhotoLoading)
+                                ? null
+                                : () => _pickFaultPhoto(ImageSource.camera),
+                            icon: const Icon(Icons.photo_camera_outlined),
+                            label: const Text('Snimi'),
+                          ),
+                        OutlinedButton.icon(
+                          onPressed: (_submitting || _faultPhotoLoading)
+                              ? null
+                              : () => _pickFaultPhoto(ImageSource.gallery),
+                          icon: const Icon(Icons.photo_library_outlined),
+                          label: Text(
+                            _isAndroidOrIos ? 'Galerija' : 'Odaberi sliku',
+                          ),
                         ),
-                        const SizedBox(height: 12),
-                        if (_resolvingPlant)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8),
-                            child: LinearProgressIndicator(),
-                          )
-                        else if (_assetsListStream == null)
-                          const Text(
-                            'Nije moguće učitati listu uređaja (sesija). Osvježi stranicu.',
-                          )
-                        else
-                          StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
-                          stream: _assetsListStream,
-                          builder: (context, snap) {
-                            if (snap.hasError) {
-                              return Text(
-                                'Greška pri učitavanju uređaja: ${snap.error}',
-                                style: const TextStyle(color: Colors.red),
-                              );
-                            }
-
-                            if (!snap.hasData) {
-                              return const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 8),
-                                child: LinearProgressIndicator(),
-                              );
-                            }
-
-                            final docs = List<QueryDocumentSnapshot<Map<String, dynamic>>>.from(
-                              snap.data!,
-                            );
-
-                            if (docs.isEmpty) {
-                              return Text(
-                                'Nema uređaja za tvoj pogon. '
-                                'Tražimo plantKey u [${_mergedPlantKeys.join(", ")}] '
-                                'i plantId u [${_mergedPlantIds.join(", ")}]. '
-                                'U Firestore `assets` moraju imati isti companyId i jedan od tih ključeva. '
-                                'Ako i dalje vidiš staru poruku, deployaj novu web verziju Production app-a.',
-                              );
-                            }
-
-                            if (_selectedAssetId == null ||
-                                (!docs.any((d) => d.id == _selectedAssetId) &&
-                                    _assetPayloadOverride == null)) {
-                              _selectedAssetId = docs.first.id;
-                            }
-
-                            final assetData = _resolveAssetData(docs);
-
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (_isAndroidOrIos) ...[
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: [
-                                      OutlinedButton.icon(
-                                        onPressed: _submitting
-                                            ? null
-                                            : _openDeviceQrAndAssign,
-                                        icon: const Icon(Icons.qr_code_scanner),
-                                        label: const Text('QR uređaja'),
-                                      ),
-                                      OutlinedButton.icon(
-                                        onPressed: _submitting
-                                            ? null
-                                            : _openProductQrAppendDescription,
-                                        icon: const Icon(Icons.inventory_2_outlined),
-                                        label: const Text('QR proizvoda / naloga'),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 10),
-                                ],
-                                DropdownButtonFormField<String>(
-                                  key: ValueKey<String>(
-                                    'asset_${_selectedAssetId ?? 'none'}',
-                                  ),
-                                  isExpanded: true,
-                                  initialValue: _selectedAssetId,
-                                  items: _assetDropdownItems(docs),
-                                  onChanged: _submitting
-                                      ? null
-                                      : (v) {
-                                          if (v == null) return;
-                                          setState(() {
-                                            _selectedAssetId = v;
-                                            _assetPayloadOverride = null;
-                                          });
-                                        },
-                                  decoration: const InputDecoration(
-                                    labelText: 'Uređaj',
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                DropdownButtonFormField<String>(
-                                  key: ValueKey<String>(
-                                    'ftype_${_selectedFaultType ?? 'none'}',
-                                  ),
-                                  isExpanded: true,
-                                  initialValue: _selectedFaultType,
-                                  items: _faultTypes
-                                      .map(
-                                        (t) => DropdownMenuItem<String>(
-                                          value: t,
-                                          child: Text(t),
-                                        ),
-                                      )
-                                      .toList(growable: false),
-                                  onChanged: _submitting
-                                      ? null
-                                      : (v) => setState(
-                                          () => _selectedFaultType = v,
-                                        ),
-                                  decoration: const InputDecoration(
-                                    labelText: 'Tip kvara',
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                TextField(
-                                  controller: _descriptionCtrl,
-                                  minLines: 3,
-                                  maxLines: 6,
-                                  enabled: !_submitting,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Opis kvara',
-                                    hintText:
-                                        'Šta se desilo, kada i koji su simptomi...',
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  _isAndroidOrIos
-                                      ? 'Slika (opcionalno) — kamera ili galerija'
-                                      : 'Upload slike (opcionalno)',
-                                  style: Theme.of(context).textTheme.titleSmall,
-                                ),
-                                const SizedBox(height: 6),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: [
-                                    if (_isAndroidOrIos)
-                                      OutlinedButton.icon(
-                                        onPressed: (_submitting ||
-                                                _faultPhotoLoading)
-                                            ? null
-                                            : () => _pickFaultPhoto(
-                                                  ImageSource.camera,
-                                                ),
-                                        icon: const Icon(Icons.photo_camera_outlined),
-                                        label: const Text('Snimi'),
-                                      ),
-                                    OutlinedButton.icon(
-                                      onPressed: (_submitting ||
-                                              _faultPhotoLoading)
-                                          ? null
-                                          : () => _pickFaultPhoto(
-                                                ImageSource.gallery,
-                                              ),
-                                      icon: const Icon(Icons.photo_library_outlined),
-                                      label: Text(
-                                        _isAndroidOrIos ? 'Galerija' : 'Odaberi sliku',
-                                      ),
-                                    ),
-                                    if (_faultPhoto != null)
-                                      TextButton.icon(
-                                        onPressed: (_submitting ||
-                                                _faultPhotoLoading)
-                                            ? null
-                                            : _clearFaultPhoto,
-                                        icon: const Icon(Icons.clear),
-                                        label: const Text('Ukloni sliku'),
-                                      ),
-                                  ],
-                                ),
-                                if (_faultPhotoPreview != null) ...[
-                                  const SizedBox(height: 8),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image.memory(
-                                      _faultPhotoPreview!,
-                                      height: 140,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                ],
-                                const SizedBox(height: 10),
-                                SwitchListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  value: _isRunningReported,
-                                  onChanged: (_submitting || _faultPhotoLoading)
-                                      ? null
-                                      : (v) =>
-                                          setState(() => _isRunningReported = v),
-                                  title: const Text('Uređaj radi'),
-                                  subtitle: const Text(
-                                    'Ako je isključeno, prijava ide kao "Ne radi".',
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: FilledButton.icon(
-                                    onPressed: _canSubmit
-                                        ? () => _submitFault(assetData)
-                                        : null,
-                                    icon: _submitting
-                                        ? const SizedBox(
-                                            width: 16,
-                                            height: 16,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          )
-                                        : const Icon(Icons.send_outlined),
-                                    label: Text(
-                                      _faultPhotoLoading
-                                          ? 'Priprema slike...'
-                                          : _submitting
-                                              ? 'Slanje...'
-                                              : 'Pošalji prijavu kvara',
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
+                        if (_faultPhoto != null)
+                          TextButton.icon(
+                            onPressed: (_submitting || _faultPhotoLoading)
+                                ? null
+                                : _clearFaultPhoto,
+                            icon: const Icon(Icons.clear),
+                            label: const Text('Ukloni sliku'),
+                          ),
                       ],
                     ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _sectionTitle(context, 'Moje prijave kvarova'),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    ChoiceChip(
-                      label: const Text('Aktivni'),
-                      selected: _statusFilter == 'active',
-                      onSelected: (_) => setState(() => _statusFilter = 'active'),
-                    ),
-                    ChoiceChip(
-                      label: const Text('Arhiva'),
-                      selected: _statusFilter == 'archived',
-                      onSelected: (_) =>
-                          setState(() => _statusFilter = 'archived'),
-                    ),
-                    ChoiceChip(
-                      label: const Text('Svi'),
-                      selected: _statusFilter == 'all',
-                      onSelected: (_) => setState(() => _statusFilter = 'all'),
+                    if (_faultPhotoPreview != null) ...[
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.memory(
+                          _faultPhotoPreview!,
+                          height: 140,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _canSubmit ? () => _submitFault(assetData) : null,
+                        icon: _submitting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.send_outlined),
+                        label: Text(
+                          _faultPhotoLoading
+                              ? 'Priprema slike...'
+                              : _submitting
+                              ? 'Slanje...'
+                              : 'Pošalji',
+                        ),
+                      ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 8),
-                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: _myFaultsStream(),
-                  builder: (context, snap) {
-                    if (snap.hasError) {
-                      return Text(
-                        'Greška pri učitavanju prijava: ${snap.error}',
-                        style: const TextStyle(color: Colors.red),
-                      );
-                    }
-                    if (!snap.hasData) {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 20),
-                        child: Center(child: CircularProgressIndicator()),
-                      );
-                    }
-
-                    final docs = snap.data!.docs
-                        .where((d) => _statusAllowedByFilter(_s(d['status'])))
-                        .toList(growable: false)
-                      ..sort((a, b) {
-                        final da = a.data()['createdAt'];
-                        final db = b.data()['createdAt'];
-                        final aDate = da is Timestamp ? da.toDate() : DateTime(0);
-                        final bDate = db is Timestamp ? db.toDate() : DateTime(0);
-                        return bDate.compareTo(aDate);
-                      });
-
-                    if (docs.isEmpty) {
-                      return const Card(
-                        child: Padding(
-                          padding: EdgeInsets.all(14),
-                          child: Text(
-                            'Nema prijava za odabrani filter.',
-                          ),
-                        ),
-                      );
-                    }
-
-                    return Column(
-                      children: docs.map((doc) {
-                        final d = doc.data();
-                        final status = _s(d['status']);
-                        final created = d['createdAt'];
-                        final createdAt = created is Timestamp
-                            ? created.toDate()
-                            : null;
-                        final title = _faultDeviceTitle(d);
-                        return Card(
-                          child: ListTile(
-                            onTap: () {
-                              Navigator.of(context).push<void>(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => ProductionFaultDetailScreen(
-                                    companyData: widget.companyData,
-                                    faultId: doc.id,
-                                  ),
-                                ),
-                              );
-                            },
-                            title: Text(
-                              title.isEmpty ? 'Uređaj -' : title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 4),
-                                Text(_s(d['description'])),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Tip: ${_s(d['faultType'])} • ${createdAt?.toLocal().toString().substring(0, 16) ?? '-'}',
-                                  style: const TextStyle(color: Colors.black54),
-                                ),
-                              ],
-                            ),
-                            trailing: _StatusBadge(
-                              label: _statusLabel(status),
-                              color: _statusColor(status),
-                            ),
-                          ),
-                        );
-                      }).toList(growable: false),
-                    );
-                  },
-                ),
-                const SizedBox(height: 16),
-                _sectionTitle(context, 'Production škart / neusklađenost'),
-                const SizedBox(height: 10),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Za škart i proizvodne neusklađenosti koristi postojeći tok praćenja proizvodnje (unos dobrog i škarta po šifri defekta).',
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'Ili otvori praćenje odmah dugmetom ispod.',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        FilledButton.icon(
-                          onPressed: () {
-                            Navigator.of(context).push<void>(
-                              MaterialPageRoute<void>(
-                                builder: (_) => ProductionOperatorTrackingScreen(
-                                  companyData: widget.companyData,
-                                ),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.play_circle_outline),
-                          label: const Text('Otvori praćenje proizvodnje'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+                );
+              },
             ),
-    );
-  }
-
-  Widget _sectionTitle(BuildContext context, String text) {
-    return Text(
-      text,
-      style: Theme.of(
-        context,
-      ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.45)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 12),
-      ),
     );
   }
 }
@@ -1118,7 +784,7 @@ class _MissingContextMessage extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.all(24),
         child: Text(
-          'Nedostaju sesijski podaci (companyId/plantKey/userId). Ponovo se prijavi ili kontaktiraj admina.',
+          'Nedostaje kontekst sesije. Odjavi se i prijavi ponovo, ili odaberi pogon rada.',
           textAlign: TextAlign.center,
         ),
       ),
@@ -1135,7 +801,8 @@ class _MissingMaintenanceModuleMessage extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.all(24),
         child: Text(
-          'Prijava kvara ovdje nije dostupna: kompanija mora imati Maintenance modul, a Admin mora vam u profilu uključiti pristup (appAccess.maintenance).',
+          'Prijava kvara nije dostupna za ovu kompaniju ili korisnički profil. '
+          'Obrati se administratoru.',
           textAlign: TextAlign.center,
         ),
       ),
