@@ -76,6 +76,7 @@ class ProductionStationWorkSessionCallableService {
     List<Map<String, dynamic>>? materialConsumptions,
     List<Map<String, dynamic>>? operatorWorkLogs,
     List<Map<String, dynamic>>? scrapItems,
+    List<Map<String, dynamic>>? controlledItems,
   }) async {
     final payload = <String, dynamic>{
       'companyId': companyId.trim(),
@@ -99,6 +100,7 @@ class ProductionStationWorkSessionCallableService {
         payload['operatorWorkLogs'] = operatorWorkLogs;
       }
       if (scrapItems != null) payload['scrapItems'] = scrapItems;
+      if (controlledItems != null) payload['controlledItems'] = controlledItems;
     } else if (comment != null && comment.trim().isNotEmpty) {
       payload['comment'] = comment.trim();
     }
@@ -228,6 +230,54 @@ class ProductionStationWorkSessionCallableService {
       scrapItems: scrapItems,
     );
     return result.session;
+  }
+
+  Future<ProductionStationWorkSession> updateFinalControlProfileSession({
+    required String companyId,
+    required String sessionId,
+    required Map<String, dynamic> fieldValues,
+    required List<Map<String, dynamic>> controlledItems,
+  }) async {
+    final result = await updateProductionStationWorkSession(
+      companyId: companyId,
+      sessionId: sessionId,
+      action: 'set_field_values',
+      fieldValues: fieldValues,
+      controlledItems: controlledItems,
+    );
+    return result.session;
+  }
+
+  Future<ProductionStationWorkSession> finishFinalControlProfileSession({
+    required String companyId,
+    required String sessionId,
+    Map<String, dynamic>? fieldValues,
+    List<Map<String, dynamic>>? controlledItems,
+  }) async {
+    final payload = <String, dynamic>{
+      'companyId': companyId.trim(),
+      'sessionId': sessionId.trim(),
+    };
+    if (fieldValues != null && fieldValues.isNotEmpty) {
+      payload['fieldValues'] = fieldValues;
+    }
+    if (controlledItems != null) payload['controlledItems'] = controlledItems;
+
+    final res = await _functions
+        .httpsCallable('finishProductionStationWorkSession')
+        .call<Map<String, dynamic>>(payload);
+    final data = res.data;
+    if (data['success'] != true) {
+      throw Exception('Završetak sesije nije uspio.');
+    }
+    final raw = data['session'];
+    if (raw is! Map) {
+      throw Exception('Nepotpun odgovor servera.');
+    }
+    return ProductionStationWorkSession.fromMap(
+      sessionId.trim(),
+      Map<String, dynamic>.from(raw),
+    );
   }
 
   Future<ProductionStationWorkSession> finishStructuredProfileSession({

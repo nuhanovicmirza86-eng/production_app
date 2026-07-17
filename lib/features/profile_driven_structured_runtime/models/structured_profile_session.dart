@@ -20,6 +20,8 @@ class StructuredProfileSessionBehavior {
 
   bool get isStructured => inputModel.trim() == 'structured';
 
+  bool get isStructuredLite => inputModel.trim() == 'structured_lite';
+
   factory StructuredProfileSessionBehavior.fromMap(Map<String, dynamic>? raw) {
     final data = raw ?? const <String, dynamic>{};
     final subs = <String>[];
@@ -100,12 +102,14 @@ class StructuredProfileTablePayloadKeys {
   static const materialConsumptions = 'materialConsumptions';
   static const operatorWorkLogs = 'operatorWorkLogs';
   static const scrapItems = 'scrapItems';
+  static const controlledItems = 'controlledItems';
 
   static const subcollectionToPayloadKey = {
     'processed_items': processedItems,
     'material_consumptions': materialConsumptions,
     'operator_work_logs': operatorWorkLogs,
     'scrap_items': scrapItems,
+    'controlled_items': controlledItems,
   };
 
   static String? payloadKeyForTable(String tableKey) =>
@@ -130,14 +134,16 @@ class StructuredProfileSessionState {
     tablesByKey = {...tablesByKey, tableKey: rows};
   }
 
-  Map<String, dynamic> buildUpdatePayload() {
+  Map<String, dynamic> buildUpdatePayload({Iterable<String>? tableKeys}) {
     final payload = <String, dynamic>{
       'fieldValues': Map<String, dynamic>.from(fieldValues),
     };
-    for (final entry in StructuredProfileTablePayloadKeys
-        .subcollectionToPayloadKey.entries) {
-      final tableKey = entry.key;
-      final payloadKey = entry.value;
+    final keys = tableKeys ??
+        StructuredProfileTablePayloadKeys.subcollectionToPayloadKey.keys;
+    for (final tableKey in keys) {
+      final payloadKey =
+          StructuredProfileTablePayloadKeys.payloadKeyForTable(tableKey);
+      if (payloadKey == null) continue;
       payload[payloadKey] = rowsFor(tableKey)
           .map((row) => row.toPayload())
           .toList(growable: false);
@@ -154,6 +160,9 @@ extension StructuredProfileCatalogEntryX on ProductionStationProfileCatalogEntry
 
   bool get isStructuredInputModel =>
       sessionBehaviorModel?.isStructured ?? false;
+
+  bool get isStructuredLiteInputModel =>
+      sessionBehaviorModel?.isStructuredLite ?? false;
 
   List<StructuredRepeatableTableDefinition> get repeatableTableDefinitions {
     final out = <StructuredRepeatableTableDefinition>[];

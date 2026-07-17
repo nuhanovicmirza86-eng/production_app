@@ -821,3 +821,26 @@ String? validateStructuredHeader({
   }
   return null;
 }
+
+/// Završna kontrola — red mora imati inspectedQty = goodQty + scrapQty + reworkQty.
+String? validateControlledItemsQtyBalance({
+  required StructuredRepeatableTableDefinition table,
+  required List<StructuredRepeatableRow> rows,
+}) {
+  if (table.key != 'controlled_items') return null;
+  for (var i = 0; i < rows.length; i++) {
+    final row = rows[i];
+    final inspected = _parseQty(row.values['inspectedQty']);
+    final good = _parseQty(row.values['goodQty']);
+    final scrap = _parseQty(row.values['scrapQty']);
+    final rework = _parseQty(row.values['reworkQty']);
+    if (inspected <= 0) {
+      return '${table.label}, red ${i + 1}: kontrolisana količina mora biti veća od nule.';
+    }
+    if ((good + scrap + rework - inspected).abs() > 0.000001) {
+      return '${table.label}, red ${i + 1}: zbroj OK, škarta i dorade mora biti '
+          'jednak kontrolisanoj količini.';
+    }
+  }
+  return null;
+}

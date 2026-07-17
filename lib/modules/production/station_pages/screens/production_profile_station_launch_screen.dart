@@ -4,6 +4,7 @@ import '../../station_pages/models/production_station_config.dart';
 import '../../station_pages/models/production_station_profile_catalog_entry.dart';
 import '../../station_work/screens/profile_driven_work_screen.dart';
 import '../../../../features/profile_driven_structured_runtime/models/structured_profile_session.dart';
+import '../../../../features/profile_driven_structured_runtime/screens/final_control_work_screen.dart';
 import '../../../../features/profile_driven_structured_runtime/screens/structured_profile_driven_work_screen.dart';
 
 /// M1-B / M1-C — operator ulaz u profile-driven runtime.
@@ -43,6 +44,15 @@ class ProductionProfileStationLaunchScreen extends StatelessWidget {
 
     if (profile.isStructuredInputModel && profile.isComplete) {
       return StructuredProfileDrivenWorkScreen(
+        companyData: companyData,
+        stationConfig: stationConfig,
+        profile: profile,
+        onCloseStation: onCloseStation,
+      );
+    }
+
+    if (profile.isStructuredLiteInputModel && profile.isComplete) {
+      return FinalControlWorkScreen(
         companyData: companyData,
         stationConfig: stationConfig,
         profile: profile,

@@ -29,15 +29,24 @@ class ProductionStationConfig {
     'rework_and_painting',
   ];
 
+  /// Profili sa structured_lite runtime-om (M1-E).
+  static const List<String> structuredLiteProfileDrivenRuntimeProfileKeys = [
+    'final_control',
+  ];
+
   static bool isProfileDrivenRuntimeProfile(String profileKey) =>
       profileDrivenRuntimeProfileKeys.contains(profileKey.trim());
 
   static bool isStructuredProfileDrivenRuntimeProfile(String profileKey) =>
       structuredProfileDrivenRuntimeProfileKeys.contains(profileKey.trim());
 
+  static bool isStructuredLiteProfileDrivenRuntimeProfile(String profileKey) =>
+      structuredLiteProfileDrivenRuntimeProfileKeys.contains(profileKey.trim());
+
   static bool isOperatorProfileRuntimeProfile(String profileKey) =>
       isProfileDrivenRuntimeProfile(profileKey) ||
-      isStructuredProfileDrivenRuntimeProfile(profileKey);
+      isStructuredProfileDrivenRuntimeProfile(profileKey) ||
+      isStructuredLiteProfileDrivenRuntimeProfile(profileKey);
 
   /// Profili evidencije — kontrolisan unos (M1-B0 / M1-C).
   static const List<String> evidenceProfileTypes = [
@@ -416,6 +425,8 @@ class ProductionStationConfig {
         return 'Doziranje hemikalija';
       case 'rework_and_painting':
         return 'Dorade i lakiranje';
+      case 'final_control':
+        return 'Završna kontrola';
       case 'process_log':
         return 'Procesna evidencija';
       case 'standard_production':
