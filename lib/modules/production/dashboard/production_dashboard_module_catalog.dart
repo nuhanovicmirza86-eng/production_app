@@ -17,7 +17,6 @@ import '../../logistics/receipt/screens/station1_packed_boxes_logistics_screen.d
 import '../../logistics/screens/logistics_hub_entry_screen.dart';
 import '../../personal/work_time/screens/work_time_hub_screen.dart';
 import '../../planning/aps/screens/aps_hub_screen.dart';
-import '../../quality/screens/execute_inspection_screen.dart';
 import '../../quality/screens/quality_hub_screen.dart';
 import '../../sustainability/screens/carbon_footprint_screen.dart';
 import '../../workforce/screens/workforce_dashboard_screen.dart';
@@ -36,12 +35,11 @@ import '../products/screens/products_list_screen.dart';
 import '../issues/screens/production_problem_reporting_screen.dart';
 import '../station_pages/screens/production_profile_stations_hub_screen.dart';
 import '../station_pages/screens/production_stations_admin_screen.dart';
-import '../station_pages/screens/station1_operator_launch_screen.dart';
-import '../station_pages/screens/station2_operator_launch_screen.dart';
 import '../station_pages/widgets/station_page_active_gate.dart';
 import '../tracking/models/production_operator_tracking_entry.dart';
 import '../tracking/screens/production_operator_tracking_screen.dart';
 import '../tracking/screens/production_operator_tracking_station_screen.dart';
+import '../tracking/screens/production_preparation_station_screen.dart';
 import '../tracking/screens/production_reports_hub_screen.dart';
 import '../work_centers/screens/work_centers_list_screen.dart';
 import 'models/production_dashboard_module.dart';
@@ -75,28 +73,11 @@ class ProductionDashboardModuleCatalog {
             phase: phase,
             stationBuilder: (_) =>
                 phase == ProductionOperatorTrackingEntry.phasePreparation
-                ? Station1OperatorLaunchScreen(companyData: companyData)
-                : phase == ProductionOperatorTrackingEntry.phaseFirstControl
-                ? Station2OperatorLaunchScreen(companyData: companyData)
+                ? ProductionPreparationStationScreen(companyData: companyData)
                 : ProductionOperatorTrackingStationScreen(
                     companyData: companyData,
                     phase: phase,
                   ),
-          ),
-        ),
-      );
-    }
-
-    void openQmsInspectionForStationPhase(String phase) {
-      final pref = phase == ProductionOperatorTrackingEntry.phaseFirstControl
-          ? 'IN_PROCESS'
-          : 'FINAL';
-      Navigator.push<void>(
-        context,
-        MaterialPageRoute<void>(
-          builder: (_) => ExecuteInspectionScreen(
-            companyData: companyData,
-            preferredInspectionType: pref,
           ),
         ),
       );
@@ -201,31 +182,21 @@ class ProductionDashboardModuleCatalog {
               id: 'production.station_first_control',
               icon: Icons.fact_check_outlined,
               title: 'Stanica: prva kontrola',
-              subtitle: access.hasModule('quality')
-                  ? 'Kontrola kvaliteta u tijeku obrade. Seriju unosite u „Praćenje proizvodnje“.'
-                  : 'Puni zaslon — faza u izradi (placeholder do punog unosa).',
-              onTap: () => access.hasModule('quality')
-                  ? openQmsInspectionForStationPhase(
-                      ProductionOperatorTrackingEntry.phaseFirstControl,
-                    )
-                  : openTrackingStation(
-                      ProductionOperatorTrackingEntry.phaseFirstControl,
-                    ),
+              subtitle:
+                  'Puni zaslon — faza u izradi (placeholder do punog unosa).',
+              onTap: () => openTrackingStation(
+                ProductionOperatorTrackingEntry.phaseFirstControl,
+              ),
             ),
             ProductionDashboardModuleEntry(
               id: 'production.station_final_control',
               icon: Icons.verified_outlined,
               title: 'Stanica: završna kontrola',
-              subtitle: access.hasModule('quality')
-                  ? 'Završna kontrola kvalitete. Seriju unosite u „Praćenje proizvodnje“.'
-                  : 'Puni zaslon — faza u izradi (placeholder do punog unosa).',
-              onTap: () => access.hasModule('quality')
-                  ? openQmsInspectionForStationPhase(
-                      ProductionOperatorTrackingEntry.phaseFinalControl,
-                    )
-                  : openTrackingStation(
-                      ProductionOperatorTrackingEntry.phaseFinalControl,
-                    ),
+              subtitle:
+                  'Puni zaslon — faza u izradi (placeholder do punog unosa).',
+              onTap: () => openTrackingStation(
+                ProductionOperatorTrackingEntry.phaseFinalControl,
+              ),
             ),
           ]);
           if (ProductionAccessHelper.canUseProfileStationRuntime(access.role)) {

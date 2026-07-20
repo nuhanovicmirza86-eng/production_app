@@ -40,8 +40,7 @@ import '../../planning/screens/production_planning_home_screen.dart';
 import '../../tracking/models/production_operator_tracking_entry.dart';
 import '../../tracking/screens/production_operator_tracking_screen.dart';
 import '../../tracking/screens/production_operator_tracking_station_screen.dart';
-import '../../station_pages/screens/station1_operator_launch_screen.dart';
-import '../../station_pages/screens/station2_operator_launch_screen.dart';
+import '../../tracking/screens/production_preparation_station_screen.dart';
 import '../../station_pages/widgets/station_page_active_gate.dart';
 import '../../qr/production_qr_scan_flow.dart';
 import '../../../quality/screens/quality_hub_screen.dart';
@@ -424,7 +423,8 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           builder: (_) => StationPageActiveGate(
             companyData: cd,
             phase: ProductionOperatorTrackingEntry.phasePreparation,
-            stationBuilder: (_) => Station1OperatorLaunchScreen(companyData: cd),
+            stationBuilder: (_) =>
+                ProductionPreparationStationScreen(companyData: cd),
           ),
           destination: const NavigationDestination(
             icon: Icon(Icons.fullscreen_outlined),
@@ -436,7 +436,10 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           builder: (_) => StationPageActiveGate(
             companyData: cd,
             phase: ProductionOperatorTrackingEntry.phaseFirstControl,
-            stationBuilder: (_) => Station2OperatorLaunchScreen(companyData: cd),
+            stationBuilder: (_) => ProductionOperatorTrackingStationScreen(
+              companyData: cd,
+              phase: ProductionOperatorTrackingEntry.phaseFirstControl,
+            ),
           ),
           destination: const NavigationDestination(
             icon: Icon(Icons.fact_check_outlined),

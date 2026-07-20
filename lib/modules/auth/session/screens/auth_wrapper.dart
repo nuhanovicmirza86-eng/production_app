@@ -17,8 +17,7 @@ import '../../../production/tracking/models/production_operator_tracking_entry.d
 import '../../../production/tracking/screens/production_operator_tracking_station_screen.dart';
 import '../../../production/station/screens/station_tracking_setup_screen.dart';
 import '../../../production/tracking/config/station_tracking_setup_store.dart';
-import '../../../production/station_pages/screens/station1_operator_launch_screen.dart';
-import '../../../production/station_pages/screens/station2_operator_launch_screen.dart';
+import '../../../production/tracking/screens/production_preparation_station_screen.dart';
 import '../../screens/login_screen.dart';
 import '../../shared/services/auth_service.dart';
 
@@ -385,7 +384,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
           companyData: _companyData!,
           phase: phase,
           onCloseStation: goFullApp,
-          stationBuilder: (_) => Station1OperatorLaunchScreen(
+          stationBuilder: (_) => ProductionPreparationStationScreen(
             companyData: _companyData!,
             onCloseStation: goFullApp,
             onStationTrackingSetupSaved: _refreshSession,
@@ -397,8 +396,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
           companyData: _companyData!,
           phase: phase,
           onCloseStation: goFullApp,
-          stationBuilder: (_) => Station2OperatorLaunchScreen(
+          stationBuilder: (_) => ProductionOperatorTrackingStationScreen(
             companyData: _companyData!,
+            phase: phase,
             onCloseStation: goFullApp,
             onStationTrackingSetupSaved: _refreshSession,
           ),
