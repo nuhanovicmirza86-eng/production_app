@@ -11,6 +11,7 @@ import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/production_admin_session_plant.dart';
 import '../../../../core/station_launch_config.dart';
 import '../../../../core/station_launch_preference.dart';
+import '../../../../features/station_terminal/screens/production_station_terminal_root_screen.dart';
 import '../../../production/dashboard/screens/production_dashboard_screen.dart';
 import '../../../production/station_pages/widgets/station_page_active_gate.dart';
 import '../../../production/tracking/models/production_operator_tracking_entry.dart';
@@ -208,6 +209,30 @@ class _AuthWrapperState extends State<AuthWrapper> {
         return;
       }
 
+      final normRole = ProductionAccessHelper.normalizeRole(role);
+      final isStationTerminalAccount =
+          ProductionAccessHelper.isProductionStationTerminalRole(normRole);
+
+      if (isStationTerminalAccount) {
+        final assignedStationConfigId = _s(data['assignedStationConfigId']);
+        if (assignedStationConfigId.isEmpty) {
+          _error =
+              'Terminal account nema dodijeljenu stanicu.\n'
+              'Administrator mora postaviti assignedStationConfigId.';
+          if (!mounted) return;
+          setState(() => _loading = false);
+          return;
+        }
+        if (plantKey.isEmpty) {
+          _error =
+              'Terminal account mora imati pogon (plantKey).\n'
+              'Administrator mora dodijeliti pogon prije korištenja.';
+          if (!mounted) return;
+          setState(() => _loading = false);
+          return;
+        }
+      }
+
       _companyData = {
         ...company,
         'companyId': companyId,
@@ -222,17 +247,25 @@ class _AuthWrapperState extends State<AuthWrapper> {
         'userDisplayName': _s(data['displayName']),
         'nickname': _s(data['nickname']),
         'userEmail': _s(data['email'] ?? user.email ?? ''),
+        if (isStationTerminalAccount) ...{
+          'isStationTerminalAccount': true,
+          'assignedStationConfigId': _s(data['assignedStationConfigId']),
+        },
       };
 
-      try {
-        _effLaunchPhase =
-            StationLaunchConfig.phaseOrNull ??
-            await StationLaunchPreference.getPhaseOptional();
-      } catch (_) {
-        _effLaunchPhase = StationLaunchConfig.phaseOrNull;
+      if (isStationTerminalAccount) {
+        _effLaunchPhase = null;
+      } else {
+        try {
+          _effLaunchPhase =
+              StationLaunchConfig.phaseOrNull ??
+              await StationLaunchPreference.getPhaseOptional();
+        } catch (_) {
+          _effLaunchPhase = StationLaunchConfig.phaseOrNull;
+        }
       }
 
-      if (_companyData != null) {
+      if (_companyData != null && !isStationTerminalAccount) {
         if (_effLaunchPhase != null) {
           final cid = _s(_companyData!['companyId']);
           final setup = await StationTrackingSetupStore.load(cid);
@@ -275,7 +308,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         }
       }
 
-      if (_companyData != null) {
+      if (_companyData != null && !isStationTerminalAccount) {
         await ProductionAdminSessionPlant.applyPreferenceIfAdmin(
           _companyData!,
         );
@@ -357,6 +390,13 @@ class _AuthWrapperState extends State<AuthWrapper> {
             ],
           ),
         ),
+      );
+    }
+
+    if (_companyData != null &&
+        ProductionAccessHelper.isStationTerminalAccount(_companyData!)) {
+      return ProductionStationTerminalRootScreen(
+        companyData: _companyData!,
       );
     }
 

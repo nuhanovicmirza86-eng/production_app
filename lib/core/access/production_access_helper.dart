@@ -98,6 +98,10 @@ class ProductionAccessHelper {
   static const String roleProductionOperator = 'production_operator';
   static const String roleProductionManager = 'production_manager';
 
+  /// M1-G5 — dedicated terminal/tablet account; otvara samo [assignedStationConfigId].
+  static const String roleProductionStationTerminal =
+      'production_station_terminal';
+
   /// Vođa smjene / linije — operativni nadzor (ispod menadžera proizvodnje). Kanonski `users.role`: `shift_lead`.
   static const String roleShiftLead = 'shift_lead';
 
@@ -635,6 +639,12 @@ class ProductionAccessHelper {
   static bool isSuperAdminRole(String role) {
     return normalizeRole(role) == roleSuperAdmin;
   }
+
+  static bool isProductionStationTerminalRole(String role) =>
+      normalizeRole(role) == roleProductionStationTerminal;
+
+  static bool isStationTerminalAccount(Map<String, dynamic> companyData) =>
+      companyData['isStationTerminalAccount'] == true;
 
   /// Tenant / modul uloge koje po defaultu rade na nivou **kompanije** (admin, financije, NPI/razvoj,
   /// voditelj kvaliteta/QMS),
