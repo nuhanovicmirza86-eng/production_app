@@ -36,6 +36,16 @@ class ProductionStationConfig {
     'final_control',
   ];
 
+  /// M1-F3 — catalog evidence operator runtime (pilot profili).
+  static const List<String> catalogEvidenceRuntimeProfileKeys = [
+    'production_counting',
+    'packaging_control',
+    'first_piece_approval',
+  ];
+
+  static bool isCatalogEvidenceRuntimeProfile(String profileKey) =>
+      catalogEvidenceRuntimeProfileKeys.contains(profileKey.trim());
+
   static bool isProfileDrivenRuntimeProfile(String profileKey) =>
       profileDrivenRuntimeProfileKeys.contains(profileKey.trim());
 
@@ -48,7 +58,8 @@ class ProductionStationConfig {
   static bool isOperatorProfileRuntimeProfile(String profileKey) =>
       isProfileDrivenRuntimeProfile(profileKey) ||
       isStructuredProfileDrivenRuntimeProfile(profileKey) ||
-      isStructuredLiteProfileDrivenRuntimeProfile(profileKey);
+      isStructuredLiteProfileDrivenRuntimeProfile(profileKey) ||
+      isCatalogEvidenceRuntimeProfile(profileKey);
 
   /// Profili evidencije — kontrolisan unos (M1-B0 / M1-C).
   static const List<String> evidenceProfileTypes = [
@@ -446,6 +457,12 @@ class ProductionStationConfig {
         return 'Završna kontrola';
       case 'process_log':
         return 'Procesna evidencija';
+      case 'production_counting':
+        return 'Evidencija količina proizvodnje';
+      case 'packaging_control':
+        return 'Kontrola pakovanja';
+      case 'first_piece_approval':
+        return 'Odobrenje prvog komada';
       case 'standard_production':
       default:
         return 'Standardna proizvodnja';

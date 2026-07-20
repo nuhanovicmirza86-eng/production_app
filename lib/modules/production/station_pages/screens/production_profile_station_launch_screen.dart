@@ -6,6 +6,7 @@ import '../../station_work/screens/profile_driven_work_screen.dart';
 import '../../../../features/profile_driven_structured_runtime/models/structured_profile_session.dart';
 import '../../../../features/profile_driven_structured_runtime/screens/final_control_work_screen.dart';
 import '../../../../features/profile_driven_structured_runtime/screens/structured_profile_driven_work_screen.dart';
+import '../../../../features/catalog_evidence_runtime/screens/catalog_evidence_station_screen.dart';
 
 /// M1-B / M1-C — operator ulaz u profile-driven runtime.
 class ProductionProfileStationLaunchScreen extends StatelessWidget {
@@ -39,6 +40,18 @@ class ProductionProfileStationLaunchScreen extends StatelessWidget {
         body: const Center(
           child: Text('Profil stanice nije podržan u operator runtime-u.'),
         ),
+      );
+    }
+
+    if (ProductionStationConfig.isCatalogEvidenceRuntimeProfile(
+          profile.profileKey,
+        ) &&
+        profile.isComplete) {
+      return CatalogEvidenceStationScreen(
+        companyData: companyData,
+        stationConfig: stationConfig,
+        profile: profile,
+        onCloseStation: onCloseStation,
       );
     }
 

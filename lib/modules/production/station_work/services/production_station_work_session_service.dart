@@ -42,4 +42,32 @@ class ProductionStationWorkSessionService {
       return ProductionStationWorkSession.fromDoc(doc);
     });
   }
+
+  Stream<List<ProductionStationWorkSession>> watchClosedSessionsForStation({
+    required String companyId,
+    required int stationSlot,
+    int limit = 50,
+  }) {
+    final cid = companyId.trim();
+    if (cid.isEmpty || stationSlot < 1) {
+      return Stream.value(const []);
+    }
+    return _col
+        .where('companyId', isEqualTo: cid)
+        .where('stationSlot', isEqualTo: stationSlot)
+        .where('status', isEqualTo: ProductionStationWorkSession.statusClosed)
+        .limit(limit)
+        .snapshots()
+        .map((snap) {
+          final sessions = snap.docs
+              .map(ProductionStationWorkSession.fromDoc)
+              .toList(growable: false);
+          sessions.sort((a, b) {
+            final aTs = a.endedAt ?? a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            final bTs = b.endedAt ?? b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            return bTs.compareTo(aTs);
+          });
+          return sessions;
+        });
+  }
 }

@@ -280,6 +280,71 @@ class ProductionStationWorkSessionCallableService {
     );
   }
 
+  Future<ProductionStationWorkSession> updateCatalogEvidenceSession({
+    required String companyId,
+    required String sessionId,
+    required Map<String, dynamic> fieldValues,
+    required Map<String, dynamic> tablePayload,
+  }) async {
+    final payload = <String, dynamic>{
+      'companyId': companyId.trim(),
+      'sessionId': sessionId.trim(),
+      'action': 'set_field_values',
+      'fieldValues': fieldValues,
+      ...tablePayload,
+    };
+
+    final res = await _functions
+        .httpsCallable('updateProductionStationWorkSession')
+        .call<Map<String, dynamic>>(payload);
+    final data = res.data;
+    if (data['success'] != true) {
+      throw Exception('Ažuriranje sesije nije uspjelo.');
+    }
+    final raw = data['session'];
+    if (raw is! Map) {
+      throw Exception('Nepotpun odgovor servera.');
+    }
+    return ProductionStationWorkSession.fromMap(
+      sessionId.trim(),
+      Map<String, dynamic>.from(raw),
+    );
+  }
+
+  Future<ProductionStationWorkSession> finishCatalogEvidenceSession({
+    required String companyId,
+    required String sessionId,
+    Map<String, dynamic>? fieldValues,
+    Map<String, dynamic>? tablePayload,
+  }) async {
+    final payload = <String, dynamic>{
+      'companyId': companyId.trim(),
+      'sessionId': sessionId.trim(),
+    };
+    if (fieldValues != null && fieldValues.isNotEmpty) {
+      payload['fieldValues'] = fieldValues;
+    }
+    if (tablePayload != null) {
+      payload.addAll(tablePayload);
+    }
+
+    final res = await _functions
+        .httpsCallable('finishProductionStationWorkSession')
+        .call<Map<String, dynamic>>(payload);
+    final data = res.data;
+    if (data['success'] != true) {
+      throw Exception('Završetak sesije nije uspio.');
+    }
+    final raw = data['session'];
+    if (raw is! Map) {
+      throw Exception('Nepotpun odgovor servera.');
+    }
+    return ProductionStationWorkSession.fromMap(
+      sessionId.trim(),
+      Map<String, dynamic>.from(raw),
+    );
+  }
+
   Future<ProductionStationWorkSession> finishStructuredProfileSession({
     required String companyId,
     required String sessionId,
