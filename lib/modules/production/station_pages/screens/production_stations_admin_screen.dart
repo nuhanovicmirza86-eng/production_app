@@ -8,6 +8,8 @@ import '../../tracking/models/production_operator_tracking_entry.dart';
 import '../models/production_station_config.dart';
 import '../models/production_station_profile_catalog_entry.dart';
 import '../services/production_station_config_callable_service.dart';
+import '../utils/production_station_legacy_lock.dart';
+import 'production_station_admin_form_screen.dart';
 
 /// Admin / menadžer: konfiguracija stanica proizvodnje po kompaniji (M1).
 class ProductionStationsAdminScreen extends StatefulWidget {
@@ -142,9 +144,44 @@ class _ProductionStationsAdminScreenState
       _showLimitSnack(false);
       return;
     }
-    await _openEditor(
+    if (type == ProductionStationConfig.stationTypeProduction) {
+      await _openProductionForm(stationSlot: _nextStationSlot());
+      return;
+    }
+    await _openLegacyMachineEditor(
       stationType: type,
       stationSlot: _nextStationSlot(),
+    );
+  }
+
+  Future<void> _openProductionForm({
+    ProductionStationConfig? existing,
+    int? stationSlot,
+  }) async {
+    if (_profileCatalog == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Katalog obrazaca nije učitan. Osvježite listu i pokušajte ponovo.',
+          ),
+        ),
+      );
+      return;
+    }
+    final slot = existing?.stationSlot ?? stationSlot ?? _nextStationSlot();
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => ProductionStationAdminFormScreen(
+          companyData: widget.companyData,
+          profileCatalog: _profileCatalog!,
+          limits: _limits,
+          existing: existing,
+          stationSlot: slot,
+          onSaved: _reload,
+        ),
+      ),
     );
   }
 
@@ -186,11 +223,16 @@ class _ProductionStationsAdminScreenState
     ];
   }
 
-  Future<void> _openEditor({
+  Future<void> _openLegacyMachineEditor({
     ProductionStationConfig? existing,
     String? stationType,
     int? stationSlot,
   }) async {
+    if (existing != null &&
+        existing.stationType == ProductionStationConfig.stationTypeProduction) {
+      await _openProductionForm(existing: existing);
+      return;
+    }
     final slot = existing?.stationSlot ?? stationSlot ?? _nextStationSlot();
     final st = existing?.stationType ??
         stationType ??
@@ -1005,10 +1047,7 @@ class _ProductionStationsAdminScreenState
                       child: ListView(
                         padding: const EdgeInsets.all(16),
                         children: [
-                          _LimitsSummaryCard(
-                            limits: _limits,
-                            catalogVersion: _profileCatalog?.catalogVersion,
-                          ),
+                          _LimitsSummaryCard(limits: _limits),
                           const SizedBox(height: 16),
                           if (_configs.isEmpty)
                             const Padding(
@@ -1023,7 +1062,14 @@ class _ProductionStationsAdminScreenState
                                   config: c,
                                   companyId: _companyId,
                                   profileCatalog: _profileCatalog,
-                                  onTap: () => _openEditor(existing: c),
+                                  onTap: () {
+                                    if (c.stationType ==
+                                        ProductionStationConfig.stationTypeProduction) {
+                                      _openProductionForm(existing: c);
+                                    } else {
+                                      _openLegacyMachineEditor(existing: c);
+                                    }
+                                  },
                                 )),
                         ],
                       ),
@@ -1088,11 +1134,9 @@ class _StationEditorResult {
 
 class _LimitsSummaryCard extends StatelessWidget {
   final ProductionStationLimitsSummary limits;
-  final int? catalogVersion;
 
   const _LimitsSummaryCard({
     required this.limits,
-    this.catalogVersion,
   });
 
   @override
@@ -1115,13 +1159,6 @@ class _LimitsSummaryCard extends StatelessWidget {
             Text(
               'Mašinske stanice: ${limits.activeMachineStations} / ${limits.maxMachineStations}',
             ),
-            if (catalogVersion != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Katalog profila: verzija $catalogVersion',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
           ],
         ),
       ),
@@ -1162,6 +1199,18 @@ class _StationCard extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
+                  if (ProductionStationLegacyLock.isLocked(config))
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Chip(
+                        avatar: const Icon(Icons.lock_outline, size: 16),
+                        label: const Text(
+                          'Zaključana postojeća stanica',
+                          style: TextStyle(fontSize: 11),
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
                   Chip(
                     label: Text(
                       config.active ? 'Aktivna' : 'Neaktivna',
@@ -1212,14 +1261,10 @@ class _StationCard extends StatelessWidget {
                   '${ProductionStationConfig.controlledInputModeLabel(config.controlledInputMode)}'
                   '${config.controlledInputScope != null ? ' · ${ProductionStationConfig.controlledInputScopeLabel(config.controlledInputScope)}' : ''}',
                 ),
-              if (config.supportsRuntimeEvidenceProfile)
+              if (config.runtimeVisible)
                 Text(
-                  config.runtimeVisible
-                      ? 'Operativna evidencija: vidljiva (${config.runtimeAllowedRoles.length} uloga)'
-                      : 'Operativna evidencija: skrivena',
+                  'Vidljivo operaterima (${config.runtimeAllowedRoles.length} uloga)',
                 ),
-              if (config.legacyOperatorNavSlot != null)
-                Text('Navigacija: Stanica ${config.legacyOperatorNavSlot}'),
             ],
           ),
         ),

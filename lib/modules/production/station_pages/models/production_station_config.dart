@@ -1,5 +1,7 @@
 import 'package:production_app/core/access/production_access_helper.dart';
 
+import 'production_station_display_options.dart';
+
 /// Kanonski model stanice — `production_station_configs/{companyId}__{stationSlot}`.
 class ProductionStationConfig {
   static const String stationTypeProduction = 'production_station';
@@ -159,6 +161,7 @@ class ProductionStationConfig {
   final String? controlledInputScope;
   final bool runtimeVisible;
   final List<String> runtimeAllowedRoles;
+  final ProductionStationDisplayOptions displayOptions;
 
   const ProductionStationConfig({
     required this.id,
@@ -198,6 +201,7 @@ class ProductionStationConfig {
     this.controlledInputScope,
     this.runtimeVisible = false,
     this.runtimeAllowedRoles = const [],
+    this.displayOptions = const ProductionStationDisplayOptions(),
   });
 
   static String buildConfigId({
@@ -329,6 +333,11 @@ class ProductionStationConfig {
       controlledInputScope: _optString(data['controlledInputScope']),
       runtimeVisible: data['runtimeVisible'] == true,
       runtimeAllowedRoles: _parseRuntimeAllowedRoles(data['runtimeAllowedRoles']),
+      displayOptions: ProductionStationDisplayOptions.fromMap(
+        data['displayOptions'] is Map
+            ? Map<String, dynamic>.from(data['displayOptions'] as Map)
+            : null,
+      ),
     );
   }
 
@@ -392,7 +401,15 @@ class ProductionStationConfig {
             controlledInputScope != null)
           'controlledInputScope': controlledInputScope,
       },
-      if (supportsRuntimeEvidenceProfile) ...{
+      if (stationType == stationTypeProduction) ...{
+        'runtimeVisible': runtimeVisible,
+        if (runtimeVisible) 'runtimeAllowedRoles': runtimeAllowedRoles,
+        ...displayOptions.toMap().isEmpty
+            ? const <String, dynamic>{}
+            : {'displayOptions': displayOptions.toMap()},
+      },
+      if (stationType != stationTypeProduction &&
+          supportsRuntimeEvidenceProfile) ...{
         'runtimeVisible': runtimeVisible,
         if (runtimeVisible) 'runtimeAllowedRoles': runtimeAllowedRoles,
       },
