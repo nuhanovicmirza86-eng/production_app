@@ -323,6 +323,15 @@ class _EvidenceConfigCard extends StatelessWidget {
                   ),
                 ),
               ],
+              if (config.supportsControlledInput && config.controlledInputEnabled) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Kontrolisan unos evidencije: '
+                  '${ProductionStationConfig.controlledInputModeLabel(config.controlledInputMode)}'
+                  '${config.controlledInputScope != null ? ' · ${ProductionStationConfig.controlledInputScopeLabel(config.controlledInputScope)}' : ''}',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
             ],
           ),
         ),

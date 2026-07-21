@@ -101,8 +101,16 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
   bool get _isChemicalDosingProfile =>
       widget.profile.profileKey.trim() == 'chemical_dosing';
 
-  bool get _controlledInputEnabled =>
-      !widget.isCompanyEvidence && widget.stationConfig!.controlledInputEnabled;
+  bool get _controlledInputEnabled => widget.isCompanyEvidence
+      ? widget.evidenceConfig!.controlledInputEnabled
+      : widget.stationConfig!.controlledInputEnabled;
+
+  String get _controlledInputModeLabel =>
+      ProductionStationConfig.controlledInputModeLabel(
+        widget.isCompanyEvidence
+            ? widget.evidenceConfig!.controlledInputMode
+            : widget.stationConfig!.controlledInputMode,
+      );
 
   bool get _loadsChemicalMasterData => _isChemicalDosingProfile;
 
@@ -1160,7 +1168,7 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(
                 'Kontrolisan unos: '
-                '${ProductionStationConfig.controlledInputModeLabel(widget.stationConfig!.controlledInputMode)}',
+                'Kontrolisan unos: $_controlledInputModeLabel',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),

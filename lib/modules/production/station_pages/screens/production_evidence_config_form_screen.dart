@@ -48,6 +48,8 @@ class _ProductionEvidenceConfigFormScreenState
   late String _plantKey;
   late String _phaseKey;
   late String _profileKey;
+  late bool _controlledInputEnabled;
+  late String _controlledInputMode;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -88,6 +90,11 @@ class _ProductionEvidenceConfigFormScreenState
       fallback: 'obrada',
     );
     _profileKey = e?.profileKey ?? 'chemical_dosing';
+    _controlledInputEnabled = e?.controlledInputEnabled ?? false;
+    _controlledInputMode = e?.controlledInputMode ?? 'off';
+    if (_controlledInputEnabled && _controlledInputMode == 'off') {
+      _controlledInputMode = 'strict';
+    }
     _loadPlants();
   }
 
@@ -143,6 +150,12 @@ class _ProductionEvidenceConfigFormScreenState
       runtimeVisible: _runtimeVisible,
       runtimeAllowedRoles: _runtimeRoles.toList(growable: false),
       displayOrder: order,
+      controlledInputEnabled: _controlledInputEnabled,
+      controlledInputMode: _controlledInputMode,
+      controlledInputScope: _controlledInputEnabled &&
+              _controlledInputMode != 'off'
+          ? ProductionStationConfig.controlledInputScopeWorkBath
+          : null,
     );
   }
 
@@ -303,6 +316,11 @@ class _ProductionEvidenceConfigFormScreenState
                           if (v == null) return;
                           setState(() {
                             _profileKey = v;
+                            if (!ProductionStationConfig
+                                .supportsControlledInputProfile(v)) {
+                              _controlledInputEnabled = false;
+                              _controlledInputMode = 'off';
+                            }
                             if (!(widget.profileCatalog.byKey(v)?.isComplete ??
                                 false)) {
                               _runtimeVisible = false;
@@ -378,6 +396,84 @@ class _ProductionEvidenceConfigFormScreenState
                     labelText: 'Redoslijed prikaza',
                   ),
                 ),
+                const SizedBox(height: 12),
+                if (ProductionStationConfig.supportsControlledInputProfile(
+                  _profileKey,
+                )) ...[
+                  const Divider(height: 24),
+                  Text(
+                    'Kontrolisan unos evidencije',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Operator bira vrijednosti iz kataloga (procesne kupke, hemikalije, '
+                    'dozvoljene kombinacije); backend validira pri zatvaranju sesije. '
+                    'Master podatke uređujete u postojećem katalogu kontrolisanog unosa.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Uključi kontrolisan unos'),
+                    value: _controlledInputEnabled,
+                    onChanged: _readOnly
+                        ? null
+                        : (v) => setState(() {
+                              _controlledInputEnabled = v;
+                              if (v && _controlledInputMode == 'off') {
+                                _controlledInputMode = 'strict';
+                              }
+                              if (!v) {
+                                _controlledInputMode = 'off';
+                              }
+                            }),
+                  ),
+                  if (_controlledInputEnabled) ...[
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      key: ValueKey(_controlledInputMode),
+                      isExpanded: true,
+                      initialValue: _controlledInputMode == 'off'
+                          ? 'strict'
+                          : _controlledInputMode,
+                      decoration: const InputDecoration(
+                        labelText: 'Režim validacije',
+                        helperText:
+                            'Strogo odbija nevažeće; Upozorenje zapisuje flag na sesiji.',
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'strict',
+                          child: Text('Strogo (odbij nevažeći unos)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'warning',
+                          child: Text('Upozorenje (dozvoli, zabilježi)'),
+                        ),
+                      ],
+                      onChanged: _readOnly
+                          ? null
+                          : (v) {
+                              if (v != null) {
+                                setState(() => _controlledInputMode = v);
+                              }
+                            },
+                    ),
+                    const SizedBox(height: 8),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Opseg'),
+                      subtitle: Text(
+                        ProductionStationConfig.controlledInputScopeLabel(
+                          ProductionStationConfig.controlledInputScopeWorkBath,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
                 const SizedBox(height: 8),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,

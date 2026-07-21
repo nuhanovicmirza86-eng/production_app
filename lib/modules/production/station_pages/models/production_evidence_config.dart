@@ -1,5 +1,6 @@
 import 'package:production_app/core/access/production_access_helper.dart';
 
+import 'production_station_config.dart';
 import 'production_station_display_options.dart';
 
 /// Kompanijska instanca evidencije — `production_evidence_configs/{companyId}__ev_{slot}`.
@@ -28,6 +29,9 @@ class ProductionEvidenceConfig {
   final List<String> runtimeAllowedRoles;
   final int? displayOrder;
   final ProductionStationDisplayOptions displayOptions;
+  final bool controlledInputEnabled;
+  final String controlledInputMode;
+  final String? controlledInputScope;
   final DateTime? archivedAt;
 
   const ProductionEvidenceConfig({
@@ -45,8 +49,14 @@ class ProductionEvidenceConfig {
     required this.runtimeAllowedRoles,
     this.displayOrder,
     this.displayOptions = const ProductionStationDisplayOptions(),
+    this.controlledInputEnabled = false,
+    this.controlledInputMode = 'off',
+    this.controlledInputScope,
     this.archivedAt,
   });
+
+  bool get supportsControlledInput =>
+      ProductionStationConfig.supportsControlledInputProfile(profileKey);
 
   bool get isArchived => archivedAt != null;
 
@@ -133,6 +143,13 @@ class ProductionEvidenceConfig {
           ? data['displayOrder'] as int
           : int.tryParse('${data['displayOrder'] ?? ''}'),
       displayOptions: displayOptions,
+      controlledInputEnabled: data['controlledInputEnabled'] == true,
+      controlledInputMode: (data['controlledInputMode'] ?? 'off').toString().trim().isEmpty
+          ? 'off'
+          : (data['controlledInputMode'] ?? 'off').toString().trim(),
+      controlledInputScope: (data['controlledInputScope'] ?? '').toString().trim().isEmpty
+          ? null
+          : (data['controlledInputScope'] ?? '').toString().trim(),
       archivedAt: archivedAt,
     );
   }
@@ -152,6 +169,16 @@ class ProductionEvidenceConfig {
       'runtimeVisible': runtimeVisible,
       if (runtimeVisible) 'runtimeAllowedRoles': runtimeAllowedRoles,
       if (displayOrder != null) 'displayOrder': displayOrder,
+      if (supportsControlledInput) ...{
+        'controlledInputEnabled': controlledInputEnabled,
+        'controlledInputMode': controlledInputEnabled
+            ? (controlledInputMode == 'off' ? 'strict' : controlledInputMode)
+            : 'off',
+        if (controlledInputEnabled &&
+            controlledInputMode != 'off' &&
+            controlledInputScope != null)
+          'controlledInputScope': controlledInputScope,
+      },
       ...displayOptions.toMap().isEmpty
           ? const <String, dynamic>{}
           : {'displayOptions': displayOptions.toMap()},
