@@ -34,6 +34,7 @@ import '../production_orders/screens/production_orders_list_screen.dart';
 import '../products/screens/products_list_screen.dart';
 import '../issues/screens/production_problem_reporting_screen.dart';
 import '../station_pages/screens/production_profile_stations_hub_screen.dart';
+import '../station_pages/screens/production_company_evidence_admin_screen.dart';
 import '../station_pages/screens/production_stations_admin_screen.dart';
 import '../station_pages/widgets/station_page_active_gate.dart';
 import '../tracking/models/production_operator_tracking_entry.dart';
@@ -242,6 +243,18 @@ class ProductionDashboardModuleCatalog {
           );
         }
         if (access.canViewCard(ProductionDashboardCard.stationPages)) {
+          productionEntries.add(
+            ProductionDashboardModuleEntry(
+              id: 'production.company_evidence',
+              icon: Icons.assignment_outlined,
+              title: 'Evidencije kompanije',
+              subtitle:
+                  'Aktivirani obrasci evidencije po pogonu i procesu — bez limita stanica.',
+              onTap: () => open(
+                ProductionCompanyEvidenceAdminScreen(companyData: companyData),
+              ),
+            ),
+          );
           productionEntries.add(
             ProductionDashboardModuleEntry(
               id: 'production.station_pages',
