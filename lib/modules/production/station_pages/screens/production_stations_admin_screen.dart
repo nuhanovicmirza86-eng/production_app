@@ -9,6 +9,7 @@ import '../models/production_station_config.dart';
 import '../models/production_station_profile_catalog_entry.dart';
 import '../services/production_station_config_callable_service.dart';
 import '../utils/production_station_legacy_lock.dart';
+import 'production_evidence_catalog_screen.dart';
 import 'production_station_admin_form_screen.dart';
 
 /// Admin / menadžer: konfiguracija stanica proizvodnje po kompaniji (M1).
@@ -91,7 +92,29 @@ class _ProductionStationsAdminScreenState
         1;
   }
 
+  void _openEvidenceCatalog() {
+    final catalog = _profileCatalog;
+    if (catalog == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Katalog obrazaca nije učitan. Osvježite listu i pokušajte ponovo.',
+          ),
+        ),
+      );
+      return;
+    }
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => ProductionEvidenceCatalogScreen(catalog: catalog),
+      ),
+    );
+  }
+
   Future<void> _openAddChooser() async {
+    final productionLimitReached = !_limits.canAddProductionStation();
+    final machineLimitReached = !_limits.canAddMachineStation();
     final type = await showDialog<String>(
       context: context,
       builder: (ctx) {
@@ -99,29 +122,55 @@ class _ProductionStationsAdminScreenState
           title: const Text('Dodaj stanicu'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ListTile(
+                contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.precision_manufacturing_outlined),
                 title: const Text('Proizvodna stanica'),
                 subtitle: Text(
                   '${_limits.activeProductionStations} / ${_limits.maxProductionStations}',
                 ),
-                enabled: _limits.canAddProductionStation(),
-                onTap: _limits.canAddProductionStation()
+                enabled: !productionLimitReached,
+                onTap: !productionLimitReached
                     ? () => Navigator.pop(ctx, ProductionStationConfig.stationTypeProduction)
                     : null,
               ),
+              if (productionLimitReached) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Dostignut je limit proizvodnih stanica: '
+                  '${_limits.activeProductionStations} / ${_limits.maxProductionStations}. '
+                  'Limit mijenja Super Admin.',
+                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(ctx).colorScheme.error,
+                      ),
+                ),
+              ],
+              const SizedBox(height: 8),
               ListTile(
+                contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.memory_outlined),
                 title: const Text('Mašinska stanica'),
                 subtitle: Text(
                   '${_limits.activeMachineStations} / ${_limits.maxMachineStations}',
                 ),
-                enabled: _limits.canAddMachineStation(),
-                onTap: _limits.canAddMachineStation()
+                enabled: !machineLimitReached,
+                onTap: !machineLimitReached
                     ? () => Navigator.pop(ctx, ProductionStationConfig.stationTypeMachine)
                     : null,
               ),
+              if (machineLimitReached) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Dostignut je limit mašinskih stanica: '
+                  '${_limits.activeMachineStations} / ${_limits.maxMachineStations}. '
+                  'Limit mijenja Super Admin.',
+                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(ctx).colorScheme.error,
+                      ),
+                ),
+              ],
             ],
           ),
           actions: [
@@ -190,10 +239,12 @@ class _ProductionStationsAdminScreenState
       SnackBar(
         content: Text(
           production
-              ? 'Dostigli ste maksimalan broj proizvodnih stanica za vaš paket. '
-                  'Za povećanje limita kontaktirajte administratora platforme.'
-              : 'Dostigli ste maksimalan broj mašinskih stanica za vaš paket. '
-                  'Za dodatne mašinske stanice potrebno je proširenje paketa.',
+              ? 'Dostignut je limit proizvodnih stanica: '
+                  '${_limits.activeProductionStations} / ${_limits.maxProductionStations}. '
+                  'Limit mijenja Super Admin.'
+              : 'Dostignut je limit mašinskih stanica: '
+                  '${_limits.activeMachineStations} / ${_limits.maxMachineStations}. '
+                  'Limit mijenja Super Admin.',
         ),
       ),
     );
@@ -1011,6 +1062,11 @@ class _ProductionStationsAdminScreenState
       appBar: AppBar(
         title: const Text('Stanice proizvodnje'),
         actions: [
+          IconButton(
+            onPressed: _loading ? null : _openEvidenceCatalog,
+            icon: const Icon(Icons.menu_book_outlined),
+            tooltip: 'Katalog evidencija',
+          ),
           IconButton(
             onPressed: _loading ? null : _reload,
             icon: const Icon(Icons.refresh),
