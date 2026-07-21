@@ -51,6 +51,8 @@ class _ProductionEvidenceConfigFormScreenState
   late bool _controlledInputEnabled;
   late String _controlledInputMode;
 
+  ProductionEvidenceConfig? _freshExisting;
+
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
 
@@ -77,6 +79,14 @@ class _ProductionEvidenceConfigFormScreenState
   void initState() {
     super.initState();
     final e = widget.existing;
+    _applyExistingConfig(e);
+    if (e != null) {
+      _loadExistingConfigFresh();
+    }
+    _loadPlants();
+  }
+
+  void _applyExistingConfig(ProductionEvidenceConfig? e) {
     _nameCtrl.text = e?.displayName ?? '';
     _processKeyCtrl.text = e?.processKey ?? '';
     _orderCtrl.text = '${e?.displayOrder ?? e?.evidenceSlot ?? 1}';
@@ -95,7 +105,24 @@ class _ProductionEvidenceConfigFormScreenState
     if (_controlledInputEnabled && _controlledInputMode == 'off') {
       _controlledInputMode = 'strict';
     }
-    _loadPlants();
+  }
+
+  Future<void> _loadExistingConfigFresh() async {
+    final id = widget.existing?.evidenceConfigId.trim() ?? '';
+    if (id.isEmpty || _companyId.isEmpty) return;
+    try {
+      final fresh = await _callable.getProductionEvidenceConfig(
+        companyId: _companyId,
+        evidenceConfigId: id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _freshExisting = fresh;
+        _applyExistingConfig(fresh);
+      });
+    } catch (_) {
+      // Zadrži snapshot s liste ako get ne uspije.
+    }
   }
 
   Future<void> _loadPlants() async {
@@ -126,7 +153,7 @@ class _ProductionEvidenceConfigFormScreenState
   }
 
   ProductionEvidenceConfig _buildConfig() {
-    final existing = widget.existing;
+    final existing = _freshExisting ?? widget.existing;
     final existingId = existing?.evidenceConfigId.trim() ?? '';
     final slot = existing != null
         ? (existing.evidenceSlot > 0
@@ -169,6 +196,30 @@ class _ProductionEvidenceConfigFormScreenState
     );
   }
 
+  Future<void> _verifySavedControlledInput(ProductionEvidenceConfig config) async {
+    if (!ProductionStationConfig.supportsControlledInputProfile(config.profileKey)) {
+      return;
+    }
+    final verified = await _callable.getProductionEvidenceConfig(
+      companyId: _companyId,
+      evidenceConfigId: config.evidenceConfigId,
+    );
+    if (verified.controlledInputEnabled != config.controlledInputEnabled) {
+      throw Exception(
+        'Kontrolisan unos nije potvrđen na serveru — osvježite i pokušajte ponovo.',
+      );
+    }
+    if (!config.controlledInputEnabled) return;
+    final expectedMode = config.controlledInputMode == 'off'
+        ? 'strict'
+        : config.controlledInputMode;
+    if (verified.controlledInputMode != expectedMode) {
+      throw Exception(
+        'Režim kontrolisanog unosa nije potvrđen na serveru.',
+      );
+    }
+  }
+
   Future<void> _save() async {
     if (_readOnly) return;
     final name = _nameCtrl.text.trim();
@@ -201,6 +252,7 @@ class _ProductionEvidenceConfigFormScreenState
       if (_isEdit && savedId != config.evidenceConfigId) {
         throw Exception('Server nije potvrdio ažuriranje iste evidencije.');
       }
+      await _verifySavedControlledInput(config);
       if (!mounted) return;
       await widget.onSaved();
       if (!mounted) return;

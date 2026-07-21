@@ -156,7 +156,7 @@ class ProductionEvidenceConfig {
 
   Map<String, dynamic> toUpsertPayload() {
     final id = evidenceConfigId.trim();
-    return {
+    final payload = <String, dynamic>{
       'companyId': companyId,
       if (id.isNotEmpty) 'evidenceConfigId': id,
       if (evidenceSlot > 0) 'evidenceSlot': evidenceSlot,
@@ -169,19 +169,23 @@ class ProductionEvidenceConfig {
       'runtimeVisible': runtimeVisible,
       if (runtimeVisible) 'runtimeAllowedRoles': runtimeAllowedRoles,
       if (displayOrder != null) 'displayOrder': displayOrder,
-      if (supportsControlledInput) ...{
-        'controlledInputEnabled': controlledInputEnabled,
-        'controlledInputMode': controlledInputEnabled
-            ? (controlledInputMode == 'off' ? 'strict' : controlledInputMode)
-            : 'off',
-        if (controlledInputEnabled &&
-            controlledInputMode != 'off' &&
-            controlledInputScope != null)
-          'controlledInputScope': controlledInputScope,
-      },
       ...displayOptions.toMap().isEmpty
           ? const <String, dynamic>{}
           : {'displayOptions': displayOptions.toMap()},
     };
+    if (ProductionStationConfig.supportsControlledInputProfile(profileKey)) {
+      final enabled = controlledInputEnabled;
+      final mode = enabled
+          ? (controlledInputMode == 'off' ? 'strict' : controlledInputMode)
+          : 'off';
+      payload['controlledInputEnabled'] = enabled;
+      payload['controlledInputMode'] = mode;
+      if (enabled) {
+        payload['controlledInputScope'] =
+            controlledInputScope ??
+            ProductionStationConfig.controlledInputScopeWorkBath;
+      }
+    }
+    return payload;
   }
 }
