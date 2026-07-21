@@ -3,6 +3,9 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
+import '../../../production/station_pages/models/production_station_config.dart';
+import '../../../production/station_pages/services/production_station_config_callable_service.dart';
+import 'station_terminal_assignment_fields.dart';
 
 class EditUserDialog extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -39,6 +42,7 @@ class _EditUserDialogState extends State<EditUserDialog> {
     ProductionAccessHelper.roleQualityControl,
     ProductionAccessHelper.roleAccountingManager,
     ProductionAccessHelper.roleAccountingClerk,
+    ProductionAccessHelper.roleProductionStationTerminal,
   ];
 
   static const List<String> _allowedStatuses = <String>['active', 'inactive'];
@@ -50,6 +54,10 @@ class _EditUserDialogState extends State<EditUserDialog> {
   String _selectedRole = 'production_operator';
   String _selectedStatus = 'active';
   String _selectedPlantKey = '';
+  String _selectedStationConfigId = '';
+
+  List<ProductionStationConfig> _allStationConfigs = <ProductionStationConfig>[];
+  bool _loadingStations = false;
 
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _plants =
       <QueryDocumentSnapshot<Map<String, dynamic>>>[];
@@ -99,11 +107,53 @@ class _EditUserDialogState extends State<EditUserDialog> {
     return base;
   }
 
+  bool get _isTerminalRole =>
+      ProductionAccessHelper.isProductionStationTerminalRole(_selectedRole);
+
+  List<ProductionStationConfig> get _assignableStations =>
+      filterTerminalAssignableStations(
+        configs: _allStationConfigs,
+        plantKey: _selectedPlantKey,
+      );
+
+  Future<void> _loadStationConfigs() async {
+    setState(() => _loadingStations = true);
+    try {
+      final service = ProductionStationConfigCallableService();
+      final result = await service.listProductionStationConfigs(
+        companyId: widget.companyId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _allStationConfigs = result.configs;
+        _loadingStations = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingStations = false);
+    }
+  }
+
+  void _syncSelectedStationForPlant() {
+    if (!_isTerminalRole) return;
+    final options = _assignableStations;
+    if (_selectedStationConfigId.isNotEmpty &&
+        options.any((c) => c.id == _selectedStationConfigId)) {
+      return;
+    }
+    if (options.length == 1) {
+      _selectedStationConfigId = options.first.id;
+    } else {
+      _selectedStationConfigId = '';
+    }
+  }
+
   Future<void> _loadInitialState() async {
     try {
       final currentRole = _s(widget.userData['role']).toLowerCase();
       final currentStatus = _s(widget.userData['status']).toLowerCase();
       final currentPlantKey = _s(widget.userData['plantKey']);
+      final currentStationConfigId = _s(widget.userData['assignedStationConfigId']);
 
       final query = await _db
           .collection('company_plants')
@@ -122,15 +172,23 @@ class _EditUserDialogState extends State<EditUserDialog> {
         return al.compareTo(bl);
       });
 
+      await _loadStationConfigs();
+
       if (!mounted) return;
       setState(() {
         _plants = docs;
-        _selectedRole = _productionRoles.contains(currentRole)
-            ? currentRole
+        _selectedRole =
+            ProductionAccessHelper.normalizeRole(currentRole).isNotEmpty &&
+                (_productionRoles.contains(currentRole) ||
+                    ProductionAccessHelper.isProductionStationTerminalRole(
+                      currentRole,
+                    ))
+            ? ProductionAccessHelper.normalizeRole(currentRole)
             : 'production_operator';
         _selectedStatus = _allowedStatuses.contains(currentStatus)
             ? currentStatus
             : 'active';
+        _selectedStationConfigId = currentStationConfigId;
 
         final hasCurrentPlant = docs.any((doc) {
           final data = doc.data();
@@ -149,6 +207,7 @@ class _EditUserDialogState extends State<EditUserDialog> {
               : first.id;
         }
 
+        _syncSelectedStationForPlant();
         _loading = false;
       });
     } catch (e) {
@@ -196,6 +255,15 @@ class _EditUserDialogState extends State<EditUserDialog> {
       return;
     }
 
+    if (_isTerminalRole &&
+        _selectedStatus == 'active' &&
+        _selectedStationConfigId.trim().isEmpty) {
+      setState(() {
+        _error = 'Odaberi stanicu za account terminala.';
+      });
+      return;
+    }
+
     final uid = _s(widget.userData['uid']);
     if (uid.isEmpty) {
       setState(() {
@@ -211,13 +279,17 @@ class _EditUserDialogState extends State<EditUserDialog> {
 
     try {
       final callable = _functions.httpsCallable('updateUserAccessAssignment');
-      final result = await callable.call(<String, dynamic>{
+      final payload = <String, dynamic>{
         'companyId': widget.companyId,
         'targetUid': uid,
         'selectedRole': _selectedRole,
         'selectedStatus': _selectedStatus,
         'companyPlantDocId': selectedPlantDoc.id,
-      });
+      };
+      if (_isTerminalRole || _s(widget.userData['assignedStationConfigId']).isNotEmpty) {
+        payload['assignedStationConfigId'] = _selectedStationConfigId.trim();
+      }
+      final result = await callable.call(payload);
       final raw = result.data;
       if (raw is! Map || raw['success'] != true) {
         throw StateError('Neuspjelo spremanje.');
@@ -296,9 +368,31 @@ class _EditUserDialogState extends State<EditUserDialog> {
                               setState(() {
                                 _selectedRole = (value ?? 'production_operator')
                                     .trim();
+                                if (!_isTerminalRole) {
+                                  _selectedStationConfigId = '';
+                                } else {
+                                  _syncSelectedStationForPlant();
+                                }
                               });
                             },
                     ),
+                    if (_isTerminalRole) ...[
+                      const SizedBox(height: 12),
+                      StationTerminalAssignmentFields(
+                        stations: _assignableStations,
+                        selectedStationConfigId: _selectedStationConfigId,
+                        loading: _loadingStations,
+                        enabled: !_saving,
+                        onStationChanged: (value) {
+                          setState(() {
+                            _selectedStationConfigId = (value ?? '').trim();
+                          });
+                        },
+                        onRemoveAssignment: () {
+                          setState(() => _selectedStationConfigId = '');
+                        },
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: _selectedPlantKey.isEmpty
@@ -323,6 +417,7 @@ class _EditUserDialogState extends State<EditUserDialog> {
                           : (value) {
                               setState(() {
                                 _selectedPlantKey = (value ?? '').trim();
+                                _syncSelectedStationForPlant();
                               });
                             },
                     ),

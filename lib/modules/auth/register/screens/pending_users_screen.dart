@@ -5,7 +5,10 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/ui/company_plant_label_text.dart';
+import '../../../production/station_pages/models/production_station_config.dart';
+import '../../../production/station_pages/services/production_station_config_callable_service.dart';
 import '../widgets/edit_user_dialog.dart';
+import '../widgets/station_terminal_assignment_fields.dart';
 
 class PendingUsersScreen extends StatefulWidget {
   const PendingUsersScreen({super.key});
@@ -41,6 +44,11 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
   final Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>
   _plantsByRequestId =
       <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
+  final Map<String, String> _selectedStationConfigIdsByRequestId =
+      <String, String>{};
+
+  List<ProductionStationConfig> _allStationConfigs = <ProductionStationConfig>[];
+  bool _loadingStationConfigs = false;
 
   static const List<String> _productionRoles = <String>[
     'production_operator',
@@ -57,6 +65,7 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
     ProductionAccessHelper.roleQualityControl,
     ProductionAccessHelper.roleAccountingManager,
     ProductionAccessHelper.roleAccountingClerk,
+    ProductionAccessHelper.roleProductionStationTerminal,
   ];
 
   static const List<String> _userStatusFilters = <String>[
@@ -84,6 +93,7 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
     ProductionAccessHelper.roleProductionOperator,
     'logistics_operator',
     ProductionAccessHelper.roleMaintenanceManager,
+    ProductionAccessHelper.roleProductionStationTerminal,
   ];
 
   bool get _isAdmin => ProductionAccessHelper.isAdminRole(_myRole);
@@ -123,6 +133,7 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
         _myCompanyId = _s(meData['companyId']);
         _loadingMe = false;
       });
+      await _loadStationConfigs();
     } catch (e) {
       setState(() {
         _error = 'Greška pri učitavanju admin konteksta: $e';
@@ -139,6 +150,45 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
   String _roleLabel(String role) {
     if ((role).toString().trim().isEmpty) return '—';
     return ProductionAccessHelper.displayRoleLabel(role);
+  }
+
+  bool _isTerminalRole(String role) =>
+      ProductionAccessHelper.isProductionStationTerminalRole(role);
+
+  List<ProductionStationConfig> _assignableStationsForPlant(String plantKey) =>
+      filterTerminalAssignableStations(
+        configs: _allStationConfigs,
+        plantKey: plantKey,
+      );
+
+  Future<void> _loadStationConfigs() async {
+    if (_myCompanyId.trim().isEmpty) return;
+    setState(() => _loadingStationConfigs = true);
+    try {
+      final service = ProductionStationConfigCallableService();
+      final result = await service.listProductionStationConfigs(
+        companyId: _myCompanyId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _allStationConfigs = result.configs;
+        _loadingStationConfigs = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingStationConfigs = false);
+    }
+  }
+
+  String _assignedStationLabel(Map<String, dynamic> userData) {
+    final configId = _s(userData['assignedStationConfigId']);
+    final title = stationTitleForConfigId(
+      configs: _allStationConfigs,
+      configId: configId,
+    );
+    if (title != null && title.isNotEmpty) return title;
+    if (configId.isEmpty) return '—';
+    return 'Stanica nije učitana';
   }
 
   String _roleFilterDropdownLabel(String value) {
@@ -373,6 +423,13 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
       return;
     }
 
+    final selectedStationConfigId =
+        _selectedStationConfigIdsByRequestId[requestId] ?? '';
+    if (_isTerminalRole(selectedRole) && selectedStationConfigId.trim().isEmpty) {
+      _snack('Odaberi stanicu za account terminala.');
+      return;
+    }
+
     setState(() {
       _busyIds.add(requestId);
     });
@@ -385,13 +442,17 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
       }
 
       final callable = _functions.httpsCallable('approveProductionUser');
-      final result = await callable.call(<String, dynamic>{
+      final payload = <String, dynamic>{
         'requestId': requestId,
         'companyId': companyId,
         'targetUid': uid,
         'selectedRole': selectedRole,
         'companyPlantDocId': selectedPlantDoc.id,
-      });
+      };
+      if (_isTerminalRole(selectedRole)) {
+        payload['assignedStationConfigId'] = selectedStationConfigId.trim();
+      }
+      final result = await callable.call(payload);
       final raw = result.data;
       if (raw is! Map || raw['success'] != true) {
         throw StateError('Neuspjelo odobrenje.');
@@ -501,12 +562,16 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
     final selectedRole =
         _selectedRolesByRequestId[requestId] ?? 'production_operator';
     final selectedPlantKey = _selectedPlantKeysByRequestId[requestId] ?? '';
+    final selectedStationConfigId =
+        _selectedStationConfigIdsByRequestId[requestId] ?? '';
 
     final canApprove =
         !busy &&
         !loadingPlants &&
         _productionRoles.contains(selectedRole) &&
-        selectedPlantKey.trim().isNotEmpty;
+        selectedPlantKey.trim().isNotEmpty &&
+        (!_isTerminalRole(selectedRole) ||
+            selectedStationConfigId.trim().isNotEmpty);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _ensurePlantsLoadedForRequest(doc);
@@ -560,6 +625,11 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
                       setState(() {
                         _selectedRolesByRequestId[requestId] =
                             (value ?? 'production_operator').trim();
+                        if (!_isTerminalRole(
+                          _selectedRolesByRequestId[requestId] ?? '',
+                        )) {
+                          _selectedStationConfigIdsByRequestId.remove(requestId);
+                        }
                       });
                     },
             ),
@@ -588,13 +658,45 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
                       setState(() {
                         _selectedPlantKeysByRequestId[requestId] = (value ?? '')
                             .trim();
+                        final options = _assignableStationsForPlant(
+                          _selectedPlantKeysByRequestId[requestId] ?? '',
+                        );
+                        final current =
+                            _selectedStationConfigIdsByRequestId[requestId] ?? '';
+                        if (current.isEmpty ||
+                            !options.any((c) => c.id == current)) {
+                          _selectedStationConfigIdsByRequestId[requestId] =
+                              options.length == 1 ? options.first.id : '';
+                        }
                       });
                     },
             ),
+            if (_isTerminalRole(selectedRole)) ...[
+              const SizedBox(height: 12),
+              StationTerminalAssignmentFields(
+                stations: _assignableStationsForPlant(selectedPlantKey),
+                selectedStationConfigId: selectedStationConfigId,
+                loading: _loadingStationConfigs,
+                enabled: !busy,
+                onStationChanged: (value) {
+                  setState(() {
+                    _selectedStationConfigIdsByRequestId[requestId] =
+                        (value ?? '').trim();
+                  });
+                },
+                onRemoveAssignment: () {
+                  setState(() {
+                    _selectedStationConfigIdsByRequestId[requestId] = '';
+                  });
+                },
+              ),
+            ],
             const SizedBox(height: 10),
-            const Text(
-              'Administrator mora odabrati ulogu i pogon prije odobrenja korisnika.',
-              style: TextStyle(fontSize: 12, color: Colors.black54),
+            Text(
+              _isTerminalRole(selectedRole)
+                  ? 'Administrator mora odabrati ulogu, pogon i stanicu prije odobrenja accounta terminala.'
+                  : 'Administrator mora odabrati ulogu i pogon prije odobrenja korisnika.',
+              style: const TextStyle(fontSize: 12, color: Colors.black54),
             ),
             const SizedBox(height: 14),
             Row(
@@ -698,6 +800,8 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
     final roleLabel = _roleLabel(
       ProductionAccessHelper.normalizeRole(data['role']),
     );
+    final normalizedRole = ProductionAccessHelper.normalizeRole(data['role']);
+    final isTerminal = _isTerminalRole(normalizedRole);
 
     final borderColor = isActive ? Colors.green.shade600 : Colors.black12;
     final bgColor = isActive ? Colors.green.shade50 : null;
@@ -812,6 +916,10 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
                   ],
                   const SizedBox(height: 4),
                   Text('Rola: $roleLabel'),
+                  if (isTerminal) ...[
+                    const SizedBox(height: 4),
+                    Text('Dodijeljena stanica: ${_assignedStationLabel(data)}'),
+                  ],
                   const SizedBox(height: 4),
                   CompanyPlantLabelText(
                     companyId: _myCompanyId,

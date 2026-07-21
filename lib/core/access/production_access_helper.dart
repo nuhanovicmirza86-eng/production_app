@@ -229,6 +229,8 @@ class ProductionAccessHelper {
         return 'Laboratorijski menadžer';
       case roleLaboratoryTechnician:
         return 'Laboratorijski tehničar';
+      case roleProductionStationTerminal:
+        return 'Account terminala';
       default:
         return r.isEmpty ? '-' : r;
     }
