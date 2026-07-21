@@ -95,6 +95,11 @@ class ProductionStationWorkSession {
   const ProductionStationWorkSession({
     required this.id,
     required this.companyId,
+    this.evidenceConfigId,
+    this.sessionKind,
+    this.processKey,
+    this.phaseKey,
+    this.profileKey,
     required this.stationConfigId,
     required this.stationSlot,
     required this.plantKey,
@@ -127,6 +132,11 @@ class ProductionStationWorkSession {
 
   final String id;
   final String companyId;
+  final String? evidenceConfigId;
+  final String? sessionKind;
+  final String? processKey;
+  final String? phaseKey;
+  final String? profileKey;
   final String stationConfigId;
   final int stationSlot;
   final String plantKey;
@@ -155,6 +165,10 @@ class ProductionStationWorkSession {
   final DateTime? updatedAt;
   final String? updatedByUid;
   final String? updatedByEmail;
+
+  bool get isCompanyEvidenceSession =>
+      (evidenceConfigId ?? '').trim().isNotEmpty ||
+      sessionKind == 'company_evidence';
 
   bool get isActive =>
       status == statusOpen || status == statusPaused;
@@ -220,6 +234,21 @@ class ProductionStationWorkSession {
     return ProductionStationWorkSession(
       id: id,
       companyId: (m['companyId'] ?? '').toString().trim(),
+      evidenceConfigId: (m['evidenceConfigId'] ?? '').toString().trim().isEmpty
+          ? null
+          : (m['evidenceConfigId'] ?? '').toString().trim(),
+      sessionKind: (m['sessionKind'] ?? '').toString().trim().isEmpty
+          ? null
+          : (m['sessionKind'] ?? '').toString().trim(),
+      processKey: (m['processKey'] ?? '').toString().trim().isEmpty
+          ? null
+          : (m['processKey'] ?? '').toString().trim(),
+      phaseKey: (m['phaseKey'] ?? '').toString().trim().isEmpty
+          ? null
+          : (m['phaseKey'] ?? '').toString().trim(),
+      profileKey: (m['profileKey'] ?? '').toString().trim().isEmpty
+          ? null
+          : (m['profileKey'] ?? '').toString().trim(),
       stationConfigId: (m['stationConfigId'] ?? '').toString().trim(),
       stationSlot: (m['stationSlot'] as num?)?.toInt() ?? 0,
       plantKey: (m['plantKey'] ?? '').toString().trim(),

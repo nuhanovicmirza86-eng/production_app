@@ -34,6 +34,7 @@ import '../production_orders/screens/production_orders_list_screen.dart';
 import '../products/screens/products_list_screen.dart';
 import '../issues/screens/production_problem_reporting_screen.dart';
 import '../station_pages/screens/production_profile_stations_hub_screen.dart';
+import '../station_pages/screens/production_evidence_operator_hub_screen.dart';
 import '../station_pages/screens/production_company_evidence_admin_screen.dart';
 import '../station_pages/screens/production_stations_admin_screen.dart';
 import '../station_pages/widgets/station_page_active_gate.dart';
@@ -210,6 +211,20 @@ class ProductionDashboardModuleCatalog {
                     'Rad na stanicama prema profilu (npr. doziranje hemikalija).',
                 onTap: () => open(
                   ProductionProfileStationsHubScreen(companyData: companyData),
+                ),
+              ),
+            );
+            productionEntries.add(
+              ProductionDashboardModuleEntry(
+                id: 'production.company_evidence_operator',
+                icon: Icons.assignment_turned_in_outlined,
+                title: 'Operativne evidencije',
+                subtitle:
+                    'Rad na aktiviranim obrascima evidencije po pogonu i procesu.',
+                onTap: () => open(
+                  ProductionEvidenceOperatorHubScreen(
+                    companyData: companyData,
+                  ),
                 ),
               ),
             );

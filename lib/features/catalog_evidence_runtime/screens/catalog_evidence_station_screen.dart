@@ -6,6 +6,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../../core/access/production_access_helper.dart';
 import '../../../core/company_plant_display_name.dart';
+import '../../../modules/production/station_pages/models/production_evidence_config.dart';
 import '../../../modules/production/station_pages/models/production_station_config.dart';
 import '../../../modules/production/station_pages/models/production_station_profile_catalog_entry.dart';
 import '../../../modules/production/station_pages/models/production_station_profile_field.dart';
@@ -30,12 +31,23 @@ class CatalogEvidenceStationScreen extends StatefulWidget {
     required this.stationConfig,
     required this.profile,
     this.onCloseStation,
-  });
+  })  : evidenceConfig = null;
+
+  const CatalogEvidenceStationScreen.companyEvidence({
+    super.key,
+    required this.companyData,
+    required this.evidenceConfig,
+    required this.profile,
+    this.onCloseStation,
+  })  : stationConfig = null;
 
   final Map<String, dynamic> companyData;
-  final ProductionStationConfig stationConfig;
+  final ProductionStationConfig? stationConfig;
+  final ProductionEvidenceConfig? evidenceConfig;
   final ProductionStationProfileCatalogEntry profile;
   final VoidCallback? onCloseStation;
+
+  bool get isCompanyEvidence => evidenceConfig != null;
 
   @override
   State<CatalogEvidenceStationScreen> createState() =>
@@ -68,7 +80,9 @@ class _CatalogEvidenceStationScreenState
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
 
-  String get _plantKey => widget.stationConfig.assignedPlantKey.trim();
+  String get _plantKey => widget.isCompanyEvidence
+      ? widget.evidenceConfig!.plantKey.trim()
+      : widget.stationConfig!.assignedPlantKey.trim();
 
   String get _userPlantKey =>
       (widget.companyData['plantKey'] ?? '').toString().trim();
@@ -217,11 +231,20 @@ class _CatalogEvidenceStationScreenState
     }
   }
 
+  String get _runtimeTitle => widget.isCompanyEvidence
+      ? widget.evidenceConfig!.displayName
+      : widget.stationConfig!.title;
+
   Future<void> _reloadStructuredStateForActiveSession() async {
     try {
       final loaded = await _catalogService.loadActiveState(
         companyId: _companyId,
-        stationSlot: widget.stationConfig.effectiveStationSlot,
+        stationSlot: widget.isCompanyEvidence
+            ? null
+            : widget.stationConfig!.effectiveStationSlot,
+        evidenceConfigId: widget.isCompanyEvidence
+            ? widget.evidenceConfig!.evidenceConfigId
+            : null,
         profile: widget.profile,
       );
       if (!mounted || loaded == null) return;
@@ -284,7 +307,12 @@ class _CatalogEvidenceStationScreenState
       });
       await _catalogService.startSession(
         companyId: _companyId,
-        stationSlot: widget.stationConfig.effectiveStationSlot,
+        stationSlot: widget.isCompanyEvidence
+            ? null
+            : widget.stationConfig!.effectiveStationSlot,
+        evidenceConfigId: widget.isCompanyEvidence
+            ? widget.evidenceConfig!.evidenceConfigId
+            : null,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -610,7 +638,7 @@ class _CatalogEvidenceStationScreenState
   Widget build(BuildContext context) {
     if (!_plantAccessOk) {
       return Scaffold(
-        appBar: AppBar(title: Text(widget.stationConfig.title)),
+        appBar: AppBar(title: Text(_runtimeTitle)),
         body: const Center(
           child: Text('Nemate pristup ovoj stanici za dodijeljeni pogon.'),
         ),
@@ -618,10 +646,15 @@ class _CatalogEvidenceStationScreenState
     }
 
     return StreamBuilder<ProductionStationWorkSession?>(
-      stream: _sessionStream.watchActiveSession(
-        companyId: _companyId,
-        stationSlot: widget.stationConfig.effectiveStationSlot,
-      ),
+      stream: widget.isCompanyEvidence
+          ? _sessionStream.watchActiveSessionForEvidence(
+              companyId: _companyId,
+              evidenceConfigId: widget.evidenceConfig!.evidenceConfigId,
+            )
+          : _sessionStream.watchActiveSession(
+              companyId: _companyId,
+              stationSlot: widget.stationConfig!.effectiveStationSlot,
+            ),
       builder: (context, activeSnapshot) {
         final activeSession = _closedSession ?? activeSnapshot.data;
         if (activeSession != null && activeSession.isActive) {
@@ -632,10 +665,15 @@ class _CatalogEvidenceStationScreenState
             activeSession?.isActive == true && _closedSession == null;
 
         return StreamBuilder<List<ProductionStationWorkSession>>(
-          stream: _sessionStream.watchClosedSessionsForStation(
-            companyId: _companyId,
-            stationSlot: widget.stationConfig.effectiveStationSlot,
-          ),
+          stream: widget.isCompanyEvidence
+              ? _sessionStream.watchClosedSessionsForEvidence(
+                  companyId: _companyId,
+                  evidenceConfigId: widget.evidenceConfig!.evidenceConfigId,
+                )
+              : _sessionStream.watchClosedSessionsForStation(
+                  companyId: _companyId,
+                  stationSlot: widget.stationConfig!.effectiveStationSlot,
+                ),
           builder: (context, closedSnapshot) {
             final closedSessions = closedSnapshot.data ?? const [];
             final recordsLoading =
@@ -644,7 +682,7 @@ class _CatalogEvidenceStationScreenState
 
             return Scaffold(
               appBar: AppBar(
-                title: Text(widget.stationConfig.title),
+                title: Text(_runtimeTitle),
                 leading: IconButton(
                   icon: const Icon(Icons.close),
                   tooltip: 'Zatvori stanicu',

@@ -15,8 +15,19 @@ class CatalogEvidenceSessionService {
 
   Future<ProductionStationWorkSession> startSession({
     required String companyId,
-    required int stationSlot,
+    int? stationSlot,
+    String? evidenceConfigId,
   }) {
+    final eid = evidenceConfigId?.trim();
+    if (eid != null && eid.isNotEmpty) {
+      return _sessionCallables.startProductionEvidenceWorkSession(
+        companyId: companyId,
+        evidenceConfigId: eid,
+      );
+    }
+    if (stationSlot == null || stationSlot < 1) {
+      throw ArgumentError('stationSlot ili evidenceConfigId je obavezan.');
+    }
     return _sessionCallables.startProductionStationWorkSession(
       companyId: companyId,
       stationSlot: stationSlot,
@@ -25,9 +36,17 @@ class CatalogEvidenceSessionService {
 
   Future<StructuredProfileSessionState?> loadActiveState({
     required String companyId,
-    required int stationSlot,
+    int? stationSlot,
+    String? evidenceConfigId,
     required ProductionStationProfileCatalogEntry profile,
   }) async {
+    final eid = evidenceConfigId?.trim();
+    if (eid != null && eid.isNotEmpty) {
+      return null;
+    }
+    if (stationSlot == null || stationSlot < 1) {
+      return null;
+    }
     final active = await _sessionCallables.getActiveStructuredSession(
       companyId: companyId,
       stationSlot: stationSlot,

@@ -7,6 +7,7 @@ import 'package:window_manager/window_manager.dart';
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/format/ba_formatted_date.dart';
+import '../../station_pages/models/production_evidence_config.dart';
 import '../../station_pages/models/production_station_config.dart';
 import '../../station_pages/models/production_station_profile_catalog_entry.dart';
 import '../../station_pages/models/production_station_profile_field.dart';
@@ -23,12 +24,23 @@ class ProfileDrivenWorkScreen extends StatefulWidget {
     required this.stationConfig,
     required this.profile,
     this.onCloseStation,
-  });
+  })  : evidenceConfig = null;
+
+  const ProfileDrivenWorkScreen.companyEvidence({
+    super.key,
+    required this.companyData,
+    required this.evidenceConfig,
+    required this.profile,
+    this.onCloseStation,
+  })  : stationConfig = null;
 
   final Map<String, dynamic> companyData;
-  final ProductionStationConfig stationConfig;
+  final ProductionStationConfig? stationConfig;
+  final ProductionEvidenceConfig? evidenceConfig;
   final ProductionStationProfileCatalogEntry profile;
   final VoidCallback? onCloseStation;
+
+  bool get isCompanyEvidence => evidenceConfig != null;
 
   @override
   State<ProfileDrivenWorkScreen> createState() =>
@@ -68,7 +80,9 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
 
-  String get _plantKey => widget.stationConfig.assignedPlantKey.trim();
+  String get _plantKey => widget.isCompanyEvidence
+      ? widget.evidenceConfig!.plantKey.trim()
+      : widget.stationConfig!.assignedPlantKey.trim();
 
   String get _userPlantKey =>
       (widget.companyData['plantKey'] ?? '').toString().trim();
@@ -88,11 +102,13 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
       widget.profile.profileKey.trim() == 'chemical_dosing';
 
   bool get _controlledInputEnabled =>
-      widget.stationConfig.controlledInputEnabled;
+      !widget.isCompanyEvidence && widget.stationConfig!.controlledInputEnabled;
 
   bool get _loadsChemicalMasterData => _isChemicalDosingProfile;
 
-  String get _stationTitle => widget.stationConfig.title;
+  String get _stationTitle => widget.isCompanyEvidence
+      ? widget.evidenceConfig!.displayName
+      : widget.stationConfig!.title;
 
   @override
   void initState() {
@@ -529,10 +545,17 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
         _closedSession = null;
         _hydratedSessionId = null;
       });
-      await _sessionCallables.startProductionStationWorkSession(
-        companyId: _companyId,
-        stationSlot: widget.stationConfig.effectiveStationSlot,
-      );
+      if (widget.isCompanyEvidence) {
+        await _sessionCallables.startProductionEvidenceWorkSession(
+          companyId: _companyId,
+          evidenceConfigId: widget.evidenceConfig!.evidenceConfigId,
+        );
+      } else {
+        await _sessionCallables.startProductionStationWorkSession(
+          companyId: _companyId,
+          stationSlot: widget.stationConfig!.effectiveStationSlot,
+        );
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Evidencija pokrenuta.')),
@@ -1137,7 +1160,7 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(
                 'Kontrolisan unos: '
-                '${ProductionStationConfig.controlledInputModeLabel(widget.stationConfig.controlledInputMode)}',
+                '${ProductionStationConfig.controlledInputModeLabel(widget.stationConfig!.controlledInputMode)}',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
@@ -1191,10 +1214,15 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
         ),
       ),
       body: StreamBuilder<ProductionStationWorkSession?>(
-        stream: _sessionService.watchActiveSession(
-          companyId: _companyId,
-          stationSlot: widget.stationConfig.effectiveStationSlot,
-        ),
+        stream: widget.isCompanyEvidence
+            ? _sessionService.watchActiveSessionForEvidence(
+                companyId: _companyId,
+                evidenceConfigId: widget.evidenceConfig!.evidenceConfigId,
+              )
+            : _sessionService.watchActiveSession(
+                companyId: _companyId,
+                stationSlot: widget.stationConfig!.effectiveStationSlot,
+              ),
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting &&
               !snap.hasData) {

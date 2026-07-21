@@ -62,6 +62,30 @@ class ProductionStationWorkSessionCallableService {
     );
   }
 
+  Future<ProductionStationWorkSession> startProductionEvidenceWorkSession({
+    required String companyId,
+    required String evidenceConfigId,
+  }) async {
+    final res = await _functions
+        .httpsCallable('startProductionEvidenceWorkSession')
+        .call<Map<String, dynamic>>({
+          'companyId': companyId.trim(),
+          'evidenceConfigId': evidenceConfigId.trim(),
+        });
+    final data = res.data;
+    if (data['success'] != true) {
+      throw Exception('Pokretanje evidencije nije uspjelo.');
+    }
+    final raw = data['session'];
+    if (raw is! Map) {
+      throw Exception('Nepotpun odgovor servera.');
+    }
+    return ProductionStationWorkSession.fromMap(
+      (data['sessionId'] ?? '').toString(),
+      Map<String, dynamic>.from(raw),
+    );
+  }
+
   Future<({ProductionStationWorkSession session, String? trackingEntryId})>
   updateProductionStationWorkSession({
     required String companyId,

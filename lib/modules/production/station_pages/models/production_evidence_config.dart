@@ -1,7 +1,19 @@
-import '../models/production_station_display_options.dart';
+import 'package:production_app/core/access/production_access_helper.dart';
+
+import 'production_station_display_options.dart';
 
 /// Kompanijska instanca evidencije — `production_evidence_configs/{companyId}__ev_{slot}`.
 class ProductionEvidenceConfig {
+  /// M1-H3 pilot profili za operator runtime.
+  static const List<String> h3OperatorRuntimeProfileKeys = [
+    'chemical_dosing',
+    'wastewater_treatment',
+    'production_counting',
+  ];
+
+  static bool isH3OperatorRuntimeProfile(String profileKey) =>
+      h3OperatorRuntimeProfileKeys.contains(profileKey.trim());
+
   final String evidenceConfigId;
   final String companyId;
   final int evidenceSlot;
@@ -37,6 +49,17 @@ class ProductionEvidenceConfig {
   });
 
   bool get isArchived => archivedAt != null;
+
+  bool isRuntimeVisibleToRole(String role) {
+    if (!active || isArchived || !runtimeVisible) return false;
+    final r = ProductionAccessHelper.normalizeRole(role);
+    if (ProductionAccessHelper.isAdminRole(r) ||
+        r == ProductionAccessHelper.roleSuperAdmin ||
+        r == 'production_manager') {
+      return true;
+    }
+    return runtimeAllowedRoles.contains(r);
+  }
 
   static int parseEvidenceSlotFromMap(Map<String, dynamic> data) {
     final slotRaw = data['evidenceSlot'];

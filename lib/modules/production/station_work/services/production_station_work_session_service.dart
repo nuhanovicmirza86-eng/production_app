@@ -70,4 +70,57 @@ class ProductionStationWorkSessionService {
           return sessions;
         });
   }
+
+  Stream<ProductionStationWorkSession?> watchActiveSessionForEvidence({
+    required String companyId,
+    required String evidenceConfigId,
+  }) {
+    final cid = companyId.trim();
+    final eid = evidenceConfigId.trim();
+    if (cid.isEmpty || eid.isEmpty) {
+      return Stream.value(null);
+    }
+    return _col
+        .where('companyId', isEqualTo: cid)
+        .where('evidenceConfigId', isEqualTo: eid)
+        .where('status', whereIn: const [
+          ProductionStationWorkSession.statusOpen,
+          ProductionStationWorkSession.statusPaused,
+        ])
+        .limit(1)
+        .snapshots()
+        .map((snap) {
+          if (snap.docs.isEmpty) return null;
+          return ProductionStationWorkSession.fromDoc(snap.docs.first);
+        });
+  }
+
+  Stream<List<ProductionStationWorkSession>> watchClosedSessionsForEvidence({
+    required String companyId,
+    required String evidenceConfigId,
+    int limit = 50,
+  }) {
+    final cid = companyId.trim();
+    final eid = evidenceConfigId.trim();
+    if (cid.isEmpty || eid.isEmpty) {
+      return Stream.value(const []);
+    }
+    return _col
+        .where('companyId', isEqualTo: cid)
+        .where('evidenceConfigId', isEqualTo: eid)
+        .where('status', isEqualTo: ProductionStationWorkSession.statusClosed)
+        .limit(limit)
+        .snapshots()
+        .map((snap) {
+          final sessions = snap.docs
+              .map(ProductionStationWorkSession.fromDoc)
+              .toList(growable: false);
+          sessions.sort((a, b) {
+            final aTs = a.endedAt ?? a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            final bTs = b.endedAt ?? b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            return bTs.compareTo(aTs);
+          });
+          return sessions;
+        });
+  }
 }
