@@ -130,9 +130,9 @@ class _ProductionCompanyEvidenceAdminScreenState
       );
       return;
     }
-    await Navigator.push<void>(
+    final saved = await Navigator.push<bool>(
       context,
-      MaterialPageRoute<void>(
+      MaterialPageRoute<bool>(
         builder: (_) => ProductionEvidenceConfigFormScreen(
           companyData: widget.companyData,
           profileCatalog: catalog,
@@ -142,6 +142,17 @@ class _ProductionCompanyEvidenceAdminScreenState
         ),
       ),
     );
+    if (saved == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            existing == null
+                ? 'Evidencija je spremljena.'
+                : 'Izmjene evidencije su spremljene.',
+          ),
+        ),
+      );
+    }
   }
 
   @override

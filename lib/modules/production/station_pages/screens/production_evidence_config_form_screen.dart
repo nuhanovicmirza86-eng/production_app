@@ -21,7 +21,7 @@ class ProductionEvidenceConfigFormScreen extends StatefulWidget {
   final ProductionStationProfileCatalogResult profileCatalog;
   final bool canManage;
   final ProductionEvidenceConfig? existing;
-  final VoidCallback onSaved;
+  final Future<void> Function() onSaved;
 
   @override
   State<ProductionEvidenceConfigFormScreen> createState() =>
@@ -127,15 +127,25 @@ class _ProductionEvidenceConfigFormScreenState
 
   ProductionEvidenceConfig _buildConfig() {
     final existing = widget.existing;
-    final slot = existing?.evidenceSlot ?? 0;
+    final existingId = existing?.evidenceConfigId.trim() ?? '';
+    final slot = existing != null
+        ? (existing.evidenceSlot > 0
+            ? existing.evidenceSlot
+            : ProductionEvidenceConfig.parseEvidenceSlotFromMap({
+                'evidenceConfigId': existingId,
+                'evidenceSlot': existing.evidenceSlot,
+              }))
+        : 0;
     final order = int.tryParse(_orderCtrl.text.trim());
+    final configId = existingId.isNotEmpty
+        ? existingId
+        : ProductionEvidenceConfig.buildConfigId(
+            companyId: _companyId,
+            evidenceSlot: slot > 0 ? slot : 1,
+          );
 
     return ProductionEvidenceConfig(
-      evidenceConfigId: existing?.evidenceConfigId ??
-          ProductionEvidenceConfig.buildConfigId(
-            companyId: _companyId,
-            evidenceSlot: slot,
-          ),
+      evidenceConfigId: configId,
       companyId: _companyId,
       evidenceSlot: slot,
       plantKey: _plantKey,
@@ -179,14 +189,22 @@ class _ProductionEvidenceConfigFormScreenState
       _showSnack('Odaberite barem jednu ulogu za runtime pristup.');
       return;
     }
+    if (_isEdit && (widget.existing?.evidenceConfigId.trim().isEmpty ?? true)) {
+      _showSnack('Nedostaje identifikator evidencije — osvježite listu i pokušajte ponovo.');
+      return;
+    }
 
     setState(() => _saving = true);
     try {
-      await _callable.upsertProductionEvidenceConfig(_buildConfig());
+      final config = _buildConfig();
+      final savedId = await _callable.upsertProductionEvidenceConfig(config);
+      if (_isEdit && savedId != config.evidenceConfigId) {
+        throw Exception('Server nije potvrdio ažuriranje iste evidencije.');
+      }
       if (!mounted) return;
-      widget.onSaved();
-      Navigator.pop(context);
-      _showSnack('Evidencija je spremljena.');
+      await widget.onSaved();
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
       _showSnack(productionEvidenceConfigErrorMessage(e));
@@ -226,9 +244,9 @@ class _ProductionEvidenceConfigFormScreenState
         evidenceConfigId: widget.existing!.evidenceConfigId,
       );
       if (!mounted) return;
-      widget.onSaved();
-      Navigator.pop(context);
-      _showSnack('Evidencija je arhivirana.');
+      await widget.onSaved();
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
       _showSnack(productionEvidenceConfigErrorMessage(e));
@@ -248,24 +266,26 @@ class _ProductionEvidenceConfigFormScreenState
         ? _profileKey
         : (profileOptions.isNotEmpty ? profileOptions.first.profileKey : _profileKey);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_isEdit ? 'Uredi evidenciju' : 'Nova evidencija'),
-        actions: [
-          if (widget.canManage && !_readOnly)
-            TextButton(
-              onPressed: _saving ? null : _save,
-              child: _saving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Spremi'),
-            ),
-        ],
-      ),
-      body: _plantsLoading
+    return PopScope(
+      canPop: !_saving && !_archiving,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_isEdit ? 'Uredi evidenciju' : 'Nova evidencija'),
+          actions: [
+            if (widget.canManage && !_readOnly)
+              TextButton(
+                onPressed: _saving ? null : _save,
+                child: _saving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Spremi'),
+              ),
+          ],
+        ),
+        body: _plantsLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.all(16),
@@ -545,6 +565,7 @@ class _ProductionEvidenceConfigFormScreenState
                 ],
               ],
             ),
+      ),
     );
   }
 }

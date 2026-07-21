@@ -155,11 +155,11 @@ class ProductionEvidenceConfig {
   }
 
   Map<String, dynamic> toUpsertPayload() {
+    final id = evidenceConfigId.trim();
     return {
       'companyId': companyId,
+      if (id.isNotEmpty) 'evidenceConfigId': id,
       if (evidenceSlot > 0) 'evidenceSlot': evidenceSlot,
-      if (evidenceSlot > 0 && evidenceConfigId.isNotEmpty)
-        'evidenceConfigId': evidenceConfigId,
       'plantKey': plantKey,
       'processKey': processKey,
       'phaseKey': phaseKey,

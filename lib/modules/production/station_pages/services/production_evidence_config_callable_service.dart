@@ -73,7 +73,7 @@ class ProductionEvidenceConfigCallableService {
     return ProductionEvidenceConfig.fromMap(Map<String, dynamic>.from(raw));
   }
 
-  Future<String?> upsertProductionEvidenceConfig(
+  Future<String> upsertProductionEvidenceConfig(
     ProductionEvidenceConfig config,
   ) async {
     final res = await _functions
@@ -83,8 +83,11 @@ class ProductionEvidenceConfigCallableService {
     if (data['success'] != true) {
       throw Exception('Spremanje evidencije nije uspjelo.');
     }
-    final audit = data['auditLogId'];
-    return audit?.toString();
+    final savedId = (data['evidenceConfigId'] ?? '').toString().trim();
+    if (savedId.isEmpty) {
+      throw Exception('Nepotpun odgovor servera (evidenceConfigId).');
+    }
+    return savedId;
   }
 
   Future<String?> archiveProductionEvidenceConfig({
