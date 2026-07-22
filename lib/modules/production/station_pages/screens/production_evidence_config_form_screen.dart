@@ -154,25 +154,44 @@ class _ProductionEvidenceConfigFormScreenState
 
   ProductionEvidenceConfig _buildConfig() {
     final existing = _freshExisting ?? widget.existing;
-    final existingId = existing?.evidenceConfigId.trim() ?? '';
-    final slot = existing != null
-        ? (existing.evidenceSlot > 0
-            ? existing.evidenceSlot
-            : ProductionEvidenceConfig.parseEvidenceSlotFromMap({
-                'evidenceConfigId': existingId,
-                'evidenceSlot': existing.evidenceSlot,
-              }))
-        : 0;
     final order = int.tryParse(_orderCtrl.text.trim());
-    final configId = existingId.isNotEmpty
-        ? existingId
-        : ProductionEvidenceConfig.buildConfigId(
-            companyId: _companyId,
-            evidenceSlot: slot > 0 ? slot : 1,
-          );
+
+    if (existing == null) {
+      return ProductionEvidenceConfig(
+        evidenceConfigId: '',
+        companyId: _companyId,
+        evidenceSlot: 0,
+        plantKey: _plantKey,
+        processKey: _processKeyCtrl.text.trim(),
+        phaseKey: _phaseKey,
+        displayName: _nameCtrl.text.trim(),
+        profileKey: _profileKey,
+        profileNameSnapshot:
+            _selectedProfile?.displayName ??
+            ProductionStationConfig.processProfileLabel(_profileKey),
+        active: _active,
+        runtimeVisible: _runtimeVisible,
+        runtimeAllowedRoles: _runtimeRoles.toList(growable: false),
+        displayOrder: order,
+        controlledInputEnabled: _controlledInputEnabled,
+        controlledInputMode: _controlledInputMode,
+        controlledInputScope: _controlledInputEnabled &&
+                _controlledInputMode != 'off'
+            ? ProductionStationConfig.controlledInputScopeWorkBath
+            : null,
+      );
+    }
+
+    final existingId = existing.evidenceConfigId.trim();
+    final slot = existing.evidenceSlot > 0
+        ? existing.evidenceSlot
+        : ProductionEvidenceConfig.parseEvidenceSlotFromMap({
+            'evidenceConfigId': existingId,
+            'evidenceSlot': existing.evidenceSlot,
+          });
 
     return ProductionEvidenceConfig(
-      evidenceConfigId: configId,
+      evidenceConfigId: existingId,
       companyId: _companyId,
       evidenceSlot: slot,
       plantKey: _plantKey,
@@ -196,13 +215,16 @@ class _ProductionEvidenceConfigFormScreenState
     );
   }
 
-  Future<void> _verifySavedControlledInput(ProductionEvidenceConfig config) async {
+  Future<void> _verifySavedControlledInput(
+    ProductionEvidenceConfig config, {
+    required String evidenceConfigId,
+  }) async {
     if (!ProductionStationConfig.supportsControlledInputProfile(config.profileKey)) {
       return;
     }
     final verified = await _callable.getProductionEvidenceConfig(
       companyId: _companyId,
-      evidenceConfigId: config.evidenceConfigId,
+      evidenceConfigId: evidenceConfigId,
     );
     if (verified.controlledInputEnabled != config.controlledInputEnabled) {
       throw Exception(
@@ -248,11 +270,20 @@ class _ProductionEvidenceConfigFormScreenState
     setState(() => _saving = true);
     try {
       final config = _buildConfig();
-      final savedId = await _callable.upsertProductionEvidenceConfig(config);
+      final savedId = await _callable.upsertProductionEvidenceConfig(
+        config,
+        isCreate: !_isEdit,
+      );
       if (_isEdit && savedId != config.evidenceConfigId) {
         throw Exception('Server nije potvrdio ažuriranje iste evidencije.');
       }
-      await _verifySavedControlledInput(config);
+      if (!_isEdit && savedId.isEmpty) {
+        throw Exception('Server nije dodijelio novi identifikator evidencije.');
+      }
+      await _verifySavedControlledInput(
+        config,
+        evidenceConfigId: _isEdit ? config.evidenceConfigId : savedId,
+      );
       if (!mounted) return;
       await widget.onSaved();
       if (!mounted) return;

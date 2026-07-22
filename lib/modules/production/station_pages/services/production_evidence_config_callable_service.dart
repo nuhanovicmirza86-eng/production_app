@@ -74,11 +74,14 @@ class ProductionEvidenceConfigCallableService {
   }
 
   Future<String> upsertProductionEvidenceConfig(
-    ProductionEvidenceConfig config,
-  ) async {
+    ProductionEvidenceConfig config, {
+    required bool isCreate,
+  }) async {
     final res = await _functions
         .httpsCallable('upsertProductionEvidenceConfig')
-        .call<Map<String, dynamic>>(config.toUpsertPayload());
+        .call<Map<String, dynamic>>(
+          config.toUpsertPayload(isCreate: isCreate),
+        );
     final data = res.data;
     if (data['success'] != true) {
       throw Exception('Spremanje evidencije nije uspjelo.');

@@ -154,12 +154,13 @@ class ProductionEvidenceConfig {
     );
   }
 
-  Map<String, dynamic> toUpsertPayload() {
+  Map<String, dynamic> toUpsertPayload({required bool isCreate}) {
     final id = evidenceConfigId.trim();
     final payload = <String, dynamic>{
       'companyId': companyId,
-      if (id.isNotEmpty) 'evidenceConfigId': id,
-      if (evidenceSlot > 0) 'evidenceSlot': evidenceSlot,
+      if (isCreate) 'create': true,
+      if (!isCreate && id.isNotEmpty) 'evidenceConfigId': id,
+      if (!isCreate && evidenceSlot > 0) 'evidenceSlot': evidenceSlot,
       'plantKey': plantKey,
       'processKey': processKey,
       'phaseKey': phaseKey,
