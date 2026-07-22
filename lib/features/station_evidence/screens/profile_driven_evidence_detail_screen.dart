@@ -4,6 +4,7 @@ import '../../../core/company_plant_display_name.dart';
 import '../../../modules/production/station_pages/models/production_station_profile_field.dart';
 import '../models/profile_driven_evidence_session.dart';
 import '../services/profile_driven_evidence_callable_service.dart';
+import '../utils/profile_driven_evidence_detail_display.dart';
 import '../utils/profile_driven_evidence_rework_labels.dart';
 import '../widgets/profile_driven_evidence_structured_table.dart';
 
@@ -84,14 +85,35 @@ class _ProfileDrivenEvidenceDetailScreenState
   List<ProductionStationProfileField> get _operatorFields =>
       _fieldDefs.where((f) => f.isOperatorEditable).toList(growable: false);
 
-  List<ProductionStationProfileField> get _snapshotFields =>
-      _fieldDefs.where((f) => !f.isOperatorEditable).toList(growable: false);
+  List<ProductionStationProfileField> get _operatorFieldsForDisplay =>
+      _operatorFields
+          .where((field) => !profileEvidenceShouldHideDetailFieldKey(field.key))
+          .toList(growable: false);
 
-  String _displayValue(String key, dynamic raw) {
-    if (key == 'heavyMetalsPresent') {
-      return formatHeavyMetalsLabel(raw?.toString());
-    }
-    return formatFieldValue(raw);
+  List<ProductionStationProfileField> get _masterDataFieldsForDisplay =>
+      _fieldDefs
+          .where(profileEvidenceShouldShowMasterSnapshotField)
+          .toList(growable: false);
+
+  String _displayValueForField(ProductionStationProfileField field) {
+    final session = _session;
+    if (session == null) return '—';
+    return profileEvidenceDetailFieldDisplayValue(
+      field: field,
+      session: session,
+    );
+  }
+
+  String _displayLabel(ProductionStationProfileField field) =>
+      profileEvidenceDetailFieldLabel(field);
+
+  String _plantDisplayLabel(ProfileDrivenEvidenceSessionDetail session) {
+    final label = (_plantLabel ?? '').trim();
+    if (label.isNotEmpty) return label;
+    final key = session.plantKey.trim();
+    if (key.isEmpty) return '—';
+    if (profileEvidenceLooksLikeInternalDocumentId(key)) return '—';
+    return key;
   }
 
   Widget _sectionCard({
@@ -141,7 +163,6 @@ class _ProfileDrivenEvidenceDetailScreenState
     String title,
     List<ProductionStationProfileField> fields,
   ) {
-    final session = _session!;
     if (fields.isEmpty) {
       return _sectionCard(
         title: title,
@@ -152,10 +173,9 @@ class _ProfileDrivenEvidenceDetailScreenState
     return _sectionCard(
       title: title,
       children: fields.map((field) {
-        final raw = session.fieldValues[field.key];
         return _kvRow(
-          field.label.isNotEmpty ? field.label : field.key,
-          _displayValue(field.key, raw),
+          _displayLabel(field),
+          _displayValueForField(field),
         );
       }).toList(),
     );
@@ -187,7 +207,7 @@ class _ProfileDrivenEvidenceDetailScreenState
           children: [
             _kvRow('Profil', session.profileDisplayName),
             _kvRow('Stanica', station),
-            _kvRow('Pogon', _plantLabel ?? session.plantKey),
+            _kvRow('Pogon', _plantDisplayLabel(session)),
             _kvRow('Status', session.status == 'closed' ? 'Završeno' : session.status),
             _kvRow('Početak', formatEvidenceDateTime(session.startedAt)),
             _kvRow('Završetak', formatEvidenceDateTime(session.endedAt)),
@@ -195,8 +215,12 @@ class _ProfileDrivenEvidenceDetailScreenState
               _kvRow('Verzija kataloga profila', '${session.catalogVersion}'),
           ],
         ),
-        _fieldSection('Unesena polja', _operatorFields),
-        _fieldSection('Snapshoti iz master podataka', _snapshotFields),
+        _fieldSection('Unesena polja', _operatorFieldsForDisplay),
+        if (_masterDataFieldsForDisplay.isNotEmpty)
+          _fieldSection(
+            'Podaci iz master šifrarnika',
+            _masterDataFieldsForDisplay,
+          ),
         _sectionCard(
           title: 'Operator audit',
           children: [
@@ -216,7 +240,10 @@ class _ProfileDrivenEvidenceDetailScreenState
           _sectionCard(
             title: 'Upozorenje kontrolisanog unosa',
             children: session.controlledInputWarning!.entries.map((e) {
-              return _kvRow(e.key, formatFieldValue(e.value));
+              return _kvRow(
+                e.key,
+                profileEvidenceDetailSanitizedValue(e.value),
+              );
             }).toList(),
           ),
         const SizedBox(height: 24),
@@ -244,7 +271,7 @@ class _ProfileDrivenEvidenceDetailScreenState
           children: [
             _kvRow('Profil', session.profileDisplayName),
             _kvRow('Stanica', station),
-            _kvRow('Pogon', _plantLabel ?? session.plantKey),
+            _kvRow('Pogon', _plantDisplayLabel(session)),
             _kvRow('Status', session.status == 'closed' ? 'Završeno' : session.status),
             _kvRow('Početak', formatEvidenceDateTime(session.startedAt)),
             _kvRow('Završetak', formatEvidenceDateTime(session.endedAt)),
@@ -258,11 +285,10 @@ class _ProfileDrivenEvidenceDetailScreenState
             _kvRow('Tip obrade', formatReworkOperationTypeLabel(s.operationType)),
             _kvRow('Rezultat obrade', formatReworkResultStatusLabel(s.resultStatus)),
             _kvRow('Trajanje operacije', formatReworkDurationMinutes(s.durationMinutes)),
-            ..._operatorFields.map((field) {
-              final raw = session.fieldValues[field.key];
+            ..._operatorFieldsForDisplay.map((field) {
               return _kvRow(
-                field.label.isNotEmpty ? field.label : field.key,
-                _displayValue(field.key, raw),
+                _displayLabel(field),
+                _displayValueForField(field),
               );
             }),
           ],

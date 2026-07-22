@@ -710,6 +710,7 @@ class _CatalogEvidenceStationScreenState
                         Flexible(
                           flex: 4,
                           child: CatalogEvidenceRecordsTable(
+                            companyData: widget.companyData,
                             profile: widget.profile,
                             sessions: closedSessions,
                             activeSession: activeSession?.isActive == true

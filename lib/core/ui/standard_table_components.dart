@@ -2,6 +2,16 @@ import 'package:flutter/material.dart';
 
 /// Kanonski vizual tablica u Production appu (npr. Proizvodni nalozi, evidencije).
 ///
+/// Poravnanje kolona (standard):
+/// - tekstualne kolone → lijevo
+/// - brojčane kolone → desno
+/// - status badge → lijevo
+/// - akcija (Detalji / Otvori) → centar
+///
+/// Širina: kompaktna prema sadržaju (narrow / medium / wide), bez nepotrebnog
+/// širenja; header label do 2 reda po riječima (ne po slovima); horizontalni
+/// scroll kad zbroj kolona ne stane u dostupnu širinu kontejnera.
+///
 /// Koristi [StandardTableShell], [StandardTableFlexCell], [StandardTableMetrics],
 /// [StandardTableStatusBadge] i [StandardTableOpenLink] za konzistentan izgled.
 class StandardTableMetrics {

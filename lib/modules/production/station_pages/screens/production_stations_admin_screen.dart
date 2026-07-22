@@ -1235,8 +1235,29 @@ class _StationCard extends StatelessWidget {
     required this.onTap,
   });
 
+  static const double _narrowCardBreakpoint = 600;
+
   @override
   Widget build(BuildContext context) {
+    final isNarrow =
+        MediaQuery.sizeOf(context).width < _narrowCardBreakpoint;
+    final locked = ProductionStationLegacyLock.isLocked(config);
+    final activeChip = Chip(
+      label: Text(
+        config.active ? 'Aktivna' : 'Neaktivna',
+        style: const TextStyle(fontSize: 12),
+      ),
+      visualDensity: VisualDensity.compact,
+    );
+    final lockedChip = Chip(
+      avatar: const Icon(Icons.lock_outline, size: 16),
+      label: const Text(
+        'Zaključana postojeća stanica',
+        style: TextStyle(fontSize: 11),
+      ),
+      visualDensity: VisualDensity.compact,
+    );
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -1247,35 +1268,37 @@ class _StationCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      config.title,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  if (ProductionStationLegacyLock.isLocked(config))
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: Chip(
-                        avatar: const Icon(Icons.lock_outline, size: 16),
-                        label: const Text(
-                          'Zaključana postojeća stanica',
-                          style: TextStyle(fontSize: 11),
-                        ),
-                        visualDensity: VisualDensity.compact,
+              if (isNarrow) ...[
+                Text(
+                  config.title,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (locked) lockedChip,
+                    activeChip,
+                  ],
+                ),
+              ] else
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        config.title,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ),
-                  Chip(
-                    label: Text(
-                      config.active ? 'Aktivna' : 'Neaktivna',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ],
-              ),
+                    if (locked)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: lockedChip,
+                      ),
+                    activeChip,
+                  ],
+                ),
               const SizedBox(height: 8),
               Text(
                 ProductionStationConfig.stationTypeLabel(config.stationType),
@@ -1284,17 +1307,25 @@ class _StationCard extends StatelessWidget {
                 Text(
                   'Faza: ${ProductionStationConfig.productionPhaseLabel(config.productionPhaseKey!)}',
                 ),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _profileLine(config.processProfileType),
-                    ),
+              if (isNarrow) ...[
+                Text(_profileLine(config.processProfileType)),
+                if (_profileStatusChip(config.processProfileType) != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: _profileStatusChip(config.processProfileType)!,
                   ),
-                  if (_profileStatusChip(config.processProfileType) != null)
-                    _profileStatusChip(config.processProfileType)!,
-                ],
-              ),
+              ] else
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _profileLine(config.processProfileType),
+                      ),
+                    ),
+                    if (_profileStatusChip(config.processProfileType) != null)
+                      _profileStatusChip(config.processProfileType)!,
+                  ],
+                ),
               Text(
                 'Operativna faza: ${_ProductionStationsAdminScreenState._phaseLabel(config.phase)}',
               ),

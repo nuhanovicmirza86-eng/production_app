@@ -7,6 +7,7 @@ import 'package:window_manager/window_manager.dart';
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/format/ba_formatted_date.dart';
+import '../../../../features/catalog_evidence_runtime/widgets/catalog_evidence_records_table.dart';
 import '../../station_pages/models/production_evidence_config.dart';
 import '../../station_pages/models/production_station_config.dart';
 import '../../station_pages/models/production_station_profile_catalog_entry.dart';
@@ -1167,7 +1168,6 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(
-                'Kontrolisan unos: '
                 'Kontrolisan unos: $_controlledInputModeLabel',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
@@ -1212,57 +1212,101 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_stationTitle),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          tooltip: 'Zatvori stanicu',
-          onPressed: _busy ? null : _closeStation,
-        ),
-      ),
-      body: StreamBuilder<ProductionStationWorkSession?>(
-        stream: widget.isCompanyEvidence
-            ? _sessionService.watchActiveSessionForEvidence(
-                companyId: _companyId,
-                evidenceConfigId: widget.evidenceConfig!.evidenceConfigId,
-              )
-            : _sessionService.watchActiveSession(
-                companyId: _companyId,
-                stationSlot: widget.stationConfig!.effectiveStationSlot,
-              ),
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting &&
-              !snap.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final session = snap.data ?? _closedSession;
-          if (session != null &&
-              session.id != _hydratedSessionId &&
-              session.isActive) {
-            _hydratedSessionId = session.id;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-              _syncFormFromSession(session);
-              if (_loadsChemicalMasterData) {
-                final workBathId = _entitySelections['workBathId'];
-                if (workBathId != null && workBathId.isNotEmpty) {
-                  unawaited(_reloadChemicalsForWorkBath(workBathId));
-                }
-              } else {
-                _applyUnitDefaultsForSelection();
+    return StreamBuilder<ProductionStationWorkSession?>(
+      stream: widget.isCompanyEvidence
+          ? _sessionService.watchActiveSessionForEvidence(
+              companyId: _companyId,
+              evidenceConfigId: widget.evidenceConfig!.evidenceConfigId,
+            )
+          : _sessionService.watchActiveSession(
+              companyId: _companyId,
+              stationSlot: widget.stationConfig!.effectiveStationSlot,
+            ),
+      builder: (context, snap) {
+        final session = snap.data ?? _closedSession;
+        if (session != null &&
+            session.id != _hydratedSessionId &&
+            session.isActive) {
+          _hydratedSessionId = session.id;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _syncFormFromSession(session);
+            if (_loadsChemicalMasterData) {
+              final workBathId = _entitySelections['workBathId'];
+              if (workBathId != null && workBathId.isNotEmpty) {
+                unawaited(_reloadChemicalsForWorkBath(workBathId));
               }
-              setState(() {});
-            });
-          }
+            } else {
+              _applyUnitDefaultsForSelection();
+            }
+            setState(() {});
+          });
+        }
 
-          if (session == null) {
-            return _buildNoSessionBody();
-          }
-          return _buildActiveSessionBody(session);
-        },
-      ),
+        return StreamBuilder<List<ProductionStationWorkSession>>(
+          stream: widget.isCompanyEvidence
+              ? _sessionService.watchClosedSessionsForEvidence(
+                  companyId: _companyId,
+                  evidenceConfigId: widget.evidenceConfig!.evidenceConfigId,
+                )
+              : _sessionService.watchClosedSessionsForStation(
+                  companyId: _companyId,
+                  stationSlot: widget.stationConfig!.effectiveStationSlot,
+                ),
+          builder: (context, closedSnap) {
+            final closedSessions = closedSnap.data ?? const [];
+            final recordsLoading =
+                closedSnap.connectionState == ConnectionState.waiting &&
+                !closedSnap.hasData;
+
+            return Scaffold(
+              appBar: AppBar(
+                title: Text(_stationTitle),
+                leading: IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Zatvori stanicu',
+                  onPressed: _busy ? null : _closeStation,
+                ),
+              ),
+              body: AbsorbPointer(
+                absorbing: _busy,
+                child: Stack(
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Flexible(
+                          flex: 5,
+                          child: session == null
+                              ? _buildNoSessionBody()
+                              : _buildActiveSessionBody(session),
+                        ),
+                        const Divider(height: 1),
+                        Flexible(
+                          flex: 4,
+                          child: CatalogEvidenceRecordsTable(
+                            companyData: widget.companyData,
+                            profile: widget.profile,
+                            sessions: closedSessions,
+                            activeSession:
+                                session?.isActive == true ? session : null,
+                            loading: recordsLoading,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_busy)
+                      const ColoredBox(
+                        color: Color(0x33FFFFFF),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
