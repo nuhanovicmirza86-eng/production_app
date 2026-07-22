@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 /// Širina: kompaktna prema sadržaju (narrow / medium / wide), bez nepotrebnog
 /// širenja; header label do 2 reda po riječima (ne po slovima); horizontalni
 /// scroll kad zbroj kolona ne stane u dostupnu širinu kontejnera.
+/// Iznad tabele: standardni selector „Zadnjih N unosa“ (10 / 25 / 50 / 100).
 ///
 /// Koristi [StandardTableShell], [StandardTableFlexCell], [StandardTableMetrics],
 /// [StandardTableStatusBadge] i [StandardTableOpenLink] za konzistentan izgled.

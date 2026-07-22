@@ -71,6 +71,7 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
   String _plantDisplayLabel = '';
   Map<String, dynamic>? _lastControlledInputWarning;
   ProductionStationWorkSession? _closedSession;
+  int _recordsLimit = catalogEvidenceDefaultRecordLimit;
 
   bool get _supportsOsWindowChrome =>
       !kIsWeb &&
@@ -1248,10 +1249,12 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
               ? _sessionService.watchClosedSessionsForEvidence(
                   companyId: _companyId,
                   evidenceConfigId: widget.evidenceConfig!.evidenceConfigId,
+                  limit: _recordsLimit,
                 )
               : _sessionService.watchClosedSessionsForStation(
                   companyId: _companyId,
                   stationSlot: widget.stationConfig!.effectiveStationSlot,
+                  limit: _recordsLimit,
                 ),
           builder: (context, closedSnap) {
             final closedSessions = closedSnap.data ?? const [];
@@ -1288,6 +1291,10 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
                             companyData: widget.companyData,
                             profile: widget.profile,
                             sessions: closedSessions,
+                            recordLimit: _recordsLimit,
+                            onRecordLimitChanged: (value) {
+                              setState(() => _recordsLimit = value);
+                            },
                             activeSession:
                                 session?.isActive == true ? session : null,
                             loading: recordsLoading,

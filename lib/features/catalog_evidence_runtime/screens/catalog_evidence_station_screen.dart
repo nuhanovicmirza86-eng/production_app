@@ -70,6 +70,7 @@ class _CatalogEvidenceStationScreenState
   String? _hydratedSessionId;
   String _plantDisplayLabel = '';
   ProductionStationWorkSession? _closedSession;
+  int _recordsLimit = catalogEvidenceDefaultRecordLimit;
 
   bool get _supportsOsWindowChrome =>
       !kIsWeb &&
@@ -669,10 +670,12 @@ class _CatalogEvidenceStationScreenState
               ? _sessionStream.watchClosedSessionsForEvidence(
                   companyId: _companyId,
                   evidenceConfigId: widget.evidenceConfig!.evidenceConfigId,
+                  limit: _recordsLimit,
                 )
               : _sessionStream.watchClosedSessionsForStation(
                   companyId: _companyId,
                   stationSlot: widget.stationConfig!.effectiveStationSlot,
+                  limit: _recordsLimit,
                 ),
           builder: (context, closedSnapshot) {
             final closedSessions = closedSnapshot.data ?? const [];
@@ -713,6 +716,10 @@ class _CatalogEvidenceStationScreenState
                             companyData: widget.companyData,
                             profile: widget.profile,
                             sessions: closedSessions,
+                            recordLimit: _recordsLimit,
+                            onRecordLimitChanged: (value) {
+                              setState(() => _recordsLimit = value);
+                            },
                             activeSession: activeSession?.isActive == true
                                 ? activeSession
                                 : null,

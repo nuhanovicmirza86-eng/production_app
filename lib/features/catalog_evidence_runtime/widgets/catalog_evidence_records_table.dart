@@ -98,8 +98,127 @@ List<CatalogEvidenceTableColumn> _appendStandardDetailsColumn(
   return [...columns, _standardDetailsColumn];
 }
 
+bool _usesProfileOperatorFieldColumns(String profileKey) {
+  switch (profileKey.trim()) {
+    case 'chemical_dosing':
+    case 'wastewater_treatment':
+      return true;
+    default:
+      return false;
+  }
+}
+
+const List<String> _chemicalDosingTableFieldKeys = [
+  'measuredAt',
+  'workBathId',
+  'chemicalId',
+  'chemicalLot',
+  'dosedQuantity',
+  'unit',
+  'dosingReason',
+  'operatorComment',
+];
+
+const List<String> _wastewaterTableFieldKeys = [
+  'measuredAt',
+  'treatmentPointId',
+  'treatedQuantity',
+  'unit',
+  'reactorNumber',
+  'heavyMetalsPresent',
+  'operatorComment',
+];
+
+List<String> _profileOperatorTableFieldKeys(String profileKey) {
+  switch (profileKey.trim()) {
+    case 'chemical_dosing':
+      return _chemicalDosingTableFieldKeys;
+    case 'wastewater_treatment':
+      return _wastewaterTableFieldKeys;
+    default:
+      return const [];
+  }
+}
+
+CatalogEvidenceTableColumn _columnForProfileField(
+  ProductionStationProfileField field,
+) {
+  final id = field.key;
+  final label = _tableLabelForProfileField(field);
+
+  if (field.type == 'number') {
+    return _numericColumn(id: id, label: label);
+  }
+  if (field.type == 'datetime') {
+    return _textColumn(id: id, label: label);
+  }
+  if (field.type == 'text' ||
+      field.key == 'operatorComment' ||
+      field.key == 'dosingReason' ||
+      field.key == 'measurementReason' ||
+      field.key == 'chemicalUsedNote') {
+    return _textColumn(
+      id: id,
+      label: label,
+      size: CatalogEvidenceColumnSize.wide,
+    );
+  }
+  if (field.type == 'enum' &&
+      (field.key == 'reactorNumber' ||
+          field.key == 'heavyMetalsPresent' ||
+          field.key == 'unit')) {
+    return _textColumn(
+      id: id,
+      label: label,
+      size: CatalogEvidenceColumnSize.narrow,
+    );
+  }
+  return _textColumn(id: id, label: label);
+}
+
+String _tableLabelForProfileField(ProductionStationProfileField field) {
+  switch (field.key) {
+    case 'chemicalId':
+      return 'Hemikalija';
+    case 'treatmentPointId':
+      return 'Procesna tačka';
+    case 'heavyMetalsPresent':
+      return 'Teški metali';
+    case 'reactorNumber':
+      return 'Broj reaktora';
+    default:
+      final label = field.label.trim();
+      return label.isEmpty ? field.key : label;
+  }
+}
+
+List<CatalogEvidenceTableColumn> _profileOperatorFieldColumns(
+  ProductionStationProfileCatalogEntry profile,
+) {
+  final fieldKeys = _profileOperatorTableFieldKeys(profile.profileKey);
+  final fieldsByKey = {
+    for (final field in profile.fields) field.key: field,
+  };
+  final columns = <CatalogEvidenceTableColumn>[];
+  for (final key in fieldKeys) {
+    final field = fieldsByKey[key];
+    if (field == null) continue;
+    columns.add(_columnForProfileField(field));
+  }
+  columns.add(_textColumn(id: 'operator', label: 'Operater'));
+  columns.add(_standardStatusColumn);
+  return _appendStandardDetailsColumn(columns);
+}
+
 const double _catalogEvidenceNarrowTableBreakpoint = 600;
 const double _catalogEvidenceHeaderCharWidth = 6.3;
+const double _catalogEvidenceRecordLimitToolbarBreakpoint = 520;
+
+/// Standardni izbor broja zadnjih zapisa u tabeli evidencija.
+const List<int> catalogEvidenceRecordLimitOptions = [10, 25, 50, 100];
+
+/// Zadani broj zatvorenih zapisa u tabeli evidencija.
+const int catalogEvidenceDefaultRecordLimit = 25;
 
 /// Minimalna širina headera da se label ne lomi po slovima (max 2 reda po riječima).
 double catalogEvidenceHeaderLayoutWidth(String label) {
@@ -139,12 +258,23 @@ double catalogEvidenceColumnMinWidth(
   CatalogEvidenceColumnSize size = CatalogEvidenceColumnSize.medium,
 }) {
   switch (columnId.trim()) {
+    case 'measuredAt':
     case 'measured_at':
       return 116;
+    case 'workBathId':
     case 'work_bath':
+    case 'chemicalId':
     case 'chemical':
+    case 'treatmentPointId':
     case 'treatment_point':
       return 100;
+    case 'chemicalLot':
+      return 88;
+    case 'operatorComment':
+    case 'dosingReason':
+    case 'measurementReason':
+    case 'chemicalUsedNote':
+      return 120;
     case 'reason':
       return 104;
     case 'operator':
@@ -162,6 +292,8 @@ double catalogEvidenceColumnMinWidth(
     case 'time':
       return 64;
     case 'quantity':
+    case 'dosedQuantity':
+    case 'treatedQuantity':
     case 'good_qty':
     case 'scrap_qty':
     case 'rework_qty':
@@ -175,8 +307,10 @@ double catalogEvidenceColumnMinWidth(
     case 'unit':
       return 56;
     case 'reactor':
+    case 'reactorNumber':
       return 52;
     case 'heavy_metals':
+    case 'heavyMetalsPresent':
       return 76;
     case 'status':
       return 84;
@@ -194,6 +328,10 @@ double catalogEvidenceColumnMinWidth(
 List<CatalogEvidenceTableColumn> catalogEvidenceTableColumnsForProfile(
   ProductionStationProfileCatalogEntry profile,
 ) {
+  if (_usesProfileOperatorFieldColumns(profile.profileKey)) {
+    return _profileOperatorFieldColumns(profile);
+  }
+
   final List<CatalogEvidenceTableColumn> profileColumns;
   switch (profile.profileKey.trim()) {
     case 'production_counting':
@@ -229,30 +367,6 @@ List<CatalogEvidenceTableColumn> catalogEvidenceTableColumnsForProfile(
         _textColumn(id: 'product', label: 'Proizvod', size: CatalogEvidenceColumnSize.wide),
         _numericColumn(id: 'qty_submitted', label: 'Predato'),
         _textColumn(id: 'disposition', label: 'Dispozicija'),
-        _textColumn(id: 'operator', label: 'Operater'),
-        _standardStatusColumn,
-      ];
-      break;
-    case 'chemical_dosing':
-      profileColumns = [
-        _textColumn(id: 'measured_at', label: 'Vrijeme doziranja'),
-        _textColumn(id: 'work_bath', label: 'Radna kada'),
-        _textColumn(id: 'chemical', label: 'Hemikalija'),
-        _numericColumn(id: 'quantity', label: 'Količina'),
-        _textColumn(id: 'unit', label: 'Jedinica', size: CatalogEvidenceColumnSize.narrow),
-        _textColumn(id: 'reason', label: 'Razlog doziranja'),
-        _textColumn(id: 'operator', label: 'Operater'),
-        _standardStatusColumn,
-      ];
-      break;
-    case 'wastewater_treatment':
-      profileColumns = [
-        _textColumn(id: 'measured_at', label: 'Vrijeme mjerenja'),
-        _textColumn(id: 'treatment_point', label: 'Procesna tačka'),
-        _numericColumn(id: 'quantity', label: 'Tretirana kol.'),
-        _textColumn(id: 'unit', label: 'Jedinica', size: CatalogEvidenceColumnSize.narrow),
-        _textColumn(id: 'reactor', label: 'Reaktor', size: CatalogEvidenceColumnSize.narrow),
-        _textColumn(id: 'heavy_metals', label: 'Teški metali', size: CatalogEvidenceColumnSize.narrow),
         _textColumn(id: 'operator', label: 'Operater'),
         _standardStatusColumn,
       ];
@@ -318,6 +432,31 @@ String _formatMeasuredAt(DateTime? when) {
       '${when.year}. '
       '${when.hour.toString().padLeft(2, '0')}:'
       '${when.minute.toString().padLeft(2, '0')}';
+}
+
+String _cellTextForProfileFieldKey(
+  String fieldKey,
+  ProductionStationWorkSession session,
+  ProductionStationProfileCatalogEntry profile,
+) {
+  final values = session.fieldValues ?? const {};
+  const snapshotByEntityField = <String, String>{
+    'workBathId': 'workBathNameSnapshot',
+    'chemicalId': 'chemicalNameSnapshot',
+    'treatmentPointId': 'treatmentPointNameSnapshot',
+  };
+  final snapshotKey = snapshotByEntityField[fieldKey];
+  if (snapshotKey != null) {
+    final name = (values[snapshotKey] ?? '').toString().trim();
+    return name.isEmpty ? '—' : name;
+  }
+  if (fieldKey == 'measuredAt') {
+    final measured = _parseMeasuredAtValue(values['measuredAt']);
+    return _formatMeasuredAt(
+      measured ?? session.endedAt ?? session.createdAt,
+    );
+  }
+  return _fieldDisplayValue(profile, fieldKey, values[fieldKey]);
 }
 
 String _cellText(
@@ -411,7 +550,19 @@ String _cellText(
       return created.isEmpty ? '—' : created;
     case 'status':
       return catalogEvidenceSessionStatusLabel(session.status);
+    case 'lot':
+      return _fieldDisplayValue(profile, 'chemicalLot', values['chemicalLot']);
+    case 'operator_comment':
+      return _fieldDisplayValue(
+        profile,
+        'operatorComment',
+        values['operatorComment'],
+      );
     default:
+      if (_profileOperatorTableFieldKeys(profile.profileKey)
+          .contains(column.id)) {
+        return _cellTextForProfileFieldKey(column.id, session, profile);
+      }
       return '—';
   }
 }
@@ -482,13 +633,19 @@ class CatalogEvidenceRecordsTable extends StatelessWidget {
     required this.companyData,
     required this.profile,
     required this.sessions,
+    required this.recordLimit,
+    required this.onRecordLimitChanged,
     this.activeSession,
     this.loading = false,
+    this.recordLimitOptions = catalogEvidenceRecordLimitOptions,
   });
 
   final Map<String, dynamic> companyData;
   final ProductionStationProfileCatalogEntry profile;
   final List<ProductionStationWorkSession> sessions;
+  final int recordLimit;
+  final ValueChanged<int> onRecordLimitChanged;
+  final List<int> recordLimitOptions;
   final ProductionStationWorkSession? activeSession;
   final bool loading;
 
@@ -716,6 +873,100 @@ class CatalogEvidenceRecordsTable extends StatelessWidget {
     );
   }
 
+  Widget _buildRecordLimitSelector({
+    required BuildContext context,
+    required ColorScheme cs,
+  }) {
+    final effectiveLimit = recordLimitOptions.contains(recordLimit)
+        ? recordLimit
+        : catalogEvidenceDefaultRecordLimit;
+
+    return DropdownButton<int>(
+      value: effectiveLimit,
+      isDense: true,
+      underline: const SizedBox.shrink(),
+      icon: Icon(Icons.arrow_drop_down, color: cs.onSurfaceVariant),
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: cs.onSurface,
+          ),
+      items: recordLimitOptions
+          .map(
+            (n) => DropdownMenuItem<int>(
+              value: n,
+              child: Text('Zadnjih $n unosa'),
+            ),
+          )
+          .toList(growable: false),
+      onChanged: loading
+          ? null
+          : (value) {
+              if (value == null || value == effectiveLimit) return;
+              onRecordLimitChanged(value);
+            },
+    );
+  }
+
+  Widget _buildTableToolbar({
+    required BuildContext context,
+    required ThemeData theme,
+    required ColorScheme cs,
+    required int rowCount,
+  }) {
+    final title = Text(
+      'Pregled evidencija',
+      style: theme.textTheme.titleMedium,
+    );
+    final selector = _buildRecordLimitSelector(context: context, cs: cs);
+    final countText = Text(
+      loading
+          ? 'Učitavanje…'
+          : rowCount == 0
+          ? 'Nema zapisa za prikaz.'
+          : '$rowCount zapisa',
+      style: theme.textTheme.bodySmall?.copyWith(
+        color: cs.onSurfaceVariant,
+      ),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stackToolbar =
+            constraints.maxWidth < _catalogEvidenceRecordLimitToolbarBreakpoint;
+
+        if (stackToolbar) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              title,
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: selector,
+              ),
+              const SizedBox(height: 4),
+              countText,
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(child: title),
+                selector,
+              ],
+            ),
+            const SizedBox(height: 4),
+            countText,
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -733,22 +984,11 @@ class CatalogEvidenceRecordsTable extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Text(
-            'Pregled evidencija',
-            style: theme.textTheme.titleMedium,
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-          child: Text(
-            loading
-                ? 'Učitavanje…'
-                : rows.isEmpty
-                ? 'Nema zapisa za prikaz.'
-                : '${rows.length} zapisa',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: cs.onSurfaceVariant,
-            ),
+          child: _buildTableToolbar(
+            context: context,
+            theme: theme,
+            cs: cs,
+            rowCount: rows.length,
           ),
         ),
         Expanded(
