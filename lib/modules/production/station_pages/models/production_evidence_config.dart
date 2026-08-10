@@ -24,6 +24,7 @@ class ProductionEvidenceConfig {
   final String displayName;
   final String profileKey;
   final String profileNameSnapshot;
+  final Map<String, dynamic>? profileSnapshot;
   final bool active;
   final bool runtimeVisible;
   final List<String> runtimeAllowedRoles;
@@ -44,6 +45,7 @@ class ProductionEvidenceConfig {
     required this.displayName,
     required this.profileKey,
     required this.profileNameSnapshot,
+    this.profileSnapshot,
     required this.active,
     required this.runtimeVisible,
     required this.runtimeAllowedRoles,
@@ -136,6 +138,9 @@ class ProductionEvidenceConfig {
       displayName: (data['displayName'] ?? '').toString().trim(),
       profileKey: (data['profileKey'] ?? '').toString().trim(),
       profileNameSnapshot: (data['profileNameSnapshot'] ?? '').toString().trim(),
+      profileSnapshot: data['profileSnapshot'] is Map
+          ? Map<String, dynamic>.from(data['profileSnapshot'] as Map)
+          : null,
       active: data['active'] == true,
       runtimeVisible: data['runtimeVisible'] == true,
       runtimeAllowedRoles: roles,

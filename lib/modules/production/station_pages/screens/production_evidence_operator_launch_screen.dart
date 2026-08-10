@@ -13,12 +13,14 @@ class ProductionEvidenceOperatorLaunchScreen extends StatelessWidget {
     required this.companyData,
     required this.evidenceConfig,
     required this.profile,
+    this.profileCatalogVersion = 0,
     this.onClose,
   });
 
   final Map<String, dynamic> companyData;
   final ProductionEvidenceConfig evidenceConfig;
   final ProductionStationProfileCatalogEntry profile;
+  final int profileCatalogVersion;
   final VoidCallback? onClose;
 
   @override
@@ -61,6 +63,7 @@ class ProductionEvidenceOperatorLaunchScreen extends StatelessWidget {
         companyData: companyData,
         evidenceConfig: evidenceConfig,
         profile: profile,
+        profileCatalogVersion: profileCatalogVersion,
         onCloseStation: onClose,
       );
     }

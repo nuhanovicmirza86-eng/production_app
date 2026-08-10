@@ -13,13 +13,13 @@ const Set<String> profileEvidenceDetailHiddenFieldKeys = {
 const Set<String> profileEvidenceDetailRedundantSnapshotKeys = {
   'workBathNameSnapshot',
   'chemicalNameSnapshot',
-  'treatmentPointNameSnapshot',
+  'treatmentTypeLabelSnapshot',
+  'treatmentTypeNameSnapshot',
 };
 
 const Map<String, String> _entityIdToSnapshotField = {
   'workBathId': 'workBathNameSnapshot',
   'chemicalId': 'chemicalNameSnapshot',
-  'treatmentPointId': 'treatmentPointNameSnapshot',
   'productionOrderId': 'productionOrderCodeSnapshot',
 };
 
@@ -99,8 +99,10 @@ String? _summaryValueForEntityField(
       return _nonEmpty(summary.workBathName);
     case 'chemicalId':
       return _nonEmpty(summary.chemicalName);
-    case 'treatmentPointId':
-      return _nonEmpty(summary.treatmentPointName);
+    case 'treatmentType':
+      return _nonEmpty(summary.treatmentTypeLabel) ??
+          _nonEmpty(summary.treatmentTypeName) ??
+          _nonEmpty(summary.treatmentPointName);
     default:
       return null;
   }
@@ -130,6 +132,15 @@ String profileEvidenceDetailFieldDisplayValue({
   }
 
   if (field.type == 'enum') {
+    if (field.key == 'treatmentType') {
+      for (final key in [
+        'treatmentTypeLabelSnapshot',
+        'treatmentTypeNameSnapshot',
+      ]) {
+        final snap = formatFieldValue(session.fieldValues[key]);
+        if (snap != '—') return snap;
+      }
+    }
     final label = field.enumLabelFor(raw?.toString() ?? '');
     return label.trim().isEmpty ? '—' : label;
   }

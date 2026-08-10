@@ -120,13 +120,21 @@ const List<String> _chemicalDosingTableFieldKeys = [
 ];
 
 const List<String> _wastewaterTableFieldKeys = [
-  'measuredAt',
-  'treatmentPointId',
+  'treatmentType',
   'treatedQuantity',
   'unit',
   'reactorNumber',
+  'limeQuantity',
+  'sodiumMetabisulfiteQuantity',
+  'sodiumHydroxideQuantity',
   'heavyMetalsPresent',
+  'phValue',
+  'temperatureC',
+  'sludgeQuantity',
+  'finalNeutralizationPh',
+  'finalNeutralizationRedoxMv',
   'operatorComment',
+  'measuredAt',
 ];
 
 List<String> _profileOperatorTableFieldKeys(String profileKey) {
@@ -177,19 +185,10 @@ CatalogEvidenceTableColumn _columnForProfileField(
 }
 
 String _tableLabelForProfileField(ProductionStationProfileField field) {
-  switch (field.key) {
-    case 'chemicalId':
-      return 'Hemikalija';
-    case 'treatmentPointId':
-      return 'Procesna tačka';
-    case 'heavyMetalsPresent':
-      return 'Teški metali';
-    case 'reactorNumber':
-      return 'Broj reaktora';
-    default:
-      final label = field.label.trim();
-      return label.isEmpty ? field.key : label;
-  }
+  final fromKey = _tableLabelForFieldKey(field.key);
+  if (fromKey != field.key) return fromKey;
+  final label = field.label.trim();
+  return label.isEmpty ? field.key : label;
 }
 
 List<CatalogEvidenceTableColumn> _profileOperatorFieldColumns(
@@ -200,8 +199,13 @@ List<CatalogEvidenceTableColumn> _profileOperatorFieldColumns(
     for (final field in profile.fields) field.key: field,
   };
   final columns = <CatalogEvidenceTableColumn>[];
+  final isWastewater = profile.profileKey.trim() == 'wastewater_treatment';
   for (final key in fieldKeys) {
     final field = fieldsByKey[key];
+    if (isWastewater) {
+      columns.add(_wastewaterColumnForTableKey(key, field));
+      continue;
+    }
     if (field == null) continue;
     columns.add(_columnForProfileField(field));
   }
@@ -210,9 +214,116 @@ List<CatalogEvidenceTableColumn> _profileOperatorFieldColumns(
   return _appendStandardDetailsColumn(columns);
 }
 
+const Set<String> _wastewaterNumericTableFieldKeys = {
+  'treatedQuantity',
+  'limeQuantity',
+  'sodiumMetabisulfiteQuantity',
+  'sodiumHydroxideQuantity',
+  'phValue',
+  'temperatureC',
+  'sludgeQuantity',
+  'finalNeutralizationPh',
+  'finalNeutralizationRedoxMv',
+};
+
+CatalogEvidenceTableColumn _wastewaterColumnForTableKey(
+  String key,
+  ProductionStationProfileField? field,
+) {
+  if (key == 'treatmentType') {
+    return _textColumn(
+      id: key,
+      label: _tableLabelForFieldKey(key),
+      size: CatalogEvidenceColumnSize.wide,
+    );
+  }
+  if (field != null) {
+    return _columnForProfileField(field);
+  }
+  final label = _tableLabelForFieldKey(key);
+  if (_wastewaterNumericTableFieldKeys.contains(key)) {
+    return _numericColumn(id: key, label: label);
+  }
+  if (key == 'operatorComment') {
+    return _textColumn(
+      id: key,
+      label: label,
+      size: CatalogEvidenceColumnSize.wide,
+    );
+  }
+  if (key == 'reactorNumber' ||
+      key == 'heavyMetalsPresent' ||
+      key == 'unit') {
+    return _textColumn(
+      id: key,
+      label: label,
+      size: CatalogEvidenceColumnSize.narrow,
+    );
+  }
+  return _textColumn(id: key, label: label);
+}
+
+String _tableLabelForFieldKey(String key) {
+  switch (key) {
+    case 'treatmentType':
+      return 'Vrsta obrade';
+    case 'treatedQuantity':
+      return 'Količina';
+    case 'unit':
+      return 'Jed.';
+    case 'reactorNumber':
+      return 'Reaktor';
+    case 'limeQuantity':
+      return 'Kreč kg';
+    case 'sodiumMetabisulfiteQuantity':
+      return 'Na₂S₂O₅ kg';
+    case 'sodiumHydroxideQuantity':
+      return 'NaOH kg';
+    case 'heavyMetalsPresent':
+      return 'Teški metali';
+    case 'phValue':
+      return 'pH';
+    case 'temperatureC':
+      return 'Temp. °C';
+    case 'sludgeQuantity':
+      return 'Talog kg';
+    case 'finalNeutralizationPh':
+      return 'pH neutral.';
+    case 'finalNeutralizationRedoxMv':
+      return 'Redox mV';
+    case 'operatorComment':
+      return 'Komentar';
+    case 'measuredAt':
+      return 'Vrijeme';
+    case 'chemicalId':
+      return 'Hemikalija';
+    default:
+      return key;
+  }
+}
+
 const double _catalogEvidenceNarrowTableBreakpoint = 600;
 const double _catalogEvidenceHeaderCharWidth = 6.3;
 const double _catalogEvidenceRecordLimitToolbarBreakpoint = 520;
+
+/// Širina tabele = tačan zbir kolona (scroll završava na zadnjoj koloni, bez praznog desno).
+/// Globalno za sve profile koji koriste [CatalogEvidenceRecordsTable] (F1H-R2).
+double _effectiveTableLayoutWidth(List<CatalogEvidenceTableColumn> columns) {
+  return columns.fold<double>(
+    0,
+    (sum, column) => sum + column.layoutWidth,
+  );
+}
+
+/// Horizontalni scroll kad sadržaj ne stane — nije vezano za pojedinačni profileKey.
+bool _useFixedWidthTableLayout({
+  required List<CatalogEvidenceTableColumn> columns,
+  required double maxWidth,
+}) {
+  final tableLayoutWidth = _effectiveTableLayoutWidth(columns);
+  return tableLayoutWidth > maxWidth + 1 ||
+      maxWidth < _catalogEvidenceNarrowTableBreakpoint;
+}
 
 /// Standardni izbor broja zadnjih zapisa u tabeli evidencija.
 const List<int> catalogEvidenceRecordLimitOptions = [10, 25, 50, 100];
@@ -265,9 +376,17 @@ double catalogEvidenceColumnMinWidth(
     case 'work_bath':
     case 'chemicalId':
     case 'chemical':
-    case 'treatmentPointId':
-    case 'treatment_point':
-      return 100;
+    case 'treatmentType':
+      return 140;
+    case 'limeQuantity':
+    case 'sodiumMetabisulfiteQuantity':
+    case 'sodiumHydroxideQuantity':
+    case 'phValue':
+    case 'temperatureC':
+    case 'sludgeQuantity':
+    case 'finalNeutralizationPh':
+    case 'finalNeutralizationRedoxMv':
+      return 64;
     case 'chemicalLot':
       return 88;
     case 'operatorComment':
@@ -443,12 +562,20 @@ String _cellTextForProfileFieldKey(
   const snapshotByEntityField = <String, String>{
     'workBathId': 'workBathNameSnapshot',
     'chemicalId': 'chemicalNameSnapshot',
-    'treatmentPointId': 'treatmentPointNameSnapshot',
   };
   final snapshotKey = snapshotByEntityField[fieldKey];
   if (snapshotKey != null) {
     final name = (values[snapshotKey] ?? '').toString().trim();
     return name.isEmpty ? '—' : name;
+  }
+  if (fieldKey == 'treatmentType') {
+    for (final key in [
+      'treatmentTypeLabelSnapshot',
+      'treatmentTypeNameSnapshot',
+    ]) {
+      final snap = (values[key] ?? '').toString().trim();
+      if (snap.isNotEmpty) return snap;
+    }
   }
   if (fieldKey == 'measuredAt') {
     final measured = _parseMeasuredAtValue(values['measuredAt']);
@@ -657,13 +784,6 @@ class CatalogEvidenceRecordsTable extends StatelessWidget {
     return rows;
   }
 
-  double _tableLayoutWidth(List<CatalogEvidenceTableColumn> columns) {
-    return columns.fold<double>(
-      0,
-      (sum, column) => sum + column.layoutWidth,
-    );
-  }
-
   Widget _buildHeaderLabel({
     required CatalogEvidenceTableColumn column,
     required TextStyle headerStyle,
@@ -811,10 +931,11 @@ class CatalogEvidenceRecordsTable extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final tableLayoutWidth = _tableLayoutWidth(columns);
-        final useFixedWidths =
-            tableLayoutWidth > constraints.maxWidth + 1 ||
-            constraints.maxWidth < _catalogEvidenceNarrowTableBreakpoint;
+        final useFixedWidths = _useFixedWidthTableLayout(
+          columns: columns,
+          maxWidth: constraints.maxWidth,
+        );
+        final tableLayoutWidth = _effectiveTableLayoutWidth(columns);
 
         Widget tableColumn() {
           return Column(
@@ -832,7 +953,11 @@ class CatalogEvidenceRecordsTable extends StatelessWidget {
                     ? emptyBody
                     : Scrollbar(
                         thumbVisibility: true,
+                        notificationPredicate: (notification) =>
+                            notification.metrics.axis == Axis.vertical,
                         child: ListView.builder(
+                          primary: false,
+                          physics: const AlwaysScrollableScrollPhysics(),
                           itemCount: rows.length,
                           itemBuilder: (context, index) {
                             return _buildDataRow(
@@ -859,6 +984,8 @@ class CatalogEvidenceRecordsTable extends StatelessWidget {
                 notification.metrics.axis == Axis.horizontal,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
+              primary: false,
+              physics: const AlwaysScrollableScrollPhysics(),
               child: SizedBox(
                 width: tableLayoutWidth,
                 height: constraints.maxHeight,

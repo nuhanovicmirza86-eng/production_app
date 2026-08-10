@@ -8,6 +8,8 @@ import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/format/ba_formatted_date.dart';
 import '../../../../features/catalog_evidence_runtime/widgets/catalog_evidence_records_table.dart';
+import '../../../../features/catalog_evidence_runtime/widgets/catalog_evidence_viewport_split.dart';
+import '../../station_pages/utils/production_operator_profile_resolver.dart';
 import '../../station_pages/models/production_evidence_config.dart';
 import '../../station_pages/models/production_station_config.dart';
 import '../../station_pages/models/production_station_profile_catalog_entry.dart';
@@ -25,13 +27,15 @@ class ProfileDrivenWorkScreen extends StatefulWidget {
     required this.stationConfig,
     required this.profile,
     this.onCloseStation,
-  })  : evidenceConfig = null;
+  })  : evidenceConfig = null,
+        profileCatalogVersion = 0;
 
   const ProfileDrivenWorkScreen.companyEvidence({
     super.key,
     required this.companyData,
     required this.evidenceConfig,
     required this.profile,
+    this.profileCatalogVersion = 0,
     this.onCloseStation,
   })  : stationConfig = null;
 
@@ -39,6 +43,7 @@ class ProfileDrivenWorkScreen extends StatefulWidget {
   final ProductionStationConfig? stationConfig;
   final ProductionEvidenceConfig? evidenceConfig;
   final ProductionStationProfileCatalogEntry profile;
+  final int profileCatalogVersion;
   final VoidCallback? onCloseStation;
 
   bool get isCompanyEvidence => evidenceConfig != null;
@@ -60,6 +65,8 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
   final Map<String, DateTime?> _measuredAtByKey = {};
 
   List<ProductionStationProfileField> _fields = const [];
+  ProductionStationProfileCatalogEntry? _runtimeProfile;
+  int _profileCatalogVersion = 0;
   List<ControlledInputWorkBathOption> _workBaths = const [];
   List<ControlledInputChemicalOption> _chemicals = const [];
   Map<String, List<String>> _mappingAllowedUnitsByChemicalId = const {};
@@ -120,13 +127,50 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
       ? widget.evidenceConfig!.displayName
       : widget.stationConfig!.title;
 
-  @override
-  void initState() {
-    super.initState();
-    _fields = widget.profile.fields
+  ProductionStationProfileCatalogEntry get _effectiveProfile =>
+      _runtimeProfile ?? widget.profile;
+
+  void _applyProfileFields(ProductionStationProfileCatalogEntry profile) {
+    _runtimeProfile = profile;
+    _fields = profile.fields
         .where((f) => f.isOperatorEditable)
         .toList(growable: false);
     _initControllers();
+  }
+
+  void _maybeRefreshProfileFromSession(ProductionStationWorkSession? session) {
+    if (!widget.isCompanyEvidence) return;
+    final refreshed = ProductionOperatorProfileResolver.resolveNewest(
+      baseline: widget.profile,
+      baselineCatalogVersion: _profileCatalogVersion,
+      configSnapshot: widget.evidenceConfig!.profileSnapshot,
+      sessionSnapshot: session?.profileSnapshot,
+    );
+    if (refreshed.profileKey != _effectiveProfile.profileKey) return;
+    if (refreshed.fields.length == _fields.length &&
+        refreshed.fields.every(
+          (f) => _fields.any((existing) => existing.key == f.key),
+        )) {
+      return;
+    }
+    _applyProfileFields(refreshed);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _profileCatalogVersion = widget.isCompanyEvidence
+        ? widget.profileCatalogVersion
+        : 0;
+    _applyProfileFields(
+      widget.isCompanyEvidence
+          ? ProductionOperatorProfileResolver.resolveNewest(
+              baseline: widget.profile,
+              baselineCatalogVersion: _profileCatalogVersion,
+              configSnapshot: widget.evidenceConfig!.profileSnapshot,
+            )
+          : widget.profile,
+    );
     unawaited(_loadPlantDisplayLabel());
     unawaited(_loadMasterData());
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -367,11 +411,6 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
         if (b.id == workBathId) return b;
       }
     }
-    final treatmentPointId = (_entitySelections['treatmentPointId'] ?? '').trim();
-    if (treatmentPointId.isEmpty) return null;
-    for (final b in _workBaths) {
-      if (b.id == treatmentPointId) return b;
-    }
     return null;
   }
 
@@ -391,19 +430,6 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
     return _formatConcentrationPreview(_selectedChemical()?.concentrationDefault);
   }
 
-  Widget? _infoIcon(String? tooltip) {
-    final text = (tooltip ?? '').trim();
-    if (text.isEmpty) return null;
-    return Tooltip(
-      message: text,
-      child: Icon(
-        Icons.info_outline,
-        size: 20,
-        color: Theme.of(context).colorScheme.primary,
-      ),
-    );
-  }
-
   InputDecoration _fieldDecoration(
     ProductionStationProfileField field, {
     String? helperText,
@@ -413,7 +439,7 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
       labelText: field.required ? '${field.label} *' : field.label,
       border: const OutlineInputBorder(),
       helperText: helperText ?? field.helperText,
-      suffixIcon: suffix ?? _infoIcon(field.helperText),
+      suffixIcon: suffix,
     );
   }
 
@@ -665,7 +691,6 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
   ) {
     switch (field.key) {
       case 'workBathId':
-      case 'treatmentPointId':
         return _workBaths;
       case 'chemicalId':
         return _chemicals;
@@ -757,7 +782,7 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
                 .map(
                   (u) => DropdownMenuItem<String>(
                     value: u,
-                    child: Text(u),
+                    child: Text(field.enumLabelFor(u)),
                   ),
                 )
                 .toList(growable: false),
@@ -770,51 +795,60 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
     }
     if (field.type == 'datetime') {
       final dt = _measuredAtByKey[field.key];
-      return ListTile(
-        contentPadding: EdgeInsets.zero,
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(field.required ? '${field.label} *' : field.label),
+      final helper = (field.helperText ?? '').trim();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(field.required ? '${field.label} *' : field.label),
+            subtitle: Text(
+              dt == null
+                  ? 'Nije uneseno (backend popunjava pri završetku)'
+                  : BaFormattedDate.formatDateTime(dt),
             ),
-            if (_infoIcon(field.helperText) != null) _infoIcon(field.helperText)!,
-          ],
-        ),
-        subtitle: Text(
-          dt == null
-              ? 'Nije uneseno (backend popunjava pri završetku)'
-              : BaFormattedDate.formatDateTime(dt),
-        ),
-        trailing: enabled && !_busy
-            ? IconButton(
-                icon: const Icon(Icons.event),
-                onPressed: () async {
-                  final now = DateTime.now();
-                  final pickedDate = await showDatePicker(
-                    context: context,
-                    initialDate: dt ?? now,
-                    firstDate: DateTime(now.year - 2),
-                    lastDate: DateTime(now.year + 1),
-                  );
-                  if (pickedDate == null || !mounted) return;
-                  if (!context.mounted) return;
-                  final pickedTime = await showTimePicker(
-                    context: context,
-                    initialTime: TimeOfDay.fromDateTime(dt ?? now),
-                  );
-                  if (pickedTime == null || !mounted) return;
-                  setState(() {
-                    _measuredAtByKey[field.key] = DateTime(
-                      pickedDate.year,
-                      pickedDate.month,
-                      pickedDate.day,
-                      pickedTime.hour,
-                      pickedTime.minute,
-                    );
-                  });
-                },
-              )
-            : null,
+            trailing: enabled && !_busy
+                ? IconButton(
+                    icon: const Icon(Icons.event),
+                    onPressed: () async {
+                      final now = DateTime.now();
+                      final pickedDate = await showDatePicker(
+                        context: context,
+                        initialDate: dt ?? now,
+                        firstDate: DateTime(now.year - 2),
+                        lastDate: DateTime(now.year + 1),
+                      );
+                      if (pickedDate == null || !mounted) return;
+                      if (!context.mounted) return;
+                      final pickedTime = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.fromDateTime(dt ?? now),
+                      );
+                      if (pickedTime == null || !mounted) return;
+                      setState(() {
+                        _measuredAtByKey[field.key] = DateTime(
+                          pickedDate.year,
+                          pickedDate.month,
+                          pickedDate.day,
+                          pickedTime.hour,
+                          pickedTime.minute,
+                        );
+                      });
+                    },
+                  )
+                : null,
+          ),
+          if (helper.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                helper,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ),
+        ],
       );
     }
     if (field.type == 'number' || _isTextLike(field.type)) {
@@ -908,8 +942,7 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
 
   bool _showUndefinedSnapshot(String key) =>
       key == 'concentrationSnapshot' ||
-      key == 'processAreaNameSnapshot' ||
-      key == 'treatmentPointNameSnapshot';
+      key == 'processAreaNameSnapshot';
 
   String _snapshotDisplayValue(String key, String? value) {
     final trimmed = (value ?? '').trim();
@@ -980,29 +1013,38 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
               }
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      flex: 2,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              field.label,
-                              style: const TextStyle(fontWeight: FontWeight.w500),
-                            ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            field.label,
+                            style: const TextStyle(fontWeight: FontWeight.w500),
                           ),
-                          if (field.helperText != null &&
-                              field.helperText!.trim().isNotEmpty)
-                            _infoIcon(field.helperText)!,
-                        ],
+                        ),
+                        Expanded(
+                          flex: 3,
+                          child: Text(display),
+                        ),
+                      ],
+                    ),
+                    if (field.helperText != null &&
+                        field.helperText!.trim().isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          field.helperText!.trim(),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: Text(display),
-                    ),
                   ],
                 ),
               );
@@ -1045,11 +1087,13 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
     );
   }
 
-  Widget _buildProfileLaunchHero() {
+  Widget _buildProfileLaunchHero({required bool compact}) {
     final colorScheme = Theme.of(context).colorScheme;
+    final size = compact ? 56.0 : 96.0;
+    final iconSize = compact ? 28.0 : 44.0;
     return Container(
-      width: 96,
-      height: 96,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(
@@ -1063,14 +1107,14 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
         boxShadow: [
           BoxShadow(
             color: colorScheme.primary.withValues(alpha: 0.14),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            blurRadius: compact ? 12 : 20,
+            offset: Offset(0, compact ? 6 : 10),
           ),
         ],
       ),
       child: Icon(
         _profileLaunchIcon(widget.profile.profileKey),
-        size: 44,
+        size: iconSize,
         color: colorScheme.primary,
       ),
     );
@@ -1096,37 +1140,44 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final compact = CatalogEvidenceViewportSplit.isCompactViewport(context);
     final plantLabel =
         _plantDisplayLabel.isEmpty ? _plantKey : _plantDisplayLabel;
 
-    return Center(
+    return Align(
+      alignment: Alignment.topCenter,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 16 : 24,
+          vertical: compact ? 12 : 32,
+        ),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildProfileLaunchHero(),
-              const SizedBox(height: 24),
+              _buildProfileLaunchHero(compact: compact),
+              SizedBox(height: compact ? 10 : 24),
               Text(
                 widget.profile.displayName,
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: (compact
+                        ? theme.textTheme.titleMedium
+                        : theme.textTheme.headlineSmall)
+                    ?.copyWith(fontWeight: FontWeight.w600),
                 textAlign: TextAlign.center,
               ),
               if (plantLabel.trim().isNotEmpty) ...[
-                const SizedBox(height: 8),
+                SizedBox(height: compact ? 4 : 8),
                 Text(
                   'Pogon: $plantLabel',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
+                  style: (compact
+                          ? theme.textTheme.bodyMedium
+                          : theme.textTheme.bodyLarge)
+                      ?.copyWith(color: colorScheme.onSurfaceVariant),
                   textAlign: TextAlign.center,
                 ),
               ],
-              const SizedBox(height: 32),
+              SizedBox(height: compact ? 12 : 32),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
@@ -1134,7 +1185,7 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
                   icon: const Icon(Icons.play_arrow),
                   label: const Text('Pokreni evidenciju'),
                   style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    padding: EdgeInsets.symmetric(vertical: compact ? 10 : 14),
                   ),
                 ),
               ),
@@ -1231,6 +1282,7 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
           _hydratedSessionId = session.id;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
+            _maybeRefreshProfileFromSession(session);
             _syncFormFromSession(session);
             if (_loadsChemicalMasterData) {
               final workBathId = _entitySelections['workBathId'];
@@ -1275,32 +1327,23 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
                 absorbing: _busy,
                 child: Stack(
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Flexible(
-                          flex: 5,
-                          child: session == null
-                              ? _buildNoSessionBody()
-                              : _buildActiveSessionBody(session),
-                        ),
-                        const Divider(height: 1),
-                        Flexible(
-                          flex: 4,
-                          child: CatalogEvidenceRecordsTable(
-                            companyData: widget.companyData,
-                            profile: widget.profile,
-                            sessions: closedSessions,
-                            recordLimit: _recordsLimit,
-                            onRecordLimitChanged: (value) {
-                              setState(() => _recordsLimit = value);
-                            },
-                            activeSession:
-                                session?.isActive == true ? session : null,
-                            loading: recordsLoading,
-                          ),
-                        ),
-                      ],
+                    CatalogEvidenceViewportSplit(
+                      topIsIntrinsic: session == null,
+                      topSection: session == null
+                          ? _buildNoSessionBody()
+                          : _buildActiveSessionBody(session),
+                      tableSection: CatalogEvidenceRecordsTable(
+                        companyData: widget.companyData,
+                        profile: _effectiveProfile,
+                        sessions: closedSessions,
+                        recordLimit: _recordsLimit,
+                        onRecordLimitChanged: (value) {
+                          setState(() => _recordsLimit = value);
+                        },
+                        activeSession:
+                            session?.isActive == true ? session : null,
+                        loading: recordsLoading,
+                      ),
                     ),
                     if (_busy)
                       const ColoredBox(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/company_plant_display_name.dart';
+import '../utils/production_operator_profile_resolver.dart';
 import '../models/production_evidence_config.dart';
 import '../models/production_station_profile_catalog_entry.dart';
 import '../services/production_evidence_config_callable_service.dart';
@@ -35,6 +36,7 @@ class _ProductionEvidenceOperatorHubScreenState
       ProductionStationProfileCatalogEntry profile,
     })
   > _entries = const [];
+  int _profileCatalogVersion = 0;
   final Map<String, String> _plantLabels = {};
 
   String get _companyId =>
@@ -85,7 +87,10 @@ class _ProductionEvidenceOperatorHubScreenState
         }
         if (!config.isRuntimeVisibleToRole(_userRole)) continue;
 
-        final profile = profiles.byKey(config.profileKey);
+        final profile = ProductionOperatorProfileResolver.resolveForEvidenceConfig(
+          config: config,
+          catalog: profiles,
+        );
         if (profile == null || !profile.isComplete) continue;
 
         entries.add((config: config, profile: profile));
@@ -101,6 +106,7 @@ class _ProductionEvidenceOperatorHubScreenState
       if (!mounted) return;
       setState(() {
         _entries = entries;
+        _profileCatalogVersion = profiles.catalogVersion;
         _plantLabels
           ..clear()
           ..addEntries(plants.map((p) => MapEntry(p.plantKey, p.label)));
@@ -125,6 +131,7 @@ class _ProductionEvidenceOperatorHubScreenState
           companyData: widget.companyData,
           evidenceConfig: config,
           profile: profile,
+          profileCatalogVersion: _profileCatalogVersion,
         ),
       ),
     );

@@ -22,6 +22,7 @@ import '../../profile_driven_structured_runtime/widgets/structured_header_sectio
 import '../../profile_driven_structured_runtime/widgets/structured_repeatable_table_section.dart';
 import '../services/catalog_evidence_session_service.dart';
 import '../widgets/catalog_evidence_records_table.dart';
+import '../widgets/catalog_evidence_viewport_split.dart';
 
 /// M1-F3 — generički operator runtime za Admin-konfigurisane catalog evidence stanice.
 class CatalogEvidenceStationScreen extends StatefulWidget {
@@ -600,30 +601,37 @@ class _CatalogEvidenceStationScreenState
       );
     }
 
+    final compact = CatalogEvidenceViewportSplit.isCompactViewport(context);
     final plantLabel = _plantDisplayLabel.trim().isNotEmpty
         ? _plantDisplayLabel.trim()
         : (_plantKey.isNotEmpty ? _plantKey : '');
+    final theme = Theme.of(context);
 
-    return Center(
+    return Align(
+      alignment: Alignment.topCenter,
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(compact ? 12 : 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               widget.profile.displayName,
-              style: Theme.of(context).textTheme.headlineSmall,
+              style: compact
+                  ? theme.textTheme.titleMedium
+                  : theme.textTheme.headlineSmall,
               textAlign: TextAlign.center,
             ),
             if (plantLabel.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              SizedBox(height: compact ? 4 : 8),
               Text(
                 'Pogon: $plantLabel',
-                style: Theme.of(context).textTheme.bodyLarge,
+                style: compact
+                    ? theme.textTheme.bodyMedium
+                    : theme.textTheme.bodyLarge,
                 textAlign: TextAlign.center,
               ),
             ],
-            const SizedBox(height: 24),
+            SizedBox(height: compact ? 12 : 24),
             FilledButton.icon(
               onPressed: _busy ? null : _startSession,
               icon: const Icon(Icons.play_arrow),
@@ -697,36 +705,27 @@ class _CatalogEvidenceStationScreenState
                 absorbing: _busy,
                 child: Stack(
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Flexible(
-                          flex: 5,
-                          child: activeSession == null
-                              ? _buildNoSessionPrompt()
-                              : _buildInputSection(
-                                  session: activeSession,
-                                  formEnabled: formEnabled,
-                                ),
-                        ),
-                        const Divider(height: 1),
-                        Flexible(
-                          flex: 4,
-                          child: CatalogEvidenceRecordsTable(
-                            companyData: widget.companyData,
-                            profile: widget.profile,
-                            sessions: closedSessions,
-                            recordLimit: _recordsLimit,
-                            onRecordLimitChanged: (value) {
-                              setState(() => _recordsLimit = value);
-                            },
-                            activeSession: activeSession?.isActive == true
-                                ? activeSession
-                                : null,
-                            loading: recordsLoading,
-                          ),
-                        ),
-                      ],
+                    CatalogEvidenceViewportSplit(
+                      topIsIntrinsic: activeSession == null,
+                      topSection: activeSession == null
+                          ? _buildNoSessionPrompt()
+                          : _buildInputSection(
+                              session: activeSession,
+                              formEnabled: formEnabled,
+                            ),
+                      tableSection: CatalogEvidenceRecordsTable(
+                        companyData: widget.companyData,
+                        profile: widget.profile,
+                        sessions: closedSessions,
+                        recordLimit: _recordsLimit,
+                        onRecordLimitChanged: (value) {
+                          setState(() => _recordsLimit = value);
+                        },
+                        activeSession: activeSession?.isActive == true
+                            ? activeSession
+                            : null,
+                        loading: recordsLoading,
+                      ),
                     ),
                     if (_busy)
                       const ColoredBox(

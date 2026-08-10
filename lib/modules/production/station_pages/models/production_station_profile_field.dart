@@ -25,6 +25,7 @@ class ProductionStationProfileField {
     this.minSearchChars = 2,
     this.labelFields = const [],
     this.enumLabels = const {},
+    this.legacyEnumLabels = const {},
     this.scanEnabled = false,
   });
 
@@ -52,6 +53,7 @@ class ProductionStationProfileField {
   final int minSearchChars;
   final List<String> labelFields;
   final Map<String, String> enumLabels;
+  final Map<String, String> legacyEnumLabels;
   final bool scanEnabled;
 
   bool get isEntitySelect => type == 'entity_select';
@@ -133,6 +135,7 @@ class ProductionStationProfileField {
       minSearchChars: (data['minSearchChars'] as num?)?.toInt() ?? 2,
       labelFields: _parseStringList(data['labelFields']),
       enumLabels: _parseEnumLabels(data['enumLabels']),
+      legacyEnumLabels: _parseEnumLabels(data['legacyEnumLabels']),
       scanEnabled: data['scanEnabled'] == true,
     );
   }
@@ -159,7 +162,9 @@ class ProductionStationProfileField {
   String enumLabelFor(String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return trimmed;
-    return enumLabels[trimmed] ?? trimmed;
+    return enumLabels[trimmed] ??
+        legacyEnumLabels[trimmed] ??
+        trimmed;
   }
 
   static List<String> _parseEnumValues(Object? raw) {

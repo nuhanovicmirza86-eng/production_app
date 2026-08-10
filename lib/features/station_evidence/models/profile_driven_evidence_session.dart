@@ -7,6 +7,8 @@ class ProfileDrivenEvidenceSummaryFields {
     this.processAreaName,
     this.reactorNumber,
     this.treatmentPointName,
+    this.treatmentTypeName,
+    this.treatmentTypeLabel,
     this.heavyMetalsPresent,
     this.phValue,
     this.limeQuantity,
@@ -35,6 +37,8 @@ class ProfileDrivenEvidenceSummaryFields {
   final String? processAreaName;
   final String? reactorNumber;
   final String? treatmentPointName;
+  final String? treatmentTypeName;
+  final String? treatmentTypeLabel;
   final String? heavyMetalsPresent;
   final double? phValue;
   final double? limeQuantity;
@@ -71,6 +75,8 @@ class ProfileDrivenEvidenceSummaryFields {
       processAreaName: _s(m['processAreaName']),
       reactorNumber: _s(m['reactorNumber']),
       treatmentPointName: _s(m['treatmentPointName']),
+      treatmentTypeName: _s(m['treatmentTypeName']),
+      treatmentTypeLabel: _s(m['treatmentTypeLabel']),
       heavyMetalsPresent: _s(m['heavyMetalsPresent']),
       phValue: n(m['phValue']),
       limeQuantity: n(m['limeQuantity']),
@@ -144,9 +150,12 @@ class ProfileDrivenEvidenceListItem {
       return parts.join(' · ');
     }
     if (processProfileType == 'wastewater_treatment') {
+      final treatmentLabel = s.treatmentTypeLabel ??
+          s.treatmentTypeName ??
+          s.treatmentPointName;
       final parts = <String>[
         if (s.reactorNumber != null) 'Reaktor: ${s.reactorNumber}',
-        if (s.treatmentPointName != null) 'Tačka: ${s.treatmentPointName}',
+        if (treatmentLabel != null) 'Vrsta obrade: $treatmentLabel',
         if (s.quantity != null) 'Količina: ${s.quantity}${s.unit != null ? ' ${s.unit}' : ''}',
         if (s.heavyMetalsPresent != null) 'Teški metali: ${s.heavyMetalsPresent}',
         if (s.phValue != null) 'pH: ${s.phValue}',
