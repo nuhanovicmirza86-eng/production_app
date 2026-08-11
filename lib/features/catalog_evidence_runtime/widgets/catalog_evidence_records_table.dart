@@ -76,6 +76,20 @@ CatalogEvidenceTableColumn _numericColumn({
   );
 }
 
+/// M1-I1-F3 — zajedničke kolone na kraju svake evidence tabele (isti redoslijed).
+const CatalogEvidenceTableColumn _standardEvidenceTimeColumn =
+    CatalogEvidenceTableColumn(
+  id: 'evidence_time',
+  label: 'Vrijeme evidencije',
+  size: CatalogEvidenceColumnSize.medium,
+);
+
+const CatalogEvidenceTableColumn _standardOperatorColumn =
+    CatalogEvidenceTableColumn(
+  id: 'operator',
+  label: 'Operater',
+);
+
 const CatalogEvidenceTableColumn _standardStatusColumn = CatalogEvidenceTableColumn(
   id: 'status',
   label: 'Status',
@@ -89,13 +103,32 @@ const CatalogEvidenceTableColumn _standardDetailsColumn = CatalogEvidenceTableCo
   align: TextAlign.center,
 );
 
-List<CatalogEvidenceTableColumn> _appendStandardDetailsColumn(
-  List<CatalogEvidenceTableColumn> columns,
+/// Kolone koje nikad ne smiju ostati u poslovnom dijelu — idu isključivo u trailer.
+const Set<String> _catalogEvidenceCommonColumnIds = {
+  'evidence_time',
+  'measured_at',
+  'measuredAt',
+  'date',
+  'time',
+  'operator',
+  'status',
+  'details',
+};
+
+/// Poslovne kolone + uvijek isti kraj: Vrijeme evidencije → Operater → Status → Detalji.
+List<CatalogEvidenceTableColumn> _appendStandardCommonColumns(
+  List<CatalogEvidenceTableColumn> businessColumns,
 ) {
-  if (columns.any((column) => column.id == 'details')) {
-    return columns;
-  }
-  return [...columns, _standardDetailsColumn];
+  final filtered = businessColumns
+      .where((column) => !_catalogEvidenceCommonColumnIds.contains(column.id))
+      .toList(growable: false);
+  return [
+    ...filtered,
+    _standardEvidenceTimeColumn,
+    _standardOperatorColumn,
+    _standardStatusColumn,
+    _standardDetailsColumn,
+  ];
 }
 
 bool _usesProfileOperatorFieldColumns(String profileKey) {
@@ -108,33 +141,23 @@ bool _usesProfileOperatorFieldColumns(String profileKey) {
   }
 }
 
+/// Poslovne kolone (bez vremena/operatera/statusa — F3 trailer).
 const List<String> _chemicalDosingTableFieldKeys = [
-  'measuredAt',
-  'workBathId',
   'chemicalId',
-  'chemicalLot',
   'dosedQuantity',
   'unit',
-  'dosingReason',
+  'workBathId',
   'operatorComment',
 ];
 
 const List<String> _wastewaterTableFieldKeys = [
   'treatmentType',
   'treatedQuantity',
-  'unit',
   'reactorNumber',
-  'limeQuantity',
-  'sodiumMetabisulfiteQuantity',
-  'sodiumHydroxideQuantity',
-  'heavyMetalsPresent',
   'phValue',
-  'temperatureC',
-  'sludgeQuantity',
-  'finalNeutralizationPh',
   'finalNeutralizationRedoxMv',
+  'sludgeQuantity',
   'operatorComment',
-  'measuredAt',
 ];
 
 List<String> _profileOperatorTableFieldKeys(String profileKey) {
@@ -200,18 +223,42 @@ List<CatalogEvidenceTableColumn> _profileOperatorFieldColumns(
   };
   final columns = <CatalogEvidenceTableColumn>[];
   final isWastewater = profile.profileKey.trim() == 'wastewater_treatment';
+  final isDosing = profile.profileKey.trim() == 'chemical_dosing';
   for (final key in fieldKeys) {
+    if (_catalogEvidenceCommonColumnIds.contains(key)) continue;
     final field = fieldsByKey[key];
     if (isWastewater) {
       columns.add(_wastewaterColumnForTableKey(key, field));
       continue;
     }
+    if (isDosing && key == 'workBathId') {
+      columns.add(
+        _textColumn(
+          id: key,
+          label: 'Procesna tačka',
+          size: CatalogEvidenceColumnSize.wide,
+        ),
+      );
+      continue;
+    }
+    if (isDosing && key == 'dosedQuantity') {
+      columns.add(_numericColumn(id: key, label: 'Količina'));
+      continue;
+    }
+    if (isDosing && key == 'unit') {
+      columns.add(
+        _textColumn(
+          id: key,
+          label: 'Jedinica',
+          size: CatalogEvidenceColumnSize.narrow,
+        ),
+      );
+      continue;
+    }
     if (field == null) continue;
     columns.add(_columnForProfileField(field));
   }
-  columns.add(_textColumn(id: 'operator', label: 'Operater'));
-  columns.add(_standardStatusColumn);
-  return _appendStandardDetailsColumn(columns);
+  return _appendStandardCommonColumns(columns);
 }
 
 const Set<String> _wastewaterNumericTableFieldKeys = {
@@ -286,17 +333,22 @@ String _tableLabelForFieldKey(String key) {
     case 'temperatureC':
       return 'Temp. °C';
     case 'sludgeQuantity':
-      return 'Talog kg';
+      return 'Talog';
     case 'finalNeutralizationPh':
       return 'pH neutral.';
     case 'finalNeutralizationRedoxMv':
-      return 'Redox mV';
+      return 'Redox';
     case 'operatorComment':
       return 'Komentar';
     case 'measuredAt':
-      return 'Vrijeme';
+    case 'evidence_time':
+      return 'Vrijeme evidencije';
     case 'chemicalId':
       return 'Hemikalija';
+    case 'workBathId':
+      return 'Procesna tačka';
+    case 'dosedQuantity':
+      return 'Količina';
     default:
       return key;
   }
@@ -371,7 +423,8 @@ double catalogEvidenceColumnMinWidth(
   switch (columnId.trim()) {
     case 'measuredAt':
     case 'measured_at':
-      return 116;
+    case 'evidence_time':
+      return 128;
     case 'workBathId':
     case 'work_bath':
     case 'chemicalId':
@@ -404,6 +457,8 @@ double catalogEvidenceColumnMinWidth(
       return 100;
     case 'product':
       return 128;
+    case 'product_code':
+      return 104;
     case 'materials':
       return 120;
     case 'date':
@@ -451,54 +506,38 @@ List<CatalogEvidenceTableColumn> catalogEvidenceTableColumnsForProfile(
     return _profileOperatorFieldColumns(profile);
   }
 
-  final List<CatalogEvidenceTableColumn> profileColumns;
+  // Samo poslovne kolone — F3 trailer dodaje Vrijeme evidencije / Operater / Status / Detalji.
+  final List<CatalogEvidenceTableColumn> businessColumns;
   switch (profile.profileKey.trim()) {
     case 'production_counting':
-      profileColumns = [
-        _textColumn(id: 'date', label: 'Datum', size: CatalogEvidenceColumnSize.narrow),
-        _textColumn(id: 'time', label: 'Vrijeme', size: CatalogEvidenceColumnSize.narrow),
-        _textColumn(id: 'order', label: 'Nalog'),
+      businessColumns = [
         _textColumn(id: 'product', label: 'Proizvod', size: CatalogEvidenceColumnSize.wide),
-        _numericColumn(id: 'good_qty', label: 'Dobra'),
+        _textColumn(id: 'product_code', label: 'Šifra proizvoda'),
+        _numericColumn(id: 'good_qty', label: 'Dobra količina'),
         _numericColumn(id: 'scrap_qty', label: 'Škart'),
         _numericColumn(id: 'rework_qty', label: 'Dorada'),
-        _textColumn(id: 'unit', label: 'Jedinica', size: CatalogEvidenceColumnSize.narrow),
-        _textColumn(id: 'operator', label: 'Operater'),
-        _standardStatusColumn,
+        _textColumn(id: 'unit', label: 'Jed.', size: CatalogEvidenceColumnSize.narrow),
       ];
       break;
     case 'packaging_control':
-      profileColumns = [
-        _textColumn(id: 'date', label: 'Datum', size: CatalogEvidenceColumnSize.narrow),
-        _textColumn(id: 'time', label: 'Vrijeme', size: CatalogEvidenceColumnSize.narrow),
+      businessColumns = [
         _textColumn(id: 'order', label: 'Nalog'),
         _textColumn(id: 'product', label: 'Proizvod', size: CatalogEvidenceColumnSize.wide),
         _textColumn(id: 'disposition', label: 'Dispozicija'),
-        _textColumn(id: 'operator', label: 'Operater'),
-        _standardStatusColumn,
       ];
       break;
     case 'first_piece_approval':
-      profileColumns = [
-        _textColumn(id: 'date', label: 'Datum', size: CatalogEvidenceColumnSize.narrow),
-        _textColumn(id: 'time', label: 'Vrijeme', size: CatalogEvidenceColumnSize.narrow),
+      businessColumns = [
         _textColumn(id: 'order', label: 'Nalog'),
         _textColumn(id: 'product', label: 'Proizvod', size: CatalogEvidenceColumnSize.wide),
         _numericColumn(id: 'qty_submitted', label: 'Predato'),
         _textColumn(id: 'disposition', label: 'Dispozicija'),
-        _textColumn(id: 'operator', label: 'Operater'),
-        _standardStatusColumn,
       ];
       break;
     default:
-      profileColumns = [
-        _textColumn(id: 'date', label: 'Datum', size: CatalogEvidenceColumnSize.narrow),
-        _textColumn(id: 'time', label: 'Vrijeme', size: CatalogEvidenceColumnSize.narrow),
-        _textColumn(id: 'operator', label: 'Operater'),
-        _standardStatusColumn,
-      ];
+      businessColumns = const [];
   }
-  return _appendStandardDetailsColumn(profileColumns);
+  return _appendStandardCommonColumns(businessColumns);
 }
 
 String catalogEvidenceSessionStatusLabel(String status) {
@@ -544,11 +583,12 @@ DateTime? _parseMeasuredAtValue(dynamic raw) {
   return DateTime.tryParse(raw.toString().trim());
 }
 
-String _formatMeasuredAt(DateTime? when) {
+/// Kanonski format vremena evidencije u tabelama (M1-I1-F3): dd.MM.yyyy HH:mm
+String _formatEvidenceDateTime(DateTime? when) {
   if (when == null) return '—';
   return '${when.day.toString().padLeft(2, '0')}.'
       '${when.month.toString().padLeft(2, '0')}.'
-      '${when.year}. '
+      '${when.year} '
       '${when.hour.toString().padLeft(2, '0')}:'
       '${when.minute.toString().padLeft(2, '0')}';
 }
@@ -579,7 +619,7 @@ String _cellTextForProfileFieldKey(
   }
   if (fieldKey == 'measuredAt') {
     final measured = _parseMeasuredAtValue(values['measuredAt']);
-    return _formatMeasuredAt(
+    return _formatEvidenceDateTime(
       measured ?? session.endedAt ?? session.createdAt,
     );
   }
@@ -594,10 +634,15 @@ String _cellText(
   final values = session.fieldValues ?? const {};
   final when = session.endedAt ?? session.createdAt;
   switch (column.id) {
+    case 'evidence_time':
     case 'measured_at':
+    case 'measuredAt':
+    case 'date':
+    case 'time':
       final measured = _parseMeasuredAtValue(values['measuredAt']);
-      return _formatMeasuredAt(measured ?? when);
+      return _formatEvidenceDateTime(measured ?? when);
     case 'work_bath':
+    case 'workBathId':
       final name = (values['workBathNameSnapshot'] ?? '').toString().trim();
       return name.isEmpty ? '—' : name;
     case 'chemical':
@@ -632,29 +677,21 @@ String _cellText(
         );
       }
       return _fieldDisplayValue(profile, 'dosedQuantity', values['dosedQuantity']);
-    case 'date':
-      return when == null
-          ? '—'
-          : '${when.day.toString().padLeft(2, '0')}.'
-              '${when.month.toString().padLeft(2, '0')}.'
-              '${when.year}.';
-    case 'time':
-      return when == null
-          ? '—'
-          : '${when.hour.toString().padLeft(2, '0')}:'
-              '${when.minute.toString().padLeft(2, '0')}';
     case 'order':
       final code = (values['productionOrderCode'] ?? '').toString().trim();
-      if (code.isNotEmpty) return code;
-      return (values['productionOrderId'] ?? '').toString().trim().isEmpty
-          ? '—'
-          : (values['productionOrderId'] ?? '').toString().trim();
+      // Nikad ne prikazuj Firestore document ID kao nalog.
+      return code.isEmpty ? '—' : code;
     case 'product':
       final name = (values['productNameSnapshot'] ?? '').toString().trim();
       if (name.isNotEmpty) return name;
+      // production_counting has dedicated product_code column — do not duplicate.
+      if (profile.profileKey.trim() == 'production_counting') return '—';
       final code = (values['productCode'] ?? '').toString().trim();
       if (code.isNotEmpty) return code;
       return '—';
+    case 'product_code':
+      final code = (values['productCode'] ?? '').toString().trim();
+      return code.isEmpty ? '—' : code;
     case 'good_qty':
       return _fieldDisplayValue(profile, 'goodQty', values['goodQty']);
     case 'scrap_qty':

@@ -18,6 +18,9 @@ class ProfileDrivenEvidenceSummaryFields {
     this.concentrationSnapshot,
     this.chemicalLot,
     this.dosingReason,
+    this.productName,
+    this.productCode,
+    this.productionOrderCode,
     this.operationType,
     this.workAreaNameSnapshot,
     this.resultStatus,
@@ -48,6 +51,9 @@ class ProfileDrivenEvidenceSummaryFields {
   final String? concentrationSnapshot;
   final String? chemicalLot;
   final String? dosingReason;
+  final String? productName;
+  final String? productCode;
+  final String? productionOrderCode;
   final String? operationType;
   final String? workAreaNameSnapshot;
   final String? resultStatus;
@@ -86,6 +92,9 @@ class ProfileDrivenEvidenceSummaryFields {
       concentrationSnapshot: _s(m['concentrationSnapshot']),
       chemicalLot: _s(m['chemicalLot']),
       dosingReason: _s(m['dosingReason']),
+      productName: _s(m['productName']),
+      productCode: _s(m['productCode']),
+      productionOrderCode: _s(m['productionOrderCode']),
       operationType: _s(m['operationType']),
       workAreaNameSnapshot: _s(m['workAreaNameSnapshot']),
       resultStatus: _s(m['resultStatus']),
@@ -169,6 +178,17 @@ class ProfileDrivenEvidenceListItem {
         if (station.isNotEmpty) 'Stanica: $station',
         if (s.processedTotalQty != null) 'Obrađeno: ${formatFieldValue(s.processedTotalQty)}',
         if (s.resultStatus != null) 'Rezultat: ${s.resultStatus}',
+      ];
+      return parts.join(' · ');
+    }
+    if (processProfileType == 'production_counting') {
+      final parts = <String>[
+        if (s.productName != null) 'Proizvod: ${s.productName}',
+        if (s.productCode != null) 'Šifra: ${s.productCode}',
+        if (s.okTotalQty != null)
+          'Dobra: ${s.okTotalQty}${s.unit != null ? ' ${s.unit}' : ''}',
+        if (s.scrapTotalQty != null) 'Škart: ${s.scrapTotalQty}',
+        if (s.reworkAgainTotalQty != null) 'Dorada: ${s.reworkAgainTotalQty}',
       ];
       return parts.join(' · ');
     }
