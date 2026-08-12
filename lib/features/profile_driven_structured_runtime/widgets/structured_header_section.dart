@@ -27,6 +27,7 @@ class StructuredHeaderSection extends StatelessWidget {
     this.enabled = true,
     this.masterLoading = false,
     this.masterError,
+    this.excludedFieldKeys = const {},
   });
 
   final ProductionStationProfileCatalogEntry profile;
@@ -44,9 +45,12 @@ class StructuredHeaderSection extends StatelessWidget {
   final bool enabled;
   final bool masterLoading;
   final Object? masterError;
+  /// Polja koja se ne prikazuju u formi (npr. auto-popunjeni kontrolor).
+  final Set<String> excludedFieldKeys;
 
-  List<ProductionStationProfileField> get _fields =>
-      profile.structuredHeaderFields;
+  List<ProductionStationProfileField> get _fields => profile.structuredHeaderFields
+      .where((f) => !excludedFieldKeys.contains(f.key))
+      .toList(growable: false);
 
   @override
   Widget build(BuildContext context) {
@@ -110,6 +114,9 @@ class StructuredHeaderSection extends StatelessWidget {
           callableName: field.entitySearchCallable ?? 'searchProductionOrders',
           companyId: companyId,
           query: query,
+          assignedPlantKey: field.entitySearchCallable == 'searchPlantOperators'
+              ? plantKey
+              : null,
         ),
         onChanged: (selection) {
           entitySelections[field.key] = selection;

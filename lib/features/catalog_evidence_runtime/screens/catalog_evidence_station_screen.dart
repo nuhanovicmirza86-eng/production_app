@@ -1,11 +1,13 @@
 import 'dart:async' show unawaited;
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../../core/access/production_access_helper.dart';
 import '../../../core/company_plant_display_name.dart';
+import '../../../core/user_display_label.dart';
 import '../../../modules/production/station_pages/models/production_evidence_config.dart';
 import '../../../modules/production/station_pages/models/production_station_config.dart';
 import '../../../modules/production/station_pages/models/production_station_profile_catalog_entry.dart';
@@ -18,6 +20,7 @@ import '../../profile_driven_structured_runtime/models/structured_profile_sessio
 import '../../profile_driven_structured_runtime/models/structured_repeatable_row.dart';
 import '../../profile_driven_structured_runtime/services/production_evidence_entity_search_service.dart';
 import '../../profile_driven_structured_runtime/utils/structured_datetime_value.dart';
+import '../../profile_driven_structured_runtime/widgets/structured_datetime_field.dart';
 import '../../profile_driven_structured_runtime/widgets/structured_header_section.dart';
 import '../../profile_driven_structured_runtime/widgets/structured_repeatable_table_section.dart';
 import '../services/catalog_evidence_session_service.dart';
@@ -105,6 +108,12 @@ class _CatalogEvidenceStationScreenState
   List<StructuredRepeatableTableDefinition> get _tables =>
       widget.profile.repeatableTableDefinitions;
 
+  bool get _isPackagingControl =>
+      widget.profile.profileKey.trim() == 'packaging_control';
+
+  String get _processControllerDisplayName =>
+      UserDisplayLabel.fromSessionMap(widget.companyData);
+
   @override
   void initState() {
     super.initState();
@@ -174,6 +183,77 @@ class _CatalogEvidenceStationScreenState
     for (final c in _headerTextControllers.values) {
       c.clear();
     }
+    _ensurePackagingControllerFromSession();
+  }
+
+  /// Procesni kontrolor = prijavljeni korisnik (M1-I2-F3 / F6).
+  /// Samo [controllerEmployeeId] ide u payload — snapshot ime popunjava backend.
+  void _ensurePackagingControllerFromSession() {
+    if (!_isPackagingControl) return;
+    final name = _processControllerDisplayName.trim();
+    final uid = FirebaseAuth.instance.currentUser?.uid.trim() ?? '';
+    _state.fieldValues.remove('controllerNameSnapshot');
+    if (uid.isEmpty) return;
+    _state.fieldValues['controllerEmployeeId'] = uid;
+    _headerEntitySelections['controllerEmployeeId'] = StructuredEntitySelection(
+      fieldKey: 'controllerEmployeeId',
+      entityId: uid,
+      displayLabel: name.isNotEmpty ? name : 'Procesni kontrolor',
+    );
+  }
+
+  /// Zaglavlje: samo kanonski ID-jevi u fieldValues (M1-I2-F6).
+  /// productCode / productNameSnapshot / productionOrderCode = backend snapshot.
+  void _applyPackagingHeaderSnapshotsFromSelections() {
+    if (!_isPackagingControl) return;
+
+    _state.fieldValues.remove('productCode');
+    _state.fieldValues.remove('productNameSnapshot');
+    _state.fieldValues.remove('productionOrderCode');
+    _state.fieldValues.remove('controllerNameSnapshot');
+
+    final order = _headerEntitySelections['productionOrderId'];
+    if (order != null) {
+      final raw = order.raw;
+      final productId = (raw['productId'] ?? '').toString().trim();
+      final productCode = (raw['productCode'] ?? '').toString().trim();
+      final productName = (raw['productName'] ??
+              raw['displayName'] ??
+              '')
+          .toString()
+          .trim();
+      if (productId.isNotEmpty) {
+        _state.fieldValues['productId'] = productId;
+        final labelParts = <String>[
+          if (productCode.isNotEmpty) productCode,
+          if (productName.isNotEmpty) productName,
+        ];
+        _headerEntitySelections['productId'] = StructuredEntitySelection(
+          fieldKey: 'productId',
+          entityId: productId,
+          displayLabel:
+              labelParts.isEmpty ? productId : labelParts.join(' — '),
+          raw: {
+            'id': productId,
+            'productCode': productCode,
+            'productName': productName,
+            'displayName': productName,
+          },
+        );
+      }
+    }
+
+    _ensurePackagingControllerFromSession();
+    _stripNonOperatorEditableFieldValues();
+  }
+
+  /// Payload smije sadržavati samo operator-editable polja profila (M1-I2-F6).
+  void _stripNonOperatorEditableFieldValues() {
+    final allowed = <String>{
+      for (final f in widget.profile.fields)
+        if (f.isOperatorEditable) f.key,
+    };
+    _state.fieldValues.removeWhere((key, _) => !allowed.contains(key));
   }
 
   void _syncHeaderControllersFromState() {
@@ -185,10 +265,32 @@ class _CatalogEvidenceStationScreenState
           continue;
         }
         final id = raw.toString().trim();
+        var label = id;
+        if (field.key == 'productId') {
+          final code = (_state.fieldValues['productCode'] ?? '').toString().trim();
+          final name =
+              (_state.fieldValues['productNameSnapshot'] ?? '').toString().trim();
+          if (code.isNotEmpty && name.isNotEmpty) {
+            label = '$code — $name';
+          } else if (code.isNotEmpty) {
+            label = code;
+          } else if (name.isNotEmpty) {
+            label = name;
+          }
+        } else if (field.key == 'productionOrderId') {
+          final code =
+              (_state.fieldValues['productionOrderCode'] ?? '').toString().trim();
+          if (code.isNotEmpty) label = code;
+        } else if (field.key == 'controllerEmployeeId') {
+          final name = (_state.fieldValues['controllerNameSnapshot'] ?? '')
+              .toString()
+              .trim();
+          if (name.isNotEmpty) label = name;
+        }
         _headerEntitySelections[field.key] = StructuredEntitySelection(
           fieldKey: field.key,
           entityId: id,
-          displayLabel: id,
+          displayLabel: label,
         );
       } else if (field.type == 'enum') {
         _headerEnumSelections[field.key] = raw?.toString();
@@ -253,6 +355,7 @@ class _CatalogEvidenceStationScreenState
       setState(() {
         _state = loaded;
         _syncHeaderControllersFromState();
+        _ensurePackagingControllerFromSession();
       });
     } catch (_) {}
   }
@@ -264,6 +367,7 @@ class _CatalogEvidenceStationScreenState
       session.fieldValues ?? const {},
     );
     _syncHeaderControllersFromState();
+    _ensurePackagingControllerFromSession();
     if (_isStructuredLite) {
       unawaited(_reloadStructuredStateForActiveSession());
     }
@@ -284,6 +388,8 @@ class _CatalogEvidenceStationScreenState
 
   String? _validateBeforeSubmit({required bool forFinish}) {
     _flushHeaderFieldsToState();
+    _ensurePackagingControllerFromSession();
+    _stripNonOperatorEditableFieldValues();
     final headerError = validateStructuredHeader(
       fields: widget.profile.structuredHeaderFields,
       state: _state,
@@ -293,9 +399,41 @@ class _CatalogEvidenceStationScreenState
     );
     if (headerError != null) return headerError;
 
+    if (_isPackagingControl && forFinish) {
+      final packagingError = _validatePackagingFinish();
+      if (packagingError != null) return packagingError;
+    }
+
     if (_isStructuredLite && forFinish) {
       final tableError = validateStructuredTables(tables: _tables, state: _state);
       if (tableError != null) return tableError;
+    }
+    return null;
+  }
+
+  /// M1-I2-F7 — kraj kontrole, vremenski redoslijed, operater pakovanja.
+  String? _validatePackagingFinish() {
+    final started = _headerDateTimes['checkStartedAt'] ??
+        StructuredDateTimeValue.parse(_state.fieldValues['checkStartedAt']);
+    final finished = _headerDateTimes['checkFinishedAt'] ??
+        StructuredDateTimeValue.parse(_state.fieldValues['checkFinishedAt']);
+    if (started == null) {
+      return 'Unesite početak kontrole prije završavanja evidencije.';
+    }
+    if (finished == null) {
+      return 'Unesite kraj kontrole prije završavanja evidencije.';
+    }
+    if (finished.isBefore(started)) {
+      return 'Kraj kontrole mora biti nakon početka kontrole.';
+    }
+    final packagingOp = _headerEntitySelections['packagingOperatorEmployeeId'];
+    final packagingOpId = (packagingOp?.entityId ??
+            _state.fieldValues['packagingOperatorEmployeeId'] ??
+            '')
+        .toString()
+        .trim();
+    if (packagingOpId.isEmpty) {
+      return 'Odaberite operatera pakovanja prije završavanja evidencije.';
     }
     return null;
   }
@@ -352,6 +490,42 @@ class _CatalogEvidenceStationScreenState
   }
 
   Future<void> _finishSession(ProductionStationWorkSession session) async {
+    _flushHeaderFieldsToState();
+    _ensurePackagingControllerFromSession();
+
+    if (_isPackagingControl) {
+      final finished = _headerDateTimes['checkFinishedAt'] ??
+          StructuredDateTimeValue.parse(_state.fieldValues['checkFinishedAt']);
+      if (finished == null) {
+        final setNow = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Kraj kontrole'),
+            content: const Text(
+              'Kraj kontrole nije unesen. Postaviti sadašnje vrijeme i nastaviti sa završetkom?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Odustani'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Postavi sada'),
+              ),
+            ],
+          ),
+        );
+        if (setNow != true || !mounted) return;
+        final now = DateTime.now();
+        setState(() {
+          _headerDateTimes['checkFinishedAt'] = now;
+          _state.fieldValues['checkFinishedAt'] =
+              structuredDateTimePayload(now);
+        });
+      }
+    }
+
     final validationError = _validateBeforeSubmit(forFinish: true);
     if (validationError != null) {
       _showValidationError(validationError);
@@ -427,6 +601,7 @@ class _CatalogEvidenceStationScreenState
       setState(() {
         _headerEntitySelections[orderField.key] = selection;
         _state.fieldValues[orderField.key] = selection.entityId;
+        _applyPackagingHeaderSnapshotsFromSelections();
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Nalog: ${selection.displayLabel}')),
@@ -443,7 +618,8 @@ class _CatalogEvidenceStationScreenState
         }
       }
       if (headerProduct != null &&
-          _headerEntitySelections['productId'] == null) {
+          (_headerEntitySelections['productId'] == null ||
+              _isPackagingControl)) {
         final productField = headerProduct;
         final selection = StructuredEntitySelection.fromSearchResult(
           fieldKey: productField.key,
@@ -453,6 +629,7 @@ class _CatalogEvidenceStationScreenState
         setState(() {
           _headerEntitySelections[productField.key] = selection;
           _state.fieldValues[productField.key] = selection.entityId;
+          _applyPackagingHeaderSnapshotsFromSelections();
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Proizvod: ${selection.displayLabel}')),
@@ -471,13 +648,12 @@ class _CatalogEvidenceStationScreenState
       }
       if (productCol == null) return;
       final row = StructuredRepeatableRow.empty();
-      row.setEntitySelection(
-        StructuredEntitySelection.fromSearchResult(
-          fieldKey: productCol.key,
-          result: searchResult,
-          valueField: productCol.valueField,
-        ),
+      final selection = StructuredEntitySelection.fromSearchResult(
+        fieldKey: productCol.key,
+        result: searchResult,
+        valueField: productCol.valueField,
       );
+      row.setEntitySelection(selection);
       final next = List<StructuredRepeatableRow>.from(_state.rowsFor(table.key))
         ..add(row);
       setState(() => _state.setRows(table.key, next));
@@ -560,9 +736,30 @@ class _CatalogEvidenceStationScreenState
             dateTimes: _headerDateTimes,
             textControllers: _headerTextControllers,
             enabled: formEnabled,
-            onFieldChanged: () => setState(() {}),
+            excludedFieldKeys: _isPackagingControl
+                ? const {'controllerEmployeeId'}
+                : const {},
+            onFieldChanged: () {
+              _applyPackagingHeaderSnapshotsFromSelections();
+              setState(() {});
+            },
             onScanResolved: _applyScanResult,
           ),
+          if (_isPackagingControl) ...[
+            const SizedBox(height: 8),
+            InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Procesni kontrolor',
+                border: OutlineInputBorder(),
+              ),
+              child: Text(
+                _processControllerDisplayName.trim().isEmpty
+                    ? '—'
+                    : _processControllerDisplayName.trim(),
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ),
+          ],
           if (_isStructuredLite)
             ..._tables.map(
               (table) => Padding(
@@ -575,6 +772,9 @@ class _CatalogEvidenceStationScreenState
                   rows: _state.rowsFor(table.key),
                   searchService: _searchService,
                   enabled: formEnabled,
+                  headerProductSelection: _isPackagingControl
+                      ? _headerEntitySelections['productId']
+                      : null,
                   onRowsChanged: (rows) {
                     setState(() => _state.setRows(table.key, rows));
                   },
@@ -707,6 +907,10 @@ class _CatalogEvidenceStationScreenState
                   children: [
                     CatalogEvidenceViewportSplit(
                       topIsIntrinsic: activeSession == null,
+                      overviewRecordLimit: _recordsLimit,
+                      overviewRecordCount: closedSessions.length +
+                          (activeSession?.isActive == true ? 1 : 0),
+                      overviewLoading: recordsLoading,
                       topSection: activeSession == null
                           ? _buildNoSessionPrompt()
                           : _buildInputSection(

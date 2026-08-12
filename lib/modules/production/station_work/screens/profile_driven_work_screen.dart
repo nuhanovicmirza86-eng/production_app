@@ -1329,6 +1329,10 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
                   children: [
                     CatalogEvidenceViewportSplit(
                       topIsIntrinsic: session == null,
+                      overviewRecordLimit: _recordsLimit,
+                      overviewRecordCount: closedSessions.length +
+                          (session?.isActive == true ? 1 : 0),
+                      overviewLoading: recordsLoading,
                       topSection: session == null
                           ? _buildNoSessionBody()
                           : _buildActiveSessionBody(session),

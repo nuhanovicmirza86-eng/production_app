@@ -86,6 +86,8 @@ class StructuredScanResolveResult {
     this.resolvedId,
     this.displayCode,
     this.displayName,
+    this.productId,
+    this.productCode,
     this.message,
   });
 
@@ -93,26 +95,46 @@ class StructuredScanResolveResult {
   final String? resolvedId;
   final String? displayCode;
   final String? displayName;
+  final String? productId;
+  final String? productCode;
   final String? message;
 
   bool get isKnown => type != 'unknown' && (resolvedId ?? '').trim().isNotEmpty;
 
   StructuredEntitySearchResult? toSearchResult() {
     if (!isKnown) return null;
+    final code = (displayCode ?? '').trim();
+    final name = (displayName ?? '').trim();
+    final id = resolvedId!.trim();
+    final type = this.type.trim();
+    final raw = <String, dynamic>{
+      'id': id,
+      'displayCode': displayCode,
+      'displayName': displayName,
+      'type': type,
+    };
+    if (type == 'product') {
+      raw['productCode'] = code;
+      raw['productName'] = name;
+      raw['displayName'] = name;
+    } else if (type == 'production_order') {
+      raw['orderCode'] = code;
+      raw['productionOrderCode'] = code;
+      if (name.isNotEmpty) raw['productName'] = name;
+      final pid = (productId ?? '').trim();
+      final pCode = (productCode ?? '').trim();
+      if (pid.isNotEmpty) raw['productId'] = pid;
+      if (pCode.isNotEmpty) raw['productCode'] = pCode;
+    }
     return StructuredEntitySearchResult(
-      id: resolvedId!.trim(),
+      id: id,
       displayLabel: StructuredEntitySearchResult._composeLabel(
-        code: (displayCode ?? '').trim(),
-        name: (displayName ?? '').trim(),
-        fallback: resolvedId!.trim(),
+        code: code,
+        name: name,
+        fallback: id,
       ),
-      secondaryLabel: displayName,
-      raw: {
-        'id': resolvedId,
-        'displayCode': displayCode,
-        'displayName': displayName,
-        'type': type,
-      },
+      secondaryLabel: name.isEmpty ? null : name,
+      raw: raw,
     );
   }
 
@@ -128,6 +150,12 @@ class StructuredScanResolveResult {
       displayName: (data['displayName'] ?? '').toString().trim().isEmpty
           ? null
           : (data['displayName'] ?? '').toString().trim(),
+      productId: (data['productId'] ?? '').toString().trim().isEmpty
+          ? null
+          : (data['productId'] ?? '').toString().trim(),
+      productCode: (data['productCode'] ?? '').toString().trim().isEmpty
+          ? null
+          : (data['productCode'] ?? '').toString().trim(),
       message: (data['message'] ?? '').toString().trim().isEmpty
           ? null
           : (data['message'] ?? '').toString().trim(),

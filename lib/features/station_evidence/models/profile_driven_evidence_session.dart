@@ -31,6 +31,7 @@ class ProfileDrivenEvidenceSummaryFields {
     this.reworkAgainTotalQty,
     this.materialSummary,
     this.operatorSummary,
+    this.packagingOperatorName,
   });
 
   final String? workBathName;
@@ -64,6 +65,7 @@ class ProfileDrivenEvidenceSummaryFields {
   final double? reworkAgainTotalQty;
   final String? materialSummary;
   final String? operatorSummary;
+  final String? packagingOperatorName;
 
   factory ProfileDrivenEvidenceSummaryFields.fromMap(Map<String, dynamic>? raw) {
     final m = raw ?? const <String, dynamic>{};
@@ -105,6 +107,7 @@ class ProfileDrivenEvidenceSummaryFields {
       reworkAgainTotalQty: n(m['reworkAgainTotalQty']),
       materialSummary: _s(m['materialSummary']),
       operatorSummary: _s(m['operatorSummary']),
+      packagingOperatorName: _s(m['packagingOperatorName']),
     );
   }
 
@@ -192,6 +195,16 @@ class ProfileDrivenEvidenceListItem {
       ];
       return parts.join(' · ');
     }
+    if (processProfileType == 'packaging_control') {
+      final parts = <String>[
+        if (s.productName != null) 'Proizvod: ${s.productName}',
+        if (s.productCode != null) 'Šifra: ${s.productCode}',
+        if (s.productionOrderCode != null) 'Nalog: ${s.productionOrderCode}',
+        if (s.resultStatus != null) 'Dispozicija: ${s.resultStatus}',
+        if (s.unit != null) 'Tip: ${s.unit}',
+      ];
+      return parts.join(' · ');
+    }
     return '';
   }
 
@@ -246,6 +259,7 @@ class ProfileDrivenEvidenceSessionDetail {
     this.materialConsumptions = const [],
     this.operatorWorkLogs = const [],
     this.scrapItems = const [],
+    this.packagingCheckLines = const [],
   });
 
   final String sessionId;
@@ -273,8 +287,11 @@ class ProfileDrivenEvidenceSessionDetail {
   final List<Map<String, dynamic>> materialConsumptions;
   final List<Map<String, dynamic>> operatorWorkLogs;
   final List<Map<String, dynamic>> scrapItems;
+  final List<Map<String, dynamic>> packagingCheckLines;
 
   bool get isReworkAndPainting => processProfileType == 'rework_and_painting';
+
+  bool get isPackagingControl => processProfileType == 'packaging_control';
 
   int? get catalogVersion {
     final v = profileSnapshot?['catalogVersion'];
@@ -341,6 +358,7 @@ class ProfileDrivenEvidenceSessionDetail {
       materialConsumptions: _parseRowList(m['material_consumptions']),
       operatorWorkLogs: _parseRowList(m['operator_work_logs']),
       scrapItems: _parseRowList(m['scrap_items']),
+      packagingCheckLines: _parseRowList(m['packaging_check_lines']),
     );
   }
 }

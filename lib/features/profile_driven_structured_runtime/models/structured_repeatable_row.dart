@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import '../utils/structured_piece_quantity.dart';
 import 'structured_entity_search_result.dart';
 
 /// Jedan red repeatable tabele u UI-u.
@@ -81,11 +82,13 @@ class StructuredRepeatableRow {
   }
 
   Map<String, dynamic> toPayload() {
+    // Snapshot šifre/naziva ne šalju se kao input — backend enrich na finish (M1-I2-F6).
     const backendOnlyKeys = {
       'processedQty',
       'durationMinutes',
       'piecesPerHour',
       'minutesPerPiece',
+      'productCode',
       'productCodeSnapshot',
       'productNameSnapshot',
       'materialCodeSnapshot',
@@ -135,7 +138,9 @@ class StructuredRepeatableRow {
       }
       final raw = values[key];
       if (raw == null) continue;
-      final text = raw.toString().trim();
+      final text = isStructuredPieceQuantityField(key)
+          ? formatStructuredPieceQuantity(raw)
+          : raw.toString().trim();
       if (text.isNotEmpty) parts.add(text);
     }
     return parts.isEmpty ? '—' : parts.join(' · ');

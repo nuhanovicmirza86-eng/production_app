@@ -185,7 +185,125 @@ class _ProfileDrivenEvidenceDetailScreenState
     if (session.isReworkAndPainting) {
       return _buildReworkBody(session);
     }
+    if (session.isPackagingControl) {
+      return _buildPackagingBody(session);
+    }
     return _buildFlatProfileBody(session);
+  }
+
+  String _formatQtyInt(num? value) {
+    if (value == null) return '—';
+    if (value == value.roundToDouble()) return value.toInt().toString();
+    return formatFieldValue(value);
+  }
+
+  Widget _buildPackagingBody(ProfileDrivenEvidenceSessionDetail session) {
+    final station =
+        (session.stationDisplayName ?? '').trim().isNotEmpty
+            ? session.stationDisplayName!
+            : (session.stationSlot != null
+                  ? 'Stanica ${session.stationSlot}'
+                  : '—');
+    final s = session.summaryFields;
+    final lines = session.packagingCheckLines;
+    final multi = lines.length > 1;
+    final checkedLabel = multi ? 'Ukupno provjereno' : 'Provjereno';
+    final acceptedLabel = multi ? 'Ukupno prihvaćeno' : 'Prihvaćeno';
+    final rejectedLabel = multi ? 'Ukupno odbijeno' : 'Odbijeno';
+
+    final controllerName = (s.operatorSummary ??
+            session.fieldValues['controllerNameSnapshot'] ??
+            '')
+        .toString()
+        .trim();
+    final packagingOperator = (s.packagingOperatorName ??
+            session.fieldValues['packagingOperatorNameSnapshot'] ??
+            '')
+        .toString()
+        .trim();
+
+    return ListView(
+      children: [
+        _sectionCard(
+          title: 'Osnovni podaci',
+          children: [
+            _kvRow('Profil', session.profileDisplayName),
+            _kvRow('Stanica', station),
+            _kvRow('Pogon', _plantDisplayLabel(session)),
+            _kvRow('Status', session.status == 'closed' ? 'Završeno' : session.status),
+            _kvRow('Početak', formatEvidenceDateTime(session.startedAt)),
+            _kvRow('Završetak', formatEvidenceDateTime(session.endedAt)),
+          ],
+        ),
+        _sectionCard(
+          title: 'Kontrola pakovanja',
+          children: [
+            _kvRow(
+              'Procesni kontrolor',
+              controllerName.isEmpty ? '—' : controllerName,
+            ),
+            _kvRow(
+              'Operater pakovanja',
+              packagingOperator.isEmpty ? '—' : packagingOperator,
+            ),
+            _kvRow(checkedLabel, _formatQtyInt(s.quantity)),
+            _kvRow(acceptedLabel, _formatQtyInt(s.okTotalQty)),
+            _kvRow(rejectedLabel, _formatQtyInt(s.scrapTotalQty)),
+            ..._operatorFieldsForDisplay.map((field) {
+              if (field.key == 'controllerEmployeeId' ||
+                  field.key == 'packagingOperatorEmployeeId') {
+                return const SizedBox.shrink();
+              }
+              return _kvRow(
+                _displayLabel(field),
+                _displayValueForField(field),
+              );
+            }),
+          ],
+        ),
+        if (lines.isNotEmpty)
+          _sectionCard(
+            title: 'Kontrolisane jedinice pakovanja',
+            children: [
+              ProfileDrivenEvidenceStructuredTable(
+                columns: const [
+                  ProfileDrivenEvidenceStructuredColumn('Lot / serija', 'lotOrSerial'),
+                  ProfileDrivenEvidenceStructuredColumn('Provjereno', 'unitsChecked'),
+                  ProfileDrivenEvidenceStructuredColumn('Prihvaćeno', 'unitsAccepted'),
+                  ProfileDrivenEvidenceStructuredColumn('Odbijeno', 'unitsRejected'),
+                  ProfileDrivenEvidenceStructuredColumn('Razlog', 'defectReasonCode'),
+                  ProfileDrivenEvidenceStructuredColumn('Etiketa', 'labelCorrect'),
+                  ProfileDrivenEvidenceStructuredColumn('Pečat', 'sealIntact'),
+                  ProfileDrivenEvidenceStructuredColumn('Napomena', 'lineNote'),
+                ],
+                rows: lines,
+                cellBuilder: (row, key) {
+                  switch (key) {
+                    case 'unitsChecked':
+                    case 'unitsAccepted':
+                    case 'unitsRejected':
+                      return evidenceRowText(row[key]);
+                    case 'labelCorrect':
+                    case 'sealIntact':
+                      final v = row[key];
+                      if (v == true) return 'DA';
+                      if (v == false) return 'NE';
+                      return '—';
+                    default:
+                      return evidenceRowText(row[key]);
+                  }
+                },
+              ),
+            ],
+          ),
+        if (_masterDataFieldsForDisplay.isNotEmpty)
+          _fieldSection(
+            'Podaci iz master šifrarnika',
+            _masterDataFieldsForDisplay,
+          ),
+        const SizedBox(height: 24),
+      ],
+    );
   }
 
   Widget _buildFlatProfileBody(ProfileDrivenEvidenceSessionDetail session) {

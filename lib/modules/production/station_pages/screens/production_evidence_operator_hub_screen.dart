@@ -228,6 +228,8 @@ class _ProductionEvidenceOperatorHubScreenState
         return Icons.water_outlined;
       case 'production_counting':
         return Icons.numbers_outlined;
+      case 'packaging_control':
+        return Icons.inventory_2_outlined;
       default:
         return Icons.assignment_outlined;
     }

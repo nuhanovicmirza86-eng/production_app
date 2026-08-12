@@ -8,6 +8,7 @@ import '../models/structured_profile_session.dart';
 import '../models/structured_repeatable_row.dart';
 import '../services/production_evidence_entity_search_service.dart';
 import '../utils/structured_datetime_value.dart';
+import '../utils/structured_piece_quantity.dart';
 import 'operator_work_log_row_layout.dart';
 import 'structured_datetime_field.dart';
 import 'structured_entity_search_field.dart';
@@ -23,6 +24,7 @@ class StructuredRepeatableTableSection extends StatelessWidget {
     required this.searchService,
     required this.onRowsChanged,
     this.enabled = true,
+    this.headerProductSelection,
   });
 
   final StructuredRepeatableTableDefinition tableDef;
@@ -34,18 +36,34 @@ class StructuredRepeatableTableSection extends StatelessWidget {
   final ValueChanged<List<StructuredRepeatableRow>> onRowsChanged;
   final bool enabled;
 
+  /// packaging_control: proizvod iz zaglavlja — red ga nasljeđuje (M1-I2-F5).
+  final StructuredEntitySelection? headerProductSelection;
+
+  bool get _inheritsProductFromHeader {
+    if (!isPackagingCheckLinesTable(tableDef.key)) return false;
+    final sel = headerProductSelection;
+    return sel != null && sel.entityId.trim().isNotEmpty;
+  }
+
   List<ProductionStationProfileField> get _rowDialogColumns {
     if (OperatorWorkLogRowLayout.isOperatorWorkLogTable(tableDef.key)) {
       return OperatorWorkLogRowLayout.dialogColumns(tableDef.columns);
     }
-    return tableDef.operatorColumns;
+    final columns = tableDef.operatorColumns;
+    if (!_inheritsProductFromHeader) return columns;
+    return columns
+        .where((c) => c.key.trim() != 'productId')
+        .toList(growable: false);
   }
 
   List<String> get _summaryColumnKeys {
     final columns = _rowDialogColumns;
     final keys = <String>[];
     for (final col in columns) {
-      if (col.isEntitySearchSelect || col.type == 'enum' || col.type == 'number') {
+      if (col.isEntitySearchSelect ||
+          col.type == 'enum' ||
+          col.type == 'number' ||
+          col.type == 'boolean') {
         keys.add(col.key);
       }
       if (keys.length >= 4) break;
@@ -60,6 +78,7 @@ class StructuredRepeatableTableSection extends StatelessWidget {
   }) async {
     final draft = existing?.copyWith() ?? StructuredRepeatableRow.empty();
     final enumSelections = <String, String?>{};
+    final boolSelections = <String, bool?>{};
     final dateTimes = <String, DateTime?>{};
     final entitySelections =
         Map<String, StructuredEntitySelection?>.from(draft.entitySelections);
@@ -73,13 +92,21 @@ class StructuredRepeatableTableSection extends StatelessWidget {
             OperatorWorkLogRowLayout.yesNoFromStoredQty(raw);
         continue;
       }
+      if (col.type == 'boolean') {
+        boolSelections[col.key] = _parseBoolValue(raw);
+        continue;
+      }
       if (col.type == 'enum') {
         enumSelections[col.key] = raw?.toString();
       } else if (col.type == 'datetime') {
         dateTimes[col.key] = StructuredDateTimeValue.parse(raw);
       } else if (col.type == 'number' || _isTextLike(col.type)) {
         textControllers[col.key] = TextEditingController(
-          text: raw == null ? '' : raw.toString(),
+          text: raw == null
+              ? ''
+              : (col.type == 'number'
+                  ? formatStructuredPieceQuantity(raw)
+                  : raw.toString()),
         );
       }
     }
@@ -89,14 +116,21 @@ class StructuredRepeatableTableSection extends StatelessWidget {
       dateTimes['startedAt'] ??= DateTime.now();
     }
 
+    if (_inheritsProductFromHeader) {
+      final inherited = headerProductSelection!;
+      entitySelections['productId'] = inherited;
+      draft.setEntitySelection(inherited);
+      _applyEntitySnapshotsToDraft(draft, 'productId', inherited);
+    }
+
     final scrollController = ScrollController();
+    String? validationError;
+    final fieldErrors = <String>{};
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setLocal) {
-            String? validationError;
-
             String fieldLabel(ProductionStationProfileField col) {
               if (OperatorWorkLogRowLayout.isOperatorWorkLogTable(tableDef.key)) {
                 return OperatorWorkLogRowLayout.displayLabel(col);
@@ -105,6 +139,7 @@ class StructuredRepeatableTableSection extends StatelessWidget {
             }
 
             bool validate() {
+              fieldErrors.clear();
               for (final col in _rowDialogColumns) {
                 final required = OperatorWorkLogRowLayout.isOperatorWorkLogTable(
                       tableDef.key,
@@ -117,6 +152,9 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                   final sel = entitySelections[col.key];
                   if (sel == null || sel.entityId.isEmpty) {
                     validationError = structuredRequiredFieldMessage(label);
+                    fieldErrors
+                      ..clear()
+                      ..add(col.key);
                     return false;
                   }
                   continue;
@@ -125,6 +163,9 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                   final v = enumSelections[col.key];
                   if (v == null || v.isEmpty) {
                     validationError = structuredRequiredFieldMessage(label);
+                    fieldErrors
+                      ..clear()
+                      ..add(col.key);
                     return false;
                   }
                   continue;
@@ -132,6 +173,19 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                 if (col.type == 'datetime') {
                   if (dateTimes[col.key] == null) {
                     validationError = structuredRequiredFieldMessage(label);
+                    fieldErrors
+                      ..clear()
+                      ..add(col.key);
+                    return false;
+                  }
+                  continue;
+                }
+                if (col.type == 'boolean') {
+                  if (boolSelections[col.key] == null) {
+                    validationError = structuredRequiredFieldMessage(label);
+                    fieldErrors
+                      ..clear()
+                      ..add(col.key);
                     return false;
                   }
                   continue;
@@ -144,14 +198,29 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                     continue;
                   }
                   final text = textControllers[col.key]?.text.trim() ?? '';
-                  final n = double.tryParse(text.replaceAll(',', '.'));
+                  final zeroDefault = isPackagingZeroDefaultQuantityField(
+                    tableKey: tableDef.key,
+                    fieldKey: col.key,
+                  );
+                  if (zeroDefault && text.isEmpty) {
+                    continue;
+                  }
+                  final n = isStructuredPieceQuantityField(col.key)
+                      ? parseStructuredPieceQuantity(text)
+                      : double.tryParse(text.replaceAll(',', '.'));
                   if (n == null) {
                     validationError = structuredRequiredFieldMessage(label);
+                    fieldErrors
+                      ..clear()
+                      ..add(col.key);
                     return false;
                   }
                   if (col.min != null && n < col.min!) {
                     validationError =
                         'Polje «$label» mora biti ≥ ${col.min}.';
+                    fieldErrors
+                      ..clear()
+                      ..add(col.key);
                     return false;
                   }
                   continue;
@@ -159,6 +228,9 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                 final text = textControllers[col.key]?.text.trim() ?? '';
                 if (text.isEmpty) {
                   validationError = structuredRequiredFieldMessage(label);
+                  fieldErrors
+                    ..clear()
+                    ..add(col.key);
                   return false;
                 }
               }
@@ -185,7 +257,43 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                   return false;
                 }
               }
+              if (isPackagingCheckLinesTable(tableDef.key)) {
+                final issue = packagingUnitsBalanceIssue(
+                  unitsChecked:
+                      textControllers['unitsChecked']?.text ??
+                      draft.values['unitsChecked'],
+                  unitsAccepted:
+                      textControllers['unitsAccepted']?.text ??
+                      draft.values['unitsAccepted'],
+                  unitsRejected:
+                      textControllers['unitsRejected']?.text ??
+                      draft.values['unitsRejected'],
+                );
+                if (issue != null) {
+                  validationError = issue.message;
+                  fieldErrors
+                    ..clear()
+                    ..addAll(issue.errorFieldKeys);
+                  return false;
+                }
+              }
+              if (_inheritsProductFromHeader) {
+                final inherited = headerProductSelection!;
+                entitySelections['productId'] = inherited;
+                draft.setEntitySelection(inherited);
+                _applyEntitySnapshotsToDraft(draft, 'productId', inherited);
+              } else if (isPackagingCheckLinesTable(tableDef.key)) {
+                final sel = entitySelections['productId'];
+                if (sel == null || sel.entityId.isEmpty) {
+                  validationError = structuredRequiredFieldMessage('Proizvod');
+                  fieldErrors
+                    ..clear()
+                    ..add('productId');
+                  return false;
+                }
+              }
               validationError = null;
+              fieldErrors.clear();
               return true;
             }
 
@@ -205,6 +313,12 @@ class StructuredRepeatableTableSection extends StatelessWidget {
             }
 
             void applyDraftValues() {
+              if (_inheritsProductFromHeader) {
+                final inherited = headerProductSelection!;
+                entitySelections['productId'] = inherited;
+                draft.setEntitySelection(inherited);
+                _applyEntitySnapshotsToDraft(draft, 'productId', inherited);
+              }
               if (OperatorWorkLogRowLayout.isOperatorWorkLogTable(tableDef.key)) {
                 final yesNo =
                     enumSelections[OperatorWorkLogRowLayout.reworkYesNoUiKey] ??
@@ -251,6 +365,15 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                   }
                   continue;
                 }
+                if (col.type == 'boolean') {
+                  final v = boolSelections[col.key];
+                  if (v == null) {
+                    draft.values.remove(col.key);
+                  } else {
+                    draft.setValue(col.key, v);
+                  }
+                  continue;
+                }
                 if (col.type == 'number') {
                   if (OperatorWorkLogRowLayout.isOperatorWorkLogTable(
                         tableDef.key,
@@ -259,7 +382,17 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                     continue;
                   }
                   final text = textControllers[col.key]?.text.trim() ?? '';
-                  final n = double.tryParse(text.replaceAll(',', '.'));
+                  if (isPackagingZeroDefaultQuantityField(
+                        tableKey: tableDef.key,
+                        fieldKey: col.key,
+                      ) &&
+                      text.isEmpty) {
+                    draft.setValue(col.key, 0);
+                    continue;
+                  }
+                  final n = isStructuredPieceQuantityField(col.key)
+                      ? parseStructuredPieceQuantity(text)
+                      : double.tryParse(text.replaceAll(',', '.'));
                   if (n == null) {
                     draft.values.remove(col.key);
                   } else {
@@ -326,6 +459,20 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                             ),
                           ),
                         ),
+                      if (_inheritsProductFromHeader)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: InputDecorator(
+                            decoration: const InputDecoration(
+                              labelText: 'Proizvod (iz zaglavlja)',
+                              border: OutlineInputBorder(),
+                            ),
+                            child: Text(
+                              headerProductSelection!.displayLabel,
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
+                          ),
+                        ),
                       ..._rowDialogColumns.expand((col) {
                         final widgets = <Widget>[
                           Padding(
@@ -336,8 +483,15 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                               draft: draft,
                               entitySelections: entitySelections,
                               enumSelections: enumSelections,
+                              boolSelections: boolSelections,
                               dateTimes: dateTimes,
                               textControllers: textControllers,
+                              fieldError: fieldErrors.contains(col.key)
+                                  ? (packagingUnitsBalanceFieldKeys
+                                          .contains(col.key)
+                                      ? 'Provjereno = Prihvaćeno + Odbijeno'
+                                      : validationError)
+                                  : null,
                               onChanged: () => setLocal(() {}),
                             ),
                           ),
@@ -396,20 +550,31 @@ class StructuredRepeatableTableSection extends StatelessWidget {
       },
     );
 
-    scrollController.dispose();
-
-    for (final c in textControllers.values) {
-      c.dispose();
+    if (saved == true) {
+      final next = List<StructuredRepeatableRow>.from(rows);
+      if (index == null) {
+        next.add(draft);
+      } else {
+        next[index] = draft;
+      }
+      onRowsChanged(next);
+      if (context.mounted) {
+        final message = tableDef.key.trim() == 'packaging_check_lines'
+            ? 'Kontrolisana jedinica je spremljena.'
+            : 'Red je spremljen.';
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(message)));
+      }
     }
-    if (saved != true) return;
 
-    final next = List<StructuredRepeatableRow>.from(rows);
-    if (index == null) {
-      next.add(draft);
-    } else {
-      next[index] = draft;
-    }
-    onRowsChanged(next);
+    // M1-I2-F1: dispose nakon što dialog ruta više nije u stablu.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      scrollController.dispose();
+      for (final c in textControllers.values) {
+        c.dispose();
+      }
+    });
   }
 
   Widget _buildColumnField({
@@ -418,9 +583,11 @@ class StructuredRepeatableTableSection extends StatelessWidget {
     required StructuredRepeatableRow draft,
     required Map<String, StructuredEntitySelection?> entitySelections,
     required Map<String, String?> enumSelections,
+    required Map<String, bool?> boolSelections,
     required Map<String, DateTime?> dateTimes,
     required Map<String, TextEditingController> textControllers,
     required VoidCallback onChanged,
+    String? fieldError,
   }) {
     final label = OperatorWorkLogRowLayout.isOperatorWorkLogTable(tableDef.key)
         ? OperatorWorkLogRowLayout.displayLabel(col)
@@ -484,9 +651,14 @@ class StructuredRepeatableTableSection extends StatelessWidget {
           entitySelections[col.key] = selection;
           if (selection != null) {
             draft.setEntitySelection(selection);
+            _applyEntitySnapshotsToDraft(draft, col.key, selection);
           } else {
             draft.values.remove(col.key);
             draft.entitySelections.remove(col.key);
+            if (col.key == 'productId') {
+              draft.values.remove('productCode');
+              draft.values.remove('productNameSnapshot');
+            }
           }
           onChanged();
         },
@@ -536,23 +708,50 @@ class StructuredRepeatableTableSection extends StatelessWidget {
         },
       );
     }
+    if (col.type == 'boolean') {
+      final selected = boolSelections[col.key];
+      return InputDecorator(
+        decoration: InputDecoration(
+          labelText: required ? '$label *' : label,
+          border: const OutlineInputBorder(),
+        ),
+        child: SegmentedButton<bool>(
+          segments: const [
+            ButtonSegment<bool>(value: true, label: Text('DA')),
+            ButtonSegment<bool>(value: false, label: Text('NE')),
+          ],
+          emptySelectionAllowed: !required,
+          showSelectedIcon: false,
+          selected: selected == null ? <bool>{} : {selected},
+          onSelectionChanged: enabled
+              ? (next) {
+                  boolSelections[col.key] =
+                      next.isEmpty ? null : next.first;
+                  onChanged();
+                }
+              : null,
+        ),
+      );
+    }
     final controller = textControllers.putIfAbsent(
       col.key,
       () => TextEditingController(
         text: draft.values[col.key]?.toString() ?? '',
       ),
     );
+    final pieceQty = col.type == 'number' && isStructuredPieceQuantityField(col.key);
     return TextField(
       controller: controller,
       enabled: enabled,
       maxLines: col.type == 'text' ? 3 : 1,
       maxLength: col.maxLength,
       keyboardType: col.type == 'number'
-          ? const TextInputType.numberWithOptions(decimal: true)
+          ? TextInputType.numberWithOptions(decimal: !pieceQty)
           : TextInputType.text,
       decoration: InputDecoration(
         labelText: required ? '$label *' : label,
         border: const OutlineInputBorder(),
+        errorText: fieldError,
       ),
       onChanged: (_) => onChanged(),
     );
@@ -654,6 +853,22 @@ class StructuredRepeatableTableSection extends StatelessWidget {
 
   bool _isTextLike(String type) => type == 'string' || type == 'text';
 
+  /// M1-I2-F2 — parsiranje boolean vrijednosti (true/false, DA/NE, 1/0).
+  bool? _parseBoolValue(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is bool) return raw;
+    if (raw is num) return raw != 0;
+    final text = raw.toString().trim().toLowerCase();
+    if (text.isEmpty) return null;
+    if (text == 'true' || text == 'da' || text == '1' || text == 'yes') {
+      return true;
+    }
+    if (text == 'false' || text == 'ne' || text == '0' || text == 'no') {
+      return false;
+    }
+    return null;
+  }
+
   double _computedOperatorProcessedQty(
     Map<String, TextEditingController> textControllers, {
     Map<String, String?>? enumSelections,
@@ -678,6 +893,18 @@ class StructuredRepeatableTableSection extends StatelessWidget {
     }
     return value.toStringAsFixed(2);
   }
+}
+
+void _applyEntitySnapshotsToDraft(
+  StructuredRepeatableRow draft,
+  String fieldKey,
+  StructuredEntitySelection selection,
+) {
+  if (fieldKey != 'productId') return;
+  // Samo entity selection + displayLabel — ne productCode u values/payload (F6).
+  draft.values.remove('productCode');
+  draft.values.remove('productNameSnapshot');
+  draft.setEntitySelection(selection);
 }
 
 /// Poruka kada obavezno polje nije popunjeno.
@@ -720,10 +947,27 @@ String? validateStructuredTables({
         final label = OperatorWorkLogRowLayout.isOperatorWorkLogTable(table.key)
             ? OperatorWorkLogRowLayout.displayLabel(col)
             : col.label;
+        if (isPackagingZeroDefaultQuantityField(
+              tableKey: table.key,
+              fieldKey: col.key,
+            ) &&
+            (raw == null || (raw is String && raw.trim().isEmpty))) {
+          continue;
+        }
         if (raw == null || (raw is String && raw.trim().isEmpty)) {
           return '${table.label}, red ${rowIndex + 1}: '
               '${structuredRequiredFieldMessage(label)}';
         }
+      }
+      if (isPackagingCheckLinesTable(table.key)) {
+        final balanceError = validatePackagingUnitsBalance(
+          tableLabel: table.label,
+          rowIndexOneBased: rowIndex + 1,
+          unitsChecked: row.values['unitsChecked'],
+          unitsAccepted: row.values['unitsAccepted'],
+          unitsRejected: row.values['unitsRejected'],
+        );
+        if (balanceError != null) return balanceError;
       }
       if (OperatorWorkLogRowLayout.isOperatorWorkLogTable(table.key)) {
         final ok = _parseQty(row.values['okQty']);

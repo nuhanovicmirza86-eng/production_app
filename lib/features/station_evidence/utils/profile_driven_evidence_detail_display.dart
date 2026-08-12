@@ -17,6 +17,10 @@ const Set<String> profileEvidenceDetailRedundantSnapshotKeys = {
   'treatmentTypeNameSnapshot',
   // Prikazuje se preko productId → productNameSnapshot.
   'productNameSnapshot',
+  // Prikazuje se preko controllerEmployeeId → controllerNameSnapshot.
+  'controllerNameSnapshot',
+  // Prikazuje se preko packagingOperatorEmployeeId → packagingOperatorNameSnapshot.
+  'packagingOperatorNameSnapshot',
 };
 
 const Map<String, String> _entityIdToSnapshotField = {
@@ -24,6 +28,8 @@ const Map<String, String> _entityIdToSnapshotField = {
   'chemicalId': 'chemicalNameSnapshot',
   'productionOrderId': 'productionOrderCode',
   'productId': 'productNameSnapshot',
+  'controllerEmployeeId': 'controllerNameSnapshot',
+  'packagingOperatorEmployeeId': 'packagingOperatorNameSnapshot',
 };
 
 bool profileEvidenceShouldHideDetailFieldKey(String key) {
@@ -110,6 +116,10 @@ String? _summaryValueForEntityField(
       return _nonEmpty(summary.productName);
     case 'productionOrderId':
       return _nonEmpty(summary.productionOrderCode);
+    case 'controllerEmployeeId':
+      return _nonEmpty(summary.operatorSummary);
+    case 'packagingOperatorEmployeeId':
+      return _nonEmpty(summary.packagingOperatorName);
     default:
       return null;
   }

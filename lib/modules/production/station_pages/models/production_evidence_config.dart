@@ -5,11 +5,12 @@ import 'production_station_display_options.dart';
 
 /// Kompanijska instanca evidencije — `production_evidence_configs/{companyId}__ev_{slot}`.
 class ProductionEvidenceConfig {
-  /// M1-H3 pilot profili za operator runtime.
+  /// M1-H3 / M1-I company evidence operator runtime profili.
   static const List<String> h3OperatorRuntimeProfileKeys = [
     'chemical_dosing',
     'wastewater_treatment',
     'production_counting',
+    'packaging_control',
   ];
 
   static bool isH3OperatorRuntimeProfile(String profileKey) =>
