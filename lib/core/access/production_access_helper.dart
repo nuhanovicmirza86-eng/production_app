@@ -139,16 +139,23 @@ class ProductionAccessHelper {
   static const String roleLaboratoryTechnician = 'laboratory_technician';
 
   /// Uloge koje Admin može dodijeliti operativnoj evidenciji (runtimeAllowedRoles).
+  /// Samo postojeće Production role iz user modela (bez terminal/admin/super_admin).
   static const List<String> profileStationRuntimeAssignableRoles = [
     roleProductionOperator,
-    roleShiftLead,
-    roleQualityControl,
-    roleProductionManager,
+    roleQualityOperator,
     'logistics_operator',
     roleLogisticsManager,
-    roleMaintenanceManager,
+    roleShiftLead,
+    roleProductionManager,
     roleLaboratoryManager,
     roleLaboratoryTechnician,
+    roleProjectManager,
+    roleDevelopmentEngineer,
+    roleManagementViewer,
+    roleQualityControl,
+    roleAccountingManager,
+    roleAccountingClerk,
+    roleMaintenanceManager,
   ];
 
   /// Kanonski kod uloge; legacy aliasi se mapiraju na jednu ulogu (npr. `administrator` → [roleAdmin]).
@@ -211,6 +218,8 @@ class ProductionAccessHelper {
         return 'Operater proizvodnje';
       case roleQualityOperator:
         return 'Operater kvaliteta';
+      case 'logistics_operator':
+        return 'Operater logistike';
       case roleQualityControl:
         return 'Quality manager';
       case roleMaintenanceManager:

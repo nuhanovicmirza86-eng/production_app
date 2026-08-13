@@ -101,7 +101,7 @@ class StructuredHeaderSection extends StatelessWidget {
 
   Widget _buildField(BuildContext context, ProductionStationProfileField field) {
     if (field.isEntitySelect) {
-      return _buildWorkBathDropdown(field);
+      return _buildWorkBathDropdown(context, field);
     }
     if (field.isEntitySearchSelect) {
       return StructuredEntitySearchField(
@@ -134,11 +134,7 @@ class StructuredHeaderSection extends StatelessWidget {
           ? field.enumValues
           : profile.allowedUnits;
       return InputDecorator(
-        decoration: InputDecoration(
-          labelText: field.required ? '${field.label} *' : field.label,
-          border: const OutlineInputBorder(),
-          helperText: field.helperText,
-        ),
+        decoration: _fieldDecoration(context, field),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<String>(
             isExpanded: true,
@@ -194,11 +190,10 @@ class StructuredHeaderSection extends StatelessWidget {
       enabled: enabled,
       maxLines: field.type == 'text' ? 3 : 1,
       maxLength: field.maxLength,
-      decoration: InputDecoration(
-        labelText: field.required ? '${field.label} *' : field.label,
-        border: const OutlineInputBorder(),
-        helperText: field.helperText,
-      ),
+      keyboardType: field.type == 'number'
+          ? const TextInputType.numberWithOptions(decimal: false)
+          : TextInputType.text,
+      decoration: _fieldDecoration(context, field),
       onChanged: (value) {
         final trimmed = value.trim();
         if (trimmed.isEmpty) {
@@ -211,14 +206,33 @@ class StructuredHeaderSection extends StatelessWidget {
     );
   }
 
-  Widget _buildWorkBathDropdown(ProductionStationProfileField field) {
+  /// M1-I3-D — kratki diskretan helper; bez info ikone uz helperText.
+  InputDecoration _fieldDecoration(
+    BuildContext context,
+    ProductionStationProfileField field,
+  ) {
+    final theme = Theme.of(context);
+    final helper = field.helperText?.trim();
+    return InputDecoration(
+      labelText: field.required ? '${field.label} *' : field.label,
+      border: const OutlineInputBorder(),
+      helperText: (helper == null || helper.isEmpty) ? null : helper,
+      helperMaxLines: 2,
+      helperStyle: theme.textTheme.bodySmall?.copyWith(
+        fontSize: 11,
+        height: 1.25,
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
+    );
+  }
+
+  Widget _buildWorkBathDropdown(
+    BuildContext context,
+    ProductionStationProfileField field,
+  ) {
     final selected = entitySelections[field.key]?.entityId;
     return InputDecorator(
-      decoration: InputDecoration(
-        labelText: field.required ? '${field.label} *' : field.label,
-        border: const OutlineInputBorder(),
-        helperText: field.helperText,
-      ),
+      decoration: _fieldDecoration(context, field),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           isExpanded: true,

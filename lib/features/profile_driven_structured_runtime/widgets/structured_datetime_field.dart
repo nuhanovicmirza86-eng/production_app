@@ -58,11 +58,19 @@ class StructuredDateTimeField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final display = _displayLocal;
+    final theme = Theme.of(context);
+    final helper = helperText?.trim();
     return InputDecorator(
       decoration: InputDecoration(
         labelText: required ? '$label *' : label,
         border: const OutlineInputBorder(),
-        helperText: helperText,
+        helperText: (helper == null || helper.isEmpty) ? null : helper,
+        helperMaxLines: 2,
+        helperStyle: theme.textTheme.bodySmall?.copyWith(
+          fontSize: 11,
+          height: 1.25,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
       ),
       child: Row(
         children: [

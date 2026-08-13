@@ -11,6 +11,7 @@ class ProductionEvidenceConfig {
     'wastewater_treatment',
     'production_counting',
     'packaging_control',
+    'first_piece_approval',
   ];
 
   static bool isH3OperatorRuntimeProfile(String profileKey) =>

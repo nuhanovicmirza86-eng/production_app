@@ -111,6 +111,9 @@ class _CatalogEvidenceStationScreenState
   bool get _isPackagingControl =>
       widget.profile.profileKey.trim() == 'packaging_control';
 
+  bool get _isFirstPieceApproval =>
+      widget.profile.profileKey.trim() == 'first_piece_approval';
+
   String get _processControllerDisplayName =>
       UserDisplayLabel.fromSessionMap(widget.companyData);
 
@@ -184,6 +187,16 @@ class _CatalogEvidenceStationScreenState
       c.clear();
     }
     _ensurePackagingControllerFromSession();
+    _ensureFirstPieceInspectorFromSession();
+    _ensureFirstPieceDefaults();
+    _syncHeaderControllersFromState();
+  }
+
+  /// M1-I3-D — odobrenje prvog komada: default 1 komad.
+  void _ensureFirstPieceDefaults() {
+    if (!_isFirstPieceApproval) return;
+    if (_state.fieldValues['qtySubmitted'] != null) return;
+    _state.fieldValues['qtySubmitted'] = 1;
   }
 
   /// Procesni kontrolor = prijavljeni korisnik (M1-I2-F3 / F6).
@@ -199,6 +212,22 @@ class _CatalogEvidenceStationScreenState
       fieldKey: 'controllerEmployeeId',
       entityId: uid,
       displayLabel: name.isNotEmpty ? name : 'Procesni kontrolor',
+    );
+  }
+
+  /// M1-I3-E — kontrolor kvaliteta = prijavljeni korisnik (ne ručni search).
+  /// Samo [inspectorEmployeeId] u payloadu — snapshot ime popunjava backend.
+  void _ensureFirstPieceInspectorFromSession() {
+    if (!_isFirstPieceApproval) return;
+    final name = _processControllerDisplayName.trim();
+    final uid = FirebaseAuth.instance.currentUser?.uid.trim() ?? '';
+    _state.fieldValues.remove('inspectorNameSnapshot');
+    if (uid.isEmpty) return;
+    _state.fieldValues['inspectorEmployeeId'] = uid;
+    _headerEntitySelections['inspectorEmployeeId'] = StructuredEntitySelection(
+      fieldKey: 'inspectorEmployeeId',
+      entityId: uid,
+      displayLabel: name.isNotEmpty ? name : 'Kontrolor kvaliteta',
     );
   }
 
@@ -244,6 +273,7 @@ class _CatalogEvidenceStationScreenState
     }
 
     _ensurePackagingControllerFromSession();
+    _ensureFirstPieceInspectorFromSession();
     _stripNonOperatorEditableFieldValues();
   }
 
@@ -286,6 +316,16 @@ class _CatalogEvidenceStationScreenState
               .toString()
               .trim();
           if (name.isNotEmpty) label = name;
+        } else if (field.key == 'inspectorEmployeeId') {
+          final name = (_state.fieldValues['inspectorNameSnapshot'] ?? '')
+              .toString()
+              .trim();
+          if (name.isNotEmpty) {
+            label = name;
+          } else {
+            final sessionName = _processControllerDisplayName.trim();
+            if (sessionName.isNotEmpty) label = sessionName;
+          }
         }
         _headerEntitySelections[field.key] = StructuredEntitySelection(
           fieldKey: field.key,
@@ -301,7 +341,14 @@ class _CatalogEvidenceStationScreenState
           field.key,
           TextEditingController.new,
         );
-        controller.text = raw?.toString() ?? '';
+        final text = raw == null
+            ? ''
+            : (raw is num && raw == raw.roundToDouble()
+                ? raw.toInt().toString()
+                : raw.toString());
+        if (controller.text != text) {
+          controller.text = text;
+        }
       }
     }
   }
@@ -366,6 +413,8 @@ class _CatalogEvidenceStationScreenState
     _state.fieldValues = Map<String, dynamic>.from(
       session.fieldValues ?? const {},
     );
+    _ensureFirstPieceDefaults();
+    _ensureFirstPieceInspectorFromSession();
     _syncHeaderControllersFromState();
     _ensurePackagingControllerFromSession();
     if (_isStructuredLite) {
@@ -389,6 +438,7 @@ class _CatalogEvidenceStationScreenState
   String? _validateBeforeSubmit({required bool forFinish}) {
     _flushHeaderFieldsToState();
     _ensurePackagingControllerFromSession();
+    _ensureFirstPieceInspectorFromSession();
     _stripNonOperatorEditableFieldValues();
     final headerError = validateStructuredHeader(
       fields: widget.profile.structuredHeaderFields,
@@ -402,6 +452,11 @@ class _CatalogEvidenceStationScreenState
     if (_isPackagingControl && forFinish) {
       final packagingError = _validatePackagingFinish();
       if (packagingError != null) return packagingError;
+    }
+
+    if (_isFirstPieceApproval && forFinish) {
+      final firstPieceError = _validateFirstPieceFinish();
+      if (firstPieceError != null) return firstPieceError;
     }
 
     if (_isStructuredLite && forFinish) {
@@ -436,6 +491,65 @@ class _CatalogEvidenceStationScreenState
       return 'Odaberite operatera pakovanja prije završavanja evidencije.';
     }
     return null;
+  }
+
+  /// M1-I3-F — početak/kraj kontrole obavezni (isto poslovno pravilo kao packaging).
+  String? _validateFirstPieceFinish() {
+    final started = _headerDateTimes['inspectionStartedAt'] ??
+        StructuredDateTimeValue.parse(
+          _state.fieldValues['inspectionStartedAt'],
+        );
+    final finished = _headerDateTimes['inspectionFinishedAt'] ??
+        StructuredDateTimeValue.parse(
+          _state.fieldValues['inspectionFinishedAt'],
+        );
+    if (started == null) {
+      return 'Unesite početak kontrole prije završavanja evidencije.';
+    }
+    if (finished == null) {
+      return 'Unesite kraj kontrole prije završavanja evidencije.';
+    }
+    if (finished.isBefore(started)) {
+      return 'Kraj kontrole mora biti nakon početka kontrole.';
+    }
+    return null;
+  }
+
+  /// Ako kraj kontrole nije unesen — ponudi „Postavi sada”.
+  /// `false` = korisnik odustao; `true` = vrijeme postoji ili je postavljeno.
+  Future<bool> _offerSetFinishTimeNowIfMissing({
+    required String fieldKey,
+  }) async {
+    final finished = _headerDateTimes[fieldKey] ??
+        StructuredDateTimeValue.parse(_state.fieldValues[fieldKey]);
+    if (finished != null) return true;
+
+    final setNow = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Kraj kontrole'),
+        content: const Text(
+          'Kraj kontrole nije unesen. Postaviti sadašnje vrijeme i nastaviti sa završetkom?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Odustani'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Postavi sada'),
+          ),
+        ],
+      ),
+    );
+    if (setNow != true || !mounted) return false;
+    final now = DateTime.now();
+    setState(() {
+      _headerDateTimes[fieldKey] = now;
+      _state.fieldValues[fieldKey] = structuredDateTimePayload(now);
+    });
+    return true;
   }
 
   Future<void> _startSession() async {
@@ -492,38 +606,19 @@ class _CatalogEvidenceStationScreenState
   Future<void> _finishSession(ProductionStationWorkSession session) async {
     _flushHeaderFieldsToState();
     _ensurePackagingControllerFromSession();
+    _ensureFirstPieceInspectorFromSession();
 
     if (_isPackagingControl) {
-      final finished = _headerDateTimes['checkFinishedAt'] ??
-          StructuredDateTimeValue.parse(_state.fieldValues['checkFinishedAt']);
-      if (finished == null) {
-        final setNow = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Kraj kontrole'),
-            content: const Text(
-              'Kraj kontrole nije unesen. Postaviti sadašnje vrijeme i nastaviti sa završetkom?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Odustani'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Postavi sada'),
-              ),
-            ],
-          ),
-        );
-        if (setNow != true || !mounted) return;
-        final now = DateTime.now();
-        setState(() {
-          _headerDateTimes['checkFinishedAt'] = now;
-          _state.fieldValues['checkFinishedAt'] =
-              structuredDateTimePayload(now);
-        });
-      }
+      final offered = await _offerSetFinishTimeNowIfMissing(
+        fieldKey: 'checkFinishedAt',
+      );
+      if (!offered) return;
+    }
+    if (_isFirstPieceApproval) {
+      final offered = await _offerSetFinishTimeNowIfMissing(
+        fieldKey: 'inspectionFinishedAt',
+      );
+      if (!offered) return;
     }
 
     final validationError = _validateBeforeSubmit(forFinish: true);
@@ -736,11 +831,15 @@ class _CatalogEvidenceStationScreenState
             dateTimes: _headerDateTimes,
             textControllers: _headerTextControllers,
             enabled: formEnabled,
-            excludedFieldKeys: _isPackagingControl
-                ? const {'controllerEmployeeId'}
-                : const {},
+            excludedFieldKeys: {
+              if (_isPackagingControl) 'controllerEmployeeId',
+              if (_isFirstPieceApproval) 'inspectorEmployeeId',
+            },
             onFieldChanged: () {
               _applyPackagingHeaderSnapshotsFromSelections();
+              if (_isFirstPieceApproval) {
+                _ensureFirstPieceInspectorFromSession();
+              }
               setState(() {});
             },
             onScanResolved: _applyScanResult,
@@ -751,6 +850,22 @@ class _CatalogEvidenceStationScreenState
               decoration: const InputDecoration(
                 labelText: 'Procesni kontrolor',
                 border: OutlineInputBorder(),
+              ),
+              child: Text(
+                _processControllerDisplayName.trim().isEmpty
+                    ? '—'
+                    : _processControllerDisplayName.trim(),
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ),
+          ],
+          if (_isFirstPieceApproval) ...[
+            const SizedBox(height: 8),
+            InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Kontrolor kvaliteta',
+                border: OutlineInputBorder(),
+                helperText: 'Automatski iz prijave — ne bira se ručno.',
               ),
               child: Text(
                 _processControllerDisplayName.trim().isEmpty
