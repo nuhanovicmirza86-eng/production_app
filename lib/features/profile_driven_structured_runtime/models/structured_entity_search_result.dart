@@ -19,11 +19,13 @@ class StructuredEntitySearchResult {
             data['orderCode'] ??
             data['chemicalCode'] ??
             data['employeeCode'] ??
+            data['machineCode'] ??
             '')
         .toString()
         .trim();
     final name = (data['displayName'] ??
             data['productName'] ??
+            data['machineName'] ??
             data['email'] ??
             '')
         .toString()
@@ -88,6 +90,12 @@ class StructuredScanResolveResult {
     this.displayName,
     this.productId,
     this.productCode,
+    this.productName,
+    this.machineId,
+    this.machineName,
+    this.machineCode,
+    this.inputMaterialLot,
+    this.plannedQty,
     this.message,
   });
 
@@ -97,6 +105,12 @@ class StructuredScanResolveResult {
   final String? displayName;
   final String? productId;
   final String? productCode;
+  final String? productName;
+  final String? machineId;
+  final String? machineName;
+  final String? machineCode;
+  final String? inputMaterialLot;
+  final double? plannedQty;
   final String? message;
 
   bool get isKnown => type != 'unknown' && (resolvedId ?? '').trim().isNotEmpty;
@@ -120,11 +134,24 @@ class StructuredScanResolveResult {
     } else if (type == 'production_order') {
       raw['orderCode'] = code;
       raw['productionOrderCode'] = code;
-      if (name.isNotEmpty) raw['productName'] = name;
+      final pName = (productName ?? name).trim();
+      if (pName.isNotEmpty) {
+        raw['productName'] = pName;
+        raw['displayName'] = pName;
+      }
       final pid = (productId ?? '').trim();
       final pCode = (productCode ?? '').trim();
       if (pid.isNotEmpty) raw['productId'] = pid;
       if (pCode.isNotEmpty) raw['productCode'] = pCode;
+      final mid = (machineId ?? '').trim();
+      if (mid.isNotEmpty) raw['machineId'] = mid;
+      final mName = (machineName ?? '').trim();
+      if (mName.isNotEmpty) raw['machineName'] = mName;
+      final mCode = (machineCode ?? '').trim();
+      if (mCode.isNotEmpty) raw['machineCode'] = mCode;
+      final lot = (inputMaterialLot ?? '').trim();
+      if (lot.isNotEmpty) raw['inputMaterialLot'] = lot;
+      if (plannedQty != null) raw['plannedQty'] = plannedQty;
     }
     return StructuredEntitySearchResult(
       id: id,
@@ -139,26 +166,32 @@ class StructuredScanResolveResult {
   }
 
   factory StructuredScanResolveResult.fromMap(Map<String, dynamic> data) {
+    String? opt(String key) {
+      final t = (data[key] ?? '').toString().trim();
+      return t.isEmpty ? null : t;
+    }
+
+    double? numOpt(String key) {
+      final v = data[key];
+      if (v is num) return v.toDouble();
+      if (v is String && v.trim().isNotEmpty) return double.tryParse(v.trim());
+      return null;
+    }
+
     return StructuredScanResolveResult(
       type: (data['type'] ?? 'unknown').toString().trim(),
-      resolvedId: (data['resolvedId'] ?? '').toString().trim().isEmpty
-          ? null
-          : (data['resolvedId'] ?? '').toString().trim(),
-      displayCode: (data['displayCode'] ?? '').toString().trim().isEmpty
-          ? null
-          : (data['displayCode'] ?? '').toString().trim(),
-      displayName: (data['displayName'] ?? '').toString().trim().isEmpty
-          ? null
-          : (data['displayName'] ?? '').toString().trim(),
-      productId: (data['productId'] ?? '').toString().trim().isEmpty
-          ? null
-          : (data['productId'] ?? '').toString().trim(),
-      productCode: (data['productCode'] ?? '').toString().trim().isEmpty
-          ? null
-          : (data['productCode'] ?? '').toString().trim(),
-      message: (data['message'] ?? '').toString().trim().isEmpty
-          ? null
-          : (data['message'] ?? '').toString().trim(),
+      resolvedId: opt('resolvedId'),
+      displayCode: opt('displayCode'),
+      displayName: opt('displayName'),
+      productId: opt('productId'),
+      productCode: opt('productCode'),
+      productName: opt('productName'),
+      machineId: opt('machineId'),
+      machineName: opt('machineName'),
+      machineCode: opt('machineCode'),
+      inputMaterialLot: opt('inputMaterialLot'),
+      plannedQty: numOpt('plannedQty'),
+      message: opt('message'),
     );
   }
 }

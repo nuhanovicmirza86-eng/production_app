@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/company_plant_display_name.dart';
 import '../../../modules/production/station_pages/models/production_station_profile_field.dart';
+import '../export/first_piece_approval_pdf_actions.dart';
 import '../models/profile_driven_evidence_session.dart';
 import '../services/profile_driven_evidence_callable_service.dart';
 import '../utils/profile_driven_evidence_detail_display.dart';
@@ -27,8 +28,10 @@ class ProfileDrivenEvidenceDetailScreen extends StatefulWidget {
 class _ProfileDrivenEvidenceDetailScreenState
     extends State<ProfileDrivenEvidenceDetailScreen> {
   final _service = ProfileDrivenEvidenceCallableService();
+  final _pdfActions = FirstPieceApprovalPdfActions();
 
   bool _loading = true;
+  bool _pdfBusy = false;
   Object? _error;
   ProfileDrivenEvidenceSessionDetail? _session;
   String? _plantLabel;
@@ -114,6 +117,30 @@ class _ProfileDrivenEvidenceDetailScreenState
     if (key.isEmpty) return '—';
     if (profileEvidenceLooksLikeInternalDocumentId(key)) return '—';
     return key;
+  }
+
+  bool get _canExportFirstPiecePdf {
+    final s = _session;
+    if (s == null) return false;
+    return s.processProfileType == 'first_piece_approval' &&
+        s.status.trim().toLowerCase() == 'closed';
+  }
+
+  Future<void> _runFirstPiecePdf(
+    Future<void> Function() action,
+  ) async {
+    if (_pdfBusy) return;
+    setState(() => _pdfBusy = true);
+    try {
+      await action();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(profileDrivenEvidenceErrorMessage(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _pdfBusy = false);
+    }
   }
 
   Widget _sectionCard({
@@ -580,6 +607,59 @@ class _ProfileDrivenEvidenceDetailScreenState
       appBar: AppBar(
         title: const Text('Detalj evidencije'),
         actions: [
+          if (_canExportFirstPiecePdf)
+            PopupMenuButton<String>(
+              tooltip: 'PDF odobrenja prvog komada',
+              enabled: !_loading && !_pdfBusy,
+              onSelected: (value) {
+                Future<void> Function()? action;
+                switch (value) {
+                  case 'preview':
+                    action = () => _pdfActions.preview(
+                          companyId: _companyId,
+                          sessionId: widget.sessionId,
+                          companyData: widget.companyData,
+                        );
+                    break;
+                  case 'download':
+                    action = () => _pdfActions.downloadOrShare(
+                          companyId: _companyId,
+                          sessionId: widget.sessionId,
+                          companyData: widget.companyData,
+                        );
+                    break;
+                  case 'print':
+                    action = () => _pdfActions.print(
+                          companyId: _companyId,
+                          sessionId: widget.sessionId,
+                          companyData: widget.companyData,
+                        );
+                    break;
+                }
+                if (action != null) _runFirstPiecePdf(action);
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'preview',
+                  child: Text('Pregled PDF'),
+                ),
+                PopupMenuItem(
+                  value: 'download',
+                  child: Text('Preuzmi PDF'),
+                ),
+                PopupMenuItem(
+                  value: 'print',
+                  child: Text('Print PDF'),
+                ),
+              ],
+              icon: _pdfBusy
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.picture_as_pdf_outlined),
+            ),
           IconButton(
             tooltip: 'Osvježi',
             onPressed: _loading ? null : _load,

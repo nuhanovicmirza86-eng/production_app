@@ -1,5 +1,6 @@
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../export/first_piece_approval_release_document.dart';
 import '../models/profile_driven_evidence_session.dart';
 
 String profileDrivenEvidenceErrorMessage(Object error) {
@@ -85,6 +86,31 @@ class ProfileDrivenEvidenceCallableService {
       throw Exception('Nepotpun odgovor servera.');
     }
     return ProfileDrivenEvidenceSessionDetail.fromMap(
+      Map<String, dynamic>.from(raw),
+    );
+  }
+
+  /// M1-I3-G — validiran release dokument za PDF odobrenja prvog komada.
+  Future<FirstPieceApprovalReleaseDocument>
+  getFirstPieceApprovalReleaseDocument({
+    required String companyId,
+    required String sessionId,
+  }) async {
+    final res = await _functions
+        .httpsCallable('getFirstPieceApprovalReleaseDocument')
+        .call<Map<String, dynamic>>({
+          'companyId': companyId.trim(),
+          'sessionId': sessionId.trim(),
+        });
+    final data = res.data;
+    if (data['success'] != true) {
+      throw Exception('Priprema release dokumenta nije uspjela.');
+    }
+    final raw = data['document'];
+    if (raw is! Map) {
+      throw Exception('Nepotpun odgovor servera.');
+    }
+    return FirstPieceApprovalReleaseDocument.fromMap(
       Map<String, dynamic>.from(raw),
     );
   }

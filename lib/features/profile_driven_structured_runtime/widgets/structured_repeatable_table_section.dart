@@ -643,7 +643,9 @@ class StructuredRepeatableTableSection extends StatelessWidget {
           callableName: col.entitySearchCallable ?? 'searchProducts',
           companyId: companyId,
           query: query,
-          assignedPlantKey: col.entitySearchCallable == 'searchPlantOperators'
+          assignedPlantKey:
+              col.entitySearchCallable == 'searchPlantOperators' ||
+                  col.entitySearchCallable == 'searchProductionMachines'
               ? plantKey
               : null,
         ),

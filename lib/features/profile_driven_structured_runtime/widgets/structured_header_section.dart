@@ -114,7 +114,9 @@ class StructuredHeaderSection extends StatelessWidget {
           callableName: field.entitySearchCallable ?? 'searchProductionOrders',
           companyId: companyId,
           query: query,
-          assignedPlantKey: field.entitySearchCallable == 'searchPlantOperators'
+          assignedPlantKey:
+              field.entitySearchCallable == 'searchPlantOperators' ||
+                  field.entitySearchCallable == 'searchProductionMachines'
               ? plantKey
               : null,
         ),

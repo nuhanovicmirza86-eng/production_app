@@ -51,6 +51,7 @@ class ProductionEvidenceOperatorLaunchScreen extends StatelessWidget {
         companyData: companyData,
         evidenceConfig: evidenceConfig,
         profile: profile,
+        profileCatalogVersion: profileCatalogVersion,
         onCloseStation: onClose,
       );
     }

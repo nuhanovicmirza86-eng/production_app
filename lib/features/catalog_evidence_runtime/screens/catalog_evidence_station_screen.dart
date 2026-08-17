@@ -12,6 +12,8 @@ import '../../../modules/production/station_pages/models/production_evidence_con
 import '../../../modules/production/station_pages/models/production_station_config.dart';
 import '../../../modules/production/station_pages/models/production_station_profile_catalog_entry.dart';
 import '../../../modules/production/station_pages/models/production_station_profile_field.dart';
+import '../../../modules/production/station_pages/services/production_station_config_callable_service.dart';
+import '../../../modules/production/station_pages/utils/production_operator_profile_resolver.dart';
 import '../../../modules/production/station_work/models/production_station_work_session.dart';
 import '../../../modules/production/station_work/services/production_station_work_session_callable_service.dart';
 import '../../../modules/production/station_work/services/production_station_work_session_service.dart';
@@ -34,6 +36,7 @@ class CatalogEvidenceStationScreen extends StatefulWidget {
     required this.companyData,
     required this.stationConfig,
     required this.profile,
+    this.profileCatalogVersion = 0,
     this.onCloseStation,
   })  : evidenceConfig = null;
 
@@ -42,6 +45,7 @@ class CatalogEvidenceStationScreen extends StatefulWidget {
     required this.companyData,
     required this.evidenceConfig,
     required this.profile,
+    this.profileCatalogVersion = 0,
     this.onCloseStation,
   })  : stationConfig = null;
 
@@ -49,6 +53,8 @@ class CatalogEvidenceStationScreen extends StatefulWidget {
   final ProductionStationConfig? stationConfig;
   final ProductionEvidenceConfig? evidenceConfig;
   final ProductionStationProfileCatalogEntry profile;
+  /// Hub/live katalog verzija — za M1-I3-H1 refresh forme (npr. Mašina).
+  final int profileCatalogVersion;
   final VoidCallback? onCloseStation;
 
   bool get isCompanyEvidence => evidenceConfig != null;
@@ -63,6 +69,7 @@ class _CatalogEvidenceStationScreenState
   final _sessionStream = ProductionStationWorkSessionService();
   final _catalogService = CatalogEvidenceSessionService();
   final _searchService = ProductionEvidenceEntitySearchCallableService();
+  final _profileCatalogService = ProductionStationConfigCallableService();
 
   StructuredProfileSessionState _state = StructuredProfileSessionState();
   final Map<String, StructuredEntitySelection?> _headerEntitySelections = {};
@@ -75,6 +82,9 @@ class _CatalogEvidenceStationScreenState
   String _plantDisplayLabel = '';
   ProductionStationWorkSession? _closedSession;
   int _recordsLimit = catalogEvidenceDefaultRecordLimit;
+  ProductionStationProfileCatalogEntry? _runtimeProfile;
+  int _profileCatalogVersion = 0;
+  String? _lastFirstPieceOrderIdApplied;
 
   bool get _supportsOsWindowChrome =>
       !kIsWeb &&
@@ -103,24 +113,79 @@ class _CatalogEvidenceStationScreenState
     return _userPlantKey == _plantKey;
   }
 
-  bool get _isStructuredLite => widget.profile.isStructuredLiteInputModel;
+  ProductionStationProfileCatalogEntry get _effectiveProfile =>
+      _runtimeProfile ?? widget.profile;
+
+  bool get _isStructuredLite => _effectiveProfile.isStructuredLiteInputModel;
 
   List<StructuredRepeatableTableDefinition> get _tables =>
-      widget.profile.repeatableTableDefinitions;
+      _effectiveProfile.repeatableTableDefinitions;
 
   bool get _isPackagingControl =>
-      widget.profile.profileKey.trim() == 'packaging_control';
+      _effectiveProfile.profileKey.trim() == 'packaging_control';
 
   bool get _isFirstPieceApproval =>
-      widget.profile.profileKey.trim() == 'first_piece_approval';
+      _effectiveProfile.profileKey.trim() == 'first_piece_approval';
 
   String get _processControllerDisplayName =>
       UserDisplayLabel.fromSessionMap(widget.companyData);
 
+  void _applyRuntimeProfile(ProductionStationProfileCatalogEntry profile) {
+    _runtimeProfile = profile;
+  }
+
+  /// M1-I3-H1 — forma mora koristiti najnoviji live katalog (npr. polje Mašina).
+  Future<void> _refreshLiveProfileCatalog() async {
+    if (_companyId.isEmpty) return;
+    try {
+      final catalog = await _profileCatalogService.listProductionStationProfiles(
+        companyId: _companyId,
+      );
+      final live = catalog.byKey(_effectiveProfile.profileKey);
+      if (live == null || !live.isComplete) return;
+
+      final refreshed = ProductionOperatorProfileResolver.resolveNewest(
+        baseline: live,
+        baselineCatalogVersion: catalog.catalogVersion,
+        configSnapshot: widget.evidenceConfig?.profileSnapshot,
+      );
+      if (!mounted) return;
+      final beforeKeys =
+          _effectiveProfile.structuredHeaderFields.map((f) => f.key).toSet();
+      final afterKeys = refreshed.structuredHeaderFields.map((f) => f.key).toSet();
+      final changed = catalog.catalogVersion != _profileCatalogVersion ||
+          beforeKeys.length != afterKeys.length ||
+          !beforeKeys.containsAll(afterKeys);
+      setState(() {
+        _profileCatalogVersion = catalog.catalogVersion;
+        _applyRuntimeProfile(refreshed);
+        if (changed) {
+          _syncHeaderControllersFromState();
+          _ensureFirstPieceDefaults();
+          _ensureFirstPieceInspectorFromSession();
+          _ensurePackagingControllerFromSession();
+        }
+      });
+    } catch (_) {
+      // Soft-fail — ostaje profil s kojim je ekran otvoren.
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _profileCatalogVersion = widget.profileCatalogVersion;
+    _applyRuntimeProfile(
+      widget.isCompanyEvidence
+          ? ProductionOperatorProfileResolver.resolveNewest(
+              baseline: widget.profile,
+              baselineCatalogVersion: widget.profileCatalogVersion,
+              configSnapshot: widget.evidenceConfig!.profileSnapshot,
+            )
+          : widget.profile,
+    );
     unawaited(_loadPlantDisplayLabel());
+    unawaited(_refreshLiveProfileCatalog());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_supportsOsWindowChrome) {
         unawaited(windowManager.setFullScreen(true));
@@ -183,6 +248,7 @@ class _CatalogEvidenceStationScreenState
     _headerEntitySelections.clear();
     _headerEnumSelections.clear();
     _headerDateTimes.clear();
+    _lastFirstPieceOrderIdApplied = null;
     for (final c in _headerTextControllers.values) {
       c.clear();
     }
@@ -277,17 +343,124 @@ class _CatalogEvidenceStationScreenState
     _stripNonOperatorEditableFieldValues();
   }
 
+  /// M1-I3-H1 — sken/odabir naloga puni poznata polja (proizvod, mašina, lot).
+  /// [forceFromOrder]: true pri skeniranju; inače samo kad se promijeni nalog.
+  void _applyFirstPieceHeaderFromOrderSelection({
+    bool forceFromOrder = false,
+  }) {
+    if (!_isFirstPieceApproval) return;
+
+    _state.fieldValues.remove('productCode');
+    _state.fieldValues.remove('productNameSnapshot');
+    _state.fieldValues.remove('productionOrderCode');
+    _state.fieldValues.remove('machineNameSnapshot');
+    _state.fieldValues.remove('machineCodeSnapshot');
+
+    final order = _headerEntitySelections['productionOrderId'];
+    if (order == null) {
+      _lastFirstPieceOrderIdApplied = null;
+      _ensureFirstPieceInspectorFromSession();
+      _stripNonOperatorEditableFieldValues();
+      return;
+    }
+    final orderId = order.entityId.trim();
+    final orderChanged = orderId != (_lastFirstPieceOrderIdApplied ?? '');
+    final shouldApply = forceFromOrder || orderChanged;
+    final raw = order.raw;
+
+    final productId = (raw['productId'] ?? '').toString().trim();
+    final productCode = (raw['productCode'] ?? '').toString().trim();
+    final productName = (raw['productName'] ??
+            raw['displayName'] ??
+            '')
+        .toString()
+        .trim();
+    final existingProduct =
+        (_state.fieldValues['productId'] ?? '').toString().trim();
+    if (productId.isNotEmpty && (shouldApply || existingProduct.isEmpty)) {
+      final labelParts = <String>[
+        if (productCode.isNotEmpty) productCode,
+        if (productName.isNotEmpty) productName,
+      ];
+      _state.fieldValues['productId'] = productId;
+      _headerEntitySelections['productId'] = StructuredEntitySelection(
+        fieldKey: 'productId',
+        entityId: productId,
+        displayLabel:
+            labelParts.isEmpty ? productId : labelParts.join(' — '),
+        raw: {
+          'id': productId,
+          'productCode': productCode,
+          'productName': productName,
+          'displayName': productName,
+        },
+      );
+    }
+
+    final machineId = (raw['machineId'] ?? '').toString().trim();
+    final existingMachine =
+        (_state.fieldValues['machineId'] ?? '').toString().trim();
+    if (machineId.isNotEmpty && (shouldApply || existingMachine.isEmpty)) {
+      final machineCode = (raw['machineCode'] ?? '').toString().trim();
+      final machineName = (raw['machineName'] ?? '').toString().trim();
+      final labelParts = <String>[
+        if (machineCode.isNotEmpty) machineCode,
+        if (machineName.isNotEmpty) machineName,
+      ];
+      final displayLabel = labelParts.isNotEmpty
+          ? labelParts.join(' — ')
+          : (machineName.isNotEmpty ? machineName : 'Mašina');
+      _state.fieldValues['machineId'] = machineId;
+      _headerEntitySelections['machineId'] = StructuredEntitySelection(
+        fieldKey: 'machineId',
+        entityId: machineId,
+        displayLabel: displayLabel,
+        raw: {
+          'id': machineId,
+          'machineCode': machineCode,
+          'machineName': machineName,
+          'displayName': machineName,
+        },
+      );
+    } else if (shouldApply && machineId.isEmpty) {
+      // Novi nalog bez mašine — traži ručni kontrolisani odabir.
+      _state.fieldValues.remove('machineId');
+      _headerEntitySelections['machineId'] = null;
+    }
+
+    final lot = (raw['inputMaterialLot'] ??
+            raw['pieceSerialOrLot'] ??
+            '')
+        .toString()
+        .trim();
+    final existingLot =
+        (_state.fieldValues['pieceSerialOrLot'] ?? '').toString().trim();
+    if (lot.isNotEmpty && (shouldApply || existingLot.isEmpty)) {
+      _state.fieldValues['pieceSerialOrLot'] = lot;
+      final lotController = _headerTextControllers.putIfAbsent(
+        'pieceSerialOrLot',
+        TextEditingController.new,
+      );
+      if (lotController.text != lot) lotController.text = lot;
+    }
+
+    _lastFirstPieceOrderIdApplied = orderId;
+    _ensureFirstPieceInspectorFromSession();
+    _ensureFirstPieceDefaults();
+    _stripNonOperatorEditableFieldValues();
+  }
+
   /// Payload smije sadržavati samo operator-editable polja profila (M1-I2-F6).
   void _stripNonOperatorEditableFieldValues() {
     final allowed = <String>{
-      for (final f in widget.profile.fields)
+      for (final f in _effectiveProfile.fields)
         if (f.isOperatorEditable) f.key,
     };
     _state.fieldValues.removeWhere((key, _) => !allowed.contains(key));
   }
 
   void _syncHeaderControllersFromState() {
-    for (final field in widget.profile.structuredHeaderFields) {
+    for (final field in _effectiveProfile.structuredHeaderFields) {
       final raw = _state.fieldValues[field.key];
       if (field.isEntitySelect || field.isEntitySearchSelect) {
         if (raw == null) {
@@ -326,6 +499,18 @@ class _CatalogEvidenceStationScreenState
             final sessionName = _processControllerDisplayName.trim();
             if (sessionName.isNotEmpty) label = sessionName;
           }
+        } else if (field.key == 'machineId') {
+          final code =
+              (_state.fieldValues['machineCodeSnapshot'] ?? '').toString().trim();
+          final name =
+              (_state.fieldValues['machineNameSnapshot'] ?? '').toString().trim();
+          if (code.isNotEmpty && name.isNotEmpty) {
+            label = '$code — $name';
+          } else if (name.isNotEmpty) {
+            label = name;
+          } else if (code.isNotEmpty) {
+            label = code;
+          }
         }
         _headerEntitySelections[field.key] = StructuredEntitySelection(
           fieldKey: field.key,
@@ -356,7 +541,7 @@ class _CatalogEvidenceStationScreenState
   bool _isTextLike(String type) => type == 'string' || type == 'text';
 
   void _flushHeaderFieldsToState() {
-    for (final field in widget.profile.structuredHeaderFields) {
+    for (final field in _effectiveProfile.structuredHeaderFields) {
       if (field.type == 'number') {
         final text = _headerTextControllers[field.key]?.text.trim() ?? '';
         if (text.isEmpty) {
@@ -396,7 +581,7 @@ class _CatalogEvidenceStationScreenState
         evidenceConfigId: widget.isCompanyEvidence
             ? widget.evidenceConfig!.evidenceConfigId
             : null,
-        profile: widget.profile,
+        profile: _effectiveProfile,
       );
       if (!mounted || loaded == null) return;
       setState(() {
@@ -441,7 +626,7 @@ class _CatalogEvidenceStationScreenState
     _ensureFirstPieceInspectorFromSession();
     _stripNonOperatorEditableFieldValues();
     final headerError = validateStructuredHeader(
-      fields: widget.profile.structuredHeaderFields,
+      fields: _effectiveProfile.structuredHeaderFields,
       state: _state,
       entitySelections: _headerEntitySelections,
       enumSelections: _headerEnumSelections,
@@ -586,7 +771,7 @@ class _CatalogEvidenceStationScreenState
         await _catalogService.saveState(
           companyId: _companyId,
           sessionId: session.id,
-          profile: widget.profile,
+          profile: _effectiveProfile,
           state: _state,
         );
       } else {
@@ -653,7 +838,7 @@ class _CatalogEvidenceStationScreenState
           ? await _catalogService.finishState(
               companyId: _companyId,
               sessionId: session.id,
-              profile: widget.profile,
+              profile: _effectiveProfile,
               state: _state,
             )
           : await _catalogService.finishFlatState(
@@ -680,7 +865,7 @@ class _CatalogEvidenceStationScreenState
 
     if (result.type == 'production_order') {
       ProductionStationProfileField? field;
-      for (final f in widget.profile.structuredHeaderFields) {
+      for (final f in _effectiveProfile.structuredHeaderFields) {
         if (f.key == 'productionOrderId') {
           field = f;
           break;
@@ -697,16 +882,31 @@ class _CatalogEvidenceStationScreenState
         _headerEntitySelections[orderField.key] = selection;
         _state.fieldValues[orderField.key] = selection.entityId;
         _applyPackagingHeaderSnapshotsFromSelections();
+        _applyFirstPieceHeaderFromOrderSelection(forceFromOrder: true);
+        _syncHeaderControllersFromState();
       });
+      final filled = <String>[
+        'Nalog: ${selection.displayLabel}',
+        if ((selection.raw['productId'] ?? '').toString().trim().isNotEmpty)
+          'proizvod',
+        if ((selection.raw['machineId'] ?? '').toString().trim().isNotEmpty)
+          'mašina',
+      ];
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Nalog: ${selection.displayLabel}')),
+        SnackBar(
+          content: Text(
+            filled.length > 1
+                ? '${filled.first} — popunjeno: ${filled.skip(1).join(', ')}'
+                : filled.first,
+          ),
+        ),
       );
       return;
     }
 
     if (result.type == 'product') {
       ProductionStationProfileField? headerProduct;
-      for (final f in widget.profile.structuredHeaderFields) {
+      for (final f in _effectiveProfile.structuredHeaderFields) {
         if (f.key == 'productId') {
           headerProduct = f;
           break;
@@ -799,7 +999,7 @@ class _CatalogEvidenceStationScreenState
             children: [
               Expanded(
                 child: Text(
-                  widget.profile.displayName,
+                  _effectiveProfile.displayName,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
@@ -820,7 +1020,7 @@ class _CatalogEvidenceStationScreenState
           ),
           const SizedBox(height: 16),
           StructuredHeaderSection(
-            profile: widget.profile,
+            profile: _effectiveProfile,
             companyId: _companyId,
             plantKey: _plantKey,
             state: _state,
@@ -838,6 +1038,8 @@ class _CatalogEvidenceStationScreenState
             onFieldChanged: () {
               _applyPackagingHeaderSnapshotsFromSelections();
               if (_isFirstPieceApproval) {
+                // Puni iz naloga samo kad se nalog promijeni (ne briše ručni odabir mašine).
+                _applyFirstPieceHeaderFromOrderSelection();
                 _ensureFirstPieceInspectorFromSession();
               }
               setState(() {});
@@ -881,7 +1083,7 @@ class _CatalogEvidenceStationScreenState
                 padding: const EdgeInsets.only(top: 16),
                 child: StructuredRepeatableTableSection(
                   tableDef: table,
-                  profile: widget.profile,
+                  profile: _effectiveProfile,
                   companyId: _companyId,
                   plantKey: _plantKey,
                   rows: _state.rowsFor(table.key),
@@ -930,7 +1132,7 @@ class _CatalogEvidenceStationScreenState
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              widget.profile.displayName,
+              _effectiveProfile.displayName,
               style: compact
                   ? theme.textTheme.titleMedium
                   : theme.textTheme.headlineSmall,
@@ -1034,7 +1236,7 @@ class _CatalogEvidenceStationScreenState
                             ),
                       tableSection: CatalogEvidenceRecordsTable(
                         companyData: widget.companyData,
-                        profile: widget.profile,
+                        profile: _effectiveProfile,
                         sessions: closedSessions,
                         recordLimit: _recordsLimit,
                         onRecordLimitChanged: (value) {

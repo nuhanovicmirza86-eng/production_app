@@ -23,6 +23,9 @@ const Set<String> profileEvidenceDetailRedundantSnapshotKeys = {
   'packagingOperatorNameSnapshot',
   // Prikazuje se preko inspectorEmployeeId → inspectorNameSnapshot.
   'inspectorNameSnapshot',
+  // Prikazuje se preko machineId → machineNameSnapshot.
+  'machineNameSnapshot',
+  'machineCodeSnapshot',
 };
 
 const Map<String, String> _entityIdToSnapshotField = {
@@ -33,6 +36,7 @@ const Map<String, String> _entityIdToSnapshotField = {
   'controllerEmployeeId': 'controllerNameSnapshot',
   'packagingOperatorEmployeeId': 'packagingOperatorNameSnapshot',
   'inspectorEmployeeId': 'inspectorNameSnapshot',
+  'machineId': 'machineNameSnapshot',
 };
 
 bool profileEvidenceShouldHideDetailFieldKey(String key) {
