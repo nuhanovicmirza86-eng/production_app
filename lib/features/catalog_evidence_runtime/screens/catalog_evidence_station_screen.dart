@@ -26,6 +26,8 @@ import '../../profile_driven_structured_runtime/widgets/structured_datetime_fiel
 import '../../profile_driven_structured_runtime/widgets/structured_header_section.dart';
 import '../../profile_driven_structured_runtime/widgets/structured_repeatable_table_section.dart';
 import '../services/catalog_evidence_session_service.dart';
+import '../utils/catalog_evidence_help_texts.dart';
+import '../utils/recent_production_operators_store.dart';
 import '../widgets/catalog_evidence_records_table.dart';
 import '../widgets/catalog_evidence_viewport_split.dart';
 
@@ -85,6 +87,7 @@ class _CatalogEvidenceStationScreenState
   ProductionStationProfileCatalogEntry? _runtimeProfile;
   int _profileCatalogVersion = 0;
   String? _lastFirstPieceOrderIdApplied;
+  List<StructuredEntitySearchResult> _recentProductionOperators = const [];
 
   bool get _supportsOsWindowChrome =>
       !kIsWeb &&
@@ -127,6 +130,12 @@ class _CatalogEvidenceStationScreenState
   bool get _isFirstPieceApproval =>
       _effectiveProfile.profileKey.trim() == 'first_piece_approval';
 
+  bool get _isInProcessQualityCheck =>
+      _effectiveProfile.profileKey.trim() == 'in_process_quality_check';
+
+  bool get _autoInspectorFromSession =>
+      _isFirstPieceApproval || _isInProcessQualityCheck;
+
   String get _processControllerDisplayName =>
       UserDisplayLabel.fromSessionMap(widget.companyData);
 
@@ -164,6 +173,7 @@ class _CatalogEvidenceStationScreenState
           _ensureFirstPieceDefaults();
           _ensureFirstPieceInspectorFromSession();
           _ensurePackagingControllerFromSession();
+          _syncInProcessWorkPlaceFields();
         }
       });
     } catch (_) {
@@ -186,6 +196,7 @@ class _CatalogEvidenceStationScreenState
     );
     unawaited(_loadPlantDisplayLabel());
     unawaited(_refreshLiveProfileCatalog());
+    unawaited(_loadRecentProductionOperators());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_supportsOsWindowChrome) {
         unawaited(windowManager.setFullScreen(true));
@@ -202,6 +213,25 @@ class _CatalogEvidenceStationScreenState
       unawaited(windowManager.setFullScreen(false));
     }
     super.dispose();
+  }
+
+  Future<void> _loadRecentProductionOperators() async {
+    if (!_isInProcessQualityCheck || _companyId.isEmpty) return;
+    final items = await RecentProductionOperatorsStore.load(_companyId);
+    if (!mounted) return;
+    setState(() => _recentProductionOperators = items);
+  }
+
+  Future<void> _rememberProductionOperatorSelection(
+    StructuredEntitySelection? selection,
+  ) async {
+    if (!_isInProcessQualityCheck || selection == null) return;
+    await RecentProductionOperatorsStore.remember(
+      companyId: _companyId,
+      entityId: selection.entityId,
+      displayLabel: selection.displayLabel,
+    );
+    await _loadRecentProductionOperators();
   }
 
   Future<void> _loadPlantDisplayLabel() async {
@@ -255,6 +285,7 @@ class _CatalogEvidenceStationScreenState
     _ensurePackagingControllerFromSession();
     _ensureFirstPieceInspectorFromSession();
     _ensureFirstPieceDefaults();
+    _syncInProcessWorkPlaceFields();
     _syncHeaderControllersFromState();
   }
 
@@ -281,10 +312,10 @@ class _CatalogEvidenceStationScreenState
     );
   }
 
-  /// M1-I3-E — kontrolor kvaliteta = prijavljeni korisnik (ne ručni search).
+  /// M1-I3-E / M1-I4-C — kontrolor kvaliteta = prijavljeni korisnik (ne ručni search).
   /// Samo [inspectorEmployeeId] u payloadu — snapshot ime popunjava backend.
   void _ensureFirstPieceInspectorFromSession() {
-    if (!_isFirstPieceApproval) return;
+    if (!_autoInspectorFromSession) return;
     final name = _processControllerDisplayName.trim();
     final uid = FirebaseAuth.instance.currentUser?.uid.trim() ?? '';
     _state.fieldValues.remove('inspectorNameSnapshot');
@@ -295,6 +326,166 @@ class _CatalogEvidenceStationScreenState
       entityId: uid,
       displayLabel: name.isNotEmpty ? name : 'Kontrolor kvaliteta',
     );
+  }
+
+  /// M1-I4-C — očisti polja drugog tipa mjesta rada.
+  void _syncInProcessWorkPlaceFields() {
+    if (!_isInProcessQualityCheck) return;
+    final type = (_headerEnumSelections['workContextType'] ??
+            _state.fieldValues['workContextType'] ??
+            '')
+        .toString()
+        .trim();
+    if (type == 'machine') {
+      _headerEntitySelections.remove('workbenchId');
+      _state.fieldValues.remove('workbenchId');
+      _state.fieldValues.remove('workbenchNameSnapshot');
+      _state.fieldValues.remove('workbenchCodeSnapshot');
+    } else if (type == 'workbench') {
+      _headerEntitySelections.remove('machineId');
+      _state.fieldValues.remove('machineId');
+      _state.fieldValues.remove('machineNameSnapshot');
+      _state.fieldValues.remove('machineCodeSnapshot');
+    }
+  }
+
+  /// M1-I4-C — sken/odabir naloga: proizvod (za linije) + mašina ako je tip = mašina.
+  void _applyInProcessHeaderFromOrderSelection({
+    bool forceFromOrder = false,
+  }) {
+    if (!_isInProcessQualityCheck) return;
+
+    _state.fieldValues.remove('productionOrderCode');
+    _state.fieldValues.remove('productCode');
+    _state.fieldValues.remove('productNameSnapshot');
+    _state.fieldValues.remove('machineNameSnapshot');
+    _state.fieldValues.remove('machineCodeSnapshot');
+    _state.fieldValues.remove('workbenchNameSnapshot');
+    _state.fieldValues.remove('workbenchCodeSnapshot');
+    _state.fieldValues.remove('workLocationNameSnapshot');
+    _state.fieldValues.remove('productionOperatorNameSnapshot');
+
+    final order = _headerEntitySelections['productionOrderId'];
+    if (order == null) {
+      _lastFirstPieceOrderIdApplied = null;
+      _headerEntitySelections.remove('productId');
+      _ensureFirstPieceInspectorFromSession();
+      _syncInProcessWorkPlaceFields();
+      _stripNonOperatorEditableFieldValues();
+      return;
+    }
+    final orderId = order.entityId.trim();
+    final orderChanged = orderId != (_lastFirstPieceOrderIdApplied ?? '');
+    final shouldApply = forceFromOrder || orderChanged;
+    final raw = order.raw;
+
+    // Proizvod nije header polje — drži se za nasljeđivanje u inspection_lines.
+    final productId = (raw['productId'] ?? '').toString().trim();
+    final productCode = (raw['productCode'] ?? '').toString().trim();
+    final productName =
+        (raw['productName'] ?? raw['displayName'] ?? '').toString().trim();
+    final existingProduct =
+        (_headerEntitySelections['productId']?.entityId ?? '').trim();
+    if (productId.isNotEmpty && (shouldApply || existingProduct.isEmpty)) {
+      final labelParts = <String>[
+        if (productCode.isNotEmpty) productCode,
+        if (productName.isNotEmpty) productName,
+      ];
+      _headerEntitySelections['productId'] = StructuredEntitySelection(
+        fieldKey: 'productId',
+        entityId: productId,
+        displayLabel:
+            labelParts.isEmpty ? productId : labelParts.join(' — '),
+        raw: {
+          'id': productId,
+          'productCode': productCode,
+          'productName': productName,
+          'displayName': productName,
+        },
+      );
+    }
+
+    // Soft autofill proizvodnog operatera ako nalog nosi poznato polje.
+    final existingOp =
+        (_headerEntitySelections['productionOperatorEmployeeId']?.entityId ??
+                '')
+            .trim();
+    final opId = (raw['productionOperatorEmployeeId'] ??
+            raw['operatorEmployeeId'] ??
+            raw['assignedOperatorId'] ??
+            '')
+        .toString()
+        .trim();
+    if (opId.isNotEmpty && (shouldApply || existingOp.isEmpty)) {
+      final opName = (raw['productionOperatorName'] ??
+              raw['operatorName'] ??
+              raw['assignedOperatorName'] ??
+              '')
+          .toString()
+          .trim();
+      _state.fieldValues['productionOperatorEmployeeId'] = opId;
+      _headerEntitySelections['productionOperatorEmployeeId'] =
+          StructuredEntitySelection(
+        fieldKey: 'productionOperatorEmployeeId',
+        entityId: opId,
+        displayLabel: opName.isNotEmpty ? opName : 'Proizvodni operater',
+        raw: {
+          'id': opId,
+          'displayName': opName,
+        },
+      );
+    }
+
+    final type = (_headerEnumSelections['workContextType'] ??
+            _state.fieldValues['workContextType'] ??
+            '')
+        .toString()
+        .trim();
+    if (type == 'machine' || type.isEmpty) {
+      final machineId = (raw['machineId'] ?? '').toString().trim();
+      final existingMachine =
+          (_state.fieldValues['machineId'] ?? '').toString().trim();
+      if (machineId.isNotEmpty && (shouldApply || existingMachine.isEmpty)) {
+        final machineCode = (raw['machineCode'] ?? '').toString().trim();
+        final machineName = (raw['machineName'] ?? '').toString().trim();
+        final labelParts = <String>[
+          if (machineCode.isNotEmpty) machineCode,
+          if (machineName.isNotEmpty) machineName,
+        ];
+        final displayLabel = labelParts.isNotEmpty
+            ? labelParts.join(' — ')
+            : (machineName.isNotEmpty ? machineName : 'Mašina');
+        _state.fieldValues['machineId'] = machineId;
+        if (type.isEmpty) {
+          _headerEnumSelections['workContextType'] = 'machine';
+          _state.fieldValues['workContextType'] = 'machine';
+        }
+        _headerEntitySelections['machineId'] = StructuredEntitySelection(
+          fieldKey: 'machineId',
+          entityId: machineId,
+          displayLabel: displayLabel,
+          raw: {
+            'id': machineId,
+            'machineCode': machineCode,
+            'machineName': machineName,
+            'displayName': machineName,
+          },
+        );
+      } else if (shouldApply && machineId.isEmpty) {
+        // Novi nalog bez mašine — ne briši ručni odabir osim na force.
+        if (forceFromOrder) {
+          _headerEntitySelections.remove('machineId');
+          _state.fieldValues.remove('machineId');
+        }
+      }
+    }
+
+    if (shouldApply) {
+      _lastFirstPieceOrderIdApplied = orderId;
+    }
+    _ensureFirstPieceInspectorFromSession();
+    _syncInProcessWorkPlaceFields();
+    _stripNonOperatorEditableFieldValues();
   }
 
   /// Zaglavlje: samo kanonski ID-jevi u fieldValues (M1-I2-F6).
@@ -499,11 +690,31 @@ class _CatalogEvidenceStationScreenState
             final sessionName = _processControllerDisplayName.trim();
             if (sessionName.isNotEmpty) label = sessionName;
           }
+        } else if (field.key == 'productionOperatorEmployeeId') {
+          final name = (_state.fieldValues['productionOperatorNameSnapshot'] ??
+                  '')
+              .toString()
+              .trim();
+          if (name.isNotEmpty) label = name;
         } else if (field.key == 'machineId') {
           final code =
               (_state.fieldValues['machineCodeSnapshot'] ?? '').toString().trim();
           final name =
               (_state.fieldValues['machineNameSnapshot'] ?? '').toString().trim();
+          if (code.isNotEmpty && name.isNotEmpty) {
+            label = '$code — $name';
+          } else if (name.isNotEmpty) {
+            label = name;
+          } else if (code.isNotEmpty) {
+            label = code;
+          }
+        } else if (field.key == 'workbenchId') {
+          final code = (_state.fieldValues['workbenchCodeSnapshot'] ?? '')
+              .toString()
+              .trim();
+          final name = (_state.fieldValues['workbenchNameSnapshot'] ?? '')
+              .toString()
+              .trim();
           if (code.isNotEmpty && name.isNotEmpty) {
             label = '$code — $name';
           } else if (name.isNotEmpty) {
@@ -567,9 +778,23 @@ class _CatalogEvidenceStationScreenState
     }
   }
 
-  String get _runtimeTitle => widget.isCompanyEvidence
-      ? widget.evidenceConfig!.displayName
-      : widget.stationConfig!.title;
+  String get _runtimeTitle {
+    if (_isInProcessQualityCheck) {
+      final profileTitle = _effectiveProfile.runtimeScreenTitle.trim();
+      if (profileTitle.isNotEmpty) return profileTitle;
+    }
+    return widget.isCompanyEvidence
+        ? widget.evidenceConfig!.displayName
+        : widget.stationConfig!.title;
+  }
+
+  String get _formHeadingTitle {
+    if (_isInProcessQualityCheck) {
+      final t = _effectiveProfile.runtimeScreenTitle.trim();
+      if (t.isNotEmpty) return t;
+    }
+    return _effectiveProfile.displayName;
+  }
 
   Future<void> _reloadStructuredStateForActiveSession() async {
     try {
@@ -588,6 +813,8 @@ class _CatalogEvidenceStationScreenState
         _state = loaded;
         _syncHeaderControllersFromState();
         _ensurePackagingControllerFromSession();
+        _ensureFirstPieceInspectorFromSession();
+        _syncInProcessWorkPlaceFields();
       });
     } catch (_) {}
   }
@@ -602,6 +829,7 @@ class _CatalogEvidenceStationScreenState
     _ensureFirstPieceInspectorFromSession();
     _syncHeaderControllersFromState();
     _ensurePackagingControllerFromSession();
+    _syncInProcessWorkPlaceFields();
     if (_isStructuredLite) {
       unawaited(_reloadStructuredStateForActiveSession());
     }
@@ -624,6 +852,7 @@ class _CatalogEvidenceStationScreenState
     _flushHeaderFieldsToState();
     _ensurePackagingControllerFromSession();
     _ensureFirstPieceInspectorFromSession();
+    _syncInProcessWorkPlaceFields();
     _stripNonOperatorEditableFieldValues();
     final headerError = validateStructuredHeader(
       fields: _effectiveProfile.structuredHeaderFields,
@@ -642,6 +871,11 @@ class _CatalogEvidenceStationScreenState
     if (_isFirstPieceApproval && forFinish) {
       final firstPieceError = _validateFirstPieceFinish();
       if (firstPieceError != null) return firstPieceError;
+    }
+
+    if (_isInProcessQualityCheck && forFinish) {
+      final inProcessError = _validateInProcessQualityFinish();
+      if (inProcessError != null) return inProcessError;
     }
 
     if (_isStructuredLite && forFinish) {
@@ -698,6 +932,47 @@ class _CatalogEvidenceStationScreenState
       return 'Kraj kontrole mora biti nakon početka kontrole.';
     }
     return null;
+  }
+
+  /// M1-I4-C — mjesto rada + proizvodni operater + vremena kontrole.
+  String? _validateInProcessQualityFinish() {
+    final type = (_headerEnumSelections['workContextType'] ??
+            _state.fieldValues['workContextType'] ??
+            '')
+        .toString()
+        .trim();
+    if (type != 'machine' && type != 'workbench') {
+      return 'Odaberite mjesto rada: Mašina ili Radni sto.';
+    }
+    if (type == 'machine') {
+      final mid = (_headerEntitySelections['machineId']?.entityId ??
+              _state.fieldValues['machineId'] ??
+              '')
+          .toString()
+          .trim();
+      if (mid.isEmpty) {
+        return 'Odaberite mašinu prije završavanja evidencije.';
+      }
+    } else {
+      final wid = (_headerEntitySelections['workbenchId']?.entityId ??
+              _state.fieldValues['workbenchId'] ??
+              '')
+          .toString()
+          .trim();
+      if (wid.isEmpty) {
+        return 'Odaberite radni sto prije završavanja evidencije.';
+      }
+    }
+    final opId =
+        (_headerEntitySelections['productionOperatorEmployeeId']?.entityId ??
+                _state.fieldValues['productionOperatorEmployeeId'] ??
+                '')
+            .toString()
+            .trim();
+    if (opId.isEmpty) {
+      return 'Odaberite proizvodnog operatera prije završavanja evidencije.';
+    }
+    return _validateFirstPieceFinish();
   }
 
   /// Ako kraj kontrole nije unesen — ponudi „Postavi sada”.
@@ -799,7 +1074,7 @@ class _CatalogEvidenceStationScreenState
       );
       if (!offered) return;
     }
-    if (_isFirstPieceApproval) {
+    if (_isFirstPieceApproval || _isInProcessQualityCheck) {
       final offered = await _offerSetFinishTimeNowIfMissing(
         fieldKey: 'inspectionFinishedAt',
       );
@@ -883,6 +1158,7 @@ class _CatalogEvidenceStationScreenState
         _state.fieldValues[orderField.key] = selection.entityId;
         _applyPackagingHeaderSnapshotsFromSelections();
         _applyFirstPieceHeaderFromOrderSelection(forceFromOrder: true);
+        _applyInProcessHeaderFromOrderSelection(forceFromOrder: true);
         _syncHeaderControllersFromState();
       });
       final filled = <String>[
@@ -999,10 +1275,17 @@ class _CatalogEvidenceStationScreenState
             children: [
               Expanded(
                 child: Text(
-                  _effectiveProfile.displayName,
+                  _formHeadingTitle,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
+              if (CatalogEvidenceHelpTexts.infoIconForProfileKey(
+                    _effectiveProfile.profileKey,
+                  ) !=
+                  null)
+                CatalogEvidenceHelpTexts.infoIconForProfileKey(
+                  _effectiveProfile.profileKey,
+                )!,
               Text(
                 'Pogon: $plantLabel',
                 style: Theme.of(context).textTheme.labelMedium,
@@ -1031,9 +1314,17 @@ class _CatalogEvidenceStationScreenState
             dateTimes: _headerDateTimes,
             textControllers: _headerTextControllers,
             enabled: formEnabled,
+            recentEntitySuggestions: {
+              if (_isInProcessQualityCheck &&
+                  _recentProductionOperators.isNotEmpty)
+                'productionOperatorEmployeeId': _recentProductionOperators,
+            },
             excludedFieldKeys: {
               if (_isPackagingControl) 'controllerEmployeeId',
-              if (_isFirstPieceApproval) 'inspectorEmployeeId',
+              if (_isFirstPieceApproval || _isInProcessQualityCheck)
+                'inspectorEmployeeId',
+              // M1-I4-C — searchWorkCenters nije u runtime pretrazi; mjesto rada = Mašina/Radni sto.
+              if (_isInProcessQualityCheck) 'workCenterId',
             },
             onFieldChanged: () {
               _applyPackagingHeaderSnapshotsFromSelections();
@@ -1041,6 +1332,16 @@ class _CatalogEvidenceStationScreenState
                 // Puni iz naloga samo kad se nalog promijeni (ne briše ručni odabir mašine).
                 _applyFirstPieceHeaderFromOrderSelection();
                 _ensureFirstPieceInspectorFromSession();
+              }
+              if (_isInProcessQualityCheck) {
+                _applyInProcessHeaderFromOrderSelection();
+                _ensureFirstPieceInspectorFromSession();
+                _syncInProcessWorkPlaceFields();
+                unawaited(
+                  _rememberProductionOperatorSelection(
+                    _headerEntitySelections['productionOperatorEmployeeId'],
+                  ),
+                );
               }
               setState(() {});
             },
@@ -1061,7 +1362,7 @@ class _CatalogEvidenceStationScreenState
               ),
             ),
           ],
-          if (_isFirstPieceApproval) ...[
+          if (_isFirstPieceApproval || _isInProcessQualityCheck) ...[
             const SizedBox(height: 8),
             InputDecorator(
               decoration: const InputDecoration(
@@ -1089,9 +1390,10 @@ class _CatalogEvidenceStationScreenState
                   rows: _state.rowsFor(table.key),
                   searchService: _searchService,
                   enabled: formEnabled,
-                  headerProductSelection: _isPackagingControl
-                      ? _headerEntitySelections['productId']
-                      : null,
+                  headerProductSelection:
+                      (_isPackagingControl || _isInProcessQualityCheck)
+                          ? _headerEntitySelections['productId']
+                          : null,
                   onRowsChanged: (rows) {
                     setState(() => _state.setRows(table.key, rows));
                   },
@@ -1164,7 +1466,20 @@ class _CatalogEvidenceStationScreenState
   Widget build(BuildContext context) {
     if (!_plantAccessOk) {
       return Scaffold(
-        appBar: AppBar(title: Text(_runtimeTitle)),
+        appBar: AppBar(
+          title: Row(
+            children: [
+              Expanded(child: Text(_runtimeTitle)),
+              if (CatalogEvidenceHelpTexts.infoIconForProfileKey(
+                    _effectiveProfile.profileKey,
+                  ) !=
+                  null)
+                CatalogEvidenceHelpTexts.infoIconForProfileKey(
+                  _effectiveProfile.profileKey,
+                )!,
+            ],
+          ),
+        ),
         body: const Center(
           child: Text('Nemate pristup ovoj stanici za dodijeljeni pogon.'),
         ),
@@ -1210,7 +1525,23 @@ class _CatalogEvidenceStationScreenState
 
             return Scaffold(
               appBar: AppBar(
-                title: Text(_runtimeTitle),
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _runtimeTitle,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (CatalogEvidenceHelpTexts.infoIconForProfileKey(
+                          _effectiveProfile.profileKey,
+                        ) !=
+                        null)
+                      CatalogEvidenceHelpTexts.infoIconForProfileKey(
+                        _effectiveProfile.profileKey,
+                      )!,
+                  ],
+                ),
                 leading: IconButton(
                   icon: const Icon(Icons.close),
                   tooltip: 'Zatvori stanicu',

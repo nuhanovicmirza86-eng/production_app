@@ -20,6 +20,8 @@ class StructuredEntitySearchResult {
             data['chemicalCode'] ??
             data['employeeCode'] ??
             data['machineCode'] ??
+            data['workbenchCode'] ??
+            data['code'] ??
             '')
         .toString()
         .trim();

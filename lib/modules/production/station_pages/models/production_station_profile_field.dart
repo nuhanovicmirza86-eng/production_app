@@ -27,6 +27,8 @@ class ProductionStationProfileField {
     this.enumLabels = const {},
     this.legacyEnumLabels = const {},
     this.scanEnabled = false,
+    this.visibleWhenField,
+    this.visibleWhenEquals,
   });
 
   final String key;
@@ -55,6 +57,10 @@ class ProductionStationProfileField {
   final Map<String, String> enumLabels;
   final Map<String, String> legacyEnumLabels;
   final bool scanEnabled;
+  /// Katalog `visibleWhen.field` (npr. workContextType).
+  final String? visibleWhenField;
+  /// Katalog `visibleWhen.equals`.
+  final String? visibleWhenEquals;
 
   bool get isEntitySelect => type == 'entity_select';
 
@@ -71,7 +77,38 @@ class ProductionStationProfileField {
     return true;
   }
 
+  bool get hasVisibleWhen {
+    final f = (visibleWhenField ?? '').trim();
+    final e = (visibleWhenEquals ?? '').trim();
+    return f.isNotEmpty && e.isNotEmpty;
+  }
+
+  /// Je li polje vidljivo prema trenutnim header vrijednostima.
+  bool isVisibleGiven({
+    required Map<String, dynamic> fieldValues,
+    required Map<String, String?> enumSelections,
+  }) {
+    if (!hasVisibleWhen) return true;
+    final key = visibleWhenField!.trim();
+    final expected = visibleWhenEquals!.trim();
+    final fromEnum = (enumSelections[key] ?? '').trim();
+    if (fromEnum.isNotEmpty) return fromEnum == expected;
+    final fromState = (fieldValues[key] ?? '').toString().trim();
+    return fromState == expected;
+  }
+
   factory ProductionStationProfileField.fromMap(Map<String, dynamic> data) {
+    String? visibleWhenField;
+    String? visibleWhenEquals;
+    final visibleWhenRaw = data['visibleWhen'];
+    if (visibleWhenRaw is Map) {
+      final f = (visibleWhenRaw['field'] ?? '').toString().trim();
+      final e = (visibleWhenRaw['equals'] ?? '').toString().trim();
+      if (f.isNotEmpty && e.isNotEmpty) {
+        visibleWhenField = f;
+        visibleWhenEquals = e;
+      }
+    }
     return ProductionStationProfileField(
       key: (data['key'] ?? '').toString().trim(),
       label: (data['label'] ?? '').toString().trim(),
@@ -137,6 +174,8 @@ class ProductionStationProfileField {
       enumLabels: _parseEnumLabels(data['enumLabels']),
       legacyEnumLabels: _parseEnumLabels(data['legacyEnumLabels']),
       scanEnabled: data['scanEnabled'] == true,
+      visibleWhenField: visibleWhenField,
+      visibleWhenEquals: visibleWhenEquals,
     );
   }
 

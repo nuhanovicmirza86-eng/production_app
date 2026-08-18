@@ -23,9 +23,16 @@ const Set<String> profileEvidenceDetailRedundantSnapshotKeys = {
   'packagingOperatorNameSnapshot',
   // Prikazuje se preko inspectorEmployeeId → inspectorNameSnapshot.
   'inspectorNameSnapshot',
+  // Prikazuje se preko productionOperatorEmployeeId → productionOperatorNameSnapshot.
+  'productionOperatorNameSnapshot',
   // Prikazuje se preko machineId → machineNameSnapshot.
   'machineNameSnapshot',
   'machineCodeSnapshot',
+  // Prikazuje se preko workbenchId → workbenchNameSnapshot.
+  'workbenchNameSnapshot',
+  'workbenchCodeSnapshot',
+  // Sažetak: Mašina:… / Radni sto:… — vidi entity polja + workContextType.
+  'workLocationNameSnapshot',
 };
 
 const Map<String, String> _entityIdToSnapshotField = {
@@ -36,7 +43,9 @@ const Map<String, String> _entityIdToSnapshotField = {
   'controllerEmployeeId': 'controllerNameSnapshot',
   'packagingOperatorEmployeeId': 'packagingOperatorNameSnapshot',
   'inspectorEmployeeId': 'inspectorNameSnapshot',
+  'productionOperatorEmployeeId': 'productionOperatorNameSnapshot',
   'machineId': 'machineNameSnapshot',
+  'workbenchId': 'workbenchNameSnapshot',
 };
 
 bool profileEvidenceShouldHideDetailFieldKey(String key) {
@@ -126,6 +135,8 @@ String? _summaryValueForEntityField(
     case 'controllerEmployeeId':
       return _nonEmpty(summary.operatorSummary);
     case 'packagingOperatorEmployeeId':
+      return _nonEmpty(summary.packagingOperatorName);
+    case 'productionOperatorEmployeeId':
       return _nonEmpty(summary.packagingOperatorName);
     case 'inspectorEmployeeId':
       return _nonEmpty(summary.operatorSummary);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/company_plant_display_name.dart';
+import '../../../../features/catalog_evidence_runtime/utils/catalog_evidence_help_texts.dart';
 import '../utils/production_operator_profile_resolver.dart';
 import '../models/production_evidence_config.dart';
 import '../models/production_station_profile_catalog_entry.dart';
@@ -212,7 +213,19 @@ class _ProductionEvidenceOperatorHubScreenState
               'Proces: ${config.processKey} · Faza: ${config.phaseKey}',
             ),
             isThreeLine: true,
-            trailing: const Icon(Icons.chevron_right),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (CatalogEvidenceHelpTexts.infoIconForProfileKey(
+                      profile.profileKey,
+                    ) !=
+                    null)
+                  CatalogEvidenceHelpTexts.infoIconForProfileKey(
+                    profile.profileKey,
+                  )!,
+                const Icon(Icons.chevron_right),
+              ],
+            ),
             onTap: () => _openEvidence(config, profile),
           ),
         );
@@ -230,6 +243,10 @@ class _ProductionEvidenceOperatorHubScreenState
         return Icons.numbers_outlined;
       case 'packaging_control':
         return Icons.inventory_2_outlined;
+      case 'first_piece_approval':
+        return Icons.verified_outlined;
+      case 'in_process_quality_check':
+        return Icons.fact_check_outlined;
       default:
         return Icons.assignment_outlined;
     }

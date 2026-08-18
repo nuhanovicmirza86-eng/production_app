@@ -41,6 +41,7 @@ class ProductionStationConfig {
     'production_counting',
     'packaging_control',
     'first_piece_approval',
+    'in_process_quality_check',
   ];
 
   static bool isCatalogEvidenceRuntimeProfile(String profileKey) =>
@@ -463,6 +464,8 @@ class ProductionStationConfig {
         return 'Kontrola pakovanja';
       case 'first_piece_approval':
         return 'Odobrenje prvog komada';
+      case 'in_process_quality_check':
+        return 'Procesna kontrola kvaliteta';
       case 'standard_production':
       default:
         return 'Standardna proizvodnja';

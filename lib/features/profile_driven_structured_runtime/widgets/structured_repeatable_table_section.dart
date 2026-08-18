@@ -9,6 +9,7 @@ import '../models/structured_repeatable_row.dart';
 import '../services/production_evidence_entity_search_service.dart';
 import '../utils/structured_datetime_value.dart';
 import '../utils/structured_piece_quantity.dart';
+import '../../catalog_evidence_runtime/utils/operator_evidence_ux_standard.dart';
 import 'operator_work_log_row_layout.dart';
 import 'structured_datetime_field.dart';
 import 'structured_entity_search_field.dart';
@@ -98,6 +99,11 @@ class StructuredRepeatableTableSection extends StatelessWidget {
       }
       if (col.type == 'enum') {
         enumSelections[col.key] = raw?.toString();
+      } else if (OperatorEvidenceUxStandard.isInspectionLinesTable(
+            tableDef.key,
+          ) &&
+          col.key == 'checkpointName') {
+        enumSelections[col.key] = raw?.toString();
       } else if (col.type == 'datetime') {
         dateTimes[col.key] = StructuredDateTimeValue.parse(raw);
       } else if (col.type == 'number' || _isTextLike(col.type)) {
@@ -114,6 +120,17 @@ class StructuredRepeatableTableSection extends StatelessWidget {
     if (existing == null &&
         OperatorWorkLogRowLayout.isOperatorWorkLogTable(tableDef.key)) {
       dateTimes['startedAt'] ??= DateTime.now();
+    }
+
+    if (existing == null &&
+        OperatorEvidenceUxStandard.isInspectionLinesTable(tableDef.key)) {
+      final units =
+          OperatorEvidenceUxStandard.orderedUnits(profile.allowedUnits);
+      final currentUnit = (enumSelections['unit'] ?? '').trim();
+      if (currentUnit.isEmpty && units.isNotEmpty) {
+        enumSelections['unit'] =
+            units.contains('kom') ? 'kom' : units.first;
+      }
     }
 
     if (_inheritsProductFromHeader) {
@@ -162,6 +179,20 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                 if (col.type == 'enum') {
                   final v = enumSelections[col.key];
                   if (v == null || v.isEmpty) {
+                    validationError = structuredRequiredFieldMessage(label);
+                    fieldErrors
+                      ..clear()
+                      ..add(col.key);
+                    return false;
+                  }
+                  continue;
+                }
+                if (OperatorEvidenceUxStandard.isInspectionLinesTable(
+                      tableDef.key,
+                    ) &&
+                    col.key == 'checkpointName') {
+                  final v = enumSelections[col.key];
+                  if (v == null || v.trim().isEmpty) {
                     validationError = structuredRequiredFieldMessage(label);
                     fieldErrors
                       ..clear()
@@ -277,6 +308,30 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                   return false;
                 }
               }
+              if (OperatorEvidenceUxStandard.isInspectionLinesTable(
+                tableDef.key,
+              )) {
+                final inspected = OperatorEvidenceUxStandard.parseQty(
+                      textControllers['qtyInspected']?.text,
+                    ) ??
+                    0;
+                final pass = OperatorEvidenceUxStandard.parseQty(
+                      textControllers['qtyPass']?.text,
+                    ) ??
+                    0;
+                final fail = OperatorEvidenceUxStandard.parseQty(
+                      textControllers['qtyFail']?.text,
+                    ) ??
+                    0;
+                if ((pass + fail - inspected).abs() > 0.000001) {
+                  validationError =
+                      'Zbroj prolaza i neprolaza mora biti jednak kontrolisanoj količini.';
+                  fieldErrors
+                    ..clear()
+                    ..addAll(['qtyInspected', 'qtyPass', 'qtyFail']);
+                  return false;
+                }
+              }
               if (_inheritsProductFromHeader) {
                 final inherited = headerProductSelection!;
                 entitySelections['productId'] = inherited;
@@ -347,6 +402,18 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                 if (col.type == 'enum') {
                   final v = enumSelections[col.key];
                   if (v == null || v.isEmpty) {
+                    draft.values.remove(col.key);
+                  } else {
+                    draft.setValue(col.key, v);
+                  }
+                  continue;
+                }
+                if (OperatorEvidenceUxStandard.isInspectionLinesTable(
+                      tableDef.key,
+                    ) &&
+                    col.key == 'checkpointName') {
+                  final v = (enumSelections[col.key] ?? '').trim();
+                  if (v.isEmpty) {
                     draft.values.remove(col.key);
                   } else {
                     draft.setValue(col.key, v);
@@ -496,6 +563,25 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                             ),
                           ),
                         ];
+                        if (OperatorEvidenceUxStandard.isInspectionLinesTable(
+                              tableDef.key,
+                            ) &&
+                            col.key == 'qtyFail') {
+                          widgets.add(
+                            InspectionQtyQuickActionsBar(
+                              enabled: enabled,
+                              onAction: (action) {
+                                OperatorEvidenceUxStandard.applyQtyQuickAction(
+                                  action: action,
+                                  inspected: textControllers['qtyInspected'],
+                                  pass: textControllers['qtyPass'],
+                                  fail: textControllers['qtyFail'],
+                                );
+                                setLocal(() {});
+                              },
+                            ),
+                          );
+                        }
                         if (OperatorWorkLogRowLayout.isOperatorWorkLogTable(
                               tableDef.key,
                             ) &&
@@ -645,9 +731,12 @@ class StructuredRepeatableTableSection extends StatelessWidget {
           query: query,
           assignedPlantKey:
               col.entitySearchCallable == 'searchPlantOperators' ||
-                  col.entitySearchCallable == 'searchProductionMachines'
-              ? plantKey
-              : null,
+                      col.entitySearchCallable ==
+                          'searchProductionMachines' ||
+                      col.entitySearchCallable ==
+                          'searchProductionWorkbenches'
+                  ? plantKey
+                  : null,
         ),
         onChanged: (selection) {
           entitySelections[col.key] = selection;
@@ -666,25 +755,88 @@ class StructuredRepeatableTableSection extends StatelessWidget {
         },
       );
     }
-    if (col.type == 'enum') {
-      final options = col.enumValues.isNotEmpty
-          ? col.enumValues
-          : (col.enumFrom == 'units.allowedUnits' ? profile.allowedUnits : const []);
+
+    // M1-I4-C2 — kontrolna tačka: chips, ne slobodni tekst.
+    if (OperatorEvidenceUxStandard.isInspectionLinesTable(tableDef.key) &&
+        col.key == 'checkpointName') {
+      final selected = enumSelections[col.key];
       return InputDecorator(
         decoration: InputDecoration(
           labelText: required ? '$label *' : label,
           border: const OutlineInputBorder(),
+          errorText: fieldError,
+        ),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final option
+                in OperatorEvidenceUxStandard.inspectionCheckpointOptions)
+              ChoiceChip(
+                label: Text(option),
+                selected: selected == option,
+                onSelected: enabled
+                    ? (isSelected) {
+                        enumSelections[col.key] = isSelected ? option : null;
+                        onChanged();
+                      }
+                    : null,
+              ),
+          ],
+        ),
+      );
+    }
+
+    if (col.type == 'enum') {
+      var options = col.enumValues.isNotEmpty
+          ? col.enumValues
+          : (col.enumFrom == 'units.allowedUnits'
+              ? profile.allowedUnits
+              : const <String>[]);
+      if (OperatorEvidenceUxStandard.isInspectionLinesTable(tableDef.key) &&
+          col.key == 'unit') {
+        options = OperatorEvidenceUxStandard.orderedUnits(
+          options.isNotEmpty ? options : profile.allowedUnits,
+        );
+      }
+      if (OperatorEvidenceUxStandard.isInspectionLinesTable(tableDef.key) &&
+          col.key == 'defectReasonCode') {
+        final available = options.toSet();
+        options = OperatorEvidenceUxStandard.inspectionDefectReasonOrder
+            .where(available.contains)
+            .toList(growable: false);
+        if (options.isEmpty) {
+          options = col.enumValues;
+        }
+      }
+      String labelFor(String value) {
+        if (OperatorEvidenceUxStandard.isInspectionLinesTable(tableDef.key) &&
+            col.key == 'defectReasonCode') {
+          return OperatorEvidenceUxStandard.defectReasonLabel(value);
+        }
+        return col.enumLabelFor(value);
+      }
+
+      return InputDecorator(
+        decoration: InputDecoration(
+          labelText: required ? '$label *' : label,
+          border: const OutlineInputBorder(),
+          errorText: fieldError,
         ),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<String>(
             isExpanded: true,
-            value: enumSelections[col.key],
+            value: () {
+              final v = enumSelections[col.key];
+              if (v == null || v.isEmpty) return null;
+              return options.contains(v) ? v : null;
+            }(),
             hint: const Text('Odaberite…'),
             items: options
                 .map(
                   (value) => DropdownMenuItem<String>(
                     value: value,
-                    child: Text(col.enumLabelFor(value)),
+                    child: Text(labelFor(value)),
                   ),
                 )
                 .toList(growable: false),
@@ -971,6 +1123,15 @@ String? validateStructuredTables({
         );
         if (balanceError != null) return balanceError;
       }
+      if (table.key == 'inspection_lines') {
+        final inspected = _parseQty(row.values['qtyInspected']);
+        final pass = _parseQty(row.values['qtyPass']);
+        final fail = _parseQty(row.values['qtyFail']);
+        if ((pass + fail - inspected).abs() > 0.000001) {
+          return '${table.label}, red ${rowIndex + 1}: '
+              'Zbroj prolaza i neprolaza mora biti jednak kontrolisanoj količini.';
+        }
+      }
       if (OperatorWorkLogRowLayout.isOperatorWorkLogTable(table.key)) {
         final ok = _parseQty(row.values['okQty']);
         final scrap = _parseQty(row.values['scrapQty']);
@@ -1009,6 +1170,12 @@ String? validateStructuredHeader({
   required Map<String, DateTime?> dateTimes,
 }) {
   for (final field in fields) {
+    if (!field.isVisibleGiven(
+      fieldValues: state.fieldValues,
+      enumSelections: enumSelections,
+    )) {
+      continue;
+    }
     if (!field.required) continue;
     if (field.isEntitySelect || field.isEntitySearchSelect) {
       final sel = entitySelections[field.key];

@@ -22,6 +22,7 @@ class StructuredEntitySearchField extends StatefulWidget {
     this.onChanged,
     this.labelOverride,
     this.requiredOverride,
+    this.recentSuggestions = const [],
   });
 
   final ProductionStationProfileField field;
@@ -33,6 +34,8 @@ class StructuredEntitySearchField extends StatefulWidget {
   final ValueChanged<StructuredEntitySelection?>? onChanged;
   final String? labelOverride;
   final bool? requiredOverride;
+  /// Brzi izbor (npr. zadnji korišteni operateri) — chips iznad rezultata pretrage.
+  final List<StructuredEntitySearchResult> recentSuggestions;
 
   @override
   State<StructuredEntitySearchField> createState() =>
@@ -179,6 +182,25 @@ class _StructuredEntitySearchFieldState extends State<StructuredEntitySearchFiel
             _scheduleSearch(value);
           },
         ),
+        if (widget.recentSuggestions.isNotEmpty && _selection == null) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Zadnji korišteni',
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final item in widget.recentSuggestions)
+                ActionChip(
+                  label: Text(item.displayLabel),
+                  onPressed: widget.enabled ? () => _selectResult(item) : null,
+                ),
+            ],
+          ),
+        ],
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -196,7 +218,7 @@ class _StructuredEntitySearchFieldState extends State<StructuredEntitySearchFiel
               child: ListView.separated(
                 shrinkWrap: true,
                 itemCount: _results.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
+                separatorBuilder: (_, _) => const Divider(height: 1),
                 itemBuilder: (context, index) {
                   final item = _results[index];
                   return ListTile(

@@ -260,6 +260,7 @@ class ProfileDrivenEvidenceSessionDetail {
     this.operatorWorkLogs = const [],
     this.scrapItems = const [],
     this.packagingCheckLines = const [],
+    this.inspectionLines = const [],
   });
 
   final String sessionId;
@@ -288,10 +289,14 @@ class ProfileDrivenEvidenceSessionDetail {
   final List<Map<String, dynamic>> operatorWorkLogs;
   final List<Map<String, dynamic>> scrapItems;
   final List<Map<String, dynamic>> packagingCheckLines;
+  final List<Map<String, dynamic>> inspectionLines;
 
   bool get isReworkAndPainting => processProfileType == 'rework_and_painting';
 
   bool get isPackagingControl => processProfileType == 'packaging_control';
+
+  bool get isInProcessQualityCheck =>
+      processProfileType == 'in_process_quality_check';
 
   int? get catalogVersion {
     final v = profileSnapshot?['catalogVersion'];
@@ -359,6 +364,7 @@ class ProfileDrivenEvidenceSessionDetail {
       operatorWorkLogs: _parseRowList(m['operator_work_logs']),
       scrapItems: _parseRowList(m['scrap_items']),
       packagingCheckLines: _parseRowList(m['packaging_check_lines']),
+      inspectionLines: _parseRowList(m['inspection_lines']),
     );
   }
 }

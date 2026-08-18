@@ -4,6 +4,8 @@ import 'production_station_profile_field.dart';
 class ProductionStationProfileCatalogEntry {
   final String profileKey;
   final String displayName;
+  final String listDisplayName;
+  final String screenTitle;
   final String description;
   final String stationType;
   final String definitionStatus;
@@ -17,6 +19,8 @@ class ProductionStationProfileCatalogEntry {
   const ProductionStationProfileCatalogEntry({
     required this.profileKey,
     required this.displayName,
+    this.listDisplayName = '',
+    this.screenTitle = '',
     required this.description,
     required this.stationType,
     required this.definitionStatus,
@@ -31,6 +35,20 @@ class ProductionStationProfileCatalogEntry {
   bool get isComplete => definitionStatus == 'complete';
 
   bool get isSkeleton => definitionStatus == 'skeleton';
+
+  /// Naslov forme / AppBar — preferira katalog `screenTitle`.
+  String get runtimeScreenTitle {
+    final t = screenTitle.trim();
+    if (t.isNotEmpty) return t;
+    return displayName.trim();
+  }
+
+  /// Kratki naziv u listama — preferira `listDisplayName`.
+  String get runtimeListTitle {
+    final t = listDisplayName.trim();
+    if (t.isNotEmpty) return t;
+    return displayName.trim();
+  }
 
   static ProductionStationProfileCatalogEntry fromMap(Map<String, dynamic> data) {
     final flagsRaw = data['defaultFlags'];
@@ -67,9 +85,12 @@ class ProductionStationProfileCatalogEntry {
         }
       }
     }
+    final displayName = (data['displayName'] ?? '').toString().trim();
     return ProductionStationProfileCatalogEntry(
       profileKey: (data['profileKey'] ?? '').toString().trim(),
-      displayName: (data['displayName'] ?? '').toString().trim(),
+      displayName: displayName,
+      listDisplayName: (data['listDisplayName'] ?? '').toString().trim(),
+      screenTitle: (data['screenTitle'] ?? '').toString().trim(),
       description: (data['description'] ?? '').toString().trim(),
       stationType: (data['stationType'] ?? 'production_station').toString().trim(),
       definitionStatus: (data['definitionStatus'] ?? 'skeleton').toString().trim(),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/company_plant_display_name.dart';
 import '../../../modules/production/station_pages/models/production_station_profile_field.dart';
+import '../../catalog_evidence_runtime/utils/operator_evidence_ux_standard.dart';
 import '../export/first_piece_approval_pdf_actions.dart';
 import '../models/profile_driven_evidence_session.dart';
 import '../services/profile_driven_evidence_callable_service.dart';
@@ -215,6 +216,9 @@ class _ProfileDrivenEvidenceDetailScreenState
     if (session.isPackagingControl) {
       return _buildPackagingBody(session);
     }
+    if (session.isInProcessQualityCheck) {
+      return _buildInProcessQualityBody(session);
+    }
     return _buildFlatProfileBody(session);
   }
 
@@ -222,6 +226,218 @@ class _ProfileDrivenEvidenceDetailScreenState
     if (value == null) return '—';
     if (value == value.roundToDouble()) return value.toInt().toString();
     return formatFieldValue(value);
+  }
+
+  String _formatQtyWithUnit(num? value, String? unit) {
+    final qty = _formatQtyInt(value);
+    if (qty == '—') return '—';
+    final u = (unit ?? '').trim();
+    return u.isEmpty ? qty : '$qty $u';
+  }
+
+  Widget _buildInProcessQualityBody(ProfileDrivenEvidenceSessionDetail session) {
+    final station =
+        (session.stationDisplayName ?? '').trim().isNotEmpty
+            ? session.stationDisplayName!
+            : (session.stationSlot != null
+                  ? 'Stanica ${session.stationSlot}'
+                  : '—');
+    final s = session.summaryFields;
+    final lines = session.inspectionLines;
+    final unit = (s.unit ?? '').trim();
+    final catalogVer = session.catalogVersion;
+
+    return ListView(
+      children: [
+        _sectionCard(
+          title: 'Osnovni podaci',
+          children: [
+            _kvRow('Profil', session.profileDisplayName),
+            _kvRow('Stanica', station),
+            _kvRow('Pogon', _plantDisplayLabel(session)),
+            _kvRow(
+              'Status',
+              session.status == 'closed' ? 'Završeno' : session.status,
+            ),
+            _kvRow('Početak', formatEvidenceDateTime(session.startedAt)),
+            _kvRow('Završetak', formatEvidenceDateTime(session.endedAt)),
+            if (catalogVer != null)
+              _kvRow('Verzija kataloga profila', '$catalogVer'),
+          ],
+        ),
+        if (catalogVer != null && catalogVer < 17)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Material(
+              color: Theme.of(context).colorScheme.errorContainer,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  'Ova evidencija je snimljena s katalogom v$catalogVer. '
+                  'Nove sesije Procesne kontrole kvaliteta trebaju katalog v17+ '
+                  '(Mjesto rada). Pokrenite novu evidenciju za svježi snapshot.',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onErrorContainer,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        _sectionCard(
+          title: 'Procesna kontrola',
+          children: [
+            _kvRow(
+              'Kontrolor kvaliteta',
+              (s.operatorSummary ??
+                      session.fieldValues['inspectorNameSnapshot'] ??
+                      '')
+                  .toString()
+                  .trim()
+                  .isEmpty
+                  ? '—'
+                  : (s.operatorSummary ??
+                          session.fieldValues['inspectorNameSnapshot'])
+                      .toString()
+                      .trim(),
+            ),
+            _kvRow(
+              'Proizvodni operater',
+              (s.packagingOperatorName ??
+                      session.fieldValues['productionOperatorNameSnapshot'] ??
+                      '')
+                  .toString()
+                  .trim()
+                  .isEmpty
+                  ? '—'
+                  : (s.packagingOperatorName ??
+                          session.fieldValues['productionOperatorNameSnapshot'])
+                      .toString()
+                      .trim(),
+            ),
+            ..._operatorFieldsForDisplay.map((field) {
+              if (field.key == 'workCenterId' ||
+                  field.key == 'inspectorEmployeeId' ||
+                  field.key == 'productionOperatorEmployeeId') {
+                return const SizedBox.shrink();
+              }
+              return _kvRow(
+                _displayLabel(field),
+                _displayValueForField(field),
+              );
+            }),
+          ],
+        ),
+        _sectionCard(
+          title: 'Kontrolisane količine',
+          children: [
+            _kvRow(
+              'Ukupno kontrolisano',
+              _formatQtyWithUnit(s.quantity, unit),
+            ),
+            _kvRow(
+              'Ukupno prolazi',
+              _formatQtyWithUnit(s.okTotalQty, unit),
+            ),
+            _kvRow(
+              'Ukupno ne prolazi',
+              _formatQtyWithUnit(s.scrapTotalQty, unit),
+            ),
+            if (unit.isNotEmpty) _kvRow('Jedinica', unit),
+            if (lines.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text('Nema redova kontrolnih tačaka.'),
+              ),
+          ],
+        ),
+        if (lines.isNotEmpty)
+          _sectionCard(
+            title: 'Kontrolne tačke',
+            children: [
+              for (var i = 0; i < lines.length; i++) ...[
+                if (i > 0) const Divider(height: 20),
+                _buildInspectionLineTile(index: i + 1, row: lines[i]),
+              ],
+            ],
+          ),
+        if (_masterDataFieldsForDisplay.isNotEmpty)
+          _fieldSection(
+            'Podaci iz master šifrarnika',
+            _masterDataFieldsForDisplay,
+          ),
+        _sectionCard(
+          title: 'Operator audit',
+          children: [
+            _kvRow(
+              'Operater',
+              (session.operatorDisplayName ?? session.operatorEmail ?? '—')
+                  .trim(),
+            ),
+            _kvRow(
+              'E-mail operatera',
+              (session.operatorEmail ?? '—').trim(),
+            ),
+            _kvRow(
+              'Sesiju otvorio',
+              (session.createdByDisplayName ?? session.createdByEmail ?? '—')
+                  .trim(),
+            ),
+            _kvRow(
+              'E-mail (otvaranje)',
+              (session.createdByEmail ?? '—').trim(),
+            ),
+            _kvRow('Kreirano', formatEvidenceDateTime(session.createdAt)),
+          ],
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _buildInspectionLineTile({
+    required int index,
+    required Map<String, dynamic> row,
+  }) {
+    final checkpoint = (row['checkpointName'] ?? '').toString().trim();
+    final unit = (row['unit'] ?? '').toString().trim();
+    final inspected = _formatQtyWithUnit(
+      row['qtyInspected'] is num
+          ? row['qtyInspected'] as num
+          : num.tryParse('${row['qtyInspected']}'),
+      unit,
+    );
+    final pass = _formatQtyInt(
+      row['qtyPass'] is num
+          ? row['qtyPass'] as num
+          : num.tryParse('${row['qtyPass']}'),
+    );
+    final fail = _formatQtyInt(
+      row['qtyFail'] is num
+          ? row['qtyFail'] as num
+          : num.tryParse('${row['qtyFail']}'),
+    );
+    final reasonCode = (row['defectReasonCode'] ?? '').toString().trim();
+    final reason = reasonCode.isEmpty
+        ? '—'
+        : OperatorEvidenceUxStandard.defectReasonLabel(reasonCode);
+    final note = (row['measurementNote'] ?? '').toString().trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          '$index. ${checkpoint.isEmpty ? 'Kontrolna tačka' : checkpoint} — '
+          '$inspected / prolazi $pass / ne prolazi $fail',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: 6),
+        _kvRow('Razlog greške', reason),
+        _kvRow('Napomena', note.isEmpty ? '—' : note),
+      ],
+    );
   }
 
   Widget _buildPackagingBody(ProfileDrivenEvidenceSessionDetail session) {

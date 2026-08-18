@@ -109,6 +109,27 @@ class ProductionEvidenceEntitySearchCallableService {
     return _parseItems(res.data);
   }
 
+  Future<List<StructuredEntitySearchResult>> searchProductionWorkbenches({
+    required String companyId,
+    required String query,
+    String? assignedPlantKey,
+    int limit = 20,
+  }) async {
+    final payload = <String, dynamic>{
+      'companyId': companyId.trim(),
+      'query': query.trim(),
+      'limit': limit,
+    };
+    final stationPlant = assignedPlantKey?.trim();
+    if (stationPlant != null && stationPlant.isNotEmpty) {
+      payload['assignedPlantKey'] = stationPlant;
+    }
+    final res = await _functions
+        .httpsCallable('searchProductionWorkbenches')
+        .call<Map<String, dynamic>>(payload);
+    return _parseItems(res.data);
+  }
+
   Future<StructuredScanResolveResult> resolveProductionEvidenceScan({
     required String companyId,
     required String scanPayload,
@@ -161,6 +182,13 @@ class ProductionEvidenceEntitySearchCallableService {
         );
       case 'searchProductionMachines':
         return searchProductionMachines(
+          companyId: companyId,
+          query: query,
+          assignedPlantKey: assignedPlantKey,
+          limit: limit,
+        );
+      case 'searchProductionWorkbenches':
+        return searchProductionWorkbenches(
           companyId: companyId,
           query: query,
           assignedPlantKey: assignedPlantKey,

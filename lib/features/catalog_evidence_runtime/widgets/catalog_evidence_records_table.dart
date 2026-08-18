@@ -534,6 +534,13 @@ List<CatalogEvidenceTableColumn> catalogEvidenceTableColumnsForProfile(
         _textColumn(id: 'disposition', label: 'Dispozicija'),
       ];
       break;
+    case 'in_process_quality_check':
+      businessColumns = [
+        _textColumn(id: 'order', label: 'Nalog'),
+        _textColumn(id: 'work_location', label: 'Mjesto rada', size: CatalogEvidenceColumnSize.wide),
+        _textColumn(id: 'inspection_outcome', label: 'Ishod'),
+      ];
+      break;
     default:
       businessColumns = const [];
   }
@@ -707,6 +714,34 @@ String _cellText(
           ? 'packagingDisposition'
           : 'firstPieceDisposition';
       return _fieldDisplayValue(profile, key, values[key]);
+    case 'work_location':
+      final loc = (values['workLocationNameSnapshot'] ?? '').toString().trim();
+      if (loc.isNotEmpty) return loc;
+      final machine = (values['machineNameSnapshot'] ?? '').toString().trim();
+      final machineCode =
+          (values['machineCodeSnapshot'] ?? '').toString().trim();
+      if (machine.isNotEmpty || machineCode.isNotEmpty) {
+        if (machineCode.isNotEmpty && machine.isNotEmpty) {
+          return 'Mašina: $machineCode — $machine';
+        }
+        return 'Mašina: ${machine.isNotEmpty ? machine : machineCode}';
+      }
+      final bench = (values['workbenchNameSnapshot'] ?? '').toString().trim();
+      final benchCode =
+          (values['workbenchCodeSnapshot'] ?? '').toString().trim();
+      if (bench.isNotEmpty || benchCode.isNotEmpty) {
+        if (benchCode.isNotEmpty && bench.isNotEmpty) {
+          return 'Radni sto: $benchCode — $bench';
+        }
+        return 'Radni sto: ${bench.isNotEmpty ? bench : benchCode}';
+      }
+      return '—';
+    case 'inspection_outcome':
+      return _fieldDisplayValue(
+        profile,
+        'inspectionOutcome',
+        values['inspectionOutcome'],
+      );
     case 'operator':
       final name = (session.operatorDisplayName ?? '').trim();
       if (name.isNotEmpty) return name;

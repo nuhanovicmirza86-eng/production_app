@@ -28,6 +28,7 @@ class StructuredHeaderSection extends StatelessWidget {
     this.masterLoading = false,
     this.masterError,
     this.excludedFieldKeys = const {},
+    this.recentEntitySuggestions = const {},
   });
 
   final ProductionStationProfileCatalogEntry profile;
@@ -47,9 +48,17 @@ class StructuredHeaderSection extends StatelessWidget {
   final Object? masterError;
   /// Polja koja se ne prikazuju u formi (npr. auto-popunjeni kontrolor).
   final Set<String> excludedFieldKeys;
+  /// fieldKey → zadnji korišteni entiteti (chips).
+  final Map<String, List<StructuredEntitySearchResult>> recentEntitySuggestions;
 
   List<ProductionStationProfileField> get _fields => profile.structuredHeaderFields
       .where((f) => !excludedFieldKeys.contains(f.key))
+      .where(
+        (f) => f.isVisibleGiven(
+          fieldValues: state.fieldValues,
+          enumSelections: enumSelections,
+        ),
+      )
       .toList(growable: false);
 
   @override
@@ -110,15 +119,20 @@ class StructuredHeaderSection extends StatelessWidget {
         plantKey: plantKey,
         enabled: enabled,
         initialSelection: entitySelections[field.key],
+        recentSuggestions:
+            recentEntitySuggestions[field.key] ?? const [],
         searchFn: (query) => searchService.searchByCallable(
           callableName: field.entitySearchCallable ?? 'searchProductionOrders',
           companyId: companyId,
           query: query,
           assignedPlantKey:
               field.entitySearchCallable == 'searchPlantOperators' ||
-                  field.entitySearchCallable == 'searchProductionMachines'
-              ? plantKey
-              : null,
+                      field.entitySearchCallable ==
+                          'searchProductionMachines' ||
+                      field.entitySearchCallable ==
+                          'searchProductionWorkbenches'
+                  ? plantKey
+                  : null,
         ),
         onChanged: (selection) {
           entitySelections[field.key] = selection;

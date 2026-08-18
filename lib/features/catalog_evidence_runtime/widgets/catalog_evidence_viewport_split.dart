@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
-/// Globalni layout za operator evidencije s tabelom (M1-H3-F1H-R2 + M1-I2-D).
+/// Globalni layout za operator evidencije s tabelom (M1-H3-F1H-R2 + M1-I2-D + M1-I4-C2).
 ///
-/// - Desktop / širi viewport: forma + tabela u split layoutu (flex 5/4).
-/// - Mobile: forma skoro cijeli ekran; pregled je spuštena traka koja se
-///   na tap otvara u donji panel (i vraća nazad).
+/// **Standard (zaključano):**
+/// - Forma je primarna (cijeli radni ekran).
+/// - «Pregled evidencija» je **spušten** (collapsed) — otvara se samo klikom.
+/// - Vrijedi za mobile **i** desktop/web — tabela ne smije zauzimati pola ekrana.
 ///
 /// Koristi se u [ProfileDrivenWorkScreen] i [CatalogEvidenceStationScreen].
 class CatalogEvidenceViewportSplit extends StatefulWidget {
@@ -20,14 +21,17 @@ class CatalogEvidenceViewportSplit extends StatefulWidget {
     this.overviewLoading = false,
   });
 
-  /// Širina ispod koje vrijedi mobilni viewport.
+  /// Širina ispod koje vrijedi uži viewport (samo za eventualne nijanse UI-a).
   static const double catalogEvidenceCompactViewportBreakpoint = 600;
 
   /// Legacy: max visina gornjeg dijela (više se ne koristi za fiksni split).
   static const double catalogEvidenceCompactTopMaxHeight = 300;
 
-  /// Visina otvorenog panela pregleda (udio ekrana).
+  /// Visina otvorenog panela pregleda (udio ekrana) — mobile.
   static const double catalogEvidenceMobileOverviewPanelFraction = 0.48;
+
+  /// Visina otvorenog panela pregleda — desktop/web.
+  static const double catalogEvidenceDesktopOverviewPanelFraction = 0.40;
 
   final Widget topSection;
   final Widget tableSection;
@@ -38,7 +42,7 @@ class CatalogEvidenceViewportSplit extends StatefulWidget {
   final double compactBreakpoint;
   final double compactTopMaxHeight;
 
-  /// Limit selektora „Zadnjih N“ (za mobilnu traku).
+  /// Limit selektora „Zadnjih N“ (za traku pregleda).
   final int? overviewRecordLimit;
 
   /// Broj redova u pregledu (zatvoreni + aktivni ako je uključen).
@@ -60,6 +64,7 @@ class CatalogEvidenceViewportSplit extends StatefulWidget {
 
 class _CatalogEvidenceViewportSplitState
     extends State<CatalogEvidenceViewportSplit> {
+  /// M1-I4-C2 — pregled uvijek spušten na startu (forma prva).
   bool _overviewExpanded = false;
 
   @override
@@ -68,29 +73,19 @@ class _CatalogEvidenceViewportSplitState
       context,
       breakpoint: widget.compactBreakpoint,
     );
-    if (compact) {
-      return _buildMobileLayout(context);
-    }
-    return _buildDesktopLayout();
+    final fraction = compact
+        ? CatalogEvidenceViewportSplit.catalogEvidenceMobileOverviewPanelFraction
+        : CatalogEvidenceViewportSplit
+            .catalogEvidenceDesktopOverviewPanelFraction;
+    return _buildCollapsibleLayout(context, panelFraction: fraction);
   }
 
-  Widget _buildDesktopLayout() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Flexible(flex: 5, child: widget.topSection),
-        const Divider(height: 1),
-        Flexible(flex: 4, child: widget.tableSection),
-      ],
-    );
-  }
-
-  Widget _buildMobileLayout(BuildContext context) {
+  Widget _buildCollapsibleLayout(
+    BuildContext context, {
+    required double panelFraction,
+  }) {
     final screenH = MediaQuery.sizeOf(context).height;
-    final panelH = (screenH *
-            CatalogEvidenceViewportSplit
-                .catalogEvidenceMobileOverviewPanelFraction)
-        .clamp(220.0, 420.0);
+    final panelH = (screenH * panelFraction).clamp(220.0, 480.0);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
