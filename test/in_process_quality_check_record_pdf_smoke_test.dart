@@ -37,6 +37,8 @@ void main() {
         'productionOperatorNameSnapshot': 'Edin Isić',
         'inspectionOutcome': 'fail',
         'operatorComment': 'smoke napomena',
+        'qmsControlledFormDocumentCode': 'QF-PC-001',
+        'qmsControlledFormStatus': null,
         'inspectionStartedAt': '2026-08-18T10:00:00.000Z',
         'inspectionFinishedAt': '2026-08-18T10:15:00.000Z',
       },
@@ -89,6 +91,10 @@ void main() {
     expect(
       InProcessQualityCheckRecordPdf.documentSubtitle.toLowerCase(),
       isNot(contains('release')),
+    );
+    expect(
+      InProcessQualityCheckRecordPdf.unlinkedControlledFormMessage,
+      'Obrazac nije povezan / nije odobren',
     );
     expect(
       InProcessQualityCheckRecordPdf.outcomeBanner('fail'),

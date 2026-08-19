@@ -22,6 +22,9 @@ class InProcessQualityCheckRecordPdf {
   static const documentSubtitle =
       'Zapisnik procesne kontrole kvaliteta tokom proizvodnje.';
 
+  static const unlinkedControlledFormMessage =
+      'Obrazac nije povezan / nije odobren';
+
   /// Banner tekst po ishodu (M1-I4-C6).
   static String outcomeBanner(String? rawOutcome) {
     switch ((rawOutcome ?? '').trim()) {
@@ -78,6 +81,85 @@ class InProcessQualityCheckRecordPdf {
     if (qty == '—') return '—';
     final u = (unit ?? '').trim();
     return u.isEmpty ? qty : '$qty $u';
+  }
+
+  static String _controlledFormStatusLabel(String? raw) {
+    switch ((raw ?? '').trim().toLowerCase()) {
+      case 'approved':
+        return 'Aktivno';
+      case 'draft':
+        return 'Nacrt';
+      case 'obsolete':
+        return 'Van upotrebe';
+      default:
+        return _dash(raw);
+    }
+  }
+
+  /// M1-I4-D-C — blok kontrole dokumenta (QMS obrazac) ili poruka ako nije povezan/odobren.
+  static List<pw.Widget> _documentControlBlock({
+    required Map<String, dynamic> fv,
+    required pw.Font fontRegular,
+    required pw.Font fontBold,
+    required pw.Widget Function(String) sectionTitle,
+    required pw.Widget Function(List<pw.Widget>, List<pw.Widget>) twoCol,
+    required pw.Widget Function(String, String) kv,
+  }) {
+    final status = (fv['qmsControlledFormStatus'] ?? '').toString().trim();
+    final code = (fv['qmsControlledFormDocumentCode'] ?? '').toString().trim();
+    final title = (fv['qmsControlledFormTitle'] ?? '').toString().trim();
+    final linked = status.toLowerCase() == 'approved' &&
+        (code.isNotEmpty || title.isNotEmpty);
+
+    if (!linked) {
+      return [
+        sectionTitle('Kontrola dokumenta'),
+        pw.Text(
+          unlinkedControlledFormMessage,
+          style: pw.TextStyle(
+            font: fontBold,
+            fontSize: 8.5,
+            color: PdfColors.grey800,
+          ),
+        ),
+      ];
+    }
+
+    final rev = fv['qmsControlledFormRevision'];
+    final revLabel = rev == null ? '—' : rev.toString();
+    return [
+      sectionTitle('Kontrola dokumenta'),
+      twoCol(
+        [
+          kv('Oznaka obrasca', _dash(code)),
+          kv('Revizija', revLabel),
+          kv('Status', _controlledFormStatusLabel(status)),
+        ],
+        [
+          kv('Tip dokumenta', 'Obrazac / zapis kvaliteta'),
+          kv(
+            'Vlasnik',
+            _dash(fv['qmsControlledFormOwnerDepartment']?.toString()),
+          ),
+          kv(
+            'Retention',
+            _dash(fv['qmsControlledFormRetentionCategory']?.toString()),
+          ),
+        ],
+      ),
+      if (title.isNotEmpty)
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(top: 2),
+          child: pw.Text(
+            title,
+            style: pw.TextStyle(
+              font: fontRegular,
+              fontSize: 7.5,
+              color: PdfColors.grey700,
+            ),
+          ),
+        ),
+    ];
   }
 
   static String _statusLabel(String status) {
@@ -384,6 +466,15 @@ class InProcessQualityCheckRecordPdf {
                 fontSize: 7.5,
                 color: PdfColors.grey700,
               ),
+            ),
+            pw.SizedBox(height: 6),
+            ..._documentControlBlock(
+              fv: fv,
+              fontRegular: fontRegular,
+              fontBold: fontBold,
+              sectionTitle: sectionTitle,
+              twoCol: twoCol,
+              kv: kv,
             ),
             pw.SizedBox(height: 8),
             pw.Container(
