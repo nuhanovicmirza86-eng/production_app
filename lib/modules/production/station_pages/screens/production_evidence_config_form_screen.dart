@@ -36,6 +36,7 @@ class _ProductionEvidenceConfigFormScreenState
   final _nameCtrl = TextEditingController();
   final _processKeyCtrl = TextEditingController();
   final _orderCtrl = TextEditingController();
+  final _controlledFormCodeCtrl = TextEditingController();
 
   bool _saving = false;
   bool _archiving = false;
@@ -90,6 +91,7 @@ class _ProductionEvidenceConfigFormScreenState
     _nameCtrl.text = e?.displayName ?? '';
     _processKeyCtrl.text = e?.processKey ?? '';
     _orderCtrl.text = '${e?.displayOrder ?? e?.evidenceSlot ?? 1}';
+    _controlledFormCodeCtrl.text = e?.controlledFormDocumentCode ?? '';
     _active = e?.active ?? true;
     _runtimeVisible = e?.runtimeVisible ?? false;
     _runtimeRoles = Set<String>.from(e?.runtimeAllowedRoles ?? const []);
@@ -149,6 +151,7 @@ class _ProductionEvidenceConfigFormScreenState
     _nameCtrl.dispose();
     _processKeyCtrl.dispose();
     _orderCtrl.dispose();
+    _controlledFormCodeCtrl.dispose();
     super.dispose();
   }
 
@@ -179,6 +182,10 @@ class _ProductionEvidenceConfigFormScreenState
                 _controlledInputMode != 'off'
             ? ProductionStationConfig.controlledInputScopeWorkBath
             : null,
+        controlledFormDocumentCode:
+            _profileKey.trim() == 'in_process_quality_check'
+                ? _controlledFormCodeCtrl.text.trim()
+                : null,
       );
     }
 
@@ -212,6 +219,10 @@ class _ProductionEvidenceConfigFormScreenState
               _controlledInputMode != 'off'
           ? ProductionStationConfig.controlledInputScopeWorkBath
           : null,
+      controlledFormDocumentCode:
+          _profileKey.trim() == 'in_process_quality_check'
+              ? _controlledFormCodeCtrl.text.trim()
+              : null,
     );
   }
 
@@ -499,6 +510,35 @@ class _ProductionEvidenceConfigFormScreenState
                     labelText: 'Redoslijed prikaza',
                   ),
                 ),
+                if (_profileKey.trim() == 'in_process_quality_check') ...[
+                  const SizedBox(height: 12),
+                  const Divider(height: 24),
+                  Text(
+                    'Kontrolisani obrazac (QMS)',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Unesite samo oznaku obrasca prema dokumentacionoj politici '
+                    'kompanije. Naziv, revizija, status, vlasnik i retention '
+                    'povlače se iz odobrenog QMS obrasca (Dokumentacija → Obrasci).',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _controlledFormCodeCtrl,
+                    readOnly: _readOnly,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: const InputDecoration(
+                      labelText: 'Oznaka obrasca / dokumenta',
+                      hintText: 'npr. QF-PC-001, OBR-KV-04, F-08.2-PR',
+                      helperText:
+                          'Format nije propisan sistemom — određuje ga kompanija.',
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 if (ProductionStationConfig.supportsControlledInputProfile(
                   _profileKey,

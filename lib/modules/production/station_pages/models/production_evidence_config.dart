@@ -36,6 +36,8 @@ class ProductionEvidenceConfig {
   final bool controlledInputEnabled;
   final String controlledInputMode;
   final String? controlledInputScope;
+  /// M1-I4-D-D — samo oznaka obrasca; metapodaci iz odobrenog QMS obrasca.
+  final String? controlledFormDocumentCode;
   final DateTime? archivedAt;
 
   const ProductionEvidenceConfig({
@@ -57,11 +59,15 @@ class ProductionEvidenceConfig {
     this.controlledInputEnabled = false,
     this.controlledInputMode = 'off',
     this.controlledInputScope,
+    this.controlledFormDocumentCode,
     this.archivedAt,
   });
 
   bool get supportsControlledInput =>
       ProductionStationConfig.supportsControlledInputProfile(profileKey);
+
+  bool get supportsControlledFormDocumentCode =>
+      profileKey.trim() == 'in_process_quality_check';
 
   bool get isArchived => archivedAt != null;
 
@@ -158,6 +164,10 @@ class ProductionEvidenceConfig {
       controlledInputScope: (data['controlledInputScope'] ?? '').toString().trim().isEmpty
           ? null
           : (data['controlledInputScope'] ?? '').toString().trim(),
+      controlledFormDocumentCode:
+          (data['controlledFormDocumentCode'] ?? '').toString().trim().isEmpty
+              ? null
+              : (data['controlledFormDocumentCode'] ?? '').toString().trim(),
       archivedAt: archivedAt,
     );
   }
@@ -194,6 +204,10 @@ class ProductionEvidenceConfig {
             controlledInputScope ??
             ProductionStationConfig.controlledInputScopeWorkBath;
       }
+    }
+    if (supportsControlledFormDocumentCode) {
+      final code = (controlledFormDocumentCode ?? '').trim();
+      payload['controlledFormDocumentCode'] = code;
     }
     return payload;
   }
