@@ -125,6 +125,9 @@ class _QualityDocumentationScreenState extends State<QualityDocumentationScreen>
   }
 
   static String _productLine(QmsDocumentRow r) {
+    if (r.scopeType == 'company' || r.productId.trim().isEmpty) {
+      return 'Cijela kompanija (company-wide)';
+    }
     final code = r.productCodeSnapshot?.trim();
     final name = r.productNameSnapshot?.trim();
     if (code != null && code.isNotEmpty) {
@@ -350,8 +353,11 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Dokumenti vezani uz proizvod. Lista je straničena (50 po stranici). '
-                  'Datoteka: upload na storage preko potpisanog URL-a.',
+                  widget.kind == QmsDocumentKind.form
+                      ? 'Obrasci mogu biti company-wide (bez proizvoda) ili vezani uz proizvod. '
+                          'Oznaka dokumenta, revizija, vlasnik i retention čuvaju se na dokumentu.'
+                      : 'Dokumenti vezani uz proizvod. Lista je straničena (50 po stranici). '
+                          'Datoteka: upload na storage preko potpisanog URL-a.',
                   style: Theme.of(
                     context,
                   ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
@@ -375,7 +381,9 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Dodaj dokument i odaberi proizvod — opcionalno priloži datoteku.',
+                    widget.kind == QmsDocumentKind.form
+                        ? 'Dodaj obrazac s oznakom dokumenta — company-wide ili uz proizvod.'
+                        : 'Dodaj dokument i odaberi proizvod — opcionalno priloži datoteku.',
                     textAlign: TextAlign.center,
                     style: Theme.of(
                       context,
@@ -409,9 +417,25 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          if (r.documentCode != null &&
+                              r.documentCode!.trim().isNotEmpty)
+                            Text(
+                              'Oznaka: ${r.documentCode!.trim()}'
+                              '${r.revision != null ? ' · Rev. ${r.revision}' : ''}',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
                           Text(
-                            'Proizvod: ${_QualityDocumentationScreenState._productLine(r)}',
+                            r.scopeType == 'company'
+                                ? 'Opseg: ${_QualityDocumentationScreenState._productLine(r)}'
+                                : 'Proizvod: ${_QualityDocumentationScreenState._productLine(r)}',
                           ),
+                          if (r.ownerDepartment != null &&
+                              r.ownerDepartment!.trim().isNotEmpty)
+                            Text('Vlasnik: ${r.ownerDepartment!.trim()}'),
+                          if (r.retentionCategory != null &&
+                              r.retentionCategory!.trim().isNotEmpty)
+                            Text('Retention: ${r.retentionCategory!.trim()}'),
                           Text(
                             'Status: ${QmsDisplayFormatters.qmsDocStatus(r.status)} · '
                             'Ažurirano: ${_QualityDocumentationScreenState._formatUpdated(r.updatedAtIso)}',
@@ -496,9 +520,15 @@ class _AddQmsDocumentDialog extends StatefulWidget {
 
 class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
   final _title = TextEditingController();
+  final _documentCode = TextEditingController();
+  final _revision = TextEditingController(text: '1');
+  final _ownerDepartment = TextEditingController();
+  final _retentionCategory = TextEditingController();
   final _notes = TextEditingController();
   final _externalUrl = TextEditingController();
 
+  /// Samo za obrasce: `company` | `product`. Ostale vrste uvijek product.
+  late String _scopeType;
   String? _productId;
   String? _productLabel;
   String? _productNameSnapshot;
@@ -510,9 +540,21 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
   String? _pickedName;
   String? _mime;
 
+  bool get _isForm => widget.kind == QmsDocumentKind.form;
+
+  @override
+  void initState() {
+    super.initState();
+    _scopeType = _isForm ? 'company' : 'product';
+  }
+
   @override
   void dispose() {
     _title.dispose();
+    _documentCode.dispose();
+    _revision.dispose();
+    _ownerDepartment.dispose();
+    _retentionCategory.dispose();
     _notes.dispose();
     _externalUrl.dispose();
     super.dispose();
@@ -581,6 +623,7 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
 
   Future<void> _submit() async {
     final title = _title.text.trim();
+    final scopeType = _isForm ? _scopeType : 'product';
     final pid = _productId?.trim();
     if (title.isEmpty) {
       ScaffoldMessenger.of(
@@ -588,7 +631,7 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
       ).showSnackBar(const SnackBar(content: Text('Unesi naslov dokumenta.')));
       return;
     }
-    if (pid == null || pid.isEmpty) {
+    if (scopeType == 'product' && (pid == null || pid.isEmpty)) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Odaberi proizvod.')));
@@ -597,19 +640,37 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
 
     final notes = _notes.text.trim();
     final ext = _externalUrl.text.trim();
+    final docCode = _documentCode.text.trim();
+    final owner = _ownerDepartment.text.trim();
+    final retention = _retentionCategory.text.trim();
+    final revParsed = int.tryParse(_revision.text.trim());
+    if (_revision.text.trim().isNotEmpty &&
+        (revParsed == null || revParsed < 1)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Revizija mora biti cijeli broj ≥ 1.')),
+      );
+      return;
+    }
 
     setState(() => _submitting = true);
     try {
       final id = await widget.svc.upsertQmsDocument(
         companyId: widget.companyId,
         title: title,
-        productId: pid,
+        productId: scopeType == 'product' ? pid : null,
+        scopeType: scopeType,
         documentKind: widget.kind.apiValue,
         status: _status,
         notes: notes.isEmpty ? null : notes,
         externalUrl: ext.isEmpty ? null : ext,
-        productNameSnapshot: _productNameSnapshot,
-        productCodeSnapshot: _productCodeSnapshot,
+        productNameSnapshot:
+            scopeType == 'product' ? _productNameSnapshot : null,
+        productCodeSnapshot:
+            scopeType == 'product' ? _productCodeSnapshot : null,
+        documentCode: docCode.isEmpty ? null : docCode,
+        revision: revParsed,
+        ownerDepartment: owner.isEmpty ? null : owner,
+        retentionCategory: retention.isEmpty ? null : retention,
       );
 
       if (_fileBytes != null &&
@@ -637,13 +698,20 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
           companyId: widget.companyId,
           qmsDocumentId: id,
           title: title,
-          productId: pid,
+          productId: scopeType == 'product' ? pid : null,
+          scopeType: scopeType,
           documentKind: widget.kind.apiValue,
           status: _status,
           notes: notes.isEmpty ? null : notes,
           externalUrl: ext.isEmpty ? null : ext,
-          productNameSnapshot: _productNameSnapshot,
-          productCodeSnapshot: _productCodeSnapshot,
+          productNameSnapshot:
+              scopeType == 'product' ? _productNameSnapshot : null,
+          productCodeSnapshot:
+              scopeType == 'product' ? _productCodeSnapshot : null,
+          documentCode: docCode.isEmpty ? null : docCode,
+          revision: revParsed,
+          ownerDepartment: owner.isEmpty ? null : owner,
+          retentionCategory: retention.isEmpty ? null : retention,
           fileName: _pickedName,
           fileStoragePath: up.storagePath,
         );
@@ -695,11 +763,89 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
                 textCapitalization: TextCapitalization.sentences,
               ),
               const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: _submitting ? null : _pickProduct,
-                icon: const Icon(Icons.inventory_2_outlined),
-                label: Text(_productLabel ?? 'Odaberi proizvod'),
+              TextField(
+                controller: _documentCode,
+                decoration: const InputDecoration(
+                  labelText: 'Oznaka dokumenta',
+                  hintText: 'npr. QF-PC-001',
+                ),
+                textCapitalization: TextCapitalization.characters,
               ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _revision,
+                decoration: const InputDecoration(
+                  labelText: 'Revizija',
+                  hintText: '1',
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _ownerDepartment,
+                decoration: const InputDecoration(
+                  labelText: 'Vlasnik (odjel)',
+                  hintText: 'npr. Kontrola kvaliteta',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _retentionCategory,
+                decoration: const InputDecoration(
+                  labelText: 'Kategorija čuvanja (retention)',
+                  hintText: 'npr. Zapisi kvaliteta',
+                ),
+              ),
+              if (_isForm) ...[
+                const SizedBox(height: 12),
+                InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Opseg',
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _scopeType,
+                      isExpanded: true,
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'company',
+                          child: Text('Cijela kompanija (company-wide)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'product',
+                          child: Text('Vezano uz proizvod'),
+                        ),
+                      ],
+                      onChanged: _submitting
+                          ? null
+                          : (v) {
+                              if (v == null) return;
+                              setState(() {
+                                _scopeType = v;
+                                if (v == 'company') {
+                                  _productId = null;
+                                  _productLabel = null;
+                                  _productNameSnapshot = null;
+                                  _productCodeSnapshot = null;
+                                }
+                              });
+                            },
+                    ),
+                  ),
+                ),
+              ],
+              if (!_isForm || _scopeType == 'product') ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _submitting ? null : _pickProduct,
+                  icon: const Icon(Icons.inventory_2_outlined),
+                  label: Text(_productLabel ?? 'Odaberi proizvod'),
+                ),
+              ],
               const SizedBox(height: 12),
               InputDecorator(
                 decoration: const InputDecoration(

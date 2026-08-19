@@ -29,6 +29,20 @@ class QmsDisplayFormatters {
     }
   }
 
+  /// Status za PDF / kontrolisanu oznaku obrasca (M1-I4-D).
+  static String qmsControlledFormStatus(String status) {
+    switch (status) {
+      case 'draft':
+        return 'Nacrt';
+      case 'approved':
+        return 'Aktivno';
+      case 'obsolete':
+        return 'Van upotrebe';
+      default:
+        return status.isEmpty ? '—' : status;
+    }
+  }
+
   static String inspectionType(String t) {
     switch (t.toUpperCase()) {
       case 'INCOMING':

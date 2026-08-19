@@ -270,7 +270,9 @@ class QualityCallableService {
     String? plantKey,
     String? qmsDocumentId,
     required String title,
-    required String productId,
+    String? productId,
+    /// `company` | `product` — company samo za obrasce (`form`).
+    String? scopeType,
     required String documentKind,
     String status = 'draft',
     String? notes,
@@ -280,6 +282,9 @@ class QualityCallableService {
     String? productNameSnapshot,
     String? productCodeSnapshot,
     String? documentCode,
+    int? revision,
+    String? ownerDepartment,
+    String? retentionCategory,
   }) async {
     final callable = _functions.httpsCallable('upsertQmsDocument');
     final res = await callable.call({
@@ -288,7 +293,8 @@ class QualityCallableService {
       if (qmsDocumentId != null && qmsDocumentId.isNotEmpty)
         'qmsDocumentId': qmsDocumentId,
       'title': title,
-      'productId': productId,
+      if (productId != null && productId.isNotEmpty) 'productId': productId,
+      if (scopeType != null && scopeType.isNotEmpty) 'scopeType': scopeType,
       'documentKind': documentKind,
       'status': status,
       if (notes != null && notes.isNotEmpty) 'notes': notes,
@@ -302,6 +308,11 @@ class QualityCallableService {
         'productCodeSnapshot': productCodeSnapshot,
       if (documentCode != null && documentCode.isNotEmpty)
         'documentCode': documentCode,
+      if (revision != null) 'revision': revision,
+      if (ownerDepartment != null && ownerDepartment.isNotEmpty)
+        'ownerDepartment': ownerDepartment,
+      if (retentionCategory != null && retentionCategory.isNotEmpty)
+        'retentionCategory': retentionCategory,
     });
     final id = (res.data as Map?)?['qmsDocumentId']?.toString().trim();
     if (id == null || id.isEmpty) {

@@ -96,10 +96,15 @@ class QmsDocumentRow {
   final String? documentCode;
   final String title;
   final String documentKind;
+  /// `company` | `product` (company-wide obrasci bez proizvoda).
+  final String scopeType;
   final String productId;
   final String? productNameSnapshot;
   final String? productCodeSnapshot;
   final String status;
+  final int? revision;
+  final String? ownerDepartment;
+  final String? retentionCategory;
   final String? plantKey;
   final String? notes;
   final String? fileName;
@@ -116,10 +121,14 @@ class QmsDocumentRow {
     this.documentCode,
     required this.title,
     required this.documentKind,
+    this.scopeType = 'product',
     required this.productId,
     this.productNameSnapshot,
     this.productCodeSnapshot,
     required this.status,
+    this.revision,
+    this.ownerDepartment,
+    this.retentionCategory,
     this.plantKey,
     this.notes,
     this.fileName,
@@ -133,15 +142,31 @@ class QmsDocumentRow {
   });
 
   factory QmsDocumentRow.fromMap(Map<String, dynamic> m) {
+    final productId = (m['productId'] ?? '').toString();
+    final scopeRaw = (m['scopeType'] ?? '').toString().trim();
+    final scopeType = scopeRaw.isNotEmpty
+        ? scopeRaw
+        : (productId.trim().isEmpty ? 'company' : 'product');
+    int? revision;
+    final revRaw = m['revision'];
+    if (revRaw is int) {
+      revision = revRaw;
+    } else if (revRaw != null) {
+      revision = int.tryParse(revRaw.toString());
+    }
     return QmsDocumentRow(
       id: (m['id'] ?? '').toString(),
       documentCode: m['documentCode']?.toString(),
       title: (m['title'] ?? '').toString(),
       documentKind: (m['documentKind'] ?? '').toString(),
-      productId: (m['productId'] ?? '').toString(),
+      scopeType: scopeType,
+      productId: productId,
       productNameSnapshot: m['productNameSnapshot']?.toString(),
       productCodeSnapshot: m['productCodeSnapshot']?.toString(),
       status: (m['status'] ?? '').toString(),
+      revision: revision,
+      ownerDepartment: m['ownerDepartment']?.toString(),
+      retentionCategory: m['retentionCategory']?.toString(),
       plantKey: m['plantKey']?.toString(),
       notes: m['notes']?.toString(),
       fileName: m['fileName']?.toString(),
