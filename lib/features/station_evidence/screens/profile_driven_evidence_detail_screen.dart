@@ -4,6 +4,7 @@ import '../../../core/company_plant_display_name.dart';
 import '../../../modules/production/station_pages/models/production_station_profile_field.dart';
 import '../../catalog_evidence_runtime/utils/operator_evidence_ux_standard.dart';
 import '../export/first_piece_approval_pdf_actions.dart';
+import '../export/in_process_quality_check_record_pdf_actions.dart';
 import '../models/profile_driven_evidence_session.dart';
 import '../services/profile_driven_evidence_callable_service.dart';
 import '../utils/profile_driven_evidence_detail_display.dart';
@@ -29,7 +30,8 @@ class ProfileDrivenEvidenceDetailScreen extends StatefulWidget {
 class _ProfileDrivenEvidenceDetailScreenState
     extends State<ProfileDrivenEvidenceDetailScreen> {
   final _service = ProfileDrivenEvidenceCallableService();
-  final _pdfActions = FirstPieceApprovalPdfActions();
+  final _firstPiecePdfActions = FirstPieceApprovalPdfActions();
+  final _inProcessPdfActions = InProcessQualityCheckRecordPdfActions();
 
   bool _loading = true;
   bool _pdfBusy = false;
@@ -127,7 +129,14 @@ class _ProfileDrivenEvidenceDetailScreenState
         s.status.trim().toLowerCase() == 'closed';
   }
 
-  Future<void> _runFirstPiecePdf(
+  bool get _canExportInProcessRecordPdf {
+    final s = _session;
+    if (s == null) return false;
+    return s.processProfileType == 'in_process_quality_check' &&
+        s.status.trim().toLowerCase() == 'closed';
+  }
+
+  Future<void> _runEvidencePdf(
     Future<void> Function() action,
   ) async {
     if (_pdfBusy) return;
@@ -142,6 +151,12 @@ class _ProfileDrivenEvidenceDetailScreenState
     } finally {
       if (mounted) setState(() => _pdfBusy = false);
     }
+  }
+
+  String get _plantLabelForPdf {
+    final label = (_plantLabel ?? '').trim();
+    if (label.isNotEmpty) return label;
+    return (_session?.plantKey ?? '').trim();
   }
 
   Widget _sectionCard({
@@ -246,6 +261,27 @@ class _ProfileDrivenEvidenceDetailScreenState
     final lines = session.inspectionLines;
     final unit = (s.unit ?? '').trim();
     final catalogVer = session.catalogVersion;
+    final productCtx = _resolveInProcessProductContext(session);
+    final orderCode = (s.productionOrderCode ??
+            session.fieldValues['productionOrderCode'] ??
+            '')
+        .toString()
+        .trim();
+    final workContextRaw =
+        (session.fieldValues['workContextType'] ?? '').toString().trim();
+    final workContextLabel = workContextRaw == 'machine'
+        ? 'Mašina'
+        : workContextRaw == 'workbench'
+            ? 'Radni sto'
+            : (workContextRaw.isEmpty ? '—' : workContextRaw);
+    final machineName =
+        (session.fieldValues['machineNameSnapshot'] ?? '').toString().trim();
+    final workbenchName =
+        (session.fieldValues['workbenchNameSnapshot'] ?? '').toString().trim();
+    final workLocation =
+        (session.fieldValues['workLocationNameSnapshot'] ?? '')
+            .toString()
+            .trim();
 
     return ListView(
       children: [
@@ -275,8 +311,7 @@ class _ProfileDrivenEvidenceDetailScreenState
                 padding: const EdgeInsets.all(12),
                 child: Text(
                   'Ova evidencija je snimljena s katalogom v$catalogVer. '
-                  'Nove sesije Procesne kontrole kvaliteta trebaju katalog v17+ '
-                  '(Mjesto rada). Pokrenite novu evidenciju za svježi snapshot.',
+                  'Nove sesije trebaju katalog v17+ (Mjesto rada).',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onErrorContainer,
                   ),
@@ -285,7 +320,39 @@ class _ProfileDrivenEvidenceDetailScreenState
             ),
           ),
         _sectionCard(
-          title: 'Procesna kontrola',
+          title: 'Proizvodni kontekst',
+          children: [
+            _kvRow(
+              'Proizvodni nalog',
+              orderCode.isEmpty ? '—' : orderCode,
+            ),
+            _kvRow('Proizvod', productCtx.displayName),
+            _kvRow('Šifra proizvoda', productCtx.code),
+            _kvRow('Naziv proizvoda', productCtx.name),
+            _kvRow('Mjesto rada', workContextLabel),
+            if (workContextRaw == 'machine' || machineName.isNotEmpty)
+              _kvRow(
+                'Mašina',
+                machineName.isNotEmpty
+                    ? machineName
+                    : (workLocation.isNotEmpty ? workLocation : '—'),
+              ),
+            if (workContextRaw == 'workbench' || workbenchName.isNotEmpty)
+              _kvRow(
+                'Radni sto',
+                workbenchName.isNotEmpty
+                    ? workbenchName
+                    : (workLocation.isNotEmpty ? workLocation : '—'),
+              ),
+            if (workContextRaw.isEmpty &&
+                machineName.isEmpty &&
+                workbenchName.isEmpty &&
+                workLocation.isNotEmpty)
+              _kvRow('Lokacija rada', workLocation),
+          ],
+        ),
+        _sectionCard(
+          title: 'Kontrola',
           children: [
             _kvRow(
               'Kontrolor kvaliteta',
@@ -316,9 +383,14 @@ class _ProfileDrivenEvidenceDetailScreenState
                       .trim(),
             ),
             ..._operatorFieldsForDisplay.map((field) {
+              // Header kontekst i osobe su već gore / u Proizvodnom kontekstu.
               if (field.key == 'workCenterId' ||
                   field.key == 'inspectorEmployeeId' ||
-                  field.key == 'productionOperatorEmployeeId') {
+                  field.key == 'productionOperatorEmployeeId' ||
+                  field.key == 'productionOrderId' ||
+                  field.key == 'workContextType' ||
+                  field.key == 'machineId' ||
+                  field.key == 'workbenchId') {
                 return const SizedBox.shrink();
               }
               return _kvRow(
@@ -361,11 +433,6 @@ class _ProfileDrivenEvidenceDetailScreenState
               ],
             ],
           ),
-        if (_masterDataFieldsForDisplay.isNotEmpty)
-          _fieldSection(
-            'Podaci iz master šifrarnika',
-            _masterDataFieldsForDisplay,
-          ),
         _sectionCard(
           title: 'Operator audit',
           children: [
@@ -392,6 +459,38 @@ class _ProfileDrivenEvidenceDetailScreenState
         ),
         const SizedBox(height: 24),
       ],
+    );
+  }
+
+  /// Proizvod iz header snapshota ili prve kontrolne tačke (bez UID prikaza).
+  ({String displayName, String code, String name}) _resolveInProcessProductContext(
+    ProfileDrivenEvidenceSessionDetail session,
+  ) {
+    final s = session.summaryFields;
+    var name = (s.productName ??
+            session.fieldValues['productNameSnapshot'] ??
+            '')
+        .toString()
+        .trim();
+    var code = (s.productCode ?? session.fieldValues['productCode'] ?? '')
+        .toString()
+        .trim();
+    for (final row in session.inspectionLines) {
+      if (name.isEmpty) {
+        name = (row['productNameSnapshot'] ?? '').toString().trim();
+      }
+      if (code.isEmpty) {
+        code = (row['productCode'] ?? '').toString().trim();
+      }
+      if (name.isNotEmpty && code.isNotEmpty) break;
+    }
+    final display = name.isNotEmpty
+        ? name
+        : (code.isNotEmpty ? code : '—');
+    return (
+      displayName: display,
+      code: code.isEmpty ? '—' : code,
+      name: name.isEmpty ? '—' : name,
     );
   }
 
@@ -434,6 +533,17 @@ class _ProfileDrivenEvidenceDetailScreenState
               ),
         ),
         const SizedBox(height: 6),
+        if ((row['productNameSnapshot'] ?? row['productCode'] ?? '')
+            .toString()
+            .trim()
+            .isNotEmpty)
+          _kvRow(
+            'Proizvod',
+            [
+              (row['productCode'] ?? '').toString().trim(),
+              (row['productNameSnapshot'] ?? '').toString().trim(),
+            ].where((e) => e.isNotEmpty).join(' · '),
+          ),
         _kvRow('Razlog greške', reason),
         _kvRow('Napomena', note.isEmpty ? '—' : note),
       ],
@@ -831,28 +941,28 @@ class _ProfileDrivenEvidenceDetailScreenState
                 Future<void> Function()? action;
                 switch (value) {
                   case 'preview':
-                    action = () => _pdfActions.preview(
+                    action = () => _firstPiecePdfActions.preview(
                           companyId: _companyId,
                           sessionId: widget.sessionId,
                           companyData: widget.companyData,
                         );
                     break;
                   case 'download':
-                    action = () => _pdfActions.downloadOrShare(
+                    action = () => _firstPiecePdfActions.downloadOrShare(
                           companyId: _companyId,
                           sessionId: widget.sessionId,
                           companyData: widget.companyData,
                         );
                     break;
                   case 'print':
-                    action = () => _pdfActions.print(
+                    action = () => _firstPiecePdfActions.print(
                           companyId: _companyId,
                           sessionId: widget.sessionId,
                           companyData: widget.companyData,
                         );
                     break;
                 }
-                if (action != null) _runFirstPiecePdf(action);
+                if (action != null) _runEvidencePdf(action);
               },
               itemBuilder: (context) => const [
                 PopupMenuItem(
@@ -866,6 +976,78 @@ class _ProfileDrivenEvidenceDetailScreenState
                 PopupMenuItem(
                   value: 'print',
                   child: Text('Print PDF'),
+                ),
+              ],
+              icon: _pdfBusy
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.picture_as_pdf_outlined),
+            ),
+          if (_canExportInProcessRecordPdf)
+            PopupMenuButton<String>(
+              tooltip: 'PDF evidencijskog zapisnika procesne kontrole',
+              enabled: !_loading && !_pdfBusy,
+              onSelected: (value) {
+                Future<void> Function()? action;
+                switch (value) {
+                  case 'preview':
+                    action = () => _inProcessPdfActions.preview(
+                          companyId: _companyId,
+                          sessionId: widget.sessionId,
+                          companyData: widget.companyData,
+                          plantDisplayName: _plantLabelForPdf,
+                          session: _session,
+                        );
+                    break;
+                  case 'download':
+                    action = () => _inProcessPdfActions.downloadOrShare(
+                          companyId: _companyId,
+                          sessionId: widget.sessionId,
+                          companyData: widget.companyData,
+                          plantDisplayName: _plantLabelForPdf,
+                          session: _session,
+                        );
+                    break;
+                  case 'print':
+                    action = () => _inProcessPdfActions.print(
+                          companyId: _companyId,
+                          sessionId: widget.sessionId,
+                          companyData: widget.companyData,
+                          plantDisplayName: _plantLabelForPdf,
+                          session: _session,
+                        );
+                    break;
+                  case 'share':
+                    action = () => _inProcessPdfActions.share(
+                          companyId: _companyId,
+                          sessionId: widget.sessionId,
+                          companyData: widget.companyData,
+                          plantDisplayName: _plantLabelForPdf,
+                          session: _session,
+                        );
+                    break;
+                }
+                if (action != null) _runEvidencePdf(action);
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'preview',
+                  child: Text('Pregled PDF'),
+                ),
+                PopupMenuItem(
+                  value: 'download',
+                  child: Text('Preuzmi PDF'),
+                ),
+                PopupMenuItem(
+                  value: 'print',
+                  child: Text('Print PDF'),
+                ),
+                PopupMenuItem(
+                  value: 'share',
+                  child: Text('Pošalji PDF'),
                 ),
               ],
               icon: _pdfBusy
