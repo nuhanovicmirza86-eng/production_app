@@ -216,13 +216,12 @@ class _ProductionEvidenceOperatorHubScreenState
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (CatalogEvidenceHelpTexts.infoIconForProfileKey(
-                      profile.profileKey,
-                    ) !=
-                    null)
-                  CatalogEvidenceHelpTexts.infoIconForProfileKey(
-                    profile.profileKey,
-                  )!,
+                // M1-I5-C3 — svaka operativna evidencija mora imati info ikonicu.
+                CatalogEvidenceHelpTexts.infoIconForProfile(
+                  profileKey: profile.profileKey,
+                  displayName: profile.displayName,
+                  description: profile.description,
+                ),
                 const Icon(Icons.chevron_right),
               ],
             ),

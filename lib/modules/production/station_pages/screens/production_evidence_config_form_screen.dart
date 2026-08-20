@@ -54,6 +54,15 @@ class _ProductionEvidenceConfigFormScreenState
 
   ProductionEvidenceConfig? _freshExisting;
 
+  /// M1-I5-C2 — greške vezane za konkretna polja.
+  String? _errName;
+  String? _errProcessKey;
+  String? _errPlantKey;
+  String? _errProfile;
+  String? _errRoles;
+  String? _errActive;
+  String? _errFormCode;
+
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
 
@@ -255,32 +264,105 @@ class _ProductionEvidenceConfigFormScreenState
     }
   }
 
-  Future<void> _save() async {
-    if (_readOnly) return;
+  void _clearFieldErrors() {
+    _errName = null;
+    _errProcessKey = null;
+    _errPlantKey = null;
+    _errProfile = null;
+    _errRoles = null;
+    _errActive = null;
+    _errFormCode = null;
+  }
+
+  void _applyMappedFieldError(ProductionEvidenceConfigUiError mapped) {
+    switch (mapped.fieldKey) {
+      case 'name':
+        _errName = mapped.fieldMessage;
+        break;
+      case 'processKey':
+        _errProcessKey = mapped.fieldMessage;
+        break;
+      case 'plantKey':
+        _errPlantKey = mapped.fieldMessage;
+        break;
+      case 'profile':
+        _errProfile = mapped.fieldMessage;
+        break;
+      case 'roles':
+        _errRoles = mapped.fieldMessage;
+        break;
+      case 'active':
+        _errActive = mapped.fieldMessage;
+        break;
+      case 'formCode':
+        _errFormCode = mapped.fieldMessage;
+        break;
+    }
+  }
+
+  /// Lokalna validacija prije Callable-a — greške idu na polja.
+  bool _validateBeforeSave() {
+    _clearFieldErrors();
+    var ok = true;
     final name = _nameCtrl.text.trim();
     final processKey = _processKeyCtrl.text.trim();
+
+    if (_profileKey.trim().isEmpty) {
+      _errProfile = 'Odaberite profil evidencije.';
+      ok = false;
+    }
     if (name.isEmpty) {
-      _showSnack('Naziv prikaza je obavezan.');
-      return;
+      _errName = 'Naziv prikaza je obavezan.';
+      ok = false;
     }
     if (processKey.isEmpty) {
-      _showSnack('Proces (processKey) je obavezan.');
-      return;
+      _errProcessKey = 'Proces je obavezan.';
+      ok = false;
     }
     if (_plantKey.isEmpty) {
-      _showSnack('Odaberite pogon.');
-      return;
+      _errPlantKey = 'Odaberite pogon.';
+      ok = false;
     }
     if (_runtimeVisible && _runtimeRoles.isEmpty) {
-      _showSnack('Odaberite barem jednu ulogu za runtime pristup.');
+      _errRoles =
+          'Odaberite najmanje jednu dozvoljenu ulogu za runtime prikaz.';
+      ok = false;
+    }
+    if (_active) {
+      if (name.isEmpty || processKey.isEmpty || _plantKey.isEmpty) {
+        _errActive =
+            'Evidencija ne može biti aktivna dok nisu popunjena obavezna polja.';
+        ok = false;
+      }
+      if (_runtimeVisible && _runtimeRoles.isEmpty) {
+        _errActive =
+            'Evidencija ne može biti aktivna dok nisu popunjena obavezna polja.';
+        ok = false;
+      }
+    }
+    return ok;
+  }
+
+  Future<void> _save() async {
+    if (_readOnly) return;
+    if (!_validateBeforeSave()) {
+      setState(() {});
+      _showSnack(
+        'Nije moguće spremiti evidenciju. Provjerite označena polja.',
+      );
       return;
     }
     if (_isEdit && (widget.existing?.evidenceConfigId.trim().isEmpty ?? true)) {
-      _showSnack('Nedostaje identifikator evidencije — osvježite listu i pokušajte ponovo.');
+      _showSnack(
+        'Nedostaje identifikator evidencije — osvježite listu i pokušajte ponovo.',
+      );
       return;
     }
 
-    setState(() => _saving = true);
+    setState(() {
+      _clearFieldErrors();
+      _saving = true;
+    });
     try {
       final config = _buildConfig();
       final savedId = await _callable.upsertProductionEvidenceConfig(
@@ -303,7 +385,12 @@ class _ProductionEvidenceConfigFormScreenState
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      _showSnack(productionEvidenceConfigErrorMessage(e));
+      final mapped = mapProductionEvidenceConfigError(e);
+      setState(() {
+        _clearFieldErrors();
+        _applyMappedFieldError(mapped);
+      });
+      _showSnack(mapped.snackMessage);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -345,7 +432,7 @@ class _ProductionEvidenceConfigFormScreenState
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      _showSnack(productionEvidenceConfigErrorMessage(e));
+      _showSnack(productionEvidenceConfigArchiveErrorMessage(e));
     } finally {
       if (mounted) setState(() => _archiving = false);
     }
@@ -411,8 +498,9 @@ class _ProductionEvidenceConfigFormScreenState
                   key: ValueKey(_profileKey),
                   isExpanded: true,
                   initialValue: profileValue,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Obrazac iz kataloga',
+                    errorText: _errProfile,
                   ),
                   items: profileOptions
                       .map(
@@ -431,6 +519,7 @@ class _ProductionEvidenceConfigFormScreenState
                       : (v) {
                           if (v == null) return;
                           setState(() {
+                            _errProfile = null;
                             _profileKey = v;
                             if (!ProductionStationConfig
                                 .supportsControlledInputProfile(v)) {
@@ -449,9 +538,13 @@ class _ProductionEvidenceConfigFormScreenState
                 TextField(
                   controller: _nameCtrl,
                   readOnly: _readOnly,
-                  decoration: const InputDecoration(
+                  onChanged: (_) {
+                    if (_errName != null) setState(() => _errName = null);
+                  },
+                  decoration: InputDecoration(
                     labelText: 'Naziv prikaza',
                     helperText: 'npr. Doziranje hemikalija — Pogon BR',
+                    errorText: _errName,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -459,7 +552,10 @@ class _ProductionEvidenceConfigFormScreenState
                   key: ValueKey(_plantKey),
                   isExpanded: true,
                   initialValue: _plantKey.isEmpty ? null : _plantKey,
-                  decoration: const InputDecoration(labelText: 'Pogon'),
+                  decoration: InputDecoration(
+                    labelText: 'Pogon',
+                    errorText: _errPlantKey,
+                  ),
                   items: _plants
                       .map(
                         (p) => DropdownMenuItem(
@@ -471,16 +567,28 @@ class _ProductionEvidenceConfigFormScreenState
                   onChanged: _readOnly
                       ? null
                       : (v) {
-                          if (v != null) setState(() => _plantKey = v);
+                          if (v != null) {
+                            setState(() {
+                              _errPlantKey = null;
+                              _plantKey = v;
+                            });
+                          }
                         },
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: _processKeyCtrl,
                   readOnly: _readOnly,
-                  decoration: const InputDecoration(
+                  onChanged: (_) {
+                    if (_errProcessKey != null) {
+                      setState(() => _errProcessKey = null);
+                    }
+                  },
+                  decoration: InputDecoration(
                     labelText: 'Proces (processKey)',
-                    helperText: 'Poslovni ključ procesa u kompaniji (npr. hemikalije_br).',
+                    helperText:
+                        'Poslovni ključ procesa u kompaniji (npr. hemikalije_br).',
+                    errorText: _errProcessKey,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -534,11 +642,17 @@ class _ProductionEvidenceConfigFormScreenState
                     controller: _controlledFormCodeCtrl,
                     readOnly: _readOnly,
                     textCapitalization: TextCapitalization.characters,
-                    decoration: const InputDecoration(
+                    onChanged: (_) {
+                      if (_errFormCode != null) {
+                        setState(() => _errFormCode = null);
+                      }
+                    },
+                    decoration: InputDecoration(
                       labelText: 'Oznaka obrasca / dokumenta',
                       hintText: 'npr. QF-PC-001, OBR-KV-04, F-08.2-PR',
                       helperText:
                           'Format nije propisan sistemom — određuje ga kompanija.',
+                      errorText: _errFormCode,
                     ),
                   ),
                 ],
@@ -624,8 +738,21 @@ class _ProductionEvidenceConfigFormScreenState
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Aktivna evidencija'),
+                  subtitle: _errActive == null
+                      ? null
+                      : Text(
+                          _errActive!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
                   value: _active,
-                  onChanged: _readOnly ? null : (v) => setState(() => _active = v),
+                  onChanged: _readOnly
+                      ? null
+                      : (v) => setState(() {
+                            _errActive = null;
+                            _active = v;
+                          }),
                 ),
                 if (_profileIsComplete) ...[
                   const Divider(height: 24),
@@ -640,6 +767,7 @@ class _ProductionEvidenceConfigFormScreenState
                         ? null
                         : (v) => setState(() {
                               _runtimeVisible = v;
+                              _errRoles = null;
                               if (!v) _runtimeRoles = {};
                             }),
                   ),
@@ -647,8 +775,22 @@ class _ProductionEvidenceConfigFormScreenState
                     const SizedBox(height: 8),
                     Text(
                       'Dozvoljene uloge',
-                      style: Theme.of(context).textTheme.titleSmall,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            color: _errRoles != null
+                                ? Theme.of(context).colorScheme.error
+                                : null,
+                          ),
                     ),
+                    if (_errRoles != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _errRoles!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
@@ -662,6 +804,7 @@ class _ProductionEvidenceConfigFormScreenState
                               selected: _runtimeRoles.contains(role),
                               onSelected: (selected) {
                                 setState(() {
+                                  _errRoles = null;
                                   if (selected) {
                                     _runtimeRoles.add(role);
                                   } else {

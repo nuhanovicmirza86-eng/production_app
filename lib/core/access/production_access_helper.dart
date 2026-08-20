@@ -221,7 +221,7 @@ class ProductionAccessHelper {
       case 'logistics_operator':
         return 'Operater logistike';
       case roleQualityControl:
-        return 'Quality manager';
+        return 'Menadžer kvaliteta';
       case roleMaintenanceManager:
         return 'Menadžer održavanja';
       case roleProjectManager:

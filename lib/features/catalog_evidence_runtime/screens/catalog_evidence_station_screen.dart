@@ -1340,13 +1340,11 @@ class _CatalogEvidenceStationScreenState
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
-              if (CatalogEvidenceHelpTexts.infoIconForProfileKey(
-                    _effectiveProfile.profileKey,
-                  ) !=
-                  null)
-                CatalogEvidenceHelpTexts.infoIconForProfileKey(
-                  _effectiveProfile.profileKey,
-                )!,
+              CatalogEvidenceHelpTexts.infoIconForProfile(
+                profileKey: _effectiveProfile.profileKey,
+                displayName: _effectiveProfile.displayName,
+                description: _effectiveProfile.description,
+              ),
               Text(
                 'Pogon: $plantLabel',
                 style: Theme.of(context).textTheme.labelMedium,
@@ -1536,13 +1534,11 @@ class _CatalogEvidenceStationScreenState
           title: Row(
             children: [
               Expanded(child: Text(_runtimeTitle)),
-              if (CatalogEvidenceHelpTexts.infoIconForProfileKey(
-                    _effectiveProfile.profileKey,
-                  ) !=
-                  null)
-                CatalogEvidenceHelpTexts.infoIconForProfileKey(
-                  _effectiveProfile.profileKey,
-                )!,
+              CatalogEvidenceHelpTexts.infoIconForProfile(
+                profileKey: _effectiveProfile.profileKey,
+                displayName: _effectiveProfile.displayName,
+                description: _effectiveProfile.description,
+              ),
             ],
           ),
         ),
@@ -1599,13 +1595,11 @@ class _CatalogEvidenceStationScreenState
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    if (CatalogEvidenceHelpTexts.infoIconForProfileKey(
-                          _effectiveProfile.profileKey,
-                        ) !=
-                        null)
-                      CatalogEvidenceHelpTexts.infoIconForProfileKey(
-                        _effectiveProfile.profileKey,
-                      )!,
+                    CatalogEvidenceHelpTexts.infoIconForProfile(
+                      profileKey: _effectiveProfile.profileKey,
+                      displayName: _effectiveProfile.displayName,
+                      description: _effectiveProfile.description,
+                    ),
                   ],
                 ),
                 leading: IconButton(

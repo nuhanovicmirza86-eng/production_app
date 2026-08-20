@@ -308,6 +308,30 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                   return false;
                 }
               }
+              // M1-I5-C4B — add + edit; detekcija po key/profilu/kolonama.
+              if (needsControlledItemsQtyBalance(
+                tableKey: tableDef.key,
+                profileKey: profile.profileKey,
+                columnKeys: _rowDialogColumns.map((c) => c.key),
+              )) {
+                final issue = controlledItemsQtyBalanceIssue(
+                  inspectedQty: textControllers['inspectedQty']?.text ??
+                      draft.values['inspectedQty'],
+                  goodQty: textControllers['goodQty']?.text ??
+                      draft.values['goodQty'],
+                  scrapQty: textControllers['scrapQty']?.text ??
+                      draft.values['scrapQty'],
+                  reworkQty: textControllers['reworkQty']?.text ??
+                      draft.values['reworkQty'],
+                );
+                if (issue != null) {
+                  validationError = issue.message;
+                  fieldErrors
+                    ..clear()
+                    ..addAll(issue.errorFieldKeys);
+                  return false;
+                }
+              }
               if (OperatorEvidenceUxStandard.isInspectionLinesTable(
                 tableDef.key,
               )) {
@@ -555,8 +579,13 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                               textControllers: textControllers,
                               fieldError: fieldErrors.contains(col.key)
                                   ? (packagingUnitsBalanceFieldKeys
-                                          .contains(col.key)
-                                      ? 'Provjereno = Prihvaćeno + Odbijeno'
+                                              .contains(col.key) ||
+                                          controlledItemsQtyBalanceFieldKeys
+                                              .contains(col.key)
+                                      ? (packagingUnitsBalanceFieldKeys
+                                              .contains(col.key)
+                                          ? 'Provjereno = Prihvaćeno + Odbijeno'
+                                          : 'OK + Škart + Dorada = Kontrolisano')
                                       : validationError)
                                   : null,
                               onChanged: () => setLocal(() {}),
@@ -579,6 +608,29 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                                 );
                                 setLocal(() {});
                               },
+                            ),
+                          );
+                        }
+                        // M1-I5-C4B — puna BS poruka + obračun ispod bloka količina.
+                        if (col.key == 'reworkQty' &&
+                            validationError != null &&
+                            fieldErrors.any(
+                              controlledItemsQtyBalanceFieldKeys.contains,
+                            )) {
+                          widgets.add(
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  validationError!,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.error,
+                                    fontSize: 12,
+                                    height: 1.35,
+                                  ),
+                                ),
+                              ),
                             ),
                           );
                         }
@@ -620,8 +672,13 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                 ),
                 FilledButton(
                   onPressed: () {
-                    if (!validate()) {
-                      showValidationFailure();
+                    // M1-I5-C4B — validate + UI refresh u istom setState (add i edit).
+                    final ok = validate();
+                    if (!ok) {
+                      setLocal(() {});
+                      if (scrollController.hasClients) {
+                        scrollController.jumpTo(0);
+                      }
                       return;
                     }
                     applyDraftValues();
@@ -1123,6 +1180,21 @@ String? validateStructuredTables({
         );
         if (balanceError != null) return balanceError;
       }
+      if (isControlledItemsTable(table.key) ||
+          needsControlledItemsQtyBalance(
+            tableKey: table.key,
+            columnKeys: table.columns.map((c) => c.key),
+          )) {
+        final balanceError = validateControlledItemsQtyBalanceRow(
+          tableLabel: table.label,
+          rowIndexOneBased: rowIndex + 1,
+          inspectedQty: row.values['inspectedQty'],
+          goodQty: row.values['goodQty'],
+          scrapQty: row.values['scrapQty'],
+          reworkQty: row.values['reworkQty'],
+        );
+        if (balanceError != null) return balanceError;
+      }
       if (table.key == 'inspection_lines') {
         final inspected = _parseQty(row.values['qtyInspected']);
         final pass = _parseQty(row.values['qtyPass']);
@@ -1231,29 +1303,6 @@ String? validateStructuredHeader({
     return '«Vrijeme završetka» mora biti nakon «Vrijeme početka» '
         '(${BaFormattedDate.formatDateTime(started)} → '
         '${BaFormattedDate.formatDateTime(finished)}).';
-  }
-  return null;
-}
-
-/// Završna kontrola — red mora imati inspectedQty = goodQty + scrapQty + reworkQty.
-String? validateControlledItemsQtyBalance({
-  required StructuredRepeatableTableDefinition table,
-  required List<StructuredRepeatableRow> rows,
-}) {
-  if (table.key != 'controlled_items') return null;
-  for (var i = 0; i < rows.length; i++) {
-    final row = rows[i];
-    final inspected = _parseQty(row.values['inspectedQty']);
-    final good = _parseQty(row.values['goodQty']);
-    final scrap = _parseQty(row.values['scrapQty']);
-    final rework = _parseQty(row.values['reworkQty']);
-    if (inspected <= 0) {
-      return '${table.label}, red ${i + 1}: kontrolisana količina mora biti veća od nule.';
-    }
-    if ((good + scrap + rework - inspected).abs() > 0.000001) {
-      return '${table.label}, red ${i + 1}: zbroj OK, škarta i dorade mora biti '
-          'jednak kontrolisanoj količini.';
-    }
   }
   return null;
 }

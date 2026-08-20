@@ -268,13 +268,6 @@ class _FinalControlWorkScreenState extends State<FinalControlWorkScreen> {
     if (forFinish) {
       final tableError = validateStructuredTables(tables: _tables, state: _state);
       if (tableError != null) return tableError;
-      for (final table in _tables) {
-        final qtyError = validateControlledItemsQtyBalance(
-          table: table,
-          rows: _state.rowsFor(table.key),
-        );
-        if (qtyError != null) return qtyError;
-      }
     }
     return null;
   }

@@ -5,6 +5,7 @@ const Set<String> structuredPieceQuantityFieldKeys = {
   'unitsChecked',
   'unitsAccepted',
   'unitsRejected',
+  'inspectedQty',
   'goodQty',
   'scrapQty',
   'reworkQty',
@@ -12,6 +13,32 @@ const Set<String> structuredPieceQuantityFieldKeys = {
   'qtySubmitted',
   'processedQty',
 };
+
+/// Finalna kontrola — controlled_items količine (M1-I5-C4).
+const Set<String> controlledItemsQtyBalanceFieldKeys = {
+  'inspectedQty',
+  'goodQty',
+  'scrapQty',
+  'reworkQty',
+};
+
+bool isControlledItemsTable(String tableKey) =>
+    tableKey.trim() == 'controlled_items';
+
+/// M1-I5-C4B — detekcija balansa i kad table key / snapshot nije pouzdan.
+bool needsControlledItemsQtyBalance({
+  required String tableKey,
+  String? profileKey,
+  Iterable<String> columnKeys = const [],
+}) {
+  if (isControlledItemsTable(tableKey)) return true;
+  if ((profileKey ?? '').trim() == 'final_control') return true;
+  final keys = columnKeys.map((k) => k.trim()).where((k) => k.isNotEmpty).toSet();
+  return keys.contains('inspectedQty') &&
+      keys.contains('goodQty') &&
+      keys.contains('scrapQty') &&
+      keys.contains('reworkQty');
+}
 
 /// packaging_control: prazno Prihvaćeno / Odbijeno = 0 (M1-I2-F4).
 const Set<String> packagingZeroDefaultQuantityFieldKeys = {
@@ -122,4 +149,60 @@ String? validatePackagingUnitsBalance({
   );
   if (issue == null) return null;
   return '$tableLabel, red $rowIndexOneBased: ${issue.message}';
+}
+
+/// Rezultat validacije balansa Finalne kontrole (M1-I5-C4).
+class ControlledItemsQtyBalanceIssue {
+  const ControlledItemsQtyBalanceIssue({
+    required this.message,
+    this.errorFieldKeys = controlledItemsQtyBalanceFieldKeys,
+  });
+
+  final String message;
+  final Set<String> errorFieldKeys;
+}
+
+/// OK + Škart + Dorada == Kontrolisano.
+ControlledItemsQtyBalanceIssue? controlledItemsQtyBalanceIssue({
+  required dynamic inspectedQty,
+  required dynamic goodQty,
+  required dynamic scrapQty,
+  required dynamic reworkQty,
+}) {
+  final inspected = packagingQuantityOrZero(inspectedQty);
+  final good = packagingQuantityOrZero(goodQty);
+  final scrap = packagingQuantityOrZero(scrapQty);
+  final rework = packagingQuantityOrZero(reworkQty);
+  final sum = good + scrap + rework;
+  if ((sum - inspected).abs() <= 0.000001) return null;
+  final diff = (sum - inspected).abs();
+  final inspectedLabel = formatStructuredPieceQuantity(inspected);
+  final sumLabel = formatStructuredPieceQuantity(sum);
+  final diffLabel = formatStructuredPieceQuantity(diff);
+  return ControlledItemsQtyBalanceIssue(
+    message:
+        'Količine se ne poklapaju. Zbir OK, škart i dorada mora biti jednak '
+        'kontrolisanoj količini.\n'
+        'Kontrolisano: $inspectedLabel\n'
+        'Zbir OK + škart + dorada: $sumLabel\n'
+        'Razlika: $diffLabel',
+  );
+}
+
+String? validateControlledItemsQtyBalanceRow({
+  required String tableLabel,
+  required int rowIndexOneBased,
+  required dynamic inspectedQty,
+  required dynamic goodQty,
+  required dynamic scrapQty,
+  required dynamic reworkQty,
+}) {
+  final issue = controlledItemsQtyBalanceIssue(
+    inspectedQty: inspectedQty,
+    goodQty: goodQty,
+    scrapQty: scrapQty,
+    reworkQty: reworkQty,
+  );
+  if (issue == null) return null;
+  return '$tableLabel, red $rowIndexOneBased:\n${issue.message}';
 }
