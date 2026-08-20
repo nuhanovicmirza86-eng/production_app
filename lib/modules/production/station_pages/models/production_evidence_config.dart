@@ -13,6 +13,7 @@ class ProductionEvidenceConfig {
     'packaging_control',
     'first_piece_approval',
     'in_process_quality_check',
+    'final_control',
   ];
 
   static bool isH3OperatorRuntimeProfile(String profileKey) =>
@@ -67,7 +68,8 @@ class ProductionEvidenceConfig {
       ProductionStationConfig.supportsControlledInputProfile(profileKey);
 
   bool get supportsControlledFormDocumentCode =>
-      profileKey.trim() == 'in_process_quality_check';
+      profileKey.trim() == 'in_process_quality_check' ||
+      profileKey.trim() == 'final_control';
 
   bool get isArchived => archivedAt != null;
 

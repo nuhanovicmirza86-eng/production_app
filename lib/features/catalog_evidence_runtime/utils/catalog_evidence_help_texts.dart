@@ -29,6 +29,20 @@ abstract final class CatalogEvidenceHelpTexts {
       'prihvaćeno/odbijeno, greške pakovanja, etikete, ambalaža i komentar.\n\n'
       'Nije isto što Procesna kontrola kvaliteta (proizvod/proces tokom proizvodnje).';
 
+  static const finalControlTooltip =
+      'Finalna kontrola kvaliteta prije skladištenja ili isporuke.';
+
+  static const finalControlTitle = 'Finalna kontrola';
+
+  static const finalControlBody =
+      'Finalna kontrola koristi se kao završna provjera kvaliteta prije '
+      'skladištenja ili isporuke. Evidentira se proizvodni nalog, proizvod, '
+      'kontrolor, kontrolisani komadi (OK / škart / dorada) i finalna '
+      'dispozicija.\n\n'
+      'Nije isto što Procesna kontrola kvaliteta (kontrola tokom proizvodnje), '
+      'Odobrenje prvog komada (početno odobrenje) ni Kontrola pakovanja '
+      '(ambalaža/oznake).';
+
   /// Vraća info ikonu za poznati profil; inače null.
   static Widget? infoIconForProfileKey(String profileKey) {
     switch (profileKey.trim()) {
@@ -43,6 +57,12 @@ abstract final class CatalogEvidenceHelpTexts {
           tooltip: packagingControlTooltip,
           dialogTitle: packagingControlTitle,
           dialogBody: packagingControlBody,
+        );
+      case 'final_control':
+        return const OoeInfoIcon(
+          tooltip: finalControlTooltip,
+          dialogTitle: finalControlTitle,
+          dialogBody: finalControlBody,
         );
       default:
         return null;

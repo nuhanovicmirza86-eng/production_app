@@ -261,6 +261,7 @@ class ProfileDrivenEvidenceSessionDetail {
     this.scrapItems = const [],
     this.packagingCheckLines = const [],
     this.inspectionLines = const [],
+    this.controlledItems = const [],
   });
 
   final String sessionId;
@@ -290,6 +291,7 @@ class ProfileDrivenEvidenceSessionDetail {
   final List<Map<String, dynamic>> scrapItems;
   final List<Map<String, dynamic>> packagingCheckLines;
   final List<Map<String, dynamic>> inspectionLines;
+  final List<Map<String, dynamic>> controlledItems;
 
   bool get isReworkAndPainting => processProfileType == 'rework_and_painting';
 
@@ -297,6 +299,8 @@ class ProfileDrivenEvidenceSessionDetail {
 
   bool get isInProcessQualityCheck =>
       processProfileType == 'in_process_quality_check';
+
+  bool get isFinalControl => processProfileType == 'final_control';
 
   int? get catalogVersion {
     final v = profileSnapshot?['catalogVersion'];
@@ -365,6 +369,7 @@ class ProfileDrivenEvidenceSessionDetail {
       scrapItems: _parseRowList(m['scrap_items']),
       packagingCheckLines: _parseRowList(m['packaging_check_lines']),
       inspectionLines: _parseRowList(m['inspection_lines']),
+      controlledItems: _parseRowList(m['controlled_items']),
     );
   }
 }

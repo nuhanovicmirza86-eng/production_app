@@ -247,6 +247,8 @@ class _ProductionEvidenceOperatorHubScreenState
         return Icons.verified_outlined;
       case 'in_process_quality_check':
         return Icons.fact_check_outlined;
+      case 'final_control':
+        return Icons.verified_user_outlined;
       default:
         return Icons.assignment_outlined;
     }

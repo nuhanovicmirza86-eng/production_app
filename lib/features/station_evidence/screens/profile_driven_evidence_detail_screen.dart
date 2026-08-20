@@ -4,6 +4,7 @@ import '../../../core/company_plant_display_name.dart';
 import '../../../modules/production/station_pages/models/production_station_profile_field.dart';
 import '../../catalog_evidence_runtime/utils/operator_evidence_ux_standard.dart';
 import '../export/first_piece_approval_pdf_actions.dart';
+import '../export/final_control_record_pdf_actions.dart';
 import '../export/in_process_quality_check_record_pdf_actions.dart';
 import '../models/profile_driven_evidence_session.dart';
 import '../services/profile_driven_evidence_callable_service.dart';
@@ -32,6 +33,7 @@ class _ProfileDrivenEvidenceDetailScreenState
   final _service = ProfileDrivenEvidenceCallableService();
   final _firstPiecePdfActions = FirstPieceApprovalPdfActions();
   final _inProcessPdfActions = InProcessQualityCheckRecordPdfActions();
+  final _finalControlPdfActions = FinalControlRecordPdfActions();
 
   bool _loading = true;
   bool _pdfBusy = false;
@@ -136,6 +138,13 @@ class _ProfileDrivenEvidenceDetailScreenState
         s.status.trim().toLowerCase() == 'closed';
   }
 
+  bool get _canExportFinalControlRecordPdf {
+    final s = _session;
+    if (s == null) return false;
+    return s.processProfileType == 'final_control' &&
+        s.status.trim().toLowerCase() == 'closed';
+  }
+
   Future<void> _runEvidencePdf(
     Future<void> Function() action,
   ) async {
@@ -233,6 +242,9 @@ class _ProfileDrivenEvidenceDetailScreenState
     }
     if (session.isInProcessQualityCheck) {
       return _buildInProcessQualityBody(session);
+    }
+    if (session.isFinalControl) {
+      return _buildFinalControlBody(session);
     }
     return _buildFlatProfileBody(session);
   }
@@ -458,6 +470,259 @@ class _ProfileDrivenEvidenceDetailScreenState
           ],
         ),
         const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _buildFinalControlBody(ProfileDrivenEvidenceSessionDetail session) {
+    final station =
+        (session.stationDisplayName ?? '').trim().isNotEmpty
+            ? session.stationDisplayName!
+            : (session.stationSlot != null
+                  ? 'Stanica ${session.stationSlot}'
+                  : '—');
+    final s = session.summaryFields;
+    final lines = session.controlledItems;
+    final unit = (s.unit ?? '').trim();
+    final catalogVer = session.catalogVersion;
+    final productCtx = _resolveFinalControlProductContext(session);
+    final orderCode = (s.productionOrderCode ??
+            session.fieldValues['productionOrderCode'] ??
+            '')
+        .toString()
+        .trim();
+    final dispositionRaw =
+        (session.fieldValues['finalDisposition'] ?? '').toString().trim();
+    final dispositionLabel = switch (dispositionRaw) {
+      'approved' => 'Odobreno',
+      'recheck_required' => 'Potrebna ponovna kontrola',
+      'rework_required' => 'Potrebna dorada',
+      'blocked' => 'Blokirano / nije odobreno za dalje',
+      _ => dispositionRaw.isEmpty ? '—' : dispositionRaw,
+    };
+    final bannerText = switch (dispositionRaw) {
+      'approved' => 'ODOBRENO / FINALNA KONTROLA ZADOVOLJAVA',
+      'recheck_required' => 'POTREBNA PONOVNA KONTROLA',
+      'rework_required' => 'POTREBNA DORADA',
+      'blocked' => 'BLOKIRANO / NIJE ODOBRENO ZA DALJE',
+      _ => null,
+    };
+    final bannerColor = switch (dispositionRaw) {
+      'approved' => Colors.green.shade800,
+      'recheck_required' => Colors.orange.shade800,
+      'rework_required' => Colors.deepOrange.shade800,
+      'blocked' => Colors.red.shade800,
+      _ => Theme.of(context).colorScheme.primary,
+    };
+
+    return ListView(
+      children: [
+        if (bannerText != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: Material(
+              color: bannerColor,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                child: Text(
+                  bannerText,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        _sectionCard(
+          title: 'Osnovni podaci',
+          children: [
+            _kvRow('Profil', session.profileDisplayName),
+            _kvRow('Evidencija', station),
+            _kvRow('Pogon', _plantDisplayLabel(session)),
+            _kvRow(
+              'Status',
+              session.status == 'closed' ? 'Završeno' : session.status,
+            ),
+            _kvRow('Početak', formatEvidenceDateTime(session.startedAt)),
+            _kvRow('Završetak', formatEvidenceDateTime(session.endedAt)),
+            if (catalogVer != null)
+              _kvRow('Verzija kataloga profila', '$catalogVer'),
+          ],
+        ),
+        _sectionCard(
+          title: 'Proizvodni kontekst',
+          children: [
+            _kvRow(
+              'Proizvodni nalog',
+              orderCode.isEmpty ? '—' : orderCode,
+            ),
+            _kvRow('Proizvod', productCtx.displayName),
+            _kvRow('Šifra proizvoda', productCtx.code),
+            _kvRow('Naziv proizvoda', productCtx.name),
+          ],
+        ),
+        _sectionCard(
+          title: 'Kontrola',
+          children: [
+            _kvRow(
+              'Kontrolor',
+              (s.operatorSummary ??
+                      session.fieldValues['controllerNameSnapshot'] ??
+                      '')
+                  .toString()
+                  .trim()
+                  .isEmpty
+                  ? '—'
+                  : (s.operatorSummary ??
+                          session.fieldValues['controllerNameSnapshot'])
+                      .toString()
+                      .trim(),
+            ),
+            _kvRow('Finalna dispozicija', dispositionLabel),
+            ..._operatorFieldsForDisplay.map((field) {
+              if (field.key == 'controllerEmployeeId' ||
+                  field.key == 'productionOrderId' ||
+                  field.key == 'productId' ||
+                  field.key == 'finalDisposition') {
+                return const SizedBox.shrink();
+              }
+              return _kvRow(
+                _displayLabel(field),
+                _displayValueForField(field),
+              );
+            }),
+          ],
+        ),
+        _sectionCard(
+          title: 'Kontrolisane količine',
+          children: [
+            _kvRow(
+              'Ukupno kontrolisano',
+              _formatQtyWithUnit(s.quantity, unit),
+            ),
+            _kvRow(
+              'Ukupno OK',
+              _formatQtyWithUnit(s.okTotalQty, unit),
+            ),
+            _kvRow(
+              'Ukupno škart',
+              _formatQtyWithUnit(s.scrapTotalQty, unit),
+            ),
+            _kvRow(
+              'Ukupno dorada',
+              _formatQtyWithUnit(s.reworkAgainTotalQty, unit),
+            ),
+            if (unit.isNotEmpty) _kvRow('Jedinica', unit),
+            if (lines.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text('Nema kontrolisanih komada.'),
+              ),
+          ],
+        ),
+        if (lines.isNotEmpty)
+          _sectionCard(
+            title: 'Kontrolisani komadi',
+            children: [
+              for (var i = 0; i < lines.length; i++) ...[
+                if (i > 0) const Divider(height: 20),
+                _buildControlledItemTile(index: i + 1, row: lines[i]),
+              ],
+            ],
+          ),
+        _sectionCard(
+          title: 'Operator audit',
+          children: [
+            _kvRow(
+              'Operater',
+              (session.operatorDisplayName ?? session.operatorEmail ?? '—')
+                  .trim(),
+            ),
+            _kvRow(
+              'E-mail operatera',
+              (session.operatorEmail ?? '—').trim(),
+            ),
+            _kvRow(
+              'Sesiju otvorio',
+              (session.createdByDisplayName ?? session.createdByEmail ?? '—')
+                  .trim(),
+            ),
+            _kvRow(
+              'E-mail (otvaranje)',
+              (session.createdByEmail ?? '—').trim(),
+            ),
+            _kvRow('Kreirano', formatEvidenceDateTime(session.createdAt)),
+          ],
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  ({String displayName, String code, String name}) _resolveFinalControlProductContext(
+    ProfileDrivenEvidenceSessionDetail session,
+  ) {
+    final s = session.summaryFields;
+    var name = (s.productName ??
+            session.fieldValues['productNameSnapshot'] ??
+            '')
+        .toString()
+        .trim();
+    var code = (s.productCode ?? session.fieldValues['productCode'] ?? '')
+        .toString()
+        .trim();
+    for (final row in session.controlledItems) {
+      if (name.isEmpty) {
+        name = (row['productNameSnapshot'] ?? '').toString().trim();
+      }
+      if (code.isEmpty) {
+        code = (row['productCode'] ?? '').toString().trim();
+      }
+      if (name.isNotEmpty && code.isNotEmpty) break;
+    }
+    final display = name.isNotEmpty
+        ? name
+        : (code.isNotEmpty ? code : '—');
+    return (
+      displayName: display,
+      code: code.isEmpty ? '—' : code,
+      name: name.isEmpty ? '—' : name,
+    );
+  }
+
+  Widget _buildControlledItemTile({
+    required int index,
+    required Map<String, dynamic> row,
+  }) {
+    final name = (row['productNameSnapshot'] ?? '').toString().trim();
+    final code = (row['productCode'] ?? '').toString().trim();
+    final title = name.isNotEmpty
+        ? name
+        : (code.isNotEmpty ? code : 'Stavka $index');
+    final unit = (row['unit'] ?? '').toString().trim();
+    num? n(dynamic v) {
+      if (v is num) return v;
+      return num.tryParse('$v');
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('$index. $title', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        if (code.isNotEmpty) _kvRow('Šifra', code),
+        _kvRow('Kontrolisano', _formatQtyWithUnit(n(row['inspectedQty']), unit)),
+        _kvRow('OK', _formatQtyWithUnit(n(row['goodQty']), unit)),
+        _kvRow('Škart', _formatQtyWithUnit(n(row['scrapQty']), unit)),
+        _kvRow('Dorada', _formatQtyWithUnit(n(row['reworkQty']), unit)),
+        if ((row['defectReason'] ?? '').toString().trim().isNotEmpty)
+          _kvRow('Razlog greške', row['defectReason'].toString().trim()),
+        if ((row['comment'] ?? '').toString().trim().isNotEmpty)
+          _kvRow('Napomena', row['comment'].toString().trim()),
       ],
     );
   }
@@ -1022,6 +1287,78 @@ class _ProfileDrivenEvidenceDetailScreenState
                     break;
                   case 'share':
                     action = () => _inProcessPdfActions.share(
+                          companyId: _companyId,
+                          sessionId: widget.sessionId,
+                          companyData: widget.companyData,
+                          plantDisplayName: _plantLabelForPdf,
+                          session: _session,
+                        );
+                    break;
+                }
+                if (action != null) _runEvidencePdf(action);
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'preview',
+                  child: Text('Pregled PDF'),
+                ),
+                PopupMenuItem(
+                  value: 'download',
+                  child: Text('Preuzmi PDF'),
+                ),
+                PopupMenuItem(
+                  value: 'print',
+                  child: Text('Print PDF'),
+                ),
+                PopupMenuItem(
+                  value: 'share',
+                  child: Text('Pošalji PDF'),
+                ),
+              ],
+              icon: _pdfBusy
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.picture_as_pdf_outlined),
+            ),
+          if (_canExportFinalControlRecordPdf)
+            PopupMenuButton<String>(
+              tooltip: 'PDF evidencijskog zapisnika finalne kontrole',
+              enabled: !_loading && !_pdfBusy,
+              onSelected: (value) {
+                Future<void> Function()? action;
+                switch (value) {
+                  case 'preview':
+                    action = () => _finalControlPdfActions.preview(
+                          companyId: _companyId,
+                          sessionId: widget.sessionId,
+                          companyData: widget.companyData,
+                          plantDisplayName: _plantLabelForPdf,
+                          session: _session,
+                        );
+                    break;
+                  case 'download':
+                    action = () => _finalControlPdfActions.downloadOrShare(
+                          companyId: _companyId,
+                          sessionId: widget.sessionId,
+                          companyData: widget.companyData,
+                          plantDisplayName: _plantLabelForPdf,
+                          session: _session,
+                        );
+                    break;
+                  case 'print':
+                    action = () => _finalControlPdfActions.print(
+                          companyId: _companyId,
+                          sessionId: widget.sessionId,
+                          companyData: widget.companyData,
+                          plantDisplayName: _plantLabelForPdf,
+                          session: _session,
+                        );
+                    break;
+                  case 'share':
+                    action = () => _finalControlPdfActions.share(
                           companyId: _companyId,
                           sessionId: widget.sessionId,
                           companyData: widget.companyData,

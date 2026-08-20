@@ -42,6 +42,7 @@ class ProductionStationConfig {
     'packaging_control',
     'first_piece_approval',
     'in_process_quality_check',
+    'final_control',
   ];
 
   static bool isCatalogEvidenceRuntimeProfile(String profileKey) =>
@@ -455,7 +456,7 @@ class ProductionStationConfig {
       case 'rework_and_painting':
         return 'Dorade i lakiranje';
       case 'final_control':
-        return 'Završna kontrola';
+        return 'Finalna kontrola';
       case 'process_log':
         return 'Procesna evidencija';
       case 'production_counting':
@@ -487,7 +488,7 @@ class ProductionStationConfig {
       case 'kontrola':
         return 'Kontrola';
       case 'zavrsna_kontrola':
-        return 'Završna kontrola';
+        return 'Finalna kontrola';
       case 'etiketiranje':
         return 'Etiketiranje';
       case 'zavrsna_obrada':

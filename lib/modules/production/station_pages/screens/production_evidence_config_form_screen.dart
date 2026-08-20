@@ -183,7 +183,8 @@ class _ProductionEvidenceConfigFormScreenState
             ? ProductionStationConfig.controlledInputScopeWorkBath
             : null,
         controlledFormDocumentCode:
-            _profileKey.trim() == 'in_process_quality_check'
+            (_profileKey.trim() == 'in_process_quality_check' ||
+                    _profileKey.trim() == 'final_control')
                 ? _controlledFormCodeCtrl.text.trim()
                 : null,
       );
@@ -220,7 +221,8 @@ class _ProductionEvidenceConfigFormScreenState
           ? ProductionStationConfig.controlledInputScopeWorkBath
           : null,
       controlledFormDocumentCode:
-          _profileKey.trim() == 'in_process_quality_check'
+          (_profileKey.trim() == 'in_process_quality_check' ||
+                  _profileKey.trim() == 'final_control')
               ? _controlledFormCodeCtrl.text.trim()
               : null,
     );
@@ -510,7 +512,8 @@ class _ProductionEvidenceConfigFormScreenState
                     labelText: 'Redoslijed prikaza',
                   ),
                 ),
-                if (_profileKey.trim() == 'in_process_quality_check') ...[
+                if (_profileKey.trim() == 'in_process_quality_check' ||
+                    _profileKey.trim() == 'final_control') ...[
                   const SizedBox(height: 12),
                   const Divider(height: 24),
                   Text(

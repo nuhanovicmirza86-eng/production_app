@@ -133,6 +133,9 @@ class _CatalogEvidenceStationScreenState
   bool get _isInProcessQualityCheck =>
       _effectiveProfile.profileKey.trim() == 'in_process_quality_check';
 
+  bool get _isFinalControl =>
+      _effectiveProfile.profileKey.trim() == 'final_control';
+
   bool get _autoInspectorFromSession =>
       _isFirstPieceApproval || _isInProcessQualityCheck;
 
@@ -488,6 +491,63 @@ class _CatalogEvidenceStationScreenState
     _stripNonOperatorEditableFieldValues();
   }
 
+  /// M1-I5-B — nalog → proizvod u zaglavlju (bez tipkanja šifre).
+  void _applyFinalControlHeaderFromOrderSelection({
+    bool forceFromOrder = false,
+  }) {
+    if (!_isFinalControl) return;
+
+    _state.fieldValues.remove('productionOrderCode');
+    _state.fieldValues.remove('productCode');
+    _state.fieldValues.remove('productNameSnapshot');
+    _state.fieldValues.remove('controllerNameSnapshot');
+
+    final order = _headerEntitySelections['productionOrderId'];
+    if (order == null) {
+      _lastFirstPieceOrderIdApplied = null;
+      _stripNonOperatorEditableFieldValues();
+      return;
+    }
+    final orderId = order.entityId.trim();
+    final orderChanged = orderId != (_lastFirstPieceOrderIdApplied ?? '');
+    final shouldApply = forceFromOrder || orderChanged;
+    final raw = order.raw;
+
+    final productId = (raw['productId'] ?? '').toString().trim();
+    final productCode = (raw['productCode'] ?? '').toString().trim();
+    final productName = (raw['productName'] ??
+            raw['displayName'] ??
+            '')
+        .toString()
+        .trim();
+    final existingProduct =
+        (_headerEntitySelections['productId']?.entityId ?? '').trim();
+    if (productId.isNotEmpty && (shouldApply || existingProduct.isEmpty)) {
+      final labelParts = <String>[
+        if (productCode.isNotEmpty) productCode,
+        if (productName.isNotEmpty) productName,
+      ];
+      _state.fieldValues['productId'] = productId;
+      _headerEntitySelections['productId'] = StructuredEntitySelection(
+        fieldKey: 'productId',
+        entityId: productId,
+        displayLabel:
+            labelParts.isEmpty ? productId : labelParts.join(' — '),
+        raw: {
+          'id': productId,
+          'productCode': productCode,
+          'productName': productName,
+          'displayName': productName,
+        },
+      );
+    }
+
+    if (shouldApply) {
+      _lastFirstPieceOrderIdApplied = orderId;
+    }
+    _stripNonOperatorEditableFieldValues();
+  }
+
   /// Zaglavlje: samo kanonski ID-jevi u fieldValues (M1-I2-F6).
   /// productCode / productNameSnapshot / productionOrderCode = backend snapshot.
   void _applyPackagingHeaderSnapshotsFromSelections() {
@@ -779,7 +839,7 @@ class _CatalogEvidenceStationScreenState
   }
 
   String get _runtimeTitle {
-    if (_isInProcessQualityCheck) {
+    if (_isInProcessQualityCheck || _isFinalControl) {
       final profileTitle = _effectiveProfile.runtimeScreenTitle.trim();
       if (profileTitle.isNotEmpty) return profileTitle;
     }
@@ -789,7 +849,7 @@ class _CatalogEvidenceStationScreenState
   }
 
   String get _formHeadingTitle {
-    if (_isInProcessQualityCheck) {
+    if (_isInProcessQualityCheck || _isFinalControl) {
       final t = _effectiveProfile.runtimeScreenTitle.trim();
       if (t.isNotEmpty) return t;
     }
@@ -1159,6 +1219,7 @@ class _CatalogEvidenceStationScreenState
         _applyPackagingHeaderSnapshotsFromSelections();
         _applyFirstPieceHeaderFromOrderSelection(forceFromOrder: true);
         _applyInProcessHeaderFromOrderSelection(forceFromOrder: true);
+        _applyFinalControlHeaderFromOrderSelection(forceFromOrder: true);
         _syncHeaderControllersFromState();
       });
       final filled = <String>[
@@ -1343,6 +1404,9 @@ class _CatalogEvidenceStationScreenState
                   ),
                 );
               }
+              if (_isFinalControl) {
+                _applyFinalControlHeaderFromOrderSelection();
+              }
               setState(() {});
             },
             onScanResolved: _applyScanResult,
@@ -1391,7 +1455,9 @@ class _CatalogEvidenceStationScreenState
                   searchService: _searchService,
                   enabled: formEnabled,
                   headerProductSelection:
-                      (_isPackagingControl || _isInProcessQualityCheck)
+                      (_isPackagingControl ||
+                              _isInProcessQualityCheck ||
+                              _isFinalControl)
                           ? _headerEntitySelections['productId']
                           : null,
                   onRowsChanged: (rows) {

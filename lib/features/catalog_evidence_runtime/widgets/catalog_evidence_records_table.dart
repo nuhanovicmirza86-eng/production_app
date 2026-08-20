@@ -541,6 +541,13 @@ List<CatalogEvidenceTableColumn> catalogEvidenceTableColumnsForProfile(
         _textColumn(id: 'inspection_outcome', label: 'Ishod'),
       ];
       break;
+    case 'final_control':
+      businessColumns = [
+        _textColumn(id: 'order', label: 'Nalog'),
+        _textColumn(id: 'product', label: 'Proizvod', size: CatalogEvidenceColumnSize.wide),
+        _textColumn(id: 'disposition', label: 'Dispozicija'),
+      ];
+      break;
     default:
       businessColumns = const [];
   }
@@ -712,7 +719,9 @@ String _cellText(
     case 'disposition':
       final key = profile.profileKey.trim() == 'packaging_control'
           ? 'packagingDisposition'
-          : 'firstPieceDisposition';
+          : profile.profileKey.trim() == 'final_control'
+              ? 'finalDisposition'
+              : 'firstPieceDisposition';
       return _fieldDisplayValue(profile, key, values[key]);
     case 'work_location':
       final loc = (values['workLocationNameSnapshot'] ?? '').toString().trim();
