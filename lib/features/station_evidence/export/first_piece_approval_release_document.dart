@@ -39,6 +39,10 @@ class FirstPieceApprovalReleaseDocument {
     this.operatorDisplayName,
     this.operatorEmail,
     this.catalogVersion,
+    this.qmsControlledFormDocumentCode,
+    this.qmsControlledFormRevision,
+    this.qmsControlledFormStatus,
+    this.qmsControlledFormTitle,
   });
 
   final String documentTitle;
@@ -79,6 +83,11 @@ class FirstPieceApprovalReleaseDocument {
   final String? operatorDisplayName;
   final String? operatorEmail;
   final int? catalogVersion;
+  /// M1-I5-C6 — QMS oznaka obrasca (iz fieldValues sesije).
+  final String? qmsControlledFormDocumentCode;
+  final String? qmsControlledFormRevision;
+  final String? qmsControlledFormStatus;
+  final String? qmsControlledFormTitle;
 
   factory FirstPieceApprovalReleaseDocument.fromMap(Map<String, dynamic> m) {
     DateTime? ts(dynamic v) {
@@ -166,6 +175,10 @@ class FirstPieceApprovalReleaseDocument {
       operatorDisplayName: opt('operatorDisplayName'),
       operatorEmail: opt('operatorEmail'),
       catalogVersion: (m['catalogVersion'] as num?)?.toInt(),
+      qmsControlledFormDocumentCode: opt('qmsControlledFormDocumentCode'),
+      qmsControlledFormRevision: opt('qmsControlledFormRevision'),
+      qmsControlledFormStatus: opt('qmsControlledFormStatus'),
+      qmsControlledFormTitle: opt('qmsControlledFormTitle'),
     );
   }
 }

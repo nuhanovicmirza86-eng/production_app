@@ -81,18 +81,6 @@ void main() {
       'Evidencijski zapisnik — Procesna kontrola kvaliteta',
     );
     expect(
-      InProcessQualityCheckRecordPdf.documentSubtitle.toLowerCase(),
-      'zapisnik procesne kontrole kvaliteta tokom proizvodnje.',
-    );
-    expect(
-      InProcessQualityCheckRecordPdf.documentSubtitle.toLowerCase(),
-      isNot(contains('fai')),
-    );
-    expect(
-      InProcessQualityCheckRecordPdf.documentSubtitle.toLowerCase(),
-      isNot(contains('release')),
-    );
-    expect(
       InProcessQualityCheckRecordPdf.unlinkedControlledFormMessage,
       'Obrazac nije povezan / nije odobren',
     );

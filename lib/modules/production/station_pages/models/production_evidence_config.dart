@@ -67,9 +67,19 @@ class ProductionEvidenceConfig {
   bool get supportsControlledInput =>
       ProductionStationConfig.supportsControlledInputProfile(profileKey);
 
+  /// M1-I5-C5 — PDF evidencije: admin unosi samo oznaku obrasca.
+  static const List<String> controlledFormDocumentCodeProfileKeys = [
+    'first_piece_approval',
+    'packaging_control',
+    'in_process_quality_check',
+    'final_control',
+  ];
+
   bool get supportsControlledFormDocumentCode =>
-      profileKey.trim() == 'in_process_quality_check' ||
-      profileKey.trim() == 'final_control';
+      controlledFormDocumentCodeProfileKeys.contains(profileKey.trim());
+
+  static bool profileSupportsControlledFormDocumentCode(String profileKey) =>
+      controlledFormDocumentCodeProfileKeys.contains(profileKey.trim());
 
   bool get isArchived => archivedAt != null;
 

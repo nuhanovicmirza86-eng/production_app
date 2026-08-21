@@ -11,18 +11,16 @@ import '../../../modules/commercial/orders/export/pdf_company_header.dart';
 import '../../../modules/commercial/orders/services/company_print_identity_service.dart';
 import '../../catalog_evidence_runtime/utils/operator_evidence_ux_standard.dart';
 import '../models/profile_driven_evidence_session.dart';
+import 'evidence_pdf_qms_document_marking.dart';
 
-/// M1-I5-B — evidencijski zapisnik Finalne kontrole s disposition bannerom.
+/// M1-I5-B / M1-I5-C6 — Finalna kontrola (QMS oznaka, bez opisnog podnaslova).
 class FinalControlRecordPdf {
   FinalControlRecordPdf._();
 
   static const documentTitle = 'Evidencijski zapisnik — Finalna kontrola';
 
-  static const documentSubtitle =
-      'Zapisnik finalne kontrole kvaliteta prije skladištenja ili isporuke.';
-
   static const unlinkedControlledFormMessage =
-      'Obrazac nije povezan / nije odobren';
+      EvidencePdfQmsDocumentMarking.unlinkedMessage;
 
   /// Banner tekst po finalnoj dispoziciji (M1-I5-B).
   static String dispositionBanner(String? rawDisposition) {
@@ -114,17 +112,8 @@ class FinalControlRecordPdf {
         (code.isNotEmpty || title.isNotEmpty);
 
     if (!linked) {
-      return [
-        sectionTitle('Kontrola dokumenta'),
-        pw.Text(
-          unlinkedControlledFormMessage,
-          style: pw.TextStyle(
-            font: fontBold,
-            fontSize: 8.5,
-            color: PdfColors.grey800,
-          ),
-        ),
-      ];
+      // Poruka već ispod naslova (EvidencePdfQmsDocumentMarking.underTitle).
+      return const [];
     }
 
     final rev = fv['qmsControlledFormRevision'];
@@ -423,14 +412,11 @@ class FinalControlRecordPdf {
               documentTitle,
               style: pw.TextStyle(font: fontBold, fontSize: 13),
             ),
-            pw.SizedBox(height: 2),
-            pw.Text(
-              documentSubtitle,
-              style: pw.TextStyle(
-                font: fontRegular,
-                fontSize: 7.5,
-                color: PdfColors.grey700,
-              ),
+            ...EvidencePdfQmsDocumentMarking.underTitle(
+              fieldValues: fv,
+              fontRegular: fontRegular,
+              fontBold: fontBold,
+              fontSize: 8,
             ),
             pw.SizedBox(height: 6),
             ..._documentControlBlock(

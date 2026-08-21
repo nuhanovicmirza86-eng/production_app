@@ -10,9 +10,10 @@ import '../../../core/pdf/operonix_industrial_letterhead_pdf.dart';
 import '../../../core/pdf/operonix_pdf_footer.dart';
 import '../../../modules/commercial/orders/export/pdf_company_header.dart';
 import '../../../modules/commercial/orders/services/company_print_identity_service.dart';
+import 'evidence_pdf_qms_document_marking.dart';
 import 'first_piece_approval_release_document.dart';
 
-/// M1-I3-G — IATF-friendly PDF „Odobrenje prvog komada“.
+/// M1-I3-G / M1-I5-C6 — PDF „Odobrenje prvog komada“ (QMS oznaka, bez FAI podnaslova).
 class FirstPieceApprovalPdf {
   FirstPieceApprovalPdf._();
 
@@ -170,14 +171,17 @@ class FirstPieceApprovalPdf {
               document.documentTitle,
               style: pw.TextStyle(font: fontBold, fontSize: 16),
             ),
-            pw.SizedBox(height: 4),
-            pw.Text(
-              'Dokument za puštanje u proizvodnju (first piece / FAI)',
-              style: pw.TextStyle(
-                font: fontRegular,
-                fontSize: 9,
-                color: PdfColors.grey700,
-              ),
+            ...EvidencePdfQmsDocumentMarking.underTitle(
+              fieldValues: {
+                'qmsControlledFormDocumentCode':
+                    document.qmsControlledFormDocumentCode,
+                'qmsControlledFormRevision':
+                    document.qmsControlledFormRevision,
+                'qmsControlledFormStatus': document.qmsControlledFormStatus,
+                'qmsControlledFormTitle': document.qmsControlledFormTitle,
+              },
+              fontRegular: fontRegular,
+              fontBold: fontBold,
             ),
             pw.SizedBox(height: 12),
             pw.Container(
