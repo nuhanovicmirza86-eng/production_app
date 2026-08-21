@@ -14,9 +14,29 @@ class StructuredEntitySearchResult {
 
   factory StructuredEntitySearchResult.fromMap(Map<String, dynamic> data) {
     final id = (data['id'] ?? data['uid'] ?? '').toString().trim();
+    final orderCode = (data['productionOrderCode'] ??
+            data['orderCode'] ??
+            '')
+        .toString()
+        .trim();
+    // Production order search/scan: label = samo broj naloga.
+    if (orderCode.isNotEmpty ||
+        (data['type']?.toString().trim() == 'production_order')) {
+      final raw = Map<String, dynamic>.from(data);
+      if (orderCode.isNotEmpty) {
+        raw['orderCode'] = orderCode;
+        raw['productionOrderCode'] = orderCode;
+      }
+      final productLabel = productDisplayLabel(raw);
+      return StructuredEntitySearchResult(
+        id: id,
+        displayLabel: productionOrderDisplayLabel(raw),
+        secondaryLabel: productLabel == '—' ? null : productLabel,
+        raw: raw,
+      );
+    }
     final code = (data['productCode'] ??
             data['materialCode'] ??
-            data['orderCode'] ??
             data['chemicalCode'] ??
             data['employeeCode'] ??
             data['machineCode'] ??
@@ -49,7 +69,46 @@ class StructuredEntitySearchResult {
     if (code.isNotEmpty && name.isNotEmpty) return '$code — $name';
     if (code.isNotEmpty) return code;
     if (name.isNotEmpty) return name;
-    return fallback;
+    // M1-I5-C7A — nikad ne pokazuj sirovi Firestore ID u UI.
+    if (fallback.isNotEmpty && !_looksLikeInternalDocId(fallback)) {
+      return fallback;
+    }
+    return '—';
+  }
+
+  /// Tipičan auto-ID (bez poslovne šifre s `-` / `_` / razmakom).
+  static bool _looksLikeInternalDocId(String value) {
+    final t = value.trim();
+    if (t.length < 16 || t.length > 32) return false;
+    if (t.contains('-') || t.contains('_') || t.contains(' ')) return false;
+    return RegExp(r'^[A-Za-z0-9]+$').hasMatch(t);
+  }
+
+  /// Poslovna oznaka proizvodnog naloga (ne document id).
+  static String productionOrderDisplayLabel(Map<String, dynamic> raw) {
+    final code = (raw['productionOrderCode'] ??
+            raw['orderCode'] ??
+            raw['displayCode'] ??
+            raw['code'] ??
+            '')
+        .toString()
+        .trim();
+    if (code.isNotEmpty && !_looksLikeInternalDocId(code)) return code;
+    return '—';
+  }
+
+  /// Poslovna oznaka proizvoda: šifra — naziv.
+  static String productDisplayLabel(Map<String, dynamic> raw) {
+    final code = (raw['productCode'] ?? raw['displayCode'] ?? '')
+        .toString()
+        .trim();
+    final name = (raw['productName'] ??
+            raw['productNameSnapshot'] ??
+            raw['displayName'] ??
+            '')
+        .toString()
+        .trim();
+    return _composeLabel(code: code, name: name, fallback: '');
   }
 }
 
@@ -136,10 +195,9 @@ class StructuredScanResolveResult {
     } else if (type == 'production_order') {
       raw['orderCode'] = code;
       raw['productionOrderCode'] = code;
-      final pName = (productName ?? name).trim();
+      final pName = (productName ?? '').trim();
       if (pName.isNotEmpty) {
         raw['productName'] = pName;
-        raw['displayName'] = pName;
       }
       final pid = (productId ?? '').trim();
       final pCode = (productCode ?? '').trim();
@@ -154,6 +212,17 @@ class StructuredScanResolveResult {
       final lot = (inputMaterialLot ?? '').trim();
       if (lot.isNotEmpty) raw['inputMaterialLot'] = lot;
       if (plannedQty != null) raw['plannedQty'] = plannedQty;
+      // Nalog polje = samo poslovni broj; proizvod ide u zasebno polje.
+      return StructuredEntitySearchResult(
+        id: id,
+        displayLabel: StructuredEntitySearchResult.productionOrderDisplayLabel(
+          raw,
+        ),
+        secondaryLabel: pName.isEmpty
+            ? null
+            : StructuredEntitySearchResult.productDisplayLabel(raw),
+        raw: raw,
+      );
     }
     return StructuredEntitySearchResult(
       id: id,
@@ -194,6 +263,39 @@ class StructuredScanResolveResult {
       inputMaterialLot: opt('inputMaterialLot'),
       plannedQty: numOpt('plannedQty'),
       message: opt('message'),
+    );
+  }
+
+  /// M1-I5-C7A — izbor iz autocomplete pretrage → isti payload kao QR sken.
+  factory StructuredScanResolveResult.fromOrderSearchResult(
+    StructuredEntitySearchResult item,
+  ) {
+    final raw = item.raw;
+    String? opt(String key) {
+      final t = (raw[key] ?? '').toString().trim();
+      return t.isEmpty ? null : t;
+    }
+
+    final code = (raw['productionOrderCode'] ??
+            raw['orderCode'] ??
+            item.displayLabel)
+        .toString()
+        .trim();
+    return StructuredScanResolveResult(
+      type: 'production_order',
+      resolvedId: item.id,
+      displayCode: code.isEmpty ? null : code,
+      displayName: opt('productName'),
+      productId: opt('productId'),
+      productCode: opt('productCode'),
+      productName: opt('productName'),
+      machineId: opt('machineId'),
+      machineName: opt('machineName'),
+      machineCode: opt('machineCode'),
+      inputMaterialLot: opt('inputMaterialLot'),
+      plannedQty: raw['plannedQty'] is num
+          ? (raw['plannedQty'] as num).toDouble()
+          : null,
     );
   }
 }

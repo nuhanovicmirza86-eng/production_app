@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../models/structured_entity_search_result.dart';
 import '../services/production_evidence_entity_search_service.dart';
+import 'evidence_payload_scan_screen.dart';
+import 'evidence_production_order_search_dialog.dart';
 
-/// Ručni scan fallback — validacija kroz `resolveProductionEvidenceScan`.
+/// M1-I5-C7 / C7A — skener (kamera) + pretraga naloga (autocomplete).
 class StructuredScanButton extends StatelessWidget {
   const StructuredScanButton({
     super.key,
@@ -20,111 +22,122 @@ class StructuredScanButton extends StatelessWidget {
   final ValueChanged<StructuredScanResolveResult> onResolved;
   final bool enabled;
 
-  Future<void> _openScanDialog(BuildContext context) async {
-    final controller = TextEditingController();
-    var busy = false;
-    String? errorText;
+  Future<void> _resolvePayload(
+    BuildContext context,
+    String payload, {
+    required bool treatAsOrderLookup,
+  }) async {
+    final trimmed = payload.trim();
+    if (trimmed.isEmpty) return;
 
-    await showDialog<void>(
+    showDialog<void>(
       context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setLocalState) {
-            Future<void> submit() async {
-              final payload = controller.text.trim();
-              if (payload.isEmpty) {
-                setLocalState(() => errorText = 'Unesite skenirani kod.');
-                return;
-              }
-              setLocalState(() {
-                busy = true;
-                errorText = null;
-              });
-              try {
-                final result = await searchService.resolveProductionEvidenceScan(
-                  companyId: companyId,
-                  scanPayload: payload,
-                );
-                if (!context.mounted) return;
-                if (!result.isKnown) {
-                  setLocalState(() {
-                    busy = false;
-                    errorText = result.message ??
-                        'Skenirani kod nije pronađen u bazi.';
-                  });
-                  return;
-                }
-                Navigator.pop(context);
-                onResolved(result);
-              } catch (e) {
-                if (!context.mounted) return;
-                setLocalState(() {
-                  busy = false;
-                  errorText = productionEvidenceEntitySearchErrorMessage(e);
-                });
-              }
-            }
-
-            return AlertDialog(
-              title: const Text('Skeniraj'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Unesite ili skenirajte barkod / QR kod. Vrijednost se validira na serveru.',
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: controller,
-                    autofocus: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Skenirani kod',
-                      border: OutlineInputBorder(),
-                    ),
-                    onSubmitted: busy ? null : (_) => submit(),
-                  ),
-                  if (errorText != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      errorText!,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: busy ? null : () => Navigator.pop(context),
-                  child: const Text('Odustani'),
-                ),
-                FilledButton(
-                  onPressed: busy ? null : submit,
-                  child: busy
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Validiraj'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      barrierDismissible: false,
+      builder: (ctx) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        ),
+      ),
     );
-    controller.dispose();
+
+    try {
+      final result = await searchService.resolveProductionEvidenceScan(
+        companyId: companyId,
+        scanPayload: trimmed,
+      );
+      if (!context.mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+
+      if (!result.isKnown) {
+        final msg = treatAsOrderLookup ||
+                (result.message ?? '').toLowerCase().contains('nalog')
+            ? EvidenceOrderScanUx.orderNotFoundMessage
+            : (result.message?.trim().isNotEmpty == true
+                ? result.message!.trim()
+                : EvidenceOrderScanUx.orderNotFoundMessage);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg)),
+        );
+        return;
+      }
+
+      if (treatAsOrderLookup && result.type != 'production_order') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(EvidenceOrderScanUx.orderNotFoundMessage),
+          ),
+        );
+        return;
+      }
+
+      onResolved(result);
+    } catch (e) {
+      if (!context.mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(productionEvidenceEntitySearchErrorMessage(e)),
+        ),
+      );
+    }
+  }
+
+  Future<void> _openCameraScan(BuildContext context) async {
+    if (!EvidenceOrderScanUx.useDeviceCamera) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(EvidenceOrderScanUx.scannerUnavailableMessage),
+        ),
+      );
+      await _openOrderSearch(context);
+      return;
+    }
+
+    final raw = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => const EvidencePayloadScanScreen(),
+      ),
+    );
+    if (!context.mounted || raw == null || raw.trim().isEmpty) return;
+    await _resolvePayload(context, raw, treatAsOrderLookup: false);
+  }
+
+  Future<void> _openOrderSearch(BuildContext context) async {
+    final result = await showEvidenceProductionOrderSearchDialog(
+      context: context,
+      companyId: companyId,
+      plantKey: plantKey,
+      searchService: searchService,
+    );
+    if (!context.mounted || result == null) return;
+    onResolved(result);
   }
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: enabled ? () => _openScanDialog(context) : null,
-      icon: const Icon(Icons.qr_code_scanner),
-      label: const Text('Skeniraj'),
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        FilledButton.tonalIcon(
+          onPressed: enabled ? () => _openCameraScan(context) : null,
+          icon: const Icon(Icons.qr_code_scanner),
+          label: const Text(EvidenceOrderScanUx.scanButtonLabel),
+        ),
+        OutlinedButton.icon(
+          onPressed: enabled ? () => _openOrderSearch(context) : null,
+          icon: const Icon(Icons.edit_note_outlined),
+          label: const Text(EvidenceOrderScanUx.manualOrderButtonLabel),
+        ),
+      ],
     );
   }
 }

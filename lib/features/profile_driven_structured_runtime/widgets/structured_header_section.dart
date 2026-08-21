@@ -95,6 +95,13 @@ class StructuredHeaderSection extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 4),
+            Text(
+              'Proizvodni nalog: skenirajte QR / barkod ili unesite broj naloga ručno.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: 12),
             ..._fields.map((field) {
               return Padding(

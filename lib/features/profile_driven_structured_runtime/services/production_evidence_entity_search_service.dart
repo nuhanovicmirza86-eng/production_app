@@ -3,15 +3,24 @@ import 'package:cloud_functions/cloud_functions.dart';
 import '../models/structured_entity_search_result.dart';
 
 String productionEvidenceEntitySearchErrorMessage(Object error) {
+  String raw;
   if (error is FirebaseFunctionsException) {
     final msg = (error.message ?? '').trim();
-    if (msg.isNotEmpty) return msg;
-    return error.code;
+    raw = msg.isNotEmpty ? msg : error.code;
+  } else {
+    raw = error
+        .toString()
+        .replaceFirst('Exception: ', '')
+        .replaceFirst('[firebase_functions/', '');
   }
-  return error
-      .toString()
-      .replaceFirst('Exception: ', '')
-      .replaceFirst('[firebase_functions/', '');
+  final lower = raw.toLowerCase();
+  // Tehničke plantKey poruke ne idu u UI.
+  if (lower.contains('plantkey') ||
+      lower.contains('assignedplantkey') ||
+      lower.contains('ne šalje iz klijenta')) {
+    return 'Pretraga trenutno nije dostupna. Pokušajte ponovo.';
+  }
+  return raw;
 }
 
 /// M1-D2 entity search + scan Callables za structured evidenciju.
@@ -78,6 +87,7 @@ class ProductionEvidenceEntitySearchCallableService {
     required String query,
     int limit = 20,
   }) async {
+    // Ne slati plantKey — backend rejectClientPlantKeyInRequest (M1-I5-C7A).
     final res = await _functions
         .httpsCallable('searchProductionOrders')
         .call<Map<String, dynamic>>({

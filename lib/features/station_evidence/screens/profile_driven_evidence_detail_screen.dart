@@ -367,7 +367,7 @@ class _ProfileDrivenEvidenceDetailScreenState
           title: 'Kontrola',
           children: [
             _kvRow(
-              'Kontrolor kvaliteta',
+              'Operater kvaliteta',
               (s.operatorSummary ??
                       session.fieldValues['inspectorNameSnapshot'] ??
                       '')
@@ -569,7 +569,7 @@ class _ProfileDrivenEvidenceDetailScreenState
           title: 'Kontrola',
           children: [
             _kvRow(
-              'Kontrolor',
+              'Operater kvaliteta',
               (s.operatorSummary ??
                       session.fieldValues['controllerNameSnapshot'] ??
                       '')
@@ -857,7 +857,7 @@ class _ProfileDrivenEvidenceDetailScreenState
           title: 'Kontrola pakovanja',
           children: [
             _kvRow(
-              'Procesni kontrolor',
+              'Operater kvaliteta',
               controllerName.isEmpty ? '—' : controllerName,
             ),
             _kvRow(

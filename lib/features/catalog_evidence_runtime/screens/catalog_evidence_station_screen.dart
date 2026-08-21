@@ -311,7 +311,7 @@ class _CatalogEvidenceStationScreenState
     _headerEntitySelections['controllerEmployeeId'] = StructuredEntitySelection(
       fieldKey: 'controllerEmployeeId',
       entityId: uid,
-      displayLabel: name.isNotEmpty ? name : 'Procesni kontrolor',
+      displayLabel: name.isNotEmpty ? name : 'Operater kvaliteta',
     );
   }
 
@@ -327,7 +327,7 @@ class _CatalogEvidenceStationScreenState
     _headerEntitySelections['inspectorEmployeeId'] = StructuredEntitySelection(
       fieldKey: 'inspectorEmployeeId',
       entityId: uid,
-      displayLabel: name.isNotEmpty ? name : 'Kontrolor kvaliteta',
+      displayLabel: name.isNotEmpty ? name : 'Operater kvaliteta',
     );
   }
 
@@ -390,21 +390,18 @@ class _CatalogEvidenceStationScreenState
     final existingProduct =
         (_headerEntitySelections['productId']?.entityId ?? '').trim();
     if (productId.isNotEmpty && (shouldApply || existingProduct.isEmpty)) {
-      final labelParts = <String>[
-        if (productCode.isNotEmpty) productCode,
-        if (productName.isNotEmpty) productName,
-      ];
+      final productRaw = {
+        'id': productId,
+        'productCode': productCode,
+        'productName': productName,
+        'displayName': productName,
+      };
       _headerEntitySelections['productId'] = StructuredEntitySelection(
         fieldKey: 'productId',
         entityId: productId,
         displayLabel:
-            labelParts.isEmpty ? productId : labelParts.join(' — '),
-        raw: {
-          'id': productId,
-          'productCode': productCode,
-          'productName': productName,
-          'displayName': productName,
-        },
+            StructuredEntitySearchResult.productDisplayLabel(productRaw),
+        raw: productRaw,
       );
     }
 
@@ -523,22 +520,19 @@ class _CatalogEvidenceStationScreenState
     final existingProduct =
         (_headerEntitySelections['productId']?.entityId ?? '').trim();
     if (productId.isNotEmpty && (shouldApply || existingProduct.isEmpty)) {
-      final labelParts = <String>[
-        if (productCode.isNotEmpty) productCode,
-        if (productName.isNotEmpty) productName,
-      ];
+      final productRaw = {
+        'id': productId,
+        'productCode': productCode,
+        'productName': productName,
+        'displayName': productName,
+      };
       _state.fieldValues['productId'] = productId;
       _headerEntitySelections['productId'] = StructuredEntitySelection(
         fieldKey: 'productId',
         entityId: productId,
         displayLabel:
-            labelParts.isEmpty ? productId : labelParts.join(' — '),
-        raw: {
-          'id': productId,
-          'productCode': productCode,
-          'productName': productName,
-          'displayName': productName,
-        },
+            StructuredEntitySearchResult.productDisplayLabel(productRaw),
+        raw: productRaw,
       );
     }
 
@@ -570,21 +564,18 @@ class _CatalogEvidenceStationScreenState
           .trim();
       if (productId.isNotEmpty) {
         _state.fieldValues['productId'] = productId;
-        final labelParts = <String>[
-          if (productCode.isNotEmpty) productCode,
-          if (productName.isNotEmpty) productName,
-        ];
+        final productRaw = {
+          'id': productId,
+          'productCode': productCode,
+          'productName': productName,
+          'displayName': productName,
+        };
         _headerEntitySelections['productId'] = StructuredEntitySelection(
           fieldKey: 'productId',
           entityId: productId,
           displayLabel:
-              labelParts.isEmpty ? productId : labelParts.join(' — '),
-          raw: {
-            'id': productId,
-            'productCode': productCode,
-            'productName': productName,
-            'displayName': productName,
-          },
+              StructuredEntitySearchResult.productDisplayLabel(productRaw),
+          raw: productRaw,
         );
       }
     }
@@ -629,22 +620,19 @@ class _CatalogEvidenceStationScreenState
     final existingProduct =
         (_state.fieldValues['productId'] ?? '').toString().trim();
     if (productId.isNotEmpty && (shouldApply || existingProduct.isEmpty)) {
-      final labelParts = <String>[
-        if (productCode.isNotEmpty) productCode,
-        if (productName.isNotEmpty) productName,
-      ];
+      final productRaw = {
+        'id': productId,
+        'productCode': productCode,
+        'productName': productName,
+        'displayName': productName,
+      };
       _state.fieldValues['productId'] = productId;
       _headerEntitySelections['productId'] = StructuredEntitySelection(
         fieldKey: 'productId',
         entityId: productId,
         displayLabel:
-            labelParts.isEmpty ? productId : labelParts.join(' — '),
-        raw: {
-          'id': productId,
-          'productCode': productCode,
-          'productName': productName,
-          'displayName': productName,
-        },
+            StructuredEntitySearchResult.productDisplayLabel(productRaw),
+        raw: productRaw,
       );
     }
 
@@ -719,22 +707,52 @@ class _CatalogEvidenceStationScreenState
           continue;
         }
         final id = raw.toString().trim();
+        final existing = _headerEntitySelections[field.key];
+        final existingRaw = (existing != null && existing.entityId == id)
+            ? existing.raw
+            : const <String, dynamic>{};
         var label = id;
         if (field.key == 'productId') {
-          final code = (_state.fieldValues['productCode'] ?? '').toString().trim();
-          final name =
-              (_state.fieldValues['productNameSnapshot'] ?? '').toString().trim();
-          if (code.isNotEmpty && name.isNotEmpty) {
-            label = '$code — $name';
-          } else if (code.isNotEmpty) {
-            label = code;
-          } else if (name.isNotEmpty) {
-            label = name;
+          final code = (_state.fieldValues['productCode'] ??
+                  existingRaw['productCode'] ??
+                  '')
+              .toString()
+              .trim();
+          final name = (_state.fieldValues['productNameSnapshot'] ??
+                  existingRaw['productName'] ??
+                  existingRaw['displayName'] ??
+                  '')
+              .toString()
+              .trim();
+          label = StructuredEntitySearchResult.productDisplayLabel({
+            'productCode': code,
+            'productName': name,
+          });
+          if (label == '—' &&
+              existing != null &&
+              existing.entityId == id &&
+              existing.displayLabel.trim().isNotEmpty &&
+              existing.displayLabel.trim() != id) {
+            label = existing.displayLabel.trim();
           }
         } else if (field.key == 'productionOrderId') {
-          final code =
-              (_state.fieldValues['productionOrderCode'] ?? '').toString().trim();
-          if (code.isNotEmpty) label = code;
+          final code = (_state.fieldValues['productionOrderCode'] ??
+                  existingRaw['productionOrderCode'] ??
+                  existingRaw['orderCode'] ??
+                  existingRaw['displayCode'] ??
+                  '')
+              .toString()
+              .trim();
+          label = StructuredEntitySearchResult.productionOrderDisplayLabel({
+            'productionOrderCode': code,
+          });
+          if (label == '—' &&
+              existing != null &&
+              existing.entityId == id &&
+              existing.displayLabel.trim().isNotEmpty &&
+              existing.displayLabel.trim() != id) {
+            label = existing.displayLabel.trim();
+          }
         } else if (field.key == 'controllerEmployeeId') {
           final name = (_state.fieldValues['controllerNameSnapshot'] ?? '')
               .toString()
@@ -782,11 +800,34 @@ class _CatalogEvidenceStationScreenState
           } else if (code.isNotEmpty) {
             label = code;
           }
+        } else if (existing != null &&
+            existing.entityId == id &&
+            existing.displayLabel.trim().isNotEmpty &&
+            existing.displayLabel.trim() != id) {
+          label = existing.displayLabel.trim();
+        }
+        // M1-I5-C7A — ne ostavljaj Firestore ID kao prikaz.
+        if (label == id &&
+            StructuredEntitySearchResult.productionOrderDisplayLabel({
+                  'productionOrderCode': id,
+                }) ==
+                '—') {
+          // id looks internal — keep existing business label if any
+          if (existing != null &&
+              existing.displayLabel.trim().isNotEmpty &&
+              existing.displayLabel.trim() != id) {
+            label = existing.displayLabel.trim();
+          } else {
+            label = '—';
+          }
         }
         _headerEntitySelections[field.key] = StructuredEntitySelection(
           fieldKey: field.key,
           entityId: id,
           displayLabel: label,
+          raw: existingRaw.isNotEmpty
+              ? existingRaw
+              : <String, dynamic>{'id': id},
         );
       } else if (field.type == 'enum') {
         _headerEnumSelections[field.key] = raw?.toString();
@@ -1413,7 +1454,7 @@ class _CatalogEvidenceStationScreenState
             const SizedBox(height: 8),
             InputDecorator(
               decoration: const InputDecoration(
-                labelText: 'Procesni kontrolor',
+                labelText: 'Operater kvaliteta',
                 border: OutlineInputBorder(),
               ),
               child: Text(
@@ -1424,13 +1465,30 @@ class _CatalogEvidenceStationScreenState
               ),
             ),
           ],
-          if (_isFirstPieceApproval || _isInProcessQualityCheck) ...[
+          if (_isFirstPieceApproval) ...[
             const SizedBox(height: 8),
             InputDecorator(
               decoration: const InputDecoration(
-                labelText: 'Kontrolor kvaliteta',
+                labelText: 'Operater kvaliteta',
                 border: OutlineInputBorder(),
                 helperText: 'Automatski iz prijave — ne bira se ručno.',
+              ),
+              child: Text(
+                _processControllerDisplayName.trim().isEmpty
+                    ? '—'
+                    : _processControllerDisplayName.trim(),
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ),
+          ],
+          if (_isInProcessQualityCheck) ...[
+            const SizedBox(height: 8),
+            InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Operater kvaliteta',
+                border: OutlineInputBorder(),
+                helperText:
+                    'Osoba iz kontrole kvaliteta koja vrši procesnu kontrolu.',
               ),
               child: Text(
                 _processControllerDisplayName.trim().isEmpty
