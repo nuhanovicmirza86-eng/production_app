@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/company_plant_display_name.dart';
 import '../../../modules/production/station_pages/models/production_station_profile_field.dart';
+import '../../../modules/quality/screens/ncr_detail_screen.dart';
 import '../../catalog_evidence_runtime/utils/operator_evidence_ux_standard.dart';
 import '../export/first_piece_approval_pdf_actions.dart';
 import '../export/final_control_record_pdf_actions.dart';
@@ -233,6 +234,77 @@ class _ProfileDrivenEvidenceDetailScreenState
     );
   }
 
+  Widget _buildOutcomeActionCard(ProfileDrivenEvidenceSessionDetail session) {
+    if (!session.hasOutcomeNcr) return const SizedBox.shrink();
+    final ncrCode = (session.outcomeNcrCode ?? '').trim();
+    final label = (session.outcomeLabel ?? '').trim();
+    final containment = (session.outcomeContainmentAction ?? '').trim();
+    final holdApplied = session.outcomeHoldApplied;
+    final holdSkip = (session.outcomeHoldSkipReason ?? '').trim();
+
+    return _sectionCard(
+      title: 'Neusaglašenost (NCR)',
+      children: [
+        Row(
+          children: [
+            Chip(
+              label: Text(
+                ncrCode.isEmpty ? 'NCR otvoren' : ncrCode,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              backgroundColor: Colors.orange.shade100,
+            ),
+            if (label.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+            ],
+          ],
+        ),
+        if (containment.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          _kvRow('Containment / zadržavanje', containment),
+        ],
+        if (holdApplied) ...[
+          const SizedBox(height: 4),
+          _kvRow('WMS HOLD', 'Primijenjen'),
+        ] else if (holdSkip.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          _kvRow(
+            'WMS HOLD',
+            holdSkip == 'lot_not_provided'
+                ? 'Nije primijenjen (nema lota na evidenciji)'
+                : 'Nije primijenjen ($holdSkip)',
+          ),
+        ],
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.tonalIcon(
+            onPressed: () {
+              final ncrId = (session.outcomeNcrId ?? '').trim();
+              if (ncrId.isEmpty) return;
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => NcrDetailScreen(
+                    companyData: widget.companyData,
+                    ncrId: ncrId,
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.open_in_new),
+            label: const Text('Otvori NCR u QMS'),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildBody(ProfileDrivenEvidenceSessionDetail session) {
     if (session.isReworkAndPainting) {
       return _buildReworkBody(session);
@@ -297,6 +369,7 @@ class _ProfileDrivenEvidenceDetailScreenState
 
     return ListView(
       children: [
+        _buildOutcomeActionCard(session),
         _sectionCard(
           title: 'Osnovni podaci',
           children: [
@@ -517,6 +590,7 @@ class _ProfileDrivenEvidenceDetailScreenState
 
     return ListView(
       children: [
+        _buildOutcomeActionCard(session),
         if (bannerText != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
@@ -842,6 +916,7 @@ class _ProfileDrivenEvidenceDetailScreenState
 
     return ListView(
       children: [
+        _buildOutcomeActionCard(session),
         _sectionCard(
           title: 'Osnovni podaci',
           children: [
@@ -938,6 +1013,7 @@ class _ProfileDrivenEvidenceDetailScreenState
 
     return ListView(
       children: [
+        _buildOutcomeActionCard(session),
         _sectionCard(
           title: 'Osnovni podaci',
           children: [

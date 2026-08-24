@@ -255,6 +255,14 @@ class ProfileDrivenEvidenceSessionDetail {
     required this.fieldValues,
     required this.summaryFields,
     this.controlledInputWarning,
+    this.outcomeActionRequired = false,
+    this.outcomeNcrId,
+    this.outcomeNcrCode,
+    this.outcomeKey,
+    this.outcomeLabel,
+    this.outcomeContainmentAction,
+    this.outcomeHoldApplied = false,
+    this.outcomeHoldSkipReason,
     this.processedItems = const [],
     this.materialConsumptions = const [],
     this.operatorWorkLogs = const [],
@@ -285,6 +293,15 @@ class ProfileDrivenEvidenceSessionDetail {
   final Map<String, dynamic> fieldValues;
   final ProfileDrivenEvidenceSummaryFields summaryFields;
   final Map<String, dynamic>? controlledInputWarning;
+  /// M1-I6-B3 — NCR most iz negativnog/uslovnog ishoda.
+  final bool outcomeActionRequired;
+  final String? outcomeNcrId;
+  final String? outcomeNcrCode;
+  final String? outcomeKey;
+  final String? outcomeLabel;
+  final String? outcomeContainmentAction;
+  final bool outcomeHoldApplied;
+  final String? outcomeHoldSkipReason;
   final List<Map<String, dynamic>> processedItems;
   final List<Map<String, dynamic>> materialConsumptions;
   final List<Map<String, dynamic>> operatorWorkLogs;
@@ -363,6 +380,14 @@ class ProfileDrivenEvidenceSessionDetail {
             : null,
       ),
       controlledInputWarning: warning,
+      outcomeActionRequired: m['outcomeActionRequired'] == true,
+      outcomeNcrId: _opt(m['outcomeNcrId']),
+      outcomeNcrCode: _opt(m['outcomeNcrCode']),
+      outcomeKey: _opt(m['outcomeKey']),
+      outcomeLabel: _opt(m['outcomeLabel']),
+      outcomeContainmentAction: _opt(m['outcomeContainmentAction']),
+      outcomeHoldApplied: m['outcomeHoldApplied'] == true,
+      outcomeHoldSkipReason: _opt(m['outcomeHoldSkipReason']),
       processedItems: _parseRowList(m['processed_items']),
       materialConsumptions: _parseRowList(m['material_consumptions']),
       operatorWorkLogs: _parseRowList(m['operator_work_logs']),
@@ -371,6 +396,11 @@ class ProfileDrivenEvidenceSessionDetail {
       inspectionLines: _parseRowList(m['inspection_lines']),
       controlledItems: _parseRowList(m['controlled_items']),
     );
+  }
+
+  bool get hasOutcomeNcr {
+    final id = (outcomeNcrId ?? '').trim();
+    return outcomeActionRequired && id.isNotEmpty;
   }
 }
 
