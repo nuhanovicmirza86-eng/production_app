@@ -10,6 +10,7 @@ import 'package:production_app/modules/production/production_orders/screens/prod
 import 'package:production_app/modules/finance_integrations/screens/finance_ai_assistant_screen.dart';
 import 'package:production_app/modules/finance_integrations/screens/finance_controlling_hub_screen.dart';
 import 'package:production_app/modules/quality/screens/quality_hub_screen.dart';
+import 'package:production_app/modules/quality/screens/ncr_detail_screen.dart';
 
 import 'mes_notification_preferences_screen.dart';
 
@@ -118,6 +119,31 @@ class MesInboxScreen extends StatelessWidget {
             builder: (_) => QualityHubScreen(companyData: cd),
           ),
         );
+        break;
+      case 'ncr_detail':
+        var ncrId = _s(data['entityId']);
+        final nex = data['extra'];
+        if (ncrId.isEmpty && nex is Map) {
+          ncrId = _s(nex['ncrId']);
+        }
+        if (ncrId.isNotEmpty) {
+          await Navigator.push<void>(
+            context,
+            MaterialPageRoute<void>(
+              builder: (_) => NcrDetailScreen(
+                companyData: cd,
+                ncrId: ncrId,
+              ),
+            ),
+          );
+        } else {
+          await Navigator.push<void>(
+            context,
+            MaterialPageRoute<void>(
+              builder: (_) => QualityHubScreen(companyData: cd),
+            ),
+          );
+        }
         break;
       case 'ooe_dashboard':
         await Navigator.push<void>(

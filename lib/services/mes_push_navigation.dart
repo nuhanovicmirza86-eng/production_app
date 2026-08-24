@@ -8,6 +8,7 @@ import 'package:production_app/modules/production/ooe/screens/ooe_dashboard_scre
 import 'package:production_app/modules/production/ooe/screens/ooe_shift_summary_screen.dart';
 import 'package:production_app/modules/production/production_orders/screens/production_order_details_screen.dart';
 import 'package:production_app/modules/quality/screens/quality_hub_screen.dart';
+import 'package:production_app/modules/quality/screens/ncr_detail_screen.dart';
 
 import 'mes_navigation_context_service.dart';
 
@@ -86,6 +87,29 @@ class MesPushNavigation {
             builder: (_) => QualityHubScreen(companyData: cd),
           ),
         );
+        break;
+      case 'ncr_detail':
+        final ncrId = (entityType == 'non_conformance' && entityId.isNotEmpty)
+            ? entityId
+            : _ps(data['ncrId']).isNotEmpty
+                ? _ps(data['ncrId'])
+                : entityId;
+        if (ncrId.isNotEmpty) {
+          await nav.push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => NcrDetailScreen(
+                companyData: cd,
+                ncrId: ncrId,
+              ),
+            ),
+          );
+        } else {
+          await nav.push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => QualityHubScreen(companyData: cd),
+            ),
+          );
+        }
         break;
       case 'ooe_dashboard':
         await nav.push<void>(
