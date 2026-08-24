@@ -82,6 +82,7 @@ class FinalControlProfileSessionService {
     required String companyId,
     required String sessionId,
     required StructuredProfileSessionState state,
+    String? containmentAction,
   }) {
     final payload = state.buildUpdatePayload(tableKeys: _tableKeys);
     return _sessionCallables.finishFinalControlProfileSession(
@@ -91,6 +92,7 @@ class FinalControlProfileSessionService {
         payload['fieldValues'] as Map<String, dynamic>? ?? const {},
       ),
       controlledItems: _asMapList(payload['controlledItems']),
+      containmentAction: containmentAction,
     );
   }
 

@@ -85,6 +85,7 @@ class CatalogEvidenceSessionService {
     required String sessionId,
     required ProductionStationProfileCatalogEntry profile,
     required StructuredProfileSessionState state,
+    String? containmentAction,
   }) {
     final payload = buildCatalogEvidenceUpdatePayload(
       profile: profile,
@@ -98,6 +99,7 @@ class CatalogEvidenceSessionService {
       ),
       tablePayload: Map<String, dynamic>.from(payload)
         ..remove('fieldValues'),
+      containmentAction: containmentAction,
     );
   }
 
@@ -105,11 +107,13 @@ class CatalogEvidenceSessionService {
     required String companyId,
     required String sessionId,
     required Map<String, dynamic> fieldValues,
+    String? containmentAction,
   }) {
     return _sessionCallables.finishProductionStationWorkSession(
       companyId: companyId,
       sessionId: sessionId,
       fieldValues: fieldValues,
+      containmentAction: containmentAction,
     );
   }
 

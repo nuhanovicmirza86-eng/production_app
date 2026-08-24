@@ -169,6 +169,7 @@ class ProductionStationWorkSessionCallableService {
     required String companyId,
     required String sessionId,
     Map<String, dynamic>? fieldValues,
+    String? containmentAction,
   }) async {
     final payload = <String, dynamic>{
       'companyId': companyId.trim(),
@@ -176,6 +177,10 @@ class ProductionStationWorkSessionCallableService {
     };
     if (fieldValues != null && fieldValues.isNotEmpty) {
       payload['fieldValues'] = fieldValues;
+    }
+    final containment = containmentAction?.trim() ?? '';
+    if (containment.isNotEmpty) {
+      payload['containmentAction'] = containment;
     }
 
     final res = await _functions
@@ -277,6 +282,7 @@ class ProductionStationWorkSessionCallableService {
     required String sessionId,
     Map<String, dynamic>? fieldValues,
     List<Map<String, dynamic>>? controlledItems,
+    String? containmentAction,
   }) async {
     final payload = <String, dynamic>{
       'companyId': companyId.trim(),
@@ -286,6 +292,10 @@ class ProductionStationWorkSessionCallableService {
       payload['fieldValues'] = fieldValues;
     }
     if (controlledItems != null) payload['controlledItems'] = controlledItems;
+    final containment = containmentAction?.trim() ?? '';
+    if (containment.isNotEmpty) {
+      payload['containmentAction'] = containment;
+    }
 
     final res = await _functions
         .httpsCallable('finishProductionStationWorkSession')
@@ -340,6 +350,7 @@ class ProductionStationWorkSessionCallableService {
     required String sessionId,
     Map<String, dynamic>? fieldValues,
     Map<String, dynamic>? tablePayload,
+    String? containmentAction,
   }) async {
     final payload = <String, dynamic>{
       'companyId': companyId.trim(),
@@ -350,6 +361,10 @@ class ProductionStationWorkSessionCallableService {
     }
     if (tablePayload != null) {
       payload.addAll(tablePayload);
+    }
+    final containment = containmentAction?.trim() ?? '';
+    if (containment.isNotEmpty) {
+      payload['containmentAction'] = containment;
     }
 
     final res = await _functions

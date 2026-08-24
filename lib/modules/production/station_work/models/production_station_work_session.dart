@@ -130,6 +130,10 @@ class ProductionStationWorkSession {
     this.outcomeNcrCode,
     this.outcomeKey,
     this.outcomeLabel,
+    this.outcomeContainmentAction,
+    this.outcomeHoldApplied = false,
+    this.outcomeHoldLotDocId,
+    this.outcomeHoldSkipReason,
     this.updatedAt,
     this.updatedByUid,
     this.updatedByEmail,
@@ -173,6 +177,10 @@ class ProductionStationWorkSession {
   final String? outcomeNcrCode;
   final String? outcomeKey;
   final String? outcomeLabel;
+  final String? outcomeContainmentAction;
+  final bool outcomeHoldApplied;
+  final String? outcomeHoldLotDocId;
+  final String? outcomeHoldSkipReason;
   final DateTime? updatedAt;
   final String? updatedByUid;
   final String? updatedByEmail;
@@ -312,6 +320,19 @@ class ProductionStationWorkSession {
       outcomeLabel: (m['outcomeLabel'] ?? '').toString().trim().isEmpty
           ? null
           : (m['outcomeLabel'] ?? '').toString().trim(),
+      outcomeContainmentAction:
+          (m['outcomeContainmentAction'] ?? '').toString().trim().isEmpty
+          ? null
+          : (m['outcomeContainmentAction'] ?? '').toString().trim(),
+      outcomeHoldApplied: m['outcomeHoldApplied'] == true,
+      outcomeHoldLotDocId:
+          (m['outcomeHoldLotDocId'] ?? '').toString().trim().isEmpty
+          ? null
+          : (m['outcomeHoldLotDocId'] ?? '').toString().trim(),
+      outcomeHoldSkipReason:
+          (m['outcomeHoldSkipReason'] ?? '').toString().trim().isEmpty
+          ? null
+          : (m['outcomeHoldSkipReason'] ?? '').toString().trim(),
       updatedAt: ts(m['updatedAt']),
       updatedByUid: (m['updatedByUid'] ?? '').toString().trim().isEmpty
           ? null

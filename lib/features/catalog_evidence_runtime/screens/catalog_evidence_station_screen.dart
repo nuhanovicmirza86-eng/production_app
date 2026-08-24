@@ -27,6 +27,7 @@ import '../../profile_driven_structured_runtime/widgets/structured_header_sectio
 import '../../profile_driven_structured_runtime/widgets/structured_repeatable_table_section.dart';
 import '../services/catalog_evidence_session_service.dart';
 import '../utils/catalog_evidence_help_texts.dart';
+import '../utils/evidence_outcome_action_helper.dart';
 import '../utils/recent_production_operators_store.dart';
 import '../widgets/catalog_evidence_records_table.dart';
 import '../widgets/catalog_evidence_viewport_split.dart';
@@ -1209,6 +1210,22 @@ class _CatalogEvidenceStationScreenState
     );
     if (ok != true || !mounted) return;
 
+    String? containmentAction;
+    final needsAction = EvidenceOutcomeActionHelper.requiresAction(
+      profileKey: _effectiveProfile.profileKey,
+      fieldValues: Map<String, dynamic>.from(_state.fieldValues),
+    );
+    if (needsAction) {
+      final outcomeLabel = EvidenceOutcomeActionHelper.outcomeLabel(
+        profileKey: _effectiveProfile.profileKey,
+        fieldValues: Map<String, dynamic>.from(_state.fieldValues),
+      );
+      containmentAction = await _promptContainmentAction(
+        outcomeLabel: outcomeLabel,
+      );
+      if (containmentAction == null || !mounted) return;
+    }
+
     await _runBusy(() async {
       final closed = _isStructuredLite
           ? await _catalogService.finishState(
@@ -1216,11 +1233,13 @@ class _CatalogEvidenceStationScreenState
               sessionId: session.id,
               profile: _effectiveProfile,
               state: _state,
+              containmentAction: containmentAction,
             )
           : await _catalogService.finishFlatState(
               companyId: _companyId,
               sessionId: session.id,
               fieldValues: Map<String, dynamic>.from(_state.fieldValues),
+              containmentAction: containmentAction,
             );
       if (!mounted) return;
       setState(() {
@@ -1230,14 +1249,81 @@ class _CatalogEvidenceStationScreenState
       _syncHeaderControllersFromState();
       final ncrCode = (closed.outcomeNcrCode ?? '').trim();
       final outcomeLabel = (closed.outcomeLabel ?? '').trim();
+      final holdNote = closed.outcomeHoldApplied
+          ? ' Lot stavljen na HOLD.'
+          : '';
       final snack = closed.outcomeActionRequired && ncrCode.isNotEmpty
           ? 'Evidencija završena. Otvoren NCR $ncrCode'
-              '${outcomeLabel.isEmpty ? '' : ' ($outcomeLabel)'}.'
+              '${outcomeLabel.isEmpty ? '' : ' ($outcomeLabel)'}.$holdNote'
           : 'Evidencija završena.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(snack)),
       );
     });
+  }
+
+  Future<String?> _promptContainmentAction({String? outcomeLabel}) async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Mjera zadržavanja (containment)'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  outcomeLabel == null || outcomeLabel.isEmpty
+                      ? 'Negativan ili uslovan ishod zahtijeva kratku mjeru: '
+                          'što je odmah uradjeno s komadima, lotom ili nalogom.'
+                      : 'Ishod: $outcomeLabel. Unesi kratku mjeru zadržavanja '
+                          '(što je odmah uradjeno s komadima, lotom ili nalogom).',
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  maxLines: 3,
+                  maxLength: 4000,
+                  decoration: const InputDecoration(
+                    labelText: 'Containment / zadržavanje',
+                    border: OutlineInputBorder(),
+                  ),
+                  autofocus: true,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Odustani'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final text = controller.text.trim();
+                if (text.length < 8) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Unesi najmanje 8 znakova za mjeru zadržavanja.',
+                      ),
+                    ),
+                  );
+                  return;
+                }
+                Navigator.pop(ctx, text);
+              },
+              child: const Text('Nastavi'),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    return result;
   }
 
   void _applyScanResult(StructuredScanResolveResult result) {
