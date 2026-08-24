@@ -349,8 +349,14 @@ class _FinalControlWorkScreenState extends State<FinalControlWorkScreen> {
         _hydratedSessionId = closed.id;
       });
       _syncHeaderControllersFromState();
+      final ncrCode = (closed.outcomeNcrCode ?? '').trim();
+      final outcomeLabel = (closed.outcomeLabel ?? '').trim();
+      final snack = closed.outcomeActionRequired && ncrCode.isNotEmpty
+          ? 'Kontrola završena. Otvoren NCR $ncrCode'
+              '${outcomeLabel.isEmpty ? '' : ' ($outcomeLabel)'}.'
+          : 'Kontrola završena.';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Kontrola završena.')),
+        SnackBar(content: Text(snack)),
       );
     });
   }

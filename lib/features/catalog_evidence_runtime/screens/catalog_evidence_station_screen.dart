@@ -1228,8 +1228,14 @@ class _CatalogEvidenceStationScreenState
         _hydratedSessionId = closed.id;
       });
       _syncHeaderControllersFromState();
+      final ncrCode = (closed.outcomeNcrCode ?? '').trim();
+      final outcomeLabel = (closed.outcomeLabel ?? '').trim();
+      final snack = closed.outcomeActionRequired && ncrCode.isNotEmpty
+          ? 'Evidencija završena. Otvoren NCR $ncrCode'
+              '${outcomeLabel.isEmpty ? '' : ' ($outcomeLabel)'}.'
+          : 'Evidencija završena.';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Evidencija završena.')),
+        SnackBar(content: Text(snack)),
       );
     });
   }

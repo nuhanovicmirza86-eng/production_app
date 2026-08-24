@@ -125,6 +125,11 @@ class ProductionStationWorkSession {
     this.profileSnapshot,
     this.fieldValues,
     this.controlledInputWarning,
+    this.outcomeActionRequired = false,
+    this.outcomeNcrId,
+    this.outcomeNcrCode,
+    this.outcomeKey,
+    this.outcomeLabel,
     this.updatedAt,
     this.updatedByUid,
     this.updatedByEmail,
@@ -162,6 +167,12 @@ class ProductionStationWorkSession {
   final Map<String, dynamic>? profileSnapshot;
   final Map<String, dynamic>? fieldValues;
   final Map<String, dynamic>? controlledInputWarning;
+  /// M1-I6 — negativan/uslovan ishod → NCR most.
+  final bool outcomeActionRequired;
+  final String? outcomeNcrId;
+  final String? outcomeNcrCode;
+  final String? outcomeKey;
+  final String? outcomeLabel;
   final DateTime? updatedAt;
   final String? updatedByUid;
   final String? updatedByEmail;
@@ -288,6 +299,19 @@ class ProductionStationWorkSession {
       profileSnapshot: profileSnapshot,
       fieldValues: fieldValues,
       controlledInputWarning: warningMap(m['controlledInputWarning']),
+      outcomeActionRequired: m['outcomeActionRequired'] == true,
+      outcomeNcrId: (m['outcomeNcrId'] ?? '').toString().trim().isEmpty
+          ? null
+          : (m['outcomeNcrId'] ?? '').toString().trim(),
+      outcomeNcrCode: (m['outcomeNcrCode'] ?? '').toString().trim().isEmpty
+          ? null
+          : (m['outcomeNcrCode'] ?? '').toString().trim(),
+      outcomeKey: (m['outcomeKey'] ?? '').toString().trim().isEmpty
+          ? null
+          : (m['outcomeKey'] ?? '').toString().trim(),
+      outcomeLabel: (m['outcomeLabel'] ?? '').toString().trim().isEmpty
+          ? null
+          : (m['outcomeLabel'] ?? '').toString().trim(),
       updatedAt: ts(m['updatedAt']),
       updatedByUid: (m['updatedByUid'] ?? '').toString().trim().isEmpty
           ? null
