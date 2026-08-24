@@ -91,6 +91,19 @@ abstract final class CatalogEvidenceHelpTexts {
       'nalog, proizvod, mašina ili mjesto rada, kontrolor, kontrolisani komadi, '
       'rezultat i odluka o odobrenju proizvodnje.';
 
+  static const materialPreparationTooltip =
+      'Priprema, izdavanje ili staging materijala prije ili tokom proizvodnje.';
+
+  static const materialPreparationTitle = 'Priprema materijala';
+
+  static const materialPreparationBody =
+      'Priprema materijala koristi se za evidenciju pripreme, provjere i '
+      'izdavanja materijala prije ili tokom proizvodnje. Evidentira se '
+      'proizvodni nalog, proizvod, materijal, lot/šarža, količina, jedinica, '
+      'tip pripreme, vrijeme i operater.\n\n'
+      'Nije isto što Doziranje hemikalija (dodatak u proces/kupku) niti '
+      'Miješanje šarže (batch receptura).';
+
   /// Info ikona za profil — **uvijek** vraća widget (M1-I5-C3).
   ///
   /// Za poznate profile: kurirani BS tekst.
@@ -144,6 +157,12 @@ abstract final class CatalogEvidenceHelpTexts {
           tooltip: firstPieceApprovalTooltip,
           dialogTitle: firstPieceApprovalTitle,
           dialogBody: firstPieceApprovalBody,
+        );
+      case 'material_preparation':
+        return const OoeInfoIcon(
+          tooltip: materialPreparationTooltip,
+          dialogTitle: materialPreparationTitle,
+          dialogBody: materialPreparationBody,
         );
       default:
         return _fallbackInfoIcon(

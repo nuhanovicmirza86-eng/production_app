@@ -43,6 +43,7 @@ class ProductionStationConfig {
     'first_piece_approval',
     'in_process_quality_check',
     'final_control',
+    'material_preparation',
   ];
 
   static bool isCatalogEvidenceRuntimeProfile(String profileKey) =>
@@ -467,6 +468,8 @@ class ProductionStationConfig {
         return 'Odobrenje prvog komada';
       case 'in_process_quality_check':
         return 'Procesna kontrola kvaliteta';
+      case 'material_preparation':
+        return 'Priprema materijala';
       case 'standard_production':
       default:
         return 'Standardna proizvodnja';

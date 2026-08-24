@@ -548,6 +548,17 @@ List<CatalogEvidenceTableColumn> catalogEvidenceTableColumnsForProfile(
         _textColumn(id: 'disposition', label: 'Dispozicija'),
       ];
       break;
+    case 'material_preparation':
+      businessColumns = [
+        _textColumn(id: 'order', label: 'Nalog'),
+        _textColumn(id: 'product', label: 'Proizvod', size: CatalogEvidenceColumnSize.wide),
+        _textColumn(id: 'material', label: 'Materijal', size: CatalogEvidenceColumnSize.wide),
+        _textColumn(id: 'material_lot', label: 'Lot / šarža'),
+        _textColumn(id: 'prep_type', label: 'Tip pripreme'),
+        _numericColumn(id: 'prepared_qty', label: 'Količina'),
+        _textColumn(id: 'unit', label: 'Jed.', size: CatalogEvidenceColumnSize.narrow),
+      ];
+      break;
     default:
       businessColumns = const [];
   }
@@ -706,6 +717,26 @@ String _cellText(
     case 'product_code':
       final code = (values['productCode'] ?? '').toString().trim();
       return code.isEmpty ? '—' : code;
+    case 'material':
+      final matName = (values['materialNameSnapshot'] ?? '').toString().trim();
+      if (matName.isNotEmpty) return matName;
+      final matCode = (values['materialCodeSnapshot'] ?? '').toString().trim();
+      return matCode.isEmpty ? '—' : matCode;
+    case 'material_lot':
+      final lot = (values['materialLot'] ?? '').toString().trim();
+      return lot.isEmpty ? '—' : lot;
+    case 'prep_type':
+      return _fieldDisplayValue(
+        profile,
+        'preparationType',
+        values['preparationType'],
+      );
+    case 'prepared_qty':
+      return _fieldDisplayValue(
+        profile,
+        'preparedQuantity',
+        values['preparedQuantity'],
+      );
     case 'good_qty':
       return _fieldDisplayValue(profile, 'goodQty', values['goodQty']);
     case 'scrap_qty':

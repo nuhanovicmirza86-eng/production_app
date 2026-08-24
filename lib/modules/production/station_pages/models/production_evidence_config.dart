@@ -14,6 +14,7 @@ class ProductionEvidenceConfig {
     'first_piece_approval',
     'in_process_quality_check',
     'final_control',
+    'material_preparation',
   ];
 
   static bool isH3OperatorRuntimeProfile(String profileKey) =>

@@ -88,6 +88,7 @@ class _CatalogEvidenceStationScreenState
   ProductionStationProfileCatalogEntry? _runtimeProfile;
   int _profileCatalogVersion = 0;
   String? _lastFirstPieceOrderIdApplied;
+  String? _lastMaterialPrepOrderIdApplied;
   List<StructuredEntitySearchResult> _recentProductionOperators = const [];
 
   bool get _supportsOsWindowChrome =>
@@ -136,6 +137,9 @@ class _CatalogEvidenceStationScreenState
 
   bool get _isFinalControl =>
       _effectiveProfile.profileKey.trim() == 'final_control';
+
+  bool get _isMaterialPreparation =>
+      _effectiveProfile.profileKey.trim() == 'material_preparation';
 
   bool get _autoInspectorFromSession =>
       _isFirstPieceApproval || _isInProcessQualityCheck;
@@ -489,6 +493,59 @@ class _CatalogEvidenceStationScreenState
     _stripNonOperatorEditableFieldValues();
   }
 
+  /// M1-I7-B — nalog → proizvod u zaglavlju (materijal ostaje zaseban izbor).
+  void _applyMaterialPreparationHeaderFromOrderSelection({
+    bool forceFromOrder = false,
+  }) {
+    if (!_isMaterialPreparation) return;
+
+    _state.fieldValues.remove('productionOrderCode');
+    _state.fieldValues.remove('productCode');
+    _state.fieldValues.remove('productNameSnapshot');
+
+    final order = _headerEntitySelections['productionOrderId'];
+    if (order == null) {
+      _lastMaterialPrepOrderIdApplied = null;
+      _stripNonOperatorEditableFieldValues();
+      return;
+    }
+    final orderId = order.entityId.trim();
+    final orderChanged = orderId != (_lastMaterialPrepOrderIdApplied ?? '');
+    final shouldApply = forceFromOrder || orderChanged;
+    final raw = order.raw;
+
+    final productId = (raw['productId'] ?? '').toString().trim();
+    final productCode = (raw['productCode'] ?? '').toString().trim();
+    final productName = (raw['productName'] ??
+            raw['displayName'] ??
+            '')
+        .toString()
+        .trim();
+    final existingProduct =
+        (_headerEntitySelections['productId']?.entityId ?? '').trim();
+    if (productId.isNotEmpty && (shouldApply || existingProduct.isEmpty)) {
+      final productRaw = {
+        'id': productId,
+        'productCode': productCode,
+        'productName': productName,
+        'displayName': productName,
+      };
+      _state.fieldValues['productId'] = productId;
+      _headerEntitySelections['productId'] = StructuredEntitySelection(
+        fieldKey: 'productId',
+        entityId: productId,
+        displayLabel:
+            StructuredEntitySearchResult.productDisplayLabel(productRaw),
+        raw: productRaw,
+      );
+    }
+
+    if (shouldApply) {
+      _lastMaterialPrepOrderIdApplied = orderId;
+    }
+    _stripNonOperatorEditableFieldValues();
+  }
+
   /// M1-I5-B — nalog → proizvod u zaglavlju (bez tipkanja šifre).
   void _applyFinalControlHeaderFromOrderSelection({
     bool forceFromOrder = false,
@@ -720,6 +777,29 @@ class _CatalogEvidenceStationScreenState
               .toString()
               .trim();
           final name = (_state.fieldValues['productNameSnapshot'] ??
+                  existingRaw['productName'] ??
+                  existingRaw['displayName'] ??
+                  '')
+              .toString()
+              .trim();
+          label = StructuredEntitySearchResult.productDisplayLabel({
+            'productCode': code,
+            'productName': name,
+          });
+          if (label == '—' &&
+              existing != null &&
+              existing.entityId == id &&
+              existing.displayLabel.trim().isNotEmpty &&
+              existing.displayLabel.trim() != id) {
+            label = existing.displayLabel.trim();
+          }
+        } else if (field.key == 'materialId') {
+          final code = (_state.fieldValues['materialCodeSnapshot'] ??
+                  existingRaw['productCode'] ??
+                  '')
+              .toString()
+              .trim();
+          final name = (_state.fieldValues['materialNameSnapshot'] ??
                   existingRaw['productName'] ??
                   existingRaw['displayName'] ??
                   '')
@@ -980,9 +1060,51 @@ class _CatalogEvidenceStationScreenState
       if (inProcessError != null) return inProcessError;
     }
 
+    if (_isMaterialPreparation && forFinish) {
+      final mpError = _validateMaterialPreparationFinish();
+      if (mpError != null) return mpError;
+    }
+
     if (_isStructuredLite && forFinish) {
       final tableError = validateStructuredTables(tables: _tables, state: _state);
       if (tableError != null) return tableError;
+    }
+    return null;
+  }
+
+  /// M1-I7-B — nalog, proizvod (iz naloga), materijal, lot, količina.
+  String? _validateMaterialPreparationFinish() {
+    final orderId = (_headerEntitySelections['productionOrderId']?.entityId ??
+            _state.fieldValues['productionOrderId'] ??
+            '')
+        .toString()
+        .trim();
+    if (orderId.isEmpty) {
+      return 'Odaberite proizvodni nalog prije završavanja evidencije.';
+    }
+    final productId = (_headerEntitySelections['productId']?.entityId ??
+            _state.fieldValues['productId'] ??
+            '')
+        .toString()
+        .trim();
+    if (productId.isEmpty) {
+      return 'Nalog mora imati proizvod (ili odaberite proizvod u formi).';
+    }
+    final materialId = (_headerEntitySelections['materialId']?.entityId ??
+            _state.fieldValues['materialId'] ??
+            '')
+        .toString()
+        .trim();
+    if (materialId.isEmpty) {
+      return 'Odaberite materijal prije završavanja evidencije.';
+    }
+    final lot = (_state.fieldValues['materialLot'] ??
+            _headerTextControllers['materialLot']?.text ??
+            '')
+        .toString()
+        .trim();
+    if (lot.isEmpty) {
+      return 'Unesite lot / šaržu materijala (obavezno za sljedivost).';
     }
     return null;
   }
@@ -1353,6 +1475,7 @@ class _CatalogEvidenceStationScreenState
         _applyFirstPieceHeaderFromOrderSelection(forceFromOrder: true);
         _applyInProcessHeaderFromOrderSelection(forceFromOrder: true);
         _applyFinalControlHeaderFromOrderSelection(forceFromOrder: true);
+        _applyMaterialPreparationHeaderFromOrderSelection(forceFromOrder: true);
         _syncHeaderControllersFromState();
       });
       final filled = <String>[
@@ -1537,6 +1660,9 @@ class _CatalogEvidenceStationScreenState
               }
               if (_isFinalControl) {
                 _applyFinalControlHeaderFromOrderSelection();
+              }
+              if (_isMaterialPreparation) {
+                _applyMaterialPreparationHeaderFromOrderSelection();
               }
               setState(() {});
             },

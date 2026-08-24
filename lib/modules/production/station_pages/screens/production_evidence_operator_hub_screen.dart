@@ -248,6 +248,8 @@ class _ProductionEvidenceOperatorHubScreenState
         return Icons.fact_check_outlined;
       case 'final_control':
         return Icons.verified_user_outlined;
+      case 'material_preparation':
+        return Icons.inventory_outlined;
       default:
         return Icons.assignment_outlined;
     }
