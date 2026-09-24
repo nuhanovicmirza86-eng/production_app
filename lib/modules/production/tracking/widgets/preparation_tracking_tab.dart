@@ -924,6 +924,7 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
     final merged = _mergedColumnLabels();
     final showSys = _mergedShowSystemHeaders();
     final result = await showDialog<_ColumnLabelsEditResult>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => _OperatorTrackingColumnLabelsEditorDialog(
         companyId: _companyId,
@@ -2769,6 +2770,7 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
 
   void _showPrepScreenHelpDialog() {
     showDialog<void>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Kako radi ovaj ekran'),
@@ -2799,6 +2801,7 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
 
   void _showCatalogHelpDialog() {
     showDialog<void>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Šifrarnik'),

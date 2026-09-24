@@ -377,13 +377,9 @@ class _OoeDailyOverviewScreenState extends State<OoeDailyOverviewScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      CompanyPlantLabelText(
+                      CompanyPlantContextLine(
                         companyId: _companyId,
                         plantKey: _plantKey,
-                        prefix: '',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
                       ),
                       const SizedBox(height: 14),
                       SegmentedButton<_DailyScope>(

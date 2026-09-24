@@ -30,7 +30,8 @@ class OoeInfoIcon extends StatelessWidget {
       ),
       onPressed: () {
         showDialog<void>(
-          context: context,
+      barrierDismissible: false,
+      context: context,
           builder: (ctx) => AlertDialog(
             title: Text(dialogTitle),
             content: SingleChildScrollView(

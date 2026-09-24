@@ -19,6 +19,7 @@ class ProductionStationProfileField {
     this.filterListCallable,
     this.populatedBy,
     this.operatorEditable,
+    this.verifierEditable,
     this.scope,
     this.helperText,
     this.entitySearchCallable,
@@ -27,8 +28,11 @@ class ProductionStationProfileField {
     this.enumLabels = const {},
     this.legacyEnumLabels = const {},
     this.scanEnabled = false,
+    this.uiControl,
     this.visibleWhenField,
     this.visibleWhenEquals,
+    this.visibleWhenAnyOfFields = const [],
+    this.signedByLoggedInUser = false,
   });
 
   final String key;
@@ -49,6 +53,8 @@ class ProductionStationProfileField {
   final String? filterListCallable;
   final String? populatedBy;
   final bool? operatorEditable;
+  /// M1-I15-D-HOTFIX-27 — verifikator unosi, operater ne vidi u zaglavlju.
+  final bool? verifierEditable;
   final String? scope;
   final String? helperText;
   final String? entitySearchCallable;
@@ -57,10 +63,16 @@ class ProductionStationProfileField {
   final Map<String, String> enumLabels;
   final Map<String, String> legacyEnumLabels;
   final bool scanEnabled;
+  /// Katalog `uiControl` (npr. chips umjesto dropdowna).
+  final String? uiControl;
   /// Katalog `visibleWhen.field` (npr. workContextType).
   final String? visibleWhenField;
   /// Katalog `visibleWhen.equals`.
   final String? visibleWhenEquals;
+  /// Katalog `visibleWhen.anyOfFields` (npr. 5S checklist Nije u redu).
+  final List<String> visibleWhenAnyOfFields;
+  /// M1-I15-D-HOTFIX-14 — potpis prijavljenog korisnika, nije picker tuđeg imena.
+  final bool signedByLoggedInUser;
 
   bool get isEntitySelect => type == 'entity_select';
 
@@ -70,17 +82,34 @@ class ProductionStationProfileField {
 
   bool get isSessionScope => scope == 'session';
 
+  bool get isVerifierEditable => verifierEditable == true;
+
   bool get isOperatorEditable {
     if (isBackendPopulated) return false;
-    if (operatorEditable == false) return false;
     if (isSessionScope) return false;
+    if (isVerifierEditable) return false;
+    if (operatorEditable == false) return false;
     return true;
   }
 
+  bool get usesChipEnumControl =>
+      (uiControl ?? '').trim().toLowerCase() == 'chips';
+
   bool get hasVisibleWhen {
+    if (visibleWhenAnyOfFields.isNotEmpty) return true;
     final f = (visibleWhenField ?? '').trim();
     final e = (visibleWhenEquals ?? '').trim();
     return f.isNotEmpty && e.isNotEmpty;
+  }
+
+  String _resolvedValueForVisibilityKey(
+    String key, {
+    required Map<String, dynamic> fieldValues,
+    required Map<String, String?> enumSelections,
+  }) {
+    final fromEnum = (enumSelections[key] ?? '').trim();
+    if (fromEnum.isNotEmpty) return fromEnum;
+    return (fieldValues[key] ?? '').toString().trim();
   }
 
   /// Je li polje vidljivo prema trenutnim header vrijednostima.
@@ -89,17 +118,30 @@ class ProductionStationProfileField {
     required Map<String, String?> enumSelections,
   }) {
     if (!hasVisibleWhen) return true;
+    final expected = (visibleWhenEquals ?? '').trim();
+    if (visibleWhenAnyOfFields.isNotEmpty) {
+      return visibleWhenAnyOfFields.any((key) {
+        return _resolvedValueForVisibilityKey(
+              key,
+              fieldValues: fieldValues,
+              enumSelections: enumSelections,
+            ) ==
+            expected;
+      });
+    }
     final key = visibleWhenField!.trim();
-    final expected = visibleWhenEquals!.trim();
-    final fromEnum = (enumSelections[key] ?? '').trim();
-    if (fromEnum.isNotEmpty) return fromEnum == expected;
-    final fromState = (fieldValues[key] ?? '').toString().trim();
-    return fromState == expected;
+    return _resolvedValueForVisibilityKey(
+          key,
+          fieldValues: fieldValues,
+          enumSelections: enumSelections,
+        ) ==
+        expected;
   }
 
   factory ProductionStationProfileField.fromMap(Map<String, dynamic> data) {
     String? visibleWhenField;
     String? visibleWhenEquals;
+    var visibleWhenAnyOfFields = const <String>[];
     final visibleWhenRaw = data['visibleWhen'];
     if (visibleWhenRaw is Map) {
       final f = (visibleWhenRaw['field'] ?? '').toString().trim();
@@ -107,8 +149,12 @@ class ProductionStationProfileField {
       if (f.isNotEmpty && e.isNotEmpty) {
         visibleWhenField = f;
         visibleWhenEquals = e;
+      } else if (e.isNotEmpty) {
+        visibleWhenEquals = e;
       }
+      visibleWhenAnyOfFields = _parseStringList(visibleWhenRaw['anyOfFields']);
     }
+    final uiControl = (data['uiControl'] ?? '').toString().trim();
     return ProductionStationProfileField(
       key: (data['key'] ?? '').toString().trim(),
       label: (data['label'] ?? '').toString().trim(),
@@ -157,6 +203,7 @@ class ProductionStationProfileField {
       operatorEditable: data['operatorEditable'] is bool
           ? data['operatorEditable'] as bool
           : null,
+      verifierEditable: data['verifierEditable'] == true ? true : null,
       scope: (data['scope'] ?? '').toString().trim().isEmpty
           ? null
           : (data['scope'] ?? '').toString().trim(),
@@ -174,8 +221,11 @@ class ProductionStationProfileField {
       enumLabels: _parseEnumLabels(data['enumLabels']),
       legacyEnumLabels: _parseEnumLabels(data['legacyEnumLabels']),
       scanEnabled: data['scanEnabled'] == true,
+      uiControl: uiControl.isEmpty ? null : uiControl,
       visibleWhenField: visibleWhenField,
       visibleWhenEquals: visibleWhenEquals,
+      visibleWhenAnyOfFields: visibleWhenAnyOfFields,
+      signedByLoggedInUser: data['signedByLoggedInUser'] == true,
     );
   }
 
@@ -223,5 +273,47 @@ class ProductionStationProfileField {
       return a.label.compareTo(b.label);
     });
     return list;
+  }
+
+  ProductionStationProfileField copyWith({
+    String? label,
+    String? helperText,
+    int? minSearchChars,
+    String? entitySearchCallable,
+  }) {
+    return ProductionStationProfileField(
+      key: key,
+      label: label ?? this.label,
+      type: type,
+      required: required,
+      maxLength: maxLength,
+      min: min,
+      uiOrder: uiOrder,
+      enumFrom: enumFrom,
+      enumValues: enumValues,
+      entityCollection: entityCollection,
+      entityListCallable: entityListCallable,
+      valueField: valueField,
+      labelField: labelField,
+      filterDependsOn: filterDependsOn,
+      filterMode: filterMode,
+      filterListCallable: filterListCallable,
+      populatedBy: populatedBy,
+      operatorEditable: operatorEditable,
+      verifierEditable: verifierEditable,
+      scope: scope,
+      helperText: helperText ?? this.helperText,
+      entitySearchCallable: entitySearchCallable ?? this.entitySearchCallable,
+      minSearchChars: minSearchChars ?? this.minSearchChars,
+      labelFields: labelFields,
+      enumLabels: enumLabels,
+      legacyEnumLabels: legacyEnumLabels,
+      scanEnabled: scanEnabled,
+      uiControl: uiControl,
+      visibleWhenField: visibleWhenField,
+      visibleWhenEquals: visibleWhenEquals,
+      visibleWhenAnyOfFields: visibleWhenAnyOfFields,
+      signedByLoggedInUser: signedByLoggedInUser,
+    );
   }
 }

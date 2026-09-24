@@ -105,6 +105,7 @@ class _DevelopmentProjectTeamScreenState
 
     if (!mounted) return;
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialog) => AlertDialog(

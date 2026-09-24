@@ -22,14 +22,20 @@ class ProfileDrivenEvidenceCallableService {
 
   final FirebaseFunctions _functions;
 
-  Future<List<ProfileDrivenEvidenceListItem>> listProfileDrivenEvidenceSessions({
+  Future<ProfileDrivenEvidenceListResult> listProfileDrivenEvidenceSessions({
     required String companyId,
     String? plantKey,
     String? processProfileType,
     String? stationConfigId,
+    String? evidenceConfigId,
     String? operatorUid,
     String? dateFrom,
     String? dateTo,
+    /// `all` | `none` | `step`
+    String? operationFilter,
+    int? routingStepOrder,
+    String? routingStepOperationName,
+    String? routingStepOperationCode,
     int limit = 50,
   }) async {
     final payload = <String, dynamic>{
@@ -44,9 +50,16 @@ class ProfileDrivenEvidenceCallableService {
     put('plantKey', plantKey);
     put('processProfileType', processProfileType);
     put('stationConfigId', stationConfigId);
+    put('evidenceConfigId', evidenceConfigId);
     put('operatorUid', operatorUid);
     put('dateFrom', dateFrom);
     put('dateTo', dateTo);
+    put('operationFilter', operationFilter);
+    put('routingStepOperationName', routingStepOperationName);
+    put('routingStepOperationCode', routingStepOperationCode);
+    if (routingStepOrder != null) {
+      payload['routingStepOrder'] = routingStepOrder;
+    }
 
     final res = await _functions
         .httpsCallable('listProfileDrivenEvidenceSessions')
@@ -56,15 +69,28 @@ class ProfileDrivenEvidenceCallableService {
       throw Exception('Učitavanje evidencija nije uspjelo.');
     }
     final rawItems = data['items'];
-    if (rawItems is! List) return const [];
-    return rawItems
-        .whereType<Map>()
-        .map(
-          (e) => ProfileDrivenEvidenceListItem.fromMap(
-            Map<String, dynamic>.from(e),
-          ),
-        )
-        .toList(growable: false);
+    final items = rawItems is! List
+        ? const <ProfileDrivenEvidenceListItem>[]
+        : rawItems
+            .whereType<Map>()
+            .map(
+              (e) => ProfileDrivenEvidenceListItem.fromMap(
+                Map<String, dynamic>.from(e),
+              ),
+            )
+            .toList(growable: false);
+    final rawFacets = data['operationFacets'];
+    final facets = rawFacets is! List
+        ? const <ProfileDrivenEvidenceOperationFacet>[]
+        : rawFacets
+            .whereType<Map>()
+            .map(
+              (e) => ProfileDrivenEvidenceOperationFacet.fromMap(
+                Map<String, dynamic>.from(e),
+              ),
+            )
+            .toList(growable: false);
+    return ProfileDrivenEvidenceListResult(items: items, operationFacets: facets);
   }
 
   Future<ProfileDrivenEvidenceSessionDetail> getProfileDrivenEvidenceSession({
@@ -88,6 +114,44 @@ class ProfileDrivenEvidenceCallableService {
     return ProfileDrivenEvidenceSessionDetail.fromMap(
       Map<String, dynamic>.from(raw),
     );
+  }
+
+  Future<void> recordProductionEvidencePdfGenerated({
+    required String companyId,
+    required String sessionId,
+  }) async {
+    final res = await _functions
+        .httpsCallable('recordProductionEvidencePdfGenerated')
+        .call<Map<String, dynamic>>({
+          'companyId': companyId.trim(),
+          'sessionId': sessionId.trim(),
+        });
+    final data = res.data;
+    if (data['success'] != true) {
+      throw Exception('Zapis generisanja PDF-a nije sačuvan.');
+    }
+  }
+
+  Future<List<ProductionEvidenceAuditItem>> listProductionEvidenceSessionAuditTrail({
+    required String companyId,
+    required String sessionId,
+  }) async {
+    final res = await _functions
+        .httpsCallable('listProductionEvidenceSessionAuditTrail')
+        .call<Map<String, dynamic>>({
+          'companyId': companyId.trim(),
+          'sessionId': sessionId.trim(),
+        });
+    final data = res.data;
+    if (data['success'] != true) {
+      throw Exception('Učitavanje historije evidencije nije uspjelo.');
+    }
+    final rawItems = data['items'];
+    if (rawItems is! List) return const [];
+    return rawItems
+        .whereType<Map>()
+        .map((e) => ProductionEvidenceAuditItem.fromMap(Map<String, dynamic>.from(e)))
+        .toList(growable: false);
   }
 
   /// M1-I3-G — validiran release dokument za PDF odobrenja prvog komada.

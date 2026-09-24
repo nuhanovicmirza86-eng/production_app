@@ -108,6 +108,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     final note = TextEditingController();
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSt) {

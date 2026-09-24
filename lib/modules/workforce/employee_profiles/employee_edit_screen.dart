@@ -5,6 +5,8 @@ import 'package:production_app/core/company_plant_display_name.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../../core/access/production_access_helper.dart';
+import '../../production/ai/models/operonix_ai_entity_chat_binding.dart';
+import '../../production/ai/widgets/operonix_ai_assistant_navigator.dart';
 import '../models/workforce_employee.dart';
 import '../services/workforce_callable_service.dart';
 import 'workforce_employee_badge_pdf.dart';
@@ -298,6 +300,7 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
   }) async {
     if (!mounted) return;
     await showDialog<void>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('QR bedž radnika'),
@@ -459,6 +462,20 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
     ];
   }
 
+  OperonixAiEntityChatBinding? _workerAiChatBinding() {
+    final e = widget.existing;
+    if (e == null) return null;
+    final code = e.catalogCode.trim();
+    if (code.isEmpty) return null;
+    final name = e.displayName.trim();
+    final label = name.isEmpty ? code : '$code · $name';
+    return OperonixAiEntityChatBinding(
+      kind: OperonixAiEntityChatKind.worker,
+      businessKey: code,
+      displayLabel: label,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final e = widget.existing;
@@ -466,6 +483,13 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_isNew ? 'Novi radnik' : 'Uredi radnika'),
+        actions: [
+          if (!_isNew && e != null)
+            OperonixAiAskAssistantAppBarAction(
+              companyData: widget.companyData,
+              entityBinding: _workerAiChatBinding(),
+            ),
+        ],
       ),
       body: Form(
         key: _form,

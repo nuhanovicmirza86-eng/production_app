@@ -118,6 +118,7 @@ class _CarbonActivityLineEditorSheetState
 
   void _sheetHelp(String title, String body) {
     showDialog<void>(
+      barrierDismissible: false,
       context: widget.hostContext,
       builder: (dctx) => AlertDialog(
         title: Text(title),

@@ -53,9 +53,10 @@ class DowntimeAnalyticsPdf {
       theme: pw.ThemeData.withFont(base: fontRegular, bold: fontBold),
     );
 
-    final plantLine = plantDisplayName?.trim().isNotEmpty == true
-        ? plantDisplayName!.trim()
-        : plantKey.trim();
+    final rawDisplay = plantDisplayName?.trim() ?? '';
+    final plantLine = rawDisplay.isNotEmpty && rawDisplay != plantKey.trim()
+        ? rawDisplay
+        : '—';
 
     doc.addPage(
       pw.MultiPage(
@@ -63,12 +64,12 @@ class DowntimeAnalyticsPdf {
         margin: const pw.EdgeInsets.all(40),
         build: (ctx) => [
           pw.Text(
-            'Analitika zastoja',
+            'Analitika zastoja — Pogon: $plantLine',
             style: pw.TextStyle(font: fontBold, fontSize: 16),
           ),
           pw.SizedBox(height: 6),
           pw.Text(
-            'Kompanija: $companyId · Pogon: $plantLine',
+            'Pogon: $plantLine',
             style: pw.TextStyle(font: fontRegular, fontSize: 9),
           ),
           pw.Text(
@@ -258,13 +259,16 @@ class DowntimeAnalyticsPdf {
       oeeBudgetMinutes: oeeBudgetMinutes,
     );
     final dir = await getTemporaryDirectory();
-    final safe = plantKey.trim().isEmpty ? 'plant' : plantKey.trim();
     final path =
-        '${dir.path}/zastoji_analitika_${safe}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+        '${dir.path}/zastoji_analitika_pogon_${DateTime.now().millisecondsSinceEpoch}.pdf';
     await File(path).writeAsBytes(bytes);
     await Share.shareXFiles(
       [XFile(path)],
-      text: 'Analitika zastoja (PDF)',
+      text: plantDisplayName != null &&
+              plantDisplayName!.trim().isNotEmpty &&
+              plantDisplayName!.trim() != plantKey.trim()
+          ? 'Analitika zastoja — Pogon: ${plantDisplayName!.trim()} (PDF)'
+          : 'Analitika zastoja (PDF)',
     );
   }
 }

@@ -616,6 +616,7 @@ class _ProfileDrivenWorkScreenState extends State<ProfileDrivenWorkScreen> {
 
   Future<void> _finishSession(ProductionStationWorkSession session) async {
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Završi evidenciju'),

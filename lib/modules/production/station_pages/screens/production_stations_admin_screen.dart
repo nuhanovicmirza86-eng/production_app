@@ -116,6 +116,7 @@ class _ProductionStationsAdminScreenState
     final productionLimitReached = !_limits.canAddProductionStation();
     final machineLimitReached = !_limits.canAddMachineStation();
     final type = await showDialog<String>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         return AlertDialog(
@@ -374,6 +375,7 @@ class _ProductionStationsAdminScreenState
     final profileOptions = _productionProfileOptions(selectedProfile);
 
     final result = await showDialog<_StationEditorResult>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         return StatefulBuilder(

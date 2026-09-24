@@ -123,6 +123,7 @@ class _ProductionTrackingDevicesScreenState
     final assetCtrl = TextEditingController();
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         return AlertDialog(

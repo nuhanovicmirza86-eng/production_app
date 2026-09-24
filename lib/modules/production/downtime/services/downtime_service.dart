@@ -1,39 +1,70 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 import '../models/downtime_event_model.dart';
 import 'downtime_callable_service.dart';
 
 class DowntimeService {
-  DowntimeService({FirebaseFirestore? firestore, DowntimeCallableService? callables})
-    : _firestore = firestore ?? FirebaseFirestore.instance,
-      _callables = callables ?? DowntimeCallableService();
+  DowntimeService({DowntimeCallableService? callables})
+    : _callables = callables ?? DowntimeCallableService();
 
-  final FirebaseFirestore _firestore;
   final DowntimeCallableService _callables;
 
-  CollectionReference<Map<String, dynamic>> get _col =>
-      _firestore.collection('downtime_events');
-
   static String _s(dynamic v) => (v ?? '').toString().trim();
+
+  /// APP-RBAC-M1-C — lista preko Callable, ne klijentski Firestore.
+  Future<List<DowntimeEventModel>> listDowntimeEvents({
+    required String companyId,
+    required String plantKey,
+    int limit = 400,
+  }) async {
+    final cid = companyId.trim();
+    final pk = plantKey.trim();
+    if (cid.isEmpty || pk.isEmpty) return const [];
+    final page = await _callables.listEvents(
+      companyId: cid,
+      plantKey: pk,
+      limit: limit,
+      descending: true,
+    );
+    return page.items;
+  }
+
+  Future<({List<DowntimeCreateOrderOption> orders, List<DowntimeCreateProcessOption> processes})>
+      listCreateOptions({
+    required String companyId,
+    required String plantKey,
+  }) {
+    return _callables.listCreateOptions(
+      companyId: companyId,
+      plantKey: plantKey,
+    );
+  }
 
   Stream<List<DowntimeEventModel>> watchDowntimeEvents({
     required String companyId,
     required String plantKey,
     int limit = 400,
   }) {
-    final cid = companyId.trim();
-    final pk = plantKey.trim();
-    if (cid.isEmpty || pk.isEmpty) {
-      return Stream.value(const []);
-    }
+    return Stream.fromFuture(
+      listDowntimeEvents(
+        companyId: companyId,
+        plantKey: plantKey,
+        limit: limit,
+      ),
+    );
+  }
 
-    return _col
-        .where('companyId', isEqualTo: cid)
-        .where('plantKey', isEqualTo: pk)
-        .orderBy('startedAt', descending: true)
-        .limit(limit)
-        .snapshots()
-        .map((snap) => snap.docs.map(DowntimeEventModel.fromDoc).toList());
+  Future<DowntimeEventModel?> getById({
+    required String companyId,
+    required String plantKey,
+    required String downtimeId,
+  }) async {
+    final event = await _callables.getEvent(
+      companyId: companyId,
+      downtimeId: downtimeId,
+    );
+    if (event == null) return null;
+    final pk = plantKey.trim();
+    if (pk.isNotEmpty && event.plantKey != pk) return null;
+    return event;
   }
 
   Future<String> createDowntime({
@@ -215,8 +246,8 @@ class DowntimeService {
     required DateTime rangeStartLocal,
     required DateTime rangeEndExclusiveLocal,
     int bufferDaysBeforeRange = 120,
-    int pageSize = 500,
-    int maxPages = 60,
+    int pageSize = 400,
+    int maxPages = 20,
   }) async {
     final cid = companyId.trim();
     final pk = plantKey.trim();
@@ -232,30 +263,22 @@ class DowntimeService {
     if (!to.isAfter(from)) return const [];
 
     final out = <DowntimeEventModel>[];
-    DocumentSnapshot<Map<String, dynamic>>? cursor;
+    String? cursorId;
 
     for (var p = 0; p < maxPages; p++) {
-      Query<Map<String, dynamic>> q = _col
-          .where('companyId', isEqualTo: cid)
-          .where('plantKey', isEqualTo: pk)
-          .where('startedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(from))
-          .where('startedAt', isLessThan: Timestamp.fromDate(to))
-          .orderBy('startedAt')
-          .limit(pageSize);
-
-      final cur = cursor;
-      if (cur != null) {
-        q = q.startAfterDocument(cur);
-      }
-
-      final snap = await q.get();
-      if (snap.docs.isEmpty) break;
-
-      for (final d in snap.docs) {
-        out.add(DowntimeEventModel.fromDoc(d));
-      }
-      cursor = snap.docs.last;
-      if (snap.docs.length < pageSize) break;
+      final page = await _callables.listEvents(
+        companyId: cid,
+        plantKey: pk,
+        limit: pageSize,
+        descending: false,
+        startedAtFrom: from,
+        startedAtTo: to,
+        cursorId: cursorId,
+      );
+      if (page.items.isEmpty) break;
+      out.addAll(page.items);
+      cursorId = page.cursorId;
+      if (cursorId == null || cursorId.isEmpty) break;
     }
 
     return out;

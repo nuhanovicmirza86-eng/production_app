@@ -110,6 +110,7 @@ class _FinancePlannedCashItemDetailScreenState
 
   Future<void> _approve() async {
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(FinanceStrings.t(ctx, 'approve_planned_item')),
@@ -152,6 +153,7 @@ class _FinancePlannedCashItemDetailScreenState
 
   Future<void> _cancel() async {
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(FinanceStrings.t(ctx, 'cancel_planned_item')),

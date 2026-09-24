@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../tracking/services/production_asset_display_lookup.dart';
@@ -55,6 +56,14 @@ class _WorkCenterCreateScreenState extends State<WorkCenterCreateScreen> {
       (widget.companyData['userId'] ?? widget.companyData['uid'] ?? 'system')
           .toString()
           .trim();
+
+  String get _role =>
+      ProductionAccessHelper.normalizeRole(widget.companyData['role']);
+
+  bool get _canManage => ProductionAccessHelper.canManage(
+    role: _role,
+    card: ProductionDashboardCard.workCenters,
+  );
 
   @override
   void initState() {
@@ -166,6 +175,7 @@ class _WorkCenterCreateScreenState extends State<WorkCenterCreateScreen> {
   }
 
   Future<void> _save() async {
+    if (!_canManage) return;
     if (!_formKey.currentState!.validate()) return;
     if (_companyId.isEmpty || _plantKey.isEmpty || _userId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -224,6 +234,20 @@ class _WorkCenterCreateScreenState extends State<WorkCenterCreateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_canManage) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Novi radni centar')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Nemate pravo dodavanja radnih centara za ovu ulogu.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('Novi radni centar'),

@@ -95,6 +95,7 @@ class _ProductionStationPagesAdminScreenState
     if (!mounted) return;
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         return StatefulBuilder(

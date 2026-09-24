@@ -1,17 +1,32 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
+import '../../../../core/errors/app_error_mapper.dart';
 import '../models/work_center_model.dart';
 
 class WorkCenterService {
-  WorkCenterService({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+  WorkCenterService({
+    FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _functions =
+           functions ?? FirebaseFunctions.instanceFor(region: 'europe-west1');
 
   final FirebaseFirestore _firestore;
+  final FirebaseFunctions _functions;
 
   CollectionReference<Map<String, dynamic>> get _col =>
       _firestore.collection('work_centers');
 
   String _s(dynamic v) => (v ?? '').toString().trim();
+
+  Map<String, dynamic> _asStringKeyMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) {
+      return raw.map((k, v) => MapEntry(k.toString(), v));
+    }
+    return const {};
+  }
 
   Future<void> _ensureUniqueCode({
     required String companyId,
@@ -26,22 +41,24 @@ class WorkCenterService {
       throw Exception('Nedostaju companyId, plantKey ili šifra radnog centra.');
     }
 
-    final q = await _col
-        .where('companyId', isEqualTo: cid)
-        .where('plantKey', isEqualTo: pk)
-        .where('workCenterCode', isEqualTo: code)
-        .limit(5)
-        .get();
-
-    for (final doc in q.docs) {
-      if (excludeWorkCenterId != null && doc.id == excludeWorkCenterId) {
+    final existing = await listWorkCentersForPlant(
+      companyId: cid,
+      plantKey: pk,
+      onlyActive: false,
+    );
+    for (final wc in existing) {
+      if (excludeWorkCenterId != null && wc.id == excludeWorkCenterId) {
         continue;
       }
-      throw Exception('Radni centar s ovom šifrom već postoji na ovom pogonu.');
+      if (wc.workCenterCode.trim().toLowerCase() == code.toLowerCase()) {
+        throw Exception(
+          'Radni centar s ovom šifrom već postoji na ovom pogonu.',
+        );
+      }
     }
   }
 
-  /// Jednokratno učitavanje za padajuće izbore (filtrira aktivne lokalno).
+  /// APP-RBAC-M1-C — lista preko Callable, ne klijentski Firestore.
   Future<List<WorkCenter>> listWorkCentersForPlant({
     required String companyId,
     required String plantKey,
@@ -52,47 +69,51 @@ class WorkCenterService {
     final pk = plantKey.trim();
     if (cid.isEmpty || pk.isEmpty) return const [];
 
-    final snap = await _col
-        .where('companyId', isEqualTo: cid)
-        .where('plantKey', isEqualTo: pk)
-        .limit(limit)
-        .get();
-
-    var list = snap.docs.map(WorkCenter.fromDoc).toList();
-    if (onlyActive) {
-      list = list.where((w) => w.active).toList();
+    try {
+      final res = await _functions.httpsCallable('listWorkCenters').call({
+        'companyId': cid,
+        'plantKey': pk,
+      });
+      final data = _asStringKeyMap(res.data);
+      final rawItems = data['items'];
+      final list = <WorkCenter>[];
+      if (rawItems is List) {
+        for (final row in rawItems) {
+          final map = _asStringKeyMap(row);
+          final id = _s(map['id']);
+          if (id.isEmpty) continue;
+          list.add(WorkCenter.fromMap(id, map));
+        }
+      }
+      var out = list;
+      if (onlyActive) {
+        out = out.where((w) => w.active).toList();
+      }
+      if (out.length > limit) {
+        out = out.take(limit).toList();
+      }
+      out.sort(
+        (a, b) => a.workCenterCode.toLowerCase().compareTo(
+          b.workCenterCode.toLowerCase(),
+        ),
+      );
+      return out;
+    } catch (e) {
+      throw Exception(AppErrorMapper.toMessage(e));
     }
-    list.sort(
-      (a, b) => a.workCenterCode.toLowerCase().compareTo(
-        b.workCenterCode.toLowerCase(),
-      ),
-    );
-    return list;
   }
 
   Stream<List<WorkCenter>> watchWorkCenters({
     required String companyId,
     required String plantKey,
   }) {
-    final cid = companyId.trim();
-    final pk = plantKey.trim();
-    if (cid.isEmpty || pk.isEmpty) {
-      return Stream.value(const []);
-    }
-
-    return _col
-        .where('companyId', isEqualTo: cid)
-        .where('plantKey', isEqualTo: pk)
-        .snapshots()
-        .map((snap) {
-          final list = snap.docs.map(WorkCenter.fromDoc).toList();
-          list.sort(
-            (a, b) => a.workCenterCode.toLowerCase().compareTo(
-              b.workCenterCode.toLowerCase(),
-            ),
-          );
-          return list;
-        });
+    return Stream.fromFuture(
+      listWorkCentersForPlant(
+        companyId: companyId,
+        plantKey: plantKey,
+        onlyActive: false,
+      ),
+    );
   }
 
   Future<WorkCenter?> getById({
@@ -103,14 +124,26 @@ class WorkCenterService {
     final id = workCenterId.trim();
     final cid = companyId.trim();
     final pk = plantKey.trim();
-    if (id.isEmpty || cid.isEmpty || pk.isEmpty) return null;
+    if (id.isEmpty || cid.isEmpty) return null;
 
-    final doc = await _col.doc(id).get();
-    if (!doc.exists) return null;
-
-    final wc = WorkCenter.fromDoc(doc);
-    if (wc.companyId != cid || wc.plantKey != pk) return null;
-    return wc;
+    try {
+      final res = await _functions.httpsCallable('getWorkCenter').call({
+        'companyId': cid,
+        'workCenterId': id,
+      });
+      final data = _asStringKeyMap(res.data);
+      final item = _asStringKeyMap(data['item']);
+      final itemId = _s(item['id']);
+      if (itemId.isEmpty) return null;
+      final wc = WorkCenter.fromMap(itemId, item);
+      if (pk.isNotEmpty && wc.plantKey != pk) return null;
+      return wc;
+    } on FirebaseFunctionsException catch (e) {
+      if (e.code == 'not-found') return null;
+      throw Exception(AppErrorMapper.toMessage(e));
+    } catch (e) {
+      throw Exception(AppErrorMapper.toMessage(e));
+    }
   }
 
   Future<String> createWorkCenter({

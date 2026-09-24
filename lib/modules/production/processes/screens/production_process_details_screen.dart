@@ -156,6 +156,7 @@ class _ProductionProcessDetailsScreenState extends State<ProductionProcessDetail
     final p = _process;
     if (p == null || !_canManage || p.isArchived) return;
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Arhivirati proces?'),

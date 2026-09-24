@@ -54,6 +54,34 @@ class UserDisplayLabel {
     _uidCache[uid.trim()] = label;
   }
 
+  /// Ime iz `users` dokumenta: displayName / fullName. Nikad e-mail / UID.
+  static String? businessNameFromUserData(Map<String, dynamic> d) {
+    for (final key in [
+      'displayName',
+      'fullName',
+      'userDisplayName',
+      'nickname',
+    ]) {
+      final v = stripEmbeddedUidFromDisplayName(
+        (d[key] ?? '').toString(),
+      );
+      if (_isUsablePersonName(v)) return v;
+    }
+    final first = (d['firstName'] ?? '').toString().trim();
+    final last = (d['lastName'] ?? '').toString().trim();
+    final combined = '$first $last'.trim();
+    if (_isUsablePersonName(combined)) return combined;
+    return null;
+  }
+
+  static bool _isUsablePersonName(String raw) {
+    final t = raw.trim();
+    if (t.isEmpty || t == '—' || t == '-') return false;
+    if (t.contains('@')) return false;
+    if (looksLikeFirebaseUid(t)) return false;
+    return true;
+  }
+
   /// Resolve stored audit value: emails pass through; UIDs load from `users/{id}`.
   static Future<String> resolveStored(
     FirebaseFirestore firestore,
@@ -76,15 +104,10 @@ class UserDisplayLabel {
         return 'Korisnik';
       }
       final d = doc.data() ?? {};
-      final display = (d['displayName'] ?? '').toString().trim();
-      if (display.isNotEmpty) {
-        _put(t, display);
-        return display;
-      }
-      final email = (d['email'] ?? '').toString().trim();
-      if (email.isNotEmpty) {
-        _put(t, email);
-        return email;
+      final business = businessNameFromUserData(d);
+      if (business != null) {
+        _put(t, business);
+        return business;
       }
     } catch (_) {}
     _put(t, 'Korisnik');

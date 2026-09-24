@@ -46,6 +46,7 @@ class FinancePaymentAllocationDetailScreen extends StatelessWidget {
   Future<void> _cancel(BuildContext context) async {
     final reasonCtrl = TextEditingController();
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(FinanceStrings.t(ctx, 'allocation_cancel')),
@@ -213,7 +214,8 @@ Future<bool> showFinanceCancelAllocationDialog({
 }) async {
   final reasonCtrl = TextEditingController();
   final ok = await showDialog<bool>(
-    context: context,
+      barrierDismissible: false,
+      context: context,
     builder: (ctx) => AlertDialog(
       title: Text(FinanceStrings.t(ctx, 'allocation_cancel')),
       content: SingleChildScrollView(

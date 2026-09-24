@@ -197,7 +197,8 @@ class _PackingBoxReceiptScreenState extends State<PackingBoxReceiptScreen> {
 
       if (!mounted) return;
       await showDialog<void>(
-        context: context,
+      barrierDismissible: false,
+      context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Djelomični uspjeh'),
           content: SingleChildScrollView(

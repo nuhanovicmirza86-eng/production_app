@@ -431,6 +431,7 @@ class _ShiftContextEditorSheetState extends State<_ShiftContextEditorSheet> {
     final e = widget.existing;
     if (e == null) return;
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Ukloni unos?'),

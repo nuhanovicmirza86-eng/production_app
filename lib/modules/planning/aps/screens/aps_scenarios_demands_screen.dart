@@ -305,6 +305,7 @@ class _ApsScenariosDemandsScreenState extends State<ApsScenariosDemandsScreen>
 
   Future<void> _showCreateDemandDialog() async {
     final input = await showDialog<_CreateDemandInput>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => const _CreateDemandDialog(),
     );
@@ -338,6 +339,7 @@ class _ApsScenariosDemandsScreenState extends State<ApsScenariosDemandsScreen>
     }
 
     final input = await showDialog<_CreateScenarioInput>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => _CreateScenarioDialog(profiles: _objectiveProfiles),
     );
@@ -346,6 +348,23 @@ class _ApsScenariosDemandsScreenState extends State<ApsScenariosDemandsScreen>
 
     if (!input.periodEnd.isAfter(input.periodStart)) {
       _showError('Kraj perioda mora biti nakon početka.');
+      return;
+    }
+    final today = DateTime(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
+    final endDay = DateTime(
+      input.periodEnd.year,
+      input.periodEnd.month,
+      input.periodEnd.day,
+    );
+    if (endDay.isBefore(today)) {
+      _showError(
+        'Period planiranja ne smije biti u prošlosti. '
+        'Kraj perioda mora biti danas ili u budućnosti.',
+      );
       return;
     }
 
@@ -410,6 +429,7 @@ class _ApsScenariosDemandsScreenState extends State<ApsScenariosDemandsScreen>
 
     ApsDemandView? picked = available.first;
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
@@ -471,6 +491,7 @@ class _ApsScenariosDemandsScreenState extends State<ApsScenariosDemandsScreen>
     final label = demand?.displayLabel ?? item.demandId;
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Ukloni potražnju'),
@@ -511,6 +532,7 @@ class _ApsScenariosDemandsScreenState extends State<ApsScenariosDemandsScreen>
     }
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Generiši početni raspored'),
@@ -1024,8 +1046,14 @@ class _CreateScenarioDialogState extends State<_CreateScenarioDialog> {
     super.initState();
     _nameCtrl = TextEditingController();
     final now = DateTime.now();
-    _periodStart = DateTime(now.year, now.month, 1);
+    final today = DateTime(now.year, now.month, now.day);
+    // Početak mjeseca — ali ne prije danas (period ne smije završiti u prošlosti).
+    final monthStart = DateTime(now.year, now.month, 1);
+    _periodStart = monthStart.isBefore(today) ? today : monthStart;
     _periodEnd = DateTime(now.year, now.month + 1, 0);
+    if (_periodEnd.isBefore(_periodStart)) {
+      _periodEnd = _periodStart;
+    }
     final kinds = _availableKinds;
     _goalKind = kinds.contains(ApsOptimizationGoalKind.balanced)
         ? ApsOptimizationGoalKind.balanced
@@ -1040,7 +1068,31 @@ class _CreateScenarioDialogState extends State<_CreateScenarioDialog> {
 
   void _submit() {
     if (_nameCtrl.text.trim().isEmpty) return;
-    if (!_periodEnd.isAfter(_periodStart)) return;
+    if (!_periodEnd.isAfter(_periodStart)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kraj perioda mora biti nakon početka.'),
+        ),
+      );
+      return;
+    }
+    final today = DateTime(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
+    final endDay = DateTime(_periodEnd.year, _periodEnd.month, _periodEnd.day);
+    if (endDay.isBefore(today)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Period planiranja ne smije biti u prošlosti. '
+            'Kraj perioda mora biti danas ili u budućnosti.',
+          ),
+        ),
+      );
+      return;
+    }
     final kind = _goalKind;
     if (kind == null) return;
     final profileId = ApsOptimizationGoalCatalog.profileIdForKind(
@@ -1100,13 +1152,27 @@ class _CreateScenarioDialogState extends State<_CreateScenarioDialog> {
               subtitle: Text(_dateFmt.format(_periodStart)),
               trailing: const Icon(Icons.calendar_today_outlined),
               onTap: () async {
+                final today = DateTime(
+                  DateTime.now().year,
+                  DateTime.now().month,
+                  DateTime.now().day,
+                );
                 final picked = await showDatePicker(
                   context: context,
-                  initialDate: _periodStart,
-                  firstDate: DateTime(2020),
+                  initialDate: _periodStart.isBefore(today)
+                      ? today
+                      : _periodStart,
+                  firstDate: today,
                   lastDate: DateTime(2100),
                 );
-                if (picked != null) setState(() => _periodStart = picked);
+                if (picked != null) {
+                  setState(() {
+                    _periodStart = picked;
+                    if (_periodEnd.isBefore(_periodStart)) {
+                      _periodEnd = _periodStart;
+                    }
+                  });
+                }
               },
             ),
             ListTile(
@@ -1115,10 +1181,16 @@ class _CreateScenarioDialogState extends State<_CreateScenarioDialog> {
               subtitle: Text(_dateFmt.format(_periodEnd)),
               trailing: const Icon(Icons.calendar_today_outlined),
               onTap: () async {
+                final today = DateTime(
+                  DateTime.now().year,
+                  DateTime.now().month,
+                  DateTime.now().day,
+                );
+                final first = _periodStart.isBefore(today) ? today : _periodStart;
                 final picked = await showDatePicker(
                   context: context,
-                  initialDate: _periodEnd,
-                  firstDate: _periodStart,
+                  initialDate: _periodEnd.isBefore(first) ? first : _periodEnd,
+                  firstDate: first,
                   lastDate: DateTime(2100),
                 );
                 if (picked != null) setState(() => _periodEnd = picked);

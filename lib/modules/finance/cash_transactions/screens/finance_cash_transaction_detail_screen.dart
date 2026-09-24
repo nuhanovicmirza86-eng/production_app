@@ -156,6 +156,7 @@ class _FinanceCashTransactionDetailScreenState
 
   Future<bool> _confirm(String titleKey, String bodyKey) async {
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(FinanceStrings.t(ctx, titleKey)),

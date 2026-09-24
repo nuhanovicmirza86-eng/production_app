@@ -448,6 +448,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
 
   Future<void> _showImportInfo() async {
     await showDialog<void>(
+      barrierDismissible: false,
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
@@ -750,7 +751,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
 
       if (skippedRows.isNotEmpty) {
         await showDialog<void>(
-          context: context,
+      barrierDismissible: false,
+      context: context,
           builder: (dialogContext) {
             return AlertDialog(
               title: const Text('Rezultat importa'),
@@ -1430,7 +1432,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
             icon: const Icon(Icons.info_outline_rounded),
             onPressed: () {
               showDialog(
-                context: context,
+      barrierDismissible: false,
+      context: context,
                 builder: (_) => AlertDialog(
                   title: const Text('Proizvodi'),
                   content: const Text(

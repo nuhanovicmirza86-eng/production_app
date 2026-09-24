@@ -96,6 +96,7 @@ class _FinanceBankMatchConfirmationDetailScreenState
     if (conf == null || !conf.isActive) return;
 
     final proceed = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(FinanceStrings.t(context, 'bank_match_cancel_confirm_title')),

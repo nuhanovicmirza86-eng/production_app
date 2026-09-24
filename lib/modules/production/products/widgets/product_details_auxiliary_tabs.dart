@@ -6,6 +6,7 @@ import '../../../logistics/inventory/widgets/product_warehouse_stock_section.dar
 import '../../../quality/models/qms_document_kind.dart';
 import '../../../quality/models/qms_list_models.dart';
 import '../../../quality/services/quality_callable_service.dart';
+import '../../../quality/utils/qms_ncr_display_labels.dart';
 import '../services/product_service.dart';
 
 /// Tab „Zaliha“: stanje po magacinima + minimalna / optimalna zaliha (IATF polja na `products`).
@@ -470,7 +471,7 @@ class _ProductDetailsComplaintsTabState extends State<ProductDetailsComplaintsTa
         companyId: cid,
         productId: pid,
         limit: 200,
-        openOnly: false,
+        statusFilter: 'all',
       );
       if (!mounted) return;
       setState(() {
@@ -550,7 +551,10 @@ class _ProductDetailsComplaintsTabState extends State<ProductDetailsComplaintsTa
           return Card(
             child: ListTile(
               title: Text(
-                r.ncrCode.trim().isEmpty ? r.id : r.ncrCode.trim(),
+                QmsNcrDisplayLabels.displayDocumentNumber(
+                  ncrDocumentNo: r.ncrDocumentNo,
+                  ncrCode: r.ncrCode,
+                ),
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               subtitle: Column(

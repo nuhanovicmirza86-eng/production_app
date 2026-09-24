@@ -65,6 +65,7 @@ class DevelopmentIntelligenceGlossary {
   }) {
     final scheme = Theme.of(context).colorScheme;
     return showDialog<void>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(title),

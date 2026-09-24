@@ -20,7 +20,8 @@ class WorkforceScreenHelpIcon extends StatelessWidget {
       tooltip: tooltip ?? 'Objašnjenje ekrana',
       onPressed: () {
         showDialog<void>(
-          context: context,
+      barrierDismissible: false,
+      context: context,
           builder: (ctx) => AlertDialog(
             title: Text(title),
             content: SingleChildScrollView(

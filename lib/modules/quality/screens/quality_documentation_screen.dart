@@ -6,6 +6,9 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/access/production_access_helper.dart';
+import '../../../../core/ui/guarded_data_entry_dialog.dart';
+import '../../../features/station_evidence/widgets/qms_controlled_form_help.dart';
 import '../../production/products/services/product_service.dart';
 import '../models/qms_document_kind.dart';
 import '../models/qms_list_models.dart';
@@ -37,6 +40,12 @@ class _QualityDocumentationScreenState extends State<QualityDocumentationScreen>
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
 
+  String get _role =>
+      ProductionAccessHelper.normalizeRole(widget.companyData['role']);
+
+  bool get _canAddDocuments =>
+      ProductionAccessHelper.canManageQmsDefinitions(_role);
+
   /// Povećaj nakon spremanja dokumenta da se tabovi ponovo učitaju.
   int _reloadSeq = 0;
 
@@ -59,7 +68,7 @@ class _QualityDocumentationScreenState extends State<QualityDocumentationScreen>
     final cid = _companyId;
     if (cid.isEmpty) return;
 
-    final ok = await showDialog<bool>(
+    final ok = await showGuardedDataEntryDialog<bool>(
       context: context,
       builder: (ctx) => _AddQmsDocumentDialog(
         companyId: cid,
@@ -93,6 +102,12 @@ class _QualityDocumentationScreenState extends State<QualityDocumentationScreen>
             title: 'Dokumentacija',
             message: QmsIatfStrings.documentationHub,
           ),
+          if (cid.isNotEmpty && _canAddDocuments)
+            IconButton(
+              onPressed: () => _showAddDialog(_kinds[_tabController.index]),
+              icon: const Icon(Icons.add),
+              tooltip: 'Dodaj dokument',
+            ),
         ],
       ),
       body: cid.isEmpty
@@ -116,11 +131,6 @@ class _QualityDocumentationScreenState extends State<QualityDocumentationScreen>
                   ),
               ],
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddDialog(_kinds[_tabController.index]),
-        icon: const Icon(Icons.add),
-        label: const Text('Dodaj dokument'),
-      ),
     );
   }
 
@@ -142,6 +152,20 @@ class _QualityDocumentationScreenState extends State<QualityDocumentationScreen>
     if (iso == null || iso.isEmpty) return '—';
     if (iso.length >= 10) return iso.substring(0, 10);
     return iso;
+  }
+
+  /// QMS-M1 — datum odobrenja dd.MM.yyyy HH:mm
+  static String _formatApprovedAt(String? iso) {
+    if (iso == null || iso.trim().isEmpty) return '—';
+    final dt = DateTime.tryParse(iso.trim());
+    if (dt == null) {
+      if (iso.length >= 16) return iso.substring(0, 16).replaceAll('T', ' ');
+      return iso;
+    }
+    final local = dt.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(local.day)}.${two(local.month)}.${local.year} '
+        '${two(local.hour)}:${two(local.minute)}';
   }
 
   Future<void> _openExternalUrl(String? url) async {
@@ -200,8 +224,8 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
   bool _loadingMore = false;
   String? _error;
 
-  /// Dokument u tijeku brisanja (sprječava dvostruki klik).
-  String? _deletingId;
+  /// Dokument u tijeku brisanja / odobrenja (sprječava dvostruki klik).
+  String? _busyId;
 
   @override
   void initState() {
@@ -268,6 +292,7 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
         ? 'ovaj dokument'
         : '„${r.title.trim()}“';
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Obrisati dokument?'),
@@ -287,7 +312,7 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
       ),
     );
     if (ok != true || !mounted) return;
-    setState(() => _deletingId = r.id);
+    setState(() => _busyId = r.id);
     try {
       await widget.svc.deleteQmsDocument(
         companyId: widget.companyId,
@@ -296,17 +321,88 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
       if (!mounted) return;
       setState(() {
         _rows.removeWhere((e) => e.id == r.id);
-        _deletingId = null;
+        _busyId = null;
       });
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Dokument je obrisan.')));
     } catch (e) {
       if (!mounted) return;
-      setState(() => _deletingId = null);
+      setState(() => _busyId = null);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
+    }
+  }
+
+  Future<void> _confirmApprove(QmsDocumentRow r) async {
+    final label = r.title.trim().isEmpty
+        ? 'ovaj dokument'
+        : '„${r.title.trim()}“';
+    final ok = await showDialog<bool>(
+      barrierDismissible: false,
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Odobriti dokument?'),
+        content: Text(
+          '$label će dobiti status Odobreno. '
+          'Sistem upisuje tko i kada je odobrio (audit). '
+          'Nakon odobrenja revizija je zaključana — izmjena ide kao nova revizija.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Odustani'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Odobri dokument'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _busyId = r.id);
+    try {
+      await widget.svc.approveQmsDocument(
+        companyId: widget.companyId,
+        qmsDocumentId: r.id,
+      );
+      if (!mounted) return;
+      setState(() => _busyId = null);
+      await _loadFirst();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Dokument je odobren.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busyId = null);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorMapper.toMessage(e))));
+    }
+  }
+
+  Future<void> _createNewRevision(QmsDocumentRow r) async {
+    final nextRev = (r.revision ?? 0) + 1;
+    final ok = await showGuardedDataEntryDialog<bool>(
+      context: context,
+      builder: (ctx) => _AddQmsDocumentDialog(
+        companyId: widget.companyId,
+        kind: widget.kind,
+        svc: widget.svc,
+        productService: ProductService(),
+        seedFrom: r,
+        forcedRevision: nextRev,
+      ),
+    );
+    if (ok == true && mounted) {
+      await _loadFirst();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Nova revizija $nextRev spremljena kao nacrt.')),
+      );
     }
   }
 
@@ -352,16 +448,30 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  widget.kind == QmsDocumentKind.form
-                      ? 'Obrasci mogu biti company-wide (bez proizvoda) ili vezani uz proizvod. '
-                          'Oznaka dokumenta, revizija, vlasnik i retention čuvaju se na dokumentu.'
-                      : 'Dokumenti vezani uz proizvod. Lista je straničena (50 po stranici). '
-                          'Datoteka: upload na storage preko potpisanog URL-a.',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                ),
+                if (widget.kind == QmsDocumentKind.form)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Obrasci mogu biti za cijelu kompaniju (bez proizvoda) ili vezani uz proizvod. '
+                          'Oznaka dokumenta, revizija, vlasnik i kategorija čuvanja čuvaju se na dokumentu. '
+                          'Odobrenje ide isključivo akcijom „Odobri dokument“.',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                      ),
+                      const QmsControlledFormInfoIcon(size: 20),
+                    ],
+                  )
+                else
+                  Text(
+                    'Dokumenti vezani uz proizvod. Lista je straničena (50 po stranici). '
+                    'Datoteka: upload na storage preko potpisanog URL-a.',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                  ),
                 const SizedBox(height: 16),
               ]),
             ),
@@ -382,7 +492,7 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
                   const SizedBox(height: 8),
                   Text(
                     widget.kind == QmsDocumentKind.form
-                        ? 'Dodaj obrazac s oznakom dokumenta — company-wide ili uz proizvod.'
+                        ? 'Dodaj obrazac s oznakom dokumenta — za cijelu kompaniju ili uz proizvod.'
                         : 'Dodaj dokument i odaberi proizvod — opcionalno priloži datoteku.',
                     textAlign: TextAlign.center,
                     style: Theme.of(
@@ -403,16 +513,42 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
                     child: ListTile(
                       leading: const Icon(Icons.description_outlined),
                       title: Text(r.title.isEmpty ? 'Bez naslova' : r.title),
-                      trailing: _deletingId == r.id
+                      trailing: _busyId == r.id
                           ? const SizedBox(
                               width: 28,
                               height: 28,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : IconButton(
-                              tooltip: 'Obriši dokument',
-                              icon: Icon(Icons.delete_outline, color: cs.error),
-                              onPressed: () => _confirmDelete(r),
+                          : PopupMenuButton<String>(
+                              onSelected: (v) {
+                                switch (v) {
+                                  case 'approve':
+                                    _confirmApprove(r);
+                                  case 'revise':
+                                    _createNewRevision(r);
+                                  case 'delete':
+                                    _confirmDelete(r);
+                                }
+                              },
+                              itemBuilder: (ctx) {
+                                final st = r.status.trim().toLowerCase();
+                                return [
+                                  if (st == 'draft')
+                                    const PopupMenuItem(
+                                      value: 'approve',
+                                      child: Text('Odobri dokument'),
+                                    ),
+                                  if (st == 'approved')
+                                    const PopupMenuItem(
+                                      value: 'revise',
+                                      child: Text('Nova revizija'),
+                                    ),
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: Text('Obriši dokument'),
+                                  ),
+                                ];
+                              },
                             ),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -435,13 +571,40 @@ class _DocumentKindTabState extends State<_DocumentKindTab> {
                             Text('Vlasnik: ${r.ownerDepartment!.trim()}'),
                           if (r.retentionCategory != null &&
                               r.retentionCategory!.trim().isNotEmpty)
-                            Text('Retention: ${r.retentionCategory!.trim()}'),
+                            Text(
+                              'Kategorija čuvanja: ${r.retentionCategory!.trim()}',
+                            ),
                           Text(
                             'Status: ${QmsDisplayFormatters.qmsDocStatus(r.status)} · '
                             'Ažurirano: ${_QualityDocumentationScreenState._formatUpdated(r.updatedAtIso)}',
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: cs.onSurfaceVariant),
                           ),
+                          if (r.status.trim().toLowerCase() == 'approved') ...[
+                            Text(
+                              'Odobrio: ${(r.approvedByNameSnapshot ?? '').trim().isNotEmpty ? r.approvedByNameSnapshot!.trim() : QmsControlledFormHelp.approvalAuditGapMessage}',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color:
+                                        (r.approvedByNameSnapshot ?? '')
+                                                .trim()
+                                                .isEmpty
+                                            ? cs.error
+                                            : cs.onSurfaceVariant,
+                                  ),
+                            ),
+                            Text(
+                              'Datum odobrenja: ${(r.approvedAtIso ?? '').trim().isNotEmpty ? _QualityDocumentationScreenState._formatApprovedAt(r.approvedAtIso) : QmsControlledFormHelp.approvalAuditGapMessage}',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: (r.approvedAtIso ?? '')
+                                            .trim()
+                                            .isEmpty
+                                        ? cs.error
+                                        : cs.onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
                           if (r.notes != null && r.notes!.trim().isNotEmpty)
                             Text(
                               r.notes!.trim(),
@@ -507,12 +670,16 @@ class _AddQmsDocumentDialog extends StatefulWidget {
     required this.kind,
     required this.svc,
     required this.productService,
+    this.seedFrom,
+    this.forcedRevision,
   });
 
   final String companyId;
   final QmsDocumentKind kind;
   final QualityCallableService svc;
   final ProductService productService;
+  final QmsDocumentRow? seedFrom;
+  final int? forcedRevision;
 
   @override
   State<_AddQmsDocumentDialog> createState() => _AddQmsDocumentDialogState();
@@ -533,7 +700,6 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
   String? _productLabel;
   String? _productNameSnapshot;
   String? _productCodeSnapshot;
-  String _status = 'draft';
   bool _submitting = false;
 
   Uint8List? _fileBytes;
@@ -546,6 +712,33 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
   void initState() {
     super.initState();
     _scopeType = _isForm ? 'company' : 'product';
+    final seed = widget.seedFrom;
+    if (seed != null) {
+      _title.text = seed.title;
+      _documentCode.text = seed.documentCode?.trim() ?? '';
+      _revision.text = '${widget.forcedRevision ?? ((seed.revision ?? 0) + 1)}';
+      _ownerDepartment.text = seed.ownerDepartment?.trim() ?? '';
+      _retentionCategory.text = seed.retentionCategory?.trim() ?? '';
+      _notes.text = seed.notes?.trim() ?? '';
+      _externalUrl.text = seed.externalUrl?.trim() ?? '';
+      if (_isForm) {
+        _scopeType = seed.scopeType == 'product' ? 'product' : 'company';
+      }
+      if (seed.productId.trim().isNotEmpty) {
+        _productId = seed.productId;
+        _productNameSnapshot = seed.productNameSnapshot;
+        _productCodeSnapshot = seed.productCodeSnapshot;
+        final code = seed.productCodeSnapshot?.trim() ?? '';
+        final name = seed.productNameSnapshot?.trim() ?? '';
+        _productLabel = code.isNotEmpty && name.isNotEmpty
+            ? '$code · $name'
+            : (name.isNotEmpty
+                ? name
+                : (code.isNotEmpty ? code : seed.productId));
+      }
+    } else if (widget.forcedRevision != null) {
+      _revision.text = '${widget.forcedRevision}';
+    }
   }
 
   @override
@@ -660,7 +853,7 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
         productId: scopeType == 'product' ? pid : null,
         scopeType: scopeType,
         documentKind: widget.kind.apiValue,
-        status: _status,
+        status: 'draft',
         notes: notes.isEmpty ? null : notes,
         externalUrl: ext.isEmpty ? null : ext,
         productNameSnapshot:
@@ -701,7 +894,7 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
           productId: scopeType == 'product' ? pid : null,
           scopeType: scopeType,
           documentKind: widget.kind.apiValue,
-          status: _status,
+          status: 'draft',
           notes: notes.isEmpty ? null : notes,
           externalUrl: ext.isEmpty ? null : ext,
           productNameSnapshot:
@@ -852,30 +1045,14 @@ class _AddQmsDocumentDialogState extends State<_AddQmsDocumentDialog> {
                   labelText: 'Status',
                   contentPadding: EdgeInsets.symmetric(
                     horizontal: 12,
-                    vertical: 4,
+                    vertical: 12,
                   ),
                 ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _status,
-                    isExpanded: true,
-                    items: const [
-                      DropdownMenuItem(value: 'draft', child: Text('Nacrt')),
-                      DropdownMenuItem(
-                        value: 'approved',
-                        child: Text('Odobreno'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'obsolete',
-                        child: Text('Zastarjelo'),
-                      ),
-                    ],
-                    onChanged: _submitting
-                        ? null
-                        : (v) {
-                            if (v != null) setState(() => _status = v);
-                          },
-                  ),
+                child: Text(
+                  widget.seedFrom != null
+                      ? 'Nacrt (nova revizija — odobrenje zasebnom akcijom)'
+                      : 'Nacrt (odobrenje zasebnom akcijom „Odobri dokument“)',
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
               const SizedBox(height: 12),

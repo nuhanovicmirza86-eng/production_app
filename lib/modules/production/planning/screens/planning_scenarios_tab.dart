@@ -160,6 +160,7 @@ class _PlanningScenariosTabState extends State<PlanningScenariosTab> {
 
   Future<void> _delete(PlanningScenarioRecord r) async {
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Obrisati scenarij?'),

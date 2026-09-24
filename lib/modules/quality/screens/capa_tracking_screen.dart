@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/access/production_access_helper.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../models/qms_list_models.dart';
 import '../widgets/qms_iatf_help.dart';
@@ -25,6 +26,11 @@ class _CapaTrackingScreenState extends State<CapaTrackingScreen> {
   String get _cid =>
       (widget.companyData['companyId'] ?? '').toString().trim();
 
+  String get _role =>
+      ProductionAccessHelper.normalizeRole(widget.companyData['role']);
+
+  String get _uid => (widget.companyData['userId'] ?? '').toString().trim();
+
   @override
   void initState() {
     super.initState();
@@ -46,9 +52,18 @@ class _CapaTrackingScreenState extends State<CapaTrackingScreen> {
     });
     try {
       final rows = await _svc.listOpenCapa(companyId: cid);
+      final filtered = ProductionAccessHelper.canViewAllOpenCapa(_role)
+          ? rows
+          : rows
+              .where(
+                (r) =>
+                    (r.responsibleUserId ?? '').trim().isNotEmpty &&
+                    (r.responsibleUserId ?? '').trim() == _uid,
+              )
+              .toList(growable: false);
       if (!mounted) return;
       setState(() {
-        _rows = rows;
+        _rows = filtered;
         _loading = false;
       });
     } catch (e) {
@@ -99,12 +114,15 @@ class _CapaTrackingScreenState extends State<CapaTrackingScreen> {
       );
     }
     if (_rows.isEmpty) {
+      final emptyMsg = ProductionAccessHelper.canViewAllOpenCapa(_role)
+          ? 'Nema otvorenih CAPA zapisa (action_plans · non_conformance).'
+          : 'Nema CAPA dodijeljenih vama. Otvorene akcije vezane uz NCR su u „Moje otvorene akcije”.';
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(24),
         children: [
           Text(
-            'Nema otvorenih CAPA zapisa (action_plans · non_conformance).',
+            emptyMsg,
             style: Theme.of(context).textTheme.bodyLarge,
           ),
         ],

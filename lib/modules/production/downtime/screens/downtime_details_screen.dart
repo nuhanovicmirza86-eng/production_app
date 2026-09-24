@@ -12,6 +12,7 @@ import '../../../finance_integrations/models/finance_downtime_event_cost_doc.dar
 import '../../../finance_integrations/services/finance_derived_aggregates_service.dart';
 import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../../production_orders/screens/production_order_details_screen.dart';
+import '../downtime_business_display.dart';
 import '../models/downtime_event_model.dart';
 import '../services/downtime_service.dart';
 
@@ -37,6 +38,9 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
   String? _prefetchedUsersForEventId;
   String? _costsLoadedForEventId;
   Future<List<FinanceDowntimeEventCostDoc>>? _costsFuture;
+  bool _loading = true;
+  String? _error;
+  DowntimeEventModel? _event;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -77,6 +81,46 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 7, vsync: this);
+    _load();
+  }
+
+  Future<void> _load() async {
+    final id = widget.downtimeId.trim();
+    if (id.isEmpty || _companyId.isEmpty || _plantKey.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Nedostaju podaci za učitavanje.';
+        _event = null;
+      });
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final event = await _downtimeService.getById(
+        companyId: _companyId,
+        plantKey: _plantKey,
+        downtimeId: id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _event = event;
+        _loading = false;
+        if (event == null) {
+          _error = 'Zastoj nije pronađen ili nije u vašem pogonu.';
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = AppErrorMapper.toMessage(e);
+        _event = null;
+      });
+    }
   }
 
   @override
@@ -104,6 +148,7 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Status je ažuriran.')),
         );
+        await _load();
       }
     } catch (e) {
       if (context.mounted) {
@@ -132,6 +177,7 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Zastoj je označen kao riješen.')),
         );
+        await _load();
       }
     } catch (e) {
       if (context.mounted) {
@@ -160,6 +206,7 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Zastoj je verificiran.')),
         );
+        await _load();
       }
     } catch (e) {
       if (context.mounted) {
@@ -173,6 +220,7 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
   Future<void> _rejectDialog(BuildContext context, DowntimeEventModel m) async {
     final ctrl = TextEditingController();
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Odbij zastoj'),
@@ -219,6 +267,7 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Zastoj je odbijen.')),
         );
+        await _load();
       }
     } catch (e) {
       ctrl.dispose();
@@ -261,7 +310,10 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
   String _auditTimestampLine(DateTime? at, String storedActor) {
     if (at == null) return '—';
     final when = BaFormattedDate.formatDateTime(at);
-    final who = UserDisplayLabel.personLine('', storedActor);
+    final who = DowntimeBusinessDisplay.personLabel(
+      storedName: '',
+      storedId: storedActor,
+    );
     if (who == '—') return when;
     return '$when · $who';
   }
@@ -324,33 +376,44 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
           ],
         ),
       ),
-      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance
-            .collection('downtime_events')
-            .doc(id)
-            .snapshots(),
-        builder: (context, snap) {
-          if (snap.hasError) {
-            return Center(child: Text(AppErrorMapper.toMessage(snap.error!)));
-          }
-          if (!snap.hasData || !snap.data!.exists) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          }
+      body: _buildBody(context),
+    );
+  }
 
-          final m = DowntimeEventModel.fromDoc(snap.data!);
-          if (m.companyId != _companyId || m.plantKey != _plantKey) {
-            return const Center(
-              child: Text('Nemaš pristup ovom zastoju.'),
-            );
-          }
-          _ensureUsersPrefetched(m);
+  Widget _buildBody(BuildContext context) {
+    if (_loading && _event == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null && _event == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_error!, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _load,
+                child: const Text('Pokušaj ponovo'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    final m = _event;
+    if (m == null) {
+      return const Center(
+        child: Text('Zastoj nije pronađen ili nije u vašem pogonu.'),
+      );
+    }
+    _ensureUsersPrefetched(m);
 
-          final now = DateTime.now();
-          final mins = m.effectiveDurationMinutesNow(now);
+    final now = DateTime.now();
+    final mins = m.effectiveDurationMinutesNow(now);
 
-          return Column(
+    return Column(
             children: [
               Material(
                 elevation: 0,
@@ -405,6 +468,7 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
                                 plantKey: _plantKey,
                                 actorUid: u.uid,
                               );
+                              if (context.mounted) await _load();
                             } catch (e) {
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -436,7 +500,9 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  m.downtimeCode,
+                                  DowntimeBusinessDisplay.codeLabel(
+                                    m.downtimeCode,
+                                  ),
                                   style: Theme.of(context)
                                       .textTheme
                                       .headlineSmall
@@ -746,30 +812,30 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
                               children: [
                                 _kv(
                                   'Prijavio',
-                                  UserDisplayLabel.personLine(
-                                    m.reportedByName,
-                                    m.reportedBy,
+                                  DowntimeBusinessDisplay.personLabel(
+                                    storedName: m.reportedByName,
+                                    storedId: m.reportedBy,
                                   ),
                                 ),
                                 _kv(
                                   'Operater',
-                                  UserDisplayLabel.personLine(
-                                    '',
-                                    m.operatorId,
+                                  DowntimeBusinessDisplay.personLabel(
+                                    storedName: '',
+                                    storedId: m.operatorId,
                                   ),
                                 ),
                                 _kv(
                                   'Riješio',
-                                  UserDisplayLabel.personLine(
-                                    m.resolvedByName,
-                                    m.resolvedBy,
+                                  DowntimeBusinessDisplay.personLabel(
+                                    storedName: m.resolvedByName,
+                                    storedId: m.resolvedBy,
                                   ),
                                 ),
                                 _kv(
                                   'Verificirao',
-                                  UserDisplayLabel.personLine(
-                                    m.verifiedByName,
-                                    m.verifiedBy,
+                                  DowntimeBusinessDisplay.personLabel(
+                                    storedName: m.verifiedByName,
+                                    storedId: m.verifiedBy,
                                   ),
                                 ),
                                 _kv(
@@ -791,8 +857,5 @@ class _DowntimeDetailsScreenState extends State<DowntimeDetailsScreen>
               ),
             ],
           );
-        },
-      ),
-    );
   }
 }

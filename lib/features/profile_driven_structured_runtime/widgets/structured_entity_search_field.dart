@@ -3,8 +3,10 @@ import 'dart:async' show Timer, unawaited;
 import 'package:flutter/material.dart';
 
 import '../../../modules/production/station_pages/models/production_station_profile_field.dart';
+import '../../catalog_evidence_runtime/utils/evidence_input_empty.dart';
 import '../models/structured_entity_search_result.dart';
 import '../services/production_evidence_entity_search_service.dart';
+import '../utils/structured_entity_search_result_appearance.dart';
 
 typedef StructuredEntitySearchFn =
     Future<List<StructuredEntitySearchResult>> Function(String query);
@@ -23,6 +25,8 @@ class StructuredEntitySearchField extends StatefulWidget {
     this.labelOverride,
     this.requiredOverride,
     this.recentSuggestions = const [],
+    this.recentSuggestionsLabel,
+    this.plantDisplayLabel,
   });
 
   final ProductionStationProfileField field;
@@ -36,6 +40,10 @@ class StructuredEntitySearchField extends StatefulWidget {
   final bool? requiredOverride;
   /// Brzi izbor (npr. zadnji korišteni operateri) — chips iznad rezultata pretrage.
   final List<StructuredEntitySearchResult> recentSuggestions;
+  /// Naslov iznad chips (default: Zadnji korišteni).
+  final String? recentSuggestionsLabel;
+  /// Ljudski naziv pogona evidencije (npr. Brizganje (BR)) — ne plantKey.
+  final String? plantDisplayLabel;
 
   @override
   State<StructuredEntitySearchField> createState() =>
@@ -51,26 +59,57 @@ class _StructuredEntitySearchFieldState extends State<StructuredEntitySearchFiel
   List<StructuredEntitySearchResult> _results = const [];
   StructuredEntitySelection? _selection;
 
+  StructuredEntitySelection? _sanitizedSelection(
+    StructuredEntitySelection? raw,
+  ) {
+    if (raw == null) return null;
+    if (!isUsableEvidenceEntityId(raw.entityId)) return null;
+    final label = usableEvidenceDisplayLabel(
+      raw.displayLabel,
+      entityId: raw.entityId,
+    );
+    if (label == null) return null;
+    if (label == raw.displayLabel) return raw;
+    return StructuredEntitySelection(
+      fieldKey: raw.fieldKey,
+      entityId: raw.entityId,
+      displayLabel: label,
+      raw: raw.raw,
+    );
+  }
+
+  void _bindSelection(StructuredEntitySelection? raw) {
+    _selection = _sanitizedSelection(raw);
+    _controller.text = _selection?.displayLabel ?? '';
+  }
+
   @override
   void initState() {
     super.initState();
-    _selection = widget.initialSelection;
-    if (_selection != null) {
-      _controller.text = _selection!.displayLabel;
-    }
+    _bindSelection(widget.initialSelection);
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    if (!_focusNode.hasFocus) return;
+    if (_selection != null) return;
+    if (widget.field.minSearchChars > 0) return;
+    unawaited(_runSearch(_controller.text));
   }
 
   @override
   void didUpdateWidget(covariant StructuredEntitySearchField oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialSelection?.entityId != oldWidget.initialSelection?.entityId) {
-      _selection = widget.initialSelection;
-      _controller.text = _selection?.displayLabel ?? '';
+    if (widget.initialSelection?.entityId != oldWidget.initialSelection?.entityId ||
+        widget.initialSelection?.displayLabel !=
+            oldWidget.initialSelection?.displayLabel) {
+      _bindSelection(widget.initialSelection);
     }
   }
 
   @override
   void dispose() {
+    _focusNode.removeListener(_onFocusChange);
     _debounce?.cancel();
     _controller.dispose();
     _focusNode.dispose();
@@ -154,9 +193,12 @@ class _StructuredEntitySearchFieldState extends State<StructuredEntitySearchFiel
           enabled: widget.enabled,
           decoration: InputDecoration(
             labelText: required ? '$label *' : label,
+            hintText: evidenceSearchHint(),
             border: const OutlineInputBorder(),
             helperText: widget.field.helperText ??
-                'Unesite najmanje $minChars znaka za pretragu.',
+                (minChars <= 0
+                    ? 'Dodirnite polje ili unesite dio šifre / naziva.'
+                    : 'Unesite najmanje $minChars znaka za pretragu.'),
             suffixIcon: _selection != null
                 ? IconButton(
                     tooltip: 'Ukloni odabir',
@@ -185,7 +227,7 @@ class _StructuredEntitySearchFieldState extends State<StructuredEntitySearchFiel
         if (widget.recentSuggestions.isNotEmpty && _selection == null) ...[
           const SizedBox(height: 8),
           Text(
-            'Zadnji korišteni',
+            widget.recentSuggestionsLabel ?? 'Zadnji korišteni',
             style: Theme.of(context).textTheme.labelMedium,
           ),
           const SizedBox(height: 6),
@@ -210,30 +252,197 @@ class _StructuredEntitySearchFieldState extends State<StructuredEntitySearchFiel
             ),
           ),
         if (_results.isNotEmpty)
-          Material(
-            elevation: 2,
-            borderRadius: BorderRadius.circular(8),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 220),
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: _results.length,
-                separatorBuilder: (_, _) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final item = _results[index];
-                  return ListTile(
-                    dense: true,
-                    title: Text(item.displayLabel),
-                    subtitle: item.secondaryLabel == null
-                        ? null
-                        : Text(item.secondaryLabel!),
-                    onTap: widget.enabled ? () => _selectResult(item) : null,
-                  );
-                },
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Material(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .outline
+                      .withValues(alpha: 0.45),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 280),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: _results.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final item = _results[index];
+                      return _SearchResultCard(
+                        field: widget.field,
+                        item: item,
+                        plantDisplayLabel: widget.plantDisplayLabel,
+                        enabled: widget.enabled,
+                        onTap: () => _selectResult(item),
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
           ),
       ],
+    );
+  }
+}
+
+class _SearchResultCard extends StatefulWidget {
+  const _SearchResultCard({
+    required this.field,
+    required this.item,
+    required this.plantDisplayLabel,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final ProductionStationProfileField field;
+  final StructuredEntitySearchResult item;
+  final String? plantDisplayLabel;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  State<_SearchResultCard> createState() => _SearchResultCardState();
+}
+
+class _SearchResultCardState extends State<_SearchResultCard> {
+  bool _hovered = false;
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final title = StructuredEntitySearchResultAppearance.title(widget.item);
+    final badge = StructuredEntitySearchResultAppearance.badgeLabel(
+      field: widget.field,
+      item: widget.item,
+    );
+    final trailing = StructuredEntitySearchResultAppearance.trailingMeta(
+      field: widget.field,
+      plantDisplayLabel: widget.plantDisplayLabel,
+    );
+    final highlight = _hovered || _focused;
+    final fill = highlight
+        ? cs.primaryContainer
+        : cs.primaryContainer.withValues(alpha: 0.55);
+    final border = highlight
+        ? cs.primary
+        : cs.primary.withValues(alpha: 0.35);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: FocusableActionDetector(
+        onShowFocusHighlight: (show) => setState(() => _focused = show),
+        child: Material(
+          color: fill,
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            onTap: widget.enabled ? widget.onTap : null,
+            borderRadius: BorderRadius.circular(12),
+            hoverColor: cs.primary.withValues(alpha: 0.08),
+            focusColor: cs.primary.withValues(alpha: 0.12),
+            child: Ink(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: border, width: highlight ? 1.5 : 1),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(11),
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(width: 5, color: cs.primary),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: cs.onSurface,
+                                    ),
+                              ),
+                              if (badge != null || trailing != null) ...[
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 6,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    if (badge != null)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: cs.primary,
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          badge,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .labelSmall
+                                              ?.copyWith(
+                                                color: cs.onPrimary,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                        ),
+                                      ),
+                                    if (trailing != null)
+                                      Text(
+                                        badge != null
+                                            ? '· $trailing'
+                                            : trailing,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: cs.onSurface,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Center(
+                          child: Icon(
+                            Icons.chevron_right,
+                            color: cs.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

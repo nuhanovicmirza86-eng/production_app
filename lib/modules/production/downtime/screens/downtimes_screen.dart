@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/access/production_access_helper.dart';
+import '../../../../core/ui/company_plant_label_text.dart';
 import 'downtime_analytics_tab.dart';
-import 'downtime_create_screen.dart';
 import 'downtimes_operative_tab.dart';
 
-/// Zastoji: operativa (lista) + puna analitika (tab).
+/// Zastoji: operativa (lista) + puna analitika (tab). Pregled; prijava nije ovdje.
 class DowntimesScreen extends StatefulWidget {
   const DowntimesScreen({
     super.key,
@@ -48,14 +47,6 @@ class _DowntimesScreenState extends State<DowntimesScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
-  String get _role =>
-      ProductionAccessHelper.normalizeRole(widget.companyData['role']);
-
-  bool get _canManage => ProductionAccessHelper.canManage(
-    role: _role,
-    card: ProductionDashboardCard.downtime,
-  );
-
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
 
@@ -91,7 +82,23 @@ class _DowntimesScreenState extends State<DowntimesScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Zastoji'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Zastoji'),
+            CompanyPlantLabelText(
+              companyId: _companyId,
+              plantKey: _plantKey,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: (Theme.of(context).appBarTheme.foregroundColor ??
+                            Theme.of(context).colorScheme.onSurface)
+                        .withValues(alpha: 0.88),
+                  ),
+            ),
+          ],
+        ),
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -99,22 +106,6 @@ class _DowntimesScreenState extends State<DowntimesScreen>
             Tab(icon: Icon(Icons.analytics_outlined), text: 'Analitika'),
           ],
         ),
-        actions: [
-          if (_canManage)
-            IconButton(
-              tooltip: 'Prijavi zastoj',
-              icon: const Icon(Icons.add_circle_outline),
-              onPressed: () async {
-                await Navigator.of(context).push<void>(
-                  MaterialPageRoute<void>(
-                    builder: (_) => DowntimeCreateScreen(
-                      companyData: widget.companyData,
-                    ),
-                  ),
-                );
-              },
-            ),
-        ],
       ),
       body: TabBarView(
         controller: _tabController,

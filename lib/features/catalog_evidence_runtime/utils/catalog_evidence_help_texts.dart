@@ -29,7 +29,7 @@ abstract final class CatalogEvidenceHelpTexts {
   static const packagingControlBody =
       'Kontrola pakovanja koristi se u fazi pakovanja za provjeru da li je '
       'proizvod pravilno upakovan, označen i pripremljen za dalje kretanje. '
-      'Evidentira se operater pakovanja, kontrolor, količina pakovanja, '
+      'Evidentira se operater proizvodnje, kontrolor, količina pakovanja, '
       'prihvaćeno/odbijeno, greške pakovanja, etikete, ambalaža i komentar.\n\n'
       'Nije isto što Procesna kontrola kvaliteta (proizvod/proces tokom proizvodnje).';
 
@@ -91,6 +91,35 @@ abstract final class CatalogEvidenceHelpTexts {
       'nalog, proizvod, mašina ili mjesto rada, kontrolor, kontrolisani komadi, '
       'rezultat i odluka o odobrenju proizvodnje.';
 
+  static const lineClearanceTooltip =
+      'Čišćenje mašine, alata, linije ili radnog centra prije ili poslije proizvodnje.';
+
+  static const lineClearanceTitle = 'Čišćenje mašine / linije';
+
+  static const lineClearanceBody =
+      'Čišćenje mašine / linije koristi se kad se čisti mašina, alat, linija ili '
+      'radni centar prije ili poslije proizvodnje, ili pri promjeni proizvoda. '
+      'Operater evidentira mjesto, smjenu, vrijeme i potvrdu liste. Verifikator '
+      'na terenu potvrdi da evidentirano odgovara stvarnom stanju i da je linija '
+      'spremna za rad.\n\n'
+      'Prethodni i sljedeći proizvod se unose samo pri tipu Promjena proizvoda. '
+      'Nije isto što 5S čišćenje radnog prostora (urednost stola, poda, zona i '
+      'prolaza — bez linije).';
+
+  static const workspace5sCleaningTooltip =
+      '5S provjera urednosti i sigurnosti radnog prostora.';
+
+  static const workspace5sCleaningTitle = '5S čišćenje radnog prostora';
+
+  static const workspace5sCleaningBody =
+      '5S čišćenje radnog prostora koristi se za opštu urednost: radni sto, pod, '
+      'alat, otpad, označene zone i sigurnosne prolaze. Evidentira se zona '
+      '(šifrarnik pogona ili Drugo), smjena, tip provjere, 5S checklist '
+      '(U redu / Nije u redu / Nije primjenjivo), ishod, izvršilac i '
+      'verifikacija.\n\n'
+      'Nije vezano za proizvodni nalog ni sastavnicu. Nije isto što Čišćenje '
+      'mašine / linije (promjena proizvoda, mašina ili radni centar).';
+
   static const materialPreparationTooltip =
       'Priprema, izdavanje ili staging materijala prije ili tokom proizvodnje.';
 
@@ -103,6 +132,19 @@ abstract final class CatalogEvidenceHelpTexts {
       'tip pripreme, vrijeme i operater.\n\n'
       'Nije isto što Doziranje hemikalija (dodatak u proces/kupku) niti '
       'Miješanje šarže (batch receptura).';
+
+  static const operationMaterialPreparationTooltip =
+      'Priprema materijala za konkretnu fazu / operaciju i mjesto rada.';
+
+  static const operationMaterialPreparationTitle =
+      'Priprema materijala za operaciju';
+
+  static const operationMaterialPreparationBody =
+      'Priprema materijala za operaciju veže materijal na konkretnu fazu '
+      'proizvodnje i mjesto rada (mašina ili radni sto). Evidentira se '
+      'proizvodni nalog, proizvod, faza operacije, mjesto rada, materijal, '
+      'lot/šarža, količina, jedinica i svrha pripreme.\n\n'
+      'Nije isto što generička Priprema materijala (bez faze i mjesta rada).';
 
   /// Info ikona za profil — **uvijek** vraća widget (M1-I5-C3).
   ///
@@ -158,11 +200,29 @@ abstract final class CatalogEvidenceHelpTexts {
           dialogTitle: firstPieceApprovalTitle,
           dialogBody: firstPieceApprovalBody,
         );
+      case 'line_clearance':
+        return const OoeInfoIcon(
+          tooltip: lineClearanceTooltip,
+          dialogTitle: lineClearanceTitle,
+          dialogBody: lineClearanceBody,
+        );
+      case 'workspace_5s_cleaning':
+        return const OoeInfoIcon(
+          tooltip: workspace5sCleaningTooltip,
+          dialogTitle: workspace5sCleaningTitle,
+          dialogBody: workspace5sCleaningBody,
+        );
       case 'material_preparation':
         return const OoeInfoIcon(
           tooltip: materialPreparationTooltip,
           dialogTitle: materialPreparationTitle,
           dialogBody: materialPreparationBody,
+        );
+      case 'operation_material_preparation':
+        return const OoeInfoIcon(
+          tooltip: operationMaterialPreparationTooltip,
+          dialogTitle: operationMaterialPreparationTitle,
+          dialogBody: operationMaterialPreparationBody,
         );
       default:
         return _fallbackInfoIcon(

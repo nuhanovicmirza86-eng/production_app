@@ -1,11 +1,46 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../products/services/product_service.dart';
+import '../bom_item_traceability.dart';
 
 class BomService {
   BomService();
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  Map<String, dynamic> _traceabilityWriteFields({
+    required String bomItemKind,
+    required String traceabilityMode,
+    required bool lotRequired,
+  }) {
+    final err = validateBomItemTraceabilityForSave(
+      kind: bomItemKind,
+      mode: traceabilityMode,
+      lotRequired: lotRequired,
+    );
+    if (err != null) {
+      throw ArgumentError(err);
+    }
+    final resolved = resolveBomItemTraceability({
+      bomItemFieldKind: bomItemKind,
+      bomItemFieldTraceabilityMode: traceabilityMode,
+      bomItemFieldLotRequired: lotRequired,
+    });
+    return {
+      bomItemFieldKind: resolved.kind,
+      bomItemFieldTraceabilityMode: resolved.mode,
+      bomItemFieldLotRequired: resolved.lotRequired,
+    };
+  }
+
+  Map<String, dynamic> _traceabilityFieldsFromItem(Map<String, dynamic> item) {
+    final resolved = resolveBomItemTraceability(item);
+    return {
+      bomItemFieldKind: resolved.kind,
+      bomItemFieldTraceabilityMode: resolved.mode,
+      bomItemFieldLotRequired: resolved.lotRequired,
+    };
+  }
 
   CollectionReference<Map<String, dynamic>> get _boms =>
       _firestore.collection('boms');
@@ -218,6 +253,7 @@ class BomService {
         'qtyPerUnit': _d(item['qtyPerUnit']),
         'unit': _s(item['unit']),
         'note': _s(item['note']),
+        ..._traceabilityFieldsFromItem(item),
         'createdAt': FieldValue.serverTimestamp(),
         'createdBy': changedBy,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -263,9 +299,17 @@ class BomService {
     required double qtyPerUnit,
     required String unit,
     required String createdBy,
+    required String bomItemKind,
+    required String traceabilityMode,
+    required bool lotRequired,
     String? note,
   }) async {
     final docRef = _bomItems.doc();
+    final traceability = _traceabilityWriteFields(
+      bomItemKind: bomItemKind,
+      traceabilityMode: traceabilityMode,
+      lotRequired: lotRequired,
+    );
 
     await docRef.set({
       'id': docRef.id,
@@ -278,6 +322,7 @@ class BomService {
       'qtyPerUnit': qtyPerUnit,
       'unit': unit,
       'note': note ?? '',
+      ...traceability,
       'createdAt': FieldValue.serverTimestamp(),
       'createdBy': createdBy,
       'updatedAt': FieldValue.serverTimestamp(),
@@ -291,13 +336,22 @@ class BomService {
     required String itemId,
     required double qtyPerUnit,
     required String unit,
+    required String bomItemKind,
+    required String traceabilityMode,
+    required bool lotRequired,
     String? note,
     required String updatedBy,
   }) async {
+    final traceability = _traceabilityWriteFields(
+      bomItemKind: bomItemKind,
+      traceabilityMode: traceabilityMode,
+      lotRequired: lotRequired,
+    );
     await _bomItems.doc(itemId).update({
       'qtyPerUnit': qtyPerUnit,
       'unit': unit,
       'note': note ?? '',
+      ...traceability,
       'updatedAt': FieldValue.serverTimestamp(),
       'updatedBy': updatedBy,
     });
@@ -364,6 +418,7 @@ class BomService {
         'qtyPerUnit': _d(item['qtyPerUnit']),
         'unit': _s(item['unit']),
         'note': _s(item['note']),
+        ..._traceabilityFieldsFromItem(item),
         'createdAt': FieldValue.serverTimestamp(),
         'createdBy': userId,
         'updatedAt': FieldValue.serverTimestamp(),

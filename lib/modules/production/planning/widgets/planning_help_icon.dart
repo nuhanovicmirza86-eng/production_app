@@ -36,7 +36,8 @@ class PlanningHelpIcon extends StatelessWidget {
       style: IconButton.styleFrom(foregroundColor: t.colorScheme.primary),
       onPressed: () {
         showDialog<void>(
-          context: context,
+      barrierDismissible: false,
+      context: context,
           builder: (ctx) => AlertDialog(
             title: Text(title),
             content: SingleChildScrollView(

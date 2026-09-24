@@ -9,6 +9,8 @@ import '../models/profile_driven_evidence_hub_entry.dart';
 import '../models/profile_driven_evidence_session.dart';
 import '../services/profile_driven_evidence_callable_service.dart';
 import '../../../core/ui/standard_table_components.dart';
+import '../utils/evidence_order_context_display.dart';
+import '../widgets/evidence_order_context_grid_columns.dart';
 import '../widgets/profile_driven_evidence_grid.dart';
 import '../utils/profile_driven_evidence_rework_labels.dart';
 import 'profile_driven_evidence_detail_screen.dart';
@@ -213,6 +215,8 @@ class _ProfileDrivenEvidenceRecordsScreenState
   DateTime? _dateFrom;
   DateTime? _dateTo;
   int _pageSize = 20;
+  String? _selectedOperationKey;
+  List<ProfileDrivenEvidenceOperationFacet> _operationFacets = const [];
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -224,11 +228,16 @@ class _ProfileDrivenEvidenceRecordsScreenState
   List<ProfileDrivenEvidenceGridColumn> get _columns {
     switch (_processProfileType) {
       case _profileWastewaterTreatment:
-        return _wastewaterColumns;
+        return EvidenceOrderContextGridColumns.mergeAfterDateTime(
+          _wastewaterColumns,
+        );
       case _profileReworkAndPainting:
-        return _reworkColumns;
+        return EvidenceOrderContextGridColumns.mergeAfterDateTime(_reworkColumns);
       default:
-        return _chemicalColumns;
+        if (profileUsesCatalogEvidenceRecordsGrid(_processProfileType)) {
+          return catalogEvidenceRecordsColumns;
+        }
+        return EvidenceOrderContextGridColumns.mergeAfterDateTime(_chemicalColumns);
     }
   }
 
@@ -292,17 +301,45 @@ class _ProfileDrivenEvidenceRecordsScreenState
       _error = null;
     });
     try {
-      final items = await _service.listProfileDrivenEvidenceSessions(
+      String? operationFilter;
+      int? stepOrder;
+      String? stepName;
+      String? stepCode;
+      final selectedKey = (_selectedOperationKey ?? '').trim();
+      if (selectedKey == 'none') {
+        operationFilter = 'none';
+      } else if (selectedKey.isNotEmpty) {
+        operationFilter = 'step';
+        ProfileDrivenEvidenceOperationFacet? facet;
+        for (final f in _operationFacets) {
+          if (f.key == selectedKey) {
+            facet = f;
+            break;
+          }
+        }
+        stepOrder = facet?.routingStepOrder;
+        stepName = facet?.routingStepOperationName;
+        stepCode = facet?.routingStepOperationCode;
+      }
+
+      final result = await _service.listProfileDrivenEvidenceSessions(
         companyId: _companyId,
         plantKey: _plantKey,
         processProfileType: _processProfileType,
         dateFrom: _dateFrom != null ? _formatApiDate(_dateFrom!) : null,
         dateTo: _dateTo != null ? _formatApiDate(_dateTo!) : null,
+        operationFilter: operationFilter,
+        routingStepOrder: stepOrder,
+        routingStepOperationName: stepName,
+        routingStepOperationCode: stepCode,
         limit: _pageSize,
       );
       if (!mounted) return;
       setState(() {
-        _items = items;
+        _items = result.items;
+        if (result.operationFacets.isNotEmpty) {
+          _operationFacets = result.operationFacets;
+        }
         _loading = false;
       });
     } catch (e) {
@@ -359,7 +396,7 @@ class _ProfileDrivenEvidenceRecordsScreenState
   String _operatorLabel(ProfileDrivenEvidenceListItem item) {
     final name = (item.operatorDisplayName ?? '').trim();
     if (name.isNotEmpty) return name;
-    return (item.operatorEmail ?? '—').trim();
+    return '';
   }
 
   String? _reworkStationLabel(ProfileDrivenEvidenceListItem item) {
@@ -384,6 +421,35 @@ class _ProfileDrivenEvidenceRecordsScreenState
 
   Widget _detailButton(ProfileDrivenEvidenceListItem item) {
     return StandardTableOpenLink(onPressed: () => _openDetail(item));
+  }
+
+  String? _orderContextValue(ProfileDrivenEvidenceListItem item, String columnId) {
+    final ctx = item.orderContext;
+    switch (columnId) {
+      case 'order_code':
+        return EvidenceOrderContextDisplay.orderCode(ctx);
+      case 'product':
+        return EvidenceOrderContextDisplay.productLabel(ctx);
+      case 'operation':
+        return EvidenceOrderContextDisplay.operationLabel(ctx);
+      case 'work_center':
+        return EvidenceOrderContextDisplay.workCenterLabel(ctx);
+      case 'bom_version':
+        return EvidenceOrderContextDisplay.bomVersionLabel(ctx);
+      default:
+        return null;
+    }
+  }
+
+  String? _resolveCellValue(
+    ProfileDrivenEvidenceListItem item,
+    String columnId,
+    String? Function(String columnId) profileValue,
+  ) {
+    if (EvidenceOrderContextGridColumns.orderContextColumnIds.contains(columnId)) {
+      return _orderContextValue(item, columnId);
+    }
+    return profileValue(columnId);
   }
 
   List<Widget> _buildDataCells({
@@ -448,8 +514,8 @@ class _ProfileDrivenEvidenceRecordsScreenState
       borderColor: borderColor,
       rowBackground: rowBackground,
       cellStyle: cellStyle,
-      valueFor: (id) {
-        switch (id) {
+      valueFor: (id) => _resolveCellValue(item, id, (columnId) {
+        switch (columnId) {
           case 'date':
             return formatEvidenceDateShort(item.endedAt);
           case 'time':
@@ -481,7 +547,7 @@ class _ProfileDrivenEvidenceRecordsScreenState
           default:
             return null;
         }
-      },
+      }),
     );
   }
 
@@ -499,8 +565,8 @@ class _ProfileDrivenEvidenceRecordsScreenState
       borderColor: borderColor,
       rowBackground: rowBackground,
       cellStyle: cellStyle,
-      valueFor: (id) {
-        switch (id) {
+      valueFor: (id) => _resolveCellValue(item, id, (columnId) {
+        switch (columnId) {
           case 'date':
             return formatEvidenceDateShort(item.endedAt);
           case 'time':
@@ -526,7 +592,36 @@ class _ProfileDrivenEvidenceRecordsScreenState
           default:
             return null;
         }
-      },
+      }),
+    );
+  }
+
+  List<Widget> _catalogEvidenceCells(
+    ProfileDrivenEvidenceListItem item,
+    List<ProfileDrivenEvidenceGridColumn> cols,
+    Color borderColor,
+    Color rowBackground,
+    TextStyle cellStyle,
+  ) {
+    final s = item.summaryFields;
+    return _buildDataCells(
+      item: item,
+      cols: cols,
+      borderColor: borderColor,
+      rowBackground: rowBackground,
+      cellStyle: cellStyle,
+      valueFor: (id) => _resolveCellValue(item, id, (columnId) {
+        switch (columnId) {
+          case 'date':
+            return formatEvidenceDateShort(item.endedAt);
+          case 'time':
+            return formatEvidenceTime(item.endedAt);
+          case 'operator':
+            return s.operatorSummary ?? _operatorLabel(item);
+          default:
+            return null;
+        }
+      }),
     );
   }
 
@@ -570,6 +665,32 @@ class _ProfileDrivenEvidenceRecordsScreenState
                 onPressed: _clearDates,
                 child: const Text('Očisti datume'),
               ),
+            DropdownButton<String?>(
+              value: _selectedOperationKey,
+              hint: const Text('Operacija: sve'),
+              underline: const SizedBox.shrink(),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('Operacija: sve'),
+                ),
+                ..._operationFacets.map(
+                  (f) => DropdownMenuItem<String?>(
+                    value: f.key,
+                    child: Text(
+                      f.label,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ],
+              onChanged: _loading
+                  ? null
+                  : (value) async {
+                      setState(() => _selectedOperationKey = value);
+                      await _load();
+                    },
+            ),
             DropdownButton<int>(
               value: _pageSize,
               underline: const SizedBox.shrink(),
@@ -620,8 +741,8 @@ class _ProfileDrivenEvidenceRecordsScreenState
       borderColor: borderColor,
       rowBackground: rowBackground,
       cellStyle: cellStyle,
-      valueFor: (id) {
-        switch (id) {
+      valueFor: (id) => _resolveCellValue(item, id, (columnId) {
+        switch (columnId) {
           case 'date':
             return formatEvidenceDateShort(item.endedAt);
           case 'time':
@@ -649,7 +770,7 @@ class _ProfileDrivenEvidenceRecordsScreenState
           default:
             return null;
         }
-      },
+      }),
     );
   }
 
@@ -682,13 +803,23 @@ class _ProfileDrivenEvidenceRecordsScreenState
             cellStyle,
           );
         default:
-          cells = _chemicalCells(
-            item,
-            cols,
-            borderColor,
-            rowBackground,
-            cellStyle,
-          );
+          if (profileUsesCatalogEvidenceRecordsGrid(_processProfileType)) {
+            cells = _catalogEvidenceCells(
+              item,
+              cols,
+              borderColor,
+              rowBackground,
+              cellStyle,
+            );
+          } else {
+            cells = _chemicalCells(
+              item,
+              cols,
+              borderColor,
+              rowBackground,
+              cellStyle,
+            );
+          }
       }
 
       return IntrinsicHeight(

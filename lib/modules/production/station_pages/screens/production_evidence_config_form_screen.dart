@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:production_app/core/company_plant_display_name.dart';
+import 'package:production_app/features/catalog_evidence_runtime/utils/cleaning_checklist_mode.dart';
+import 'package:production_app/features/station_evidence/widgets/qms_controlled_form_help.dart';
 
 import '../models/production_evidence_config.dart';
 import '../models/production_station_config.dart';
@@ -46,11 +48,13 @@ class _ProductionEvidenceConfigFormScreenState
   late bool _active;
   late bool _runtimeVisible;
   late Set<String> _runtimeRoles;
+  late Set<String> _verifierRoles;
   late String _plantKey;
   late String _phaseKey;
   late String _profileKey;
   late bool _controlledInputEnabled;
   late String _controlledInputMode;
+  late String _cleaningChecklistMode;
 
   ProductionEvidenceConfig? _freshExisting;
 
@@ -60,6 +64,7 @@ class _ProductionEvidenceConfigFormScreenState
   String? _errPlantKey;
   String? _errProfile;
   String? _errRoles;
+  String? _errVerifierRoles;
   String? _errActive;
   String? _errFormCode;
 
@@ -110,12 +115,22 @@ class _ProductionEvidenceConfigFormScreenState
       e?.phaseKey,
       fallback: 'obrada',
     );
-    _profileKey = e?.profileKey ?? 'chemical_dosing';
+    final profileFromConfig = (e?.profileKey ?? '').trim();
+    _profileKey = profileFromConfig.isEmpty ? 'chemical_dosing' : profileFromConfig;
+    final catalogDefaults =
+        widget.profileCatalog.byKey(_profileKey)?.verifierRoleKeys ?? const [];
+    _verifierRoles = Set<String>.from(
+      e?.effectiveVerifierRoleKeys(catalogDefaults) ?? catalogDefaults,
+    );
     _controlledInputEnabled = e?.controlledInputEnabled ?? false;
     _controlledInputMode = e?.controlledInputMode ?? 'off';
     if (_controlledInputEnabled && _controlledInputMode == 'off') {
       _controlledInputMode = 'strict';
     }
+    _cleaningChecklistMode = normalizeCleaningChecklistMode(
+      e?.cleaningChecklistMode,
+      _profileKey,
+    );
   }
 
   Future<void> _loadExistingConfigFresh() async {
@@ -127,6 +142,7 @@ class _ProductionEvidenceConfigFormScreenState
         evidenceConfigId: id,
       );
       if (!mounted) return;
+      if (fresh.evidenceConfigId.trim() != id) return;
       setState(() {
         _freshExisting = fresh;
         _applyExistingConfig(fresh);
@@ -184,6 +200,7 @@ class _ProductionEvidenceConfigFormScreenState
         active: _active,
         runtimeVisible: _runtimeVisible,
         runtimeAllowedRoles: _runtimeRoles.toList(growable: false),
+        verifierRoleKeys: _verifierRoles.toList(growable: false),
         displayOrder: order,
         controlledInputEnabled: _controlledInputEnabled,
         controlledInputMode: _controlledInputMode,
@@ -196,6 +213,10 @@ class _ProductionEvidenceConfigFormScreenState
                   _profileKey,
                 )
                 ? _controlledFormCodeCtrl.text.trim()
+                : null,
+        cleaningChecklistMode:
+            profileSupportsCleaningChecklistMode(_profileKey)
+                ? _cleaningChecklistMode
                 : null,
       );
     }
@@ -223,6 +244,7 @@ class _ProductionEvidenceConfigFormScreenState
       active: _active,
       runtimeVisible: _runtimeVisible,
       runtimeAllowedRoles: _runtimeRoles.toList(growable: false),
+      verifierRoleKeys: _verifierRoles.toList(growable: false),
       displayOrder: order,
       controlledInputEnabled: _controlledInputEnabled,
       controlledInputMode: _controlledInputMode,
@@ -236,6 +258,9 @@ class _ProductionEvidenceConfigFormScreenState
               )
               ? _controlledFormCodeCtrl.text.trim()
               : null,
+      cleaningChecklistMode: profileSupportsCleaningChecklistMode(_profileKey)
+          ? _cleaningChecklistMode
+          : null,
     );
   }
 
@@ -272,6 +297,7 @@ class _ProductionEvidenceConfigFormScreenState
     _errPlantKey = null;
     _errProfile = null;
     _errRoles = null;
+    _errVerifierRoles = null;
     _errActive = null;
     _errFormCode = null;
   }
@@ -292,6 +318,9 @@ class _ProductionEvidenceConfigFormScreenState
         break;
       case 'roles':
         _errRoles = mapped.fieldMessage;
+        break;
+      case 'verifierRoles':
+        _errVerifierRoles = mapped.fieldMessage;
         break;
       case 'active':
         _errActive = mapped.fieldMessage;
@@ -328,6 +357,12 @@ class _ProductionEvidenceConfigFormScreenState
     if (_runtimeVisible && _runtimeRoles.isEmpty) {
       _errRoles =
           'Odaberite najmanje jednu dozvoljenu ulogu za runtime prikaz.';
+      ok = false;
+    }
+    if ((_selectedProfile?.hasSignedLoggedInVerifier ?? false) &&
+        _verifierRoles.isEmpty) {
+      _errVerifierRoles =
+          'Odaberite najmanje jednu ulogu za verifikaciju.';
       ok = false;
     }
     if (_active) {
@@ -401,6 +436,7 @@ class _ProductionEvidenceConfigFormScreenState
   Future<void> _confirmArchive() async {
     if (!_isEdit || _readOnly) return;
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Arhiviraj evidenciju'),
@@ -446,10 +482,16 @@ class _ProductionEvidenceConfigFormScreenState
 
   @override
   Widget build(BuildContext context) {
-    final profileOptions = _evidenceProfileOptions;
-    final profileValue = profileOptions.any((p) => p.profileKey == _profileKey)
-        ? _profileKey
-        : (profileOptions.isNotEmpty ? profileOptions.first.profileKey : _profileKey);
+    var profileOptions = _evidenceProfileOptions;
+    if (_profileKey.isNotEmpty &&
+        !profileOptions.any((p) => p.profileKey == _profileKey)) {
+      final missing = widget.profileCatalog.byKey(_profileKey);
+      if (missing != null) {
+        profileOptions = [missing, ...profileOptions];
+      }
+    }
+    final profileValue = _profileKey;
+    final profileLocked = _readOnly || _isEdit;
 
     return PopScope(
       canPop: !_saving && !_archiving,
@@ -489,19 +531,24 @@ class _ProductionEvidenceConfigFormScreenState
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Text(
-                      'Evidencije ne ulaze u limit proizvodnih ni mašinskih stanica. '
-                      'Ista evidencija može postojati više puta — nezavisno po pogonu i procesu.',
+                      'Svaka evidencija ima vlastite postavke. '
+                      'Spremanje jedne evidencije ne mijenja drugu.',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ),
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  key: ValueKey(_profileKey),
+                  key: ValueKey('profile-$_profileKey-$_isEdit'),
                   isExpanded: true,
-                  initialValue: profileValue,
+                  initialValue: profileOptions.any((p) => p.profileKey == profileValue)
+                      ? profileValue
+                      : null,
                   decoration: InputDecoration(
                     labelText: 'Obrazac iz kataloga',
+                    helperText: _isEdit
+                        ? 'Obrazac pripada samo ovoj evidenciji i ne može se mijenjati.'
+                        : null,
                     errorText: _errProfile,
                   ),
                   items: profileOptions
@@ -516,7 +563,7 @@ class _ProductionEvidenceConfigFormScreenState
                         ),
                       )
                       .toList(),
-                  onChanged: _readOnly
+                  onChanged: profileLocked
                       ? null
                       : (v) {
                           if (v == null) return;
@@ -533,6 +580,13 @@ class _ProductionEvidenceConfigFormScreenState
                               _runtimeVisible = false;
                               _runtimeRoles = {};
                             }
+                            _errVerifierRoles = null;
+                            _verifierRoles = Set<String>.from(
+                              widget.profileCatalog.byKey(v)?.verifierRoleKeys ??
+                                  const [],
+                            );
+                            _cleaningChecklistMode =
+                                defaultCleaningChecklistMode(v);
                           });
                         },
                 ),
@@ -626,17 +680,23 @@ class _ProductionEvidenceConfigFormScreenState
                     .profileSupportsControlledFormDocumentCode(_profileKey)) ...[
                   const SizedBox(height: 12),
                   const Divider(height: 24),
-                  Text(
-                    'Kontrolisani obrazac (QMS)',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Kontrolisani obrazac (QMS)',
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
+                      ),
+                      const QmsControlledFormInfoIcon(size: 20),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Unesite samo oznaku obrasca prema dokumentacionoj politici '
-                    'kompanije. Naziv, revizija, status, vlasnik i retention '
-                    'povlače se iz odobrenog QMS obrasca (Dokumentacija → Obrasci).',
+                    'Ovo polje samo povezuje evidenciju sa već odobrenim QMS '
+                    'obrascem (ne kreira obrazac).',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 8),
@@ -650,10 +710,12 @@ class _ProductionEvidenceConfigFormScreenState
                       }
                     },
                     decoration: InputDecoration(
-                      labelText: 'Oznaka obrasca / dokumenta',
-                      hintText: 'npr. QF-PC-001, OBR-KV-04, F-08.2-PR',
+                      labelText: 'Oznaka već odobrenog QMS obrasca',
+                      hintText: 'npr. BR_OB_0001, QF-PC-001',
                       helperText:
-                          'Format nije propisan sistemom — određuje ga kompanija.',
+                          'Mora postojati u QMS → Dokumentacija → Obrasci '
+                          '(vrsta: Obrazac, status: Odobreno, '
+                          'opseg: cijela kompanija, s auditom odobrenja).',
                       errorText: _errFormCode,
                     ),
                   ),
@@ -817,6 +879,105 @@ class _ProductionEvidenceConfigFormScreenState
                             ),
                           )
                           .toList(),
+                    ),
+                  ],
+                  const Divider(height: 24),
+                  Text(
+                    'Dozvoljene uloge za verifikaciju',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: _errVerifierRoles != null
+                              ? Theme.of(context).colorScheme.error
+                              : null,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Koje uloge smiju verifikovati ovu evidenciju. '
+                    'Postavke vrijede samo za ovu evidenciju. '
+                    'Verifikacija je uvijek potpis prijavljenog korisnika — '
+                    'nije izbor tuđeg imena.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  if (_errVerifierRoles != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      _errVerifierRoles!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: ProductionStationConfig.runtimeAssignableRoles
+                        .map(
+                          (role) => FilterChip(
+                            label: Text(
+                              ProductionStationConfig.runtimeRoleLabel(role),
+                            ),
+                            selected: _verifierRoles.contains(role),
+                            onSelected: _readOnly
+                                ? null
+                                : (selected) {
+                                    setState(() {
+                                      _errVerifierRoles = null;
+                                      if (selected) {
+                                        _verifierRoles.add(role);
+                                      } else {
+                                        _verifierRoles.remove(role);
+                                      }
+                                    });
+                                  },
+                          ),
+                        )
+                        .toList(),
+                  ),
+                  if (profileSupportsCleaningChecklistMode(_profileKey)) ...[
+                    const Divider(height: 24),
+                    Text(
+                      'Način liste čišćenja',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _profileKey.trim() == 'workspace_5s_cleaning'
+                          ? 'Brza lista je preporuka za 5S čišćenje radnog prostora. '
+                              'Proširena lista je za smjensku ili audit provjeru.'
+                          : 'Proširena lista je preporuka za čišćenje mašine / linije. '
+                              'Brza lista je za kratku dnevnu provjeru.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        ChoiceChip(
+                          label: const Text(cleaningChecklistModeQuickLabel),
+                          selected:
+                              _cleaningChecklistMode == cleaningChecklistModeQuick,
+                          onSelected: _readOnly
+                              ? null
+                              : (_) => setState(() {
+                                    _cleaningChecklistMode =
+                                        cleaningChecklistModeQuick;
+                                  }),
+                        ),
+                        ChoiceChip(
+                          label: const Text(cleaningChecklistModeExtendedLabel),
+                          selected: _cleaningChecklistMode ==
+                              cleaningChecklistModeExtended,
+                          onSelected: _readOnly
+                              ? null
+                              : (_) => setState(() {
+                                    _cleaningChecklistMode =
+                                        cleaningChecklistModeExtended;
+                                  }),
+                        ),
+                      ],
                     ),
                   ],
                 ],

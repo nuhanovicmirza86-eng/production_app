@@ -21,7 +21,7 @@ abstract final class QmsIatfStrings {
       '(S, O, D → RPN; AP = prioritet akcije). Utječe na to što kontroliramo u kontrolnom planu i kontrolama.\n\n'
       '2) Ocjene rizika u sustavu agregiraju procjene po entitetima (npr. proizvod, stroj, partner) u jedinstveni motor — '
       'vidljive su razine rizika i gdje postoji RPN.\n\n'
-      '3) Reakcijski plan na NCR-u je kratkoročan odgovor (što odmah radimo); containment je izolacija nesklada.\n\n'
+      '3) Plan brze reakcije na neusaglašenosti je kratkoročan odgovor (što odmah radimo); mjera zadržavanja je izolacija nesklada.\n\n'
       '4) Akcijski plan (CAPA) uklanja uzrok trajno (8D, Ishikawa, verifikacija) — nije isto što reakcijski plan ni PFMEA red.';
 
   static const termActionPlan = 'Akcijski plan: u smislu IATF-a strukturirani niz koraka za uklanjanje uzroka nesklada '
@@ -65,9 +65,9 @@ abstract final class QmsIatfStrings {
       'na podskup karakteristika iz kontrolnog plana (pokazivači ref, npr. 0:0).';
 
   static const kpiNcr = 'NCR (Non-Conformance Report): formalni zapis nesklada — što je otkriveno, '
-      'ozbiljnost, status i privremene mjere (containment). Otvoreni su dok su u aktivnom rješavanju.';
+      'ozbiljnost, status i mjere zadržavanja. Otvoreni su dok su u aktivnom rješavanju.';
 
-  static const kpiCapa = 'CAPA (Corrective Action / Preventive Action): strukturirano rješavanje uzroka; '
+  static const kpiCapa = 'CAPA (korektivna/preventivna mjera): strukturirano rješavanje uzroka; '
       'u sustavu su zapisane kao action_plans s izvorom NCR. Praćen su status, rok i verifikacija.';
 
   static const listControlPlans = 'Lista kontrolnih planova po kompaniji. Uređivanje i čitanje '
@@ -92,12 +92,13 @@ abstract final class QmsIatfStrings {
   static const listNcr = 'NCR: evidencija nesklada (IATF 10.2). Statusi vode životni ciklus od otvaranja do zatvaranja; '
       'prilozi pri zatvaranju služe kao dokaz (evidence).';
 
-  static const detailNcr = 'NCR: opis nesklada, ozbiljnost, containment, reakcijski plan (brzi odgovor), '
-      'prilozi (https). Prijelaz u Pregled/Contained može automatski otvoriti CAPA. Zatvoreno/Odbačeno zahtijeva prilog. '
-      'Za HIGH/CRITICAL: prije zatvaranja potrebna je otvorena CAPA ili odstupanje (razlog).';
+  static const detailNcr = 'Neusaglašenost: opis, ozbiljnost, mjera zadržavanja, plan brze reakcije, '
+      'prilozi (https). Prijelaz u U pregledu / Zadržano može automatski otvoriti korektivnu mjeru. '
+      'Zatvoreno/Odbačeno zahtijeva prilog. Za visoku/kritičnu ozbiljnost: prije zatvaranja potrebna je '
+      'CAPA ili odstupanje uz odobrenje.';
 
   /// Polje „odstupanje od CAPA” na NCR-u (korak 4 IATF plana).
-  static const termCapaGateHighSeverity = 'Za ozbiljnost HIGH ili CRITICAL sustav zahtijeva trag: '
+  static const termCapaGateHighSeverity = 'Za visoku ili kritičnu ozbiljnost sustav zahtijeva trag: '
       'barem jedna otvorena CAPA (status open, in_progress ili waiting_verification) '
       'ili eksplicitno odstupanje s razlogom ako CAPA nije primjerena.';
 
@@ -140,29 +141,104 @@ abstract final class QmsIatfStrings {
   static const termCharacteristicRefs = 'Ref u obliku operacija:indeks (npr. 1:2) pokazuje na stavku u kontrolnom planu. '
       'Prazan popis znači da se pri izvršenju uzimaju sve karakteristike iz plana.';
 
-  static const termContainment = 'Containment: brza izolacija ili zaštita od daljnje isporuke ili uporabe nesklada '
+  static const termContainment = 'Mjera zadržavanja: brza izolacija ili zaštita od daljnje isporuke ili uporabe nesklada '
       '(privremena mjera dok se ne riješi uzrok).';
 
-  static const termReactionPlan = 'Reakcijski plan (brzi odgovor): što radimo odmah u kratkom roku (npr. sortiranje, '
-      'zadržavanje, obavijest kupcu) — odvojeno od containmenta i od trajnog korektivnog plana (CAPA).';
+  static const termReactionPlan = 'Plan brze reakcije: što radimo odmah u kratkom roku (npr. sortiranje, '
+      'zadržavanje, obavijest kupcu) — odvojeno od mjere zadržavanja i od trajnog korektivnog plana (CAPA).';
 
   static const termPartnerIdsInspection = 'ID kupca / dobavljača (opcionalno): ako su uneseni, šalju se uz rezultat '
       'kontrole i na automatski NCR pri NOK — korisno za segment i reklamacije.';
 
   static const termRootCause = 'Root cause: utvrđeni uzrok nesklada (ne simptom); osnova za trajnu korektivnu akciju.';
 
-  static const termLot = 'LOT / serija: jedinica sljedljivosti u logistici i kvaliteti — koja je roba, kada i gdje proizvedena.';
+  static const termLot = 'Lot / serija: jedinica sljedljivosti u logistici i kvaliteti — koja je roba, kada i gdje proizvedena.';
 
   static const termQms = 'QMS: sustav upravljanja kvalitetom organizacije (IATF 16949 za automotive).';
 
-  static const termTraceability = 'Sljedljivost: povezivanje rezultata kontrole s nalogom, LOT-om i planom — '
+  static const termTraceability = 'Sljedljivost: povezivanje rezultata kontrole s nalogom, lotom i planom — '
       'zahtjev IATF za identifikaciju i praćenje.';
 
-  static const termSeverity = 'Ozbiljnost (severity): procjena utjecaja nesklada na proizvod, kupca ili sigurnost; '
+  static const termSeverity = 'Ozbiljnost: procjena utjecaja nesklada na proizvod, kupca ili sigurnost; '
       'pomaže prioritetima i eskalaciji.';
 
   static const termVerification = 'Verifikacija CAPA: dokaz da su akcije provedene i da je uzrok uklonjen '
       '(učinkovitost korekcije).';
+
+  /// Skraćenice — jedna po info ikonici (samo ta skraćenica, ne cijeli rječnik).
+  static const abbrNcrTitle = 'NCR';
+  static const abbrNcr =
+      'NCR znači neusaglašenost — zapis problema, odbijanja ili odstupanja u kvalitetu.';
+  static const abbrQmsTitle = 'QMS';
+  static const abbrQms =
+      'QMS znači sistem upravljanja kvalitetom.';
+  static const abbrCapaTitle = 'CAPA';
+  static const abbrCapa =
+      'CAPA znači korektivna i preventivna mjera.';
+  static const abbrWmsTitle = 'WMS';
+  static const abbrWms =
+      'WMS znači sistem za upravljanje skladištem.';
+
+  /// Postupak — Potrebna dorada (faza 1).
+  static const reworkNeededProcessHelp =
+      'Kontrola kvaliteta pokreće potrebu za doradom. '
+      'Odgovorni vlasnik je menadžer proizvodnje. '
+      'On organizuje doradu, dodjeljuje izvršioca i određuje proizvodni rok.';
+
+  /// Postupak — dodjela izvršioca dorade (faza 2).
+  static const reworkAssignExecutorProcessHelp =
+      'Menadžer proizvodnje dodjeljuje izvršioca dorade '
+      '(operater proizvodnje ili vođa smjene / linije) '
+      'i određuje proizvodni rok.';
+}
+
+/// Info ikonica za **jednu** skraćenicu — samo na mjestu gdje se koristi.
+enum QmsAbbrevTerm { ncr, qms, capa, wms }
+
+class QmsAbbrevInfoIcon extends StatelessWidget {
+  const QmsAbbrevInfoIcon({
+    super.key,
+    required this.term,
+    this.size = 18,
+  });
+
+  final QmsAbbrevTerm term;
+  final double size;
+
+  String get _title {
+    switch (term) {
+      case QmsAbbrevTerm.ncr:
+        return QmsIatfStrings.abbrNcrTitle;
+      case QmsAbbrevTerm.qms:
+        return QmsIatfStrings.abbrQmsTitle;
+      case QmsAbbrevTerm.capa:
+        return QmsIatfStrings.abbrCapaTitle;
+      case QmsAbbrevTerm.wms:
+        return QmsIatfStrings.abbrWmsTitle;
+    }
+  }
+
+  String get _message {
+    switch (term) {
+      case QmsAbbrevTerm.ncr:
+        return QmsIatfStrings.abbrNcr;
+      case QmsAbbrevTerm.qms:
+        return QmsIatfStrings.abbrQms;
+      case QmsAbbrevTerm.capa:
+        return QmsIatfStrings.abbrCapa;
+      case QmsAbbrevTerm.wms:
+        return QmsIatfStrings.abbrWms;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return QmsIatfInfoIcon(
+      title: _title,
+      message: _message,
+      size: size,
+    );
+  }
 }
 
 /// Info ikona koja otvara dijalog s IATF objašnjenjem.
@@ -188,6 +264,7 @@ class QmsIatfInfoIcon extends StatelessWidget {
       tooltip: title,
       onPressed: () {
         showDialog<void>(
+      barrierDismissible: false,
           context: context,
           builder: (ctx) => AlertDialog(
             title: Text(title),

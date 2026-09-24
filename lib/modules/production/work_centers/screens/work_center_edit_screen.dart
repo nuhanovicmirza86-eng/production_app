@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../tracking/services/production_asset_display_lookup.dart';
 import '../models/work_center_model.dart';
@@ -59,6 +60,14 @@ class _WorkCenterEditScreenState extends State<WorkCenterEditScreen> {
           .toString()
           .trim();
 
+  String get _role =>
+      ProductionAccessHelper.normalizeRole(widget.companyData['role']);
+
+  bool get _canManage => ProductionAccessHelper.canManage(
+    role: _role,
+    card: ProductionDashboardCard.workCenters,
+  );
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +86,14 @@ class _WorkCenterEditScreenState extends State<WorkCenterEditScreen> {
   }
 
   Future<void> _bootstrap() async {
+    if (!_canManage) {
+      setState(() {
+        _pageLoading = false;
+        _loadError =
+            'Nemate pravo izmjene radnih centara za ovu ulogu.';
+      });
+      return;
+    }
     setState(() {
       _pageLoading = true;
       _loadError = null;

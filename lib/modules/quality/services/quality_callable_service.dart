@@ -1,7 +1,13 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../models/ncr_action_history_models.dart';
 import '../models/qms_execution_models.dart';
 import '../models/qms_list_models.dart';
+import 'ncr_closure_attachment_upload.dart'
+    show NcrClosureAttachmentUploadInfo, NcrClosureUploadedAttachment;
 
 /// QMS Callable-i — mutacije i liste (Firestore rules: klijent read/write false na QMS kolekcijama).
 class QualityCallableService {
@@ -321,6 +327,18 @@ class QualityCallableService {
     return id;
   }
 
+  /// QMS-M1 — sistemsko odobrenje (audit snapshot ime/email/vrijeme).
+  Future<void> approveQmsDocument({
+    required String companyId,
+    required String qmsDocumentId,
+  }) async {
+    final callable = _functions.httpsCallable('approveQmsDocument');
+    await callable.call({
+      'companyId': companyId,
+      'qmsDocumentId': qmsDocumentId,
+    });
+  }
+
   /// Brisanje reda u `qms_documents` (+ Storage datoteka ako postoji putanja).
   Future<void> deleteQmsDocument({
     required String companyId,
@@ -346,10 +364,60 @@ class QualityCallableService {
     return _parseRows(res.data, QmsInspectionResultRow.fromMap);
   }
 
+  /// M1-I13-C — poslovni ledger historije akcija za jedan NCR.
+  Future<NcrActionHistoryListResult> listNcrActionHistory({
+    required String companyId,
+    required String ncrId,
+    int limit = 50,
+  }) async {
+    final callable = _functions.httpsCallable('listNcrActionHistory');
+    final res = await callable.call({
+      'companyId': companyId,
+      'ncrId': ncrId,
+      'limit': limit,
+    });
+    return NcrActionHistoryListResult.fromMap(
+      Map<String, dynamic>.from((res.data as Map?) ?? const <String, dynamic>{}),
+    );
+  }
+
+  /// M1-I13-F — Operonix AI Asistent objašnjenje determinističkih signala.
+  Future<NcrActionRiskAiExplanation> explainNcrActionRiskSignals({
+    required String companyId,
+    required String ncrId,
+  }) async {
+    final callable = _functions.httpsCallable('explainNcrActionRiskSignals');
+    final res = await callable.call({
+      'companyId': companyId,
+      'ncrId': ncrId,
+    });
+    return NcrActionRiskAiExplanation.fromMap(
+      Map<String, dynamic>.from((res.data as Map?) ?? const <String, dynamic>{}),
+    );
+  }
+
+  /// M1-I13-C — deterministički risk signali (priprema za banner M1-I13-E).
+  Future<NcrActionRiskSignalsResult> getNcrActionRiskSignals({
+    required String companyId,
+    required String ncrId,
+  }) async {
+    final callable = _functions.httpsCallable('getNcrActionRiskSignals');
+    final res = await callable.call({
+      'companyId': companyId,
+      'ncrId': ncrId,
+    });
+    return NcrActionRiskSignalsResult.fromMap(
+      Map<String, dynamic>.from((res.data as Map?) ?? const <String, dynamic>{}),
+    );
+  }
+
   Future<List<QmsNcrRow>> listNonConformances({
     required String companyId,
     int limit = 100,
-    bool openOnly = true,
+    /// `open` | `closed` | `dismissed` | `all` — default `open`.
+    String statusFilter = 'open',
+    /// Legacy: ako je `openOnly: false` a nema `statusFilter`, backend koristi `all`.
+    bool? openOnly,
     /// `customer` | `supplier` | `internal` | `operations` ili prazno = sve.
     String? sourceFilter,
     /// Filtar NCR zapisa za jedan proizvod (`products` id).
@@ -359,7 +427,8 @@ class QualityCallableService {
     final res = await callable.call({
       'companyId': companyId,
       'limit': limit,
-      'openOnly': openOnly,
+      'statusFilter': statusFilter.trim(),
+      if (openOnly != null) 'openOnly': openOnly,
       if (sourceFilter != null && sourceFilter.trim().isNotEmpty)
         'sourceFilter': sourceFilter.trim(),
       if (productId != null && productId.trim().isNotEmpty)
@@ -476,6 +545,23 @@ class QualityCallableService {
     String? capaWaiverReason,
     String? sourceModule,
     List<String>? fiveWhySteps,
+    /// M1-I10-A / M1-I12-B preddefinisana sljedeća akcija.
+    String? nextDispositionActionKey,
+    String? nextDispositionOwner,
+    String? nextDispositionOwnerUserKey,
+    String? nextDispositionDueAt,
+    String? nextDispositionReason,
+    String? nextDispositionRoleKey,
+    String? nextDispositionRoleLabel,
+    String? nextDispositionPriorityKey,
+    String? nextDispositionPriorityLabel,
+    String? nextDispositionTask,
+    String? nextDispositionNote,
+    String? nextDispositionPhase,
+    String? nextDispositionExecutor,
+    String? nextDispositionExecutorUserKey,
+    String? nextDispositionExecutorRoleKey,
+    String? nextDispositionExecutorRoleLabel,
   }) async {
     final callable = _functions.httpsCallable('updateQmsNonConformance');
     final res = await callable.call({
@@ -491,8 +577,314 @@ class QualityCallableService {
       if (capaWaiverReason != null) 'capaWaiverReason': capaWaiverReason,
       if (sourceModule != null) 'sourceModule': sourceModule,
       if (fiveWhySteps != null) 'fiveWhySteps': fiveWhySteps,
+      if (nextDispositionActionKey != null)
+        'nextDispositionActionKey': nextDispositionActionKey,
+      if (nextDispositionOwner != null)
+        'nextDispositionOwner': nextDispositionOwner,
+      if (nextDispositionOwnerUserKey != null)
+        'nextDispositionOwnerUserKey': nextDispositionOwnerUserKey,
+      if (nextDispositionDueAt != null)
+        'nextDispositionDueAt': nextDispositionDueAt,
+      if (nextDispositionReason != null)
+        'nextDispositionReason': nextDispositionReason,
+      if (nextDispositionRoleKey != null)
+        'nextDispositionRoleKey': nextDispositionRoleKey,
+      if (nextDispositionRoleLabel != null)
+        'nextDispositionRoleLabel': nextDispositionRoleLabel,
+      if (nextDispositionPriorityKey != null)
+        'nextDispositionPriorityKey': nextDispositionPriorityKey,
+      if (nextDispositionPriorityLabel != null)
+        'nextDispositionPriorityLabel': nextDispositionPriorityLabel,
+      if (nextDispositionTask != null)
+        'nextDispositionTask': nextDispositionTask,
+      if (nextDispositionNote != null)
+        'nextDispositionNote': nextDispositionNote,
+      if (nextDispositionPhase != null)
+        'nextDispositionPhase': nextDispositionPhase,
+      if (nextDispositionExecutor != null)
+        'nextDispositionExecutor': nextDispositionExecutor,
+      if (nextDispositionExecutorUserKey != null)
+        'nextDispositionExecutorUserKey': nextDispositionExecutorUserKey,
+      if (nextDispositionExecutorRoleKey != null)
+        'nextDispositionExecutorRoleKey': nextDispositionExecutorRoleKey,
+      if (nextDispositionExecutorRoleLabel != null)
+        'nextDispositionExecutorRoleLabel': nextDispositionExecutorRoleLabel,
     });
     return Map<String, dynamic>.from((res.data as Map?) ?? const <String, dynamic>{});
+  }
+
+  /// M1-I12-D — inbox otvorenih NCR akcija po ulozi.
+  Future<Map<String, dynamic>> listMyNcrOpenActionTasks({
+    required String companyId,
+  }) async {
+    final callable = _functions.httpsCallable('listMyNcrOpenActionTasks');
+    final res = await callable.call({'companyId': companyId});
+    return Map<String, dynamic>.from(
+      (res.data as Map?) ?? const <String, dynamic>{},
+    );
+  }
+
+  /// M1-I12-D — scoped lista zadataka dorade za dodijeljenog izvršioca.
+  Future<Map<String, dynamic>> listMyNcrReworkExecutorTasks({
+    required String companyId,
+  }) async {
+    final callable = _functions.httpsCallable('listMyNcrReworkExecutorTasks');
+    final res = await callable.call({'companyId': companyId});
+    return Map<String, dynamic>.from(
+      (res.data as Map?) ?? const <String, dynamic>{},
+    );
+  }
+
+  /// M1-I12-D — jedan zadatak dorade (samo dodijeljeni izvršilac).
+  Future<Map<String, dynamic>> getNcrReworkExecutorTask({
+    required String companyId,
+    required String ncrId,
+  }) async {
+    final callable = _functions.httpsCallable('getNcrReworkExecutorTask');
+    final res = await callable.call({
+      'companyId': companyId,
+      'ncrId': ncrId,
+    });
+    return Map<String, dynamic>.from(
+      (res.data as Map?) ?? const <String, dynamic>{},
+    );
+  }
+
+  /// M1-I12-D — preusmjeravanje s evidencije na zadatak dorade.
+  Future<Map<String, dynamic>> resolveNcrReworkExecutorTaskForEvidenceSession({
+    required String companyId,
+    required String sessionId,
+  }) async {
+    final callable = _functions.httpsCallable(
+      'resolveNcrReworkExecutorTaskForEvidenceSession',
+    );
+    final res = await callable.call({
+      'companyId': companyId,
+      'sessionId': sessionId,
+    });
+    return Map<String, dynamic>.from(
+      (res.data as Map?) ?? const <String, dynamic>{},
+    );
+  }
+
+  /// M1-I12-D — izvršilac potvrđuje da je dorada urađena (korak 7).
+  Future<Map<String, dynamic>> confirmNcrReworkExecution({
+    required String companyId,
+    required String ncrId,
+    required int reworkedQty,
+    required int separatedQty,
+    required int toRecheckQty,
+    required String workDescription,
+    required bool machineCorrectionDone,
+    required DateTime executedAt,
+    String? correctionDescription,
+    String? separatedDescription,
+    String? note,
+  }) async {
+    final callable = _functions.httpsCallable('confirmNcrReworkExecution');
+    final res = await callable.call({
+      'companyId': companyId,
+      'ncrId': ncrId,
+      'reworkedQty': reworkedQty,
+      'separatedQty': separatedQty,
+      'toRecheckQty': toRecheckQty,
+      'workDescription': workDescription,
+      'machineCorrectionDone': machineCorrectionDone,
+      if (correctionDescription != null)
+        'correctionDescription': correctionDescription,
+      if (separatedDescription != null)
+        'separatedDescription': separatedDescription,
+      if (note != null) 'note': note,
+      'executedAt': executedAt.toUtc().toIso8601String(),
+    });
+    return Map<String, dynamic>.from(
+      (res.data as Map?) ?? const <String, dynamic>{},
+    );
+  }
+
+  /// M1-I12-D — kontrola kvaliteta evidentira ponovnu kontrolu (korak 9).
+  Future<Map<String, dynamic>> recordNcrRecheckResult({
+    required String companyId,
+    required String ncrId,
+    required int checkedQty,
+    required int okQty,
+    required int rejectedQty,
+    required int separatedQty,
+    required String checkDescription,
+    String? note,
+  }) async {
+    final callable = _functions.httpsCallable('recordNcrRecheckResult');
+    final res = await callable.call({
+      'companyId': companyId,
+      'ncrId': ncrId,
+      'checkedQty': checkedQty,
+      'okQty': okQty,
+      'rejectedQty': rejectedQty,
+      'separatedQty': separatedQty,
+      'checkDescription': checkDescription,
+      if (note != null) 'note': note,
+    });
+    return Map<String, dynamic>.from(
+      (res.data as Map?) ?? const <String, dynamic>{},
+    );
+  }
+
+  /// M1-I12-D — upload dokaza zatvaranja NCR (Admin SDK, bez CORS).
+  Future<NcrClosureUploadedAttachment> uploadNcrClosureAttachment({
+    required String companyId,
+    required String ncrId,
+    required Uint8List bytes,
+    required String fileName,
+    required String contentType,
+    required String displayLabel,
+  }) async {
+    final callable = _functions.httpsCallable('uploadNcrClosureAttachment');
+    final res = await callable.call({
+      'companyId': companyId,
+      'ncrId': ncrId,
+      'fileName': fileName,
+      'contentType': contentType,
+      'fileBase64': base64Encode(bytes),
+    });
+    final root = Map<String, dynamic>.from((res.data as Map?) ?? {});
+    final storagePath = (root['storagePath'] ?? '').toString();
+    if (storagePath.isEmpty) {
+      throw Exception(
+        'Nije moguće dodati dokaz zatvaranja. Server nije vratio putanju datoteke.',
+      );
+    }
+    return NcrClosureUploadedAttachment(
+      label: displayLabel,
+      storagePath: storagePath,
+      fileName: (root['fileName'] ?? fileName).toString(),
+    );
+  }
+
+  /// M1-I12-D — potpisani URL za upload dokaza zatvaranja NCR (legacy / fallback).
+  Future<NcrClosureAttachmentUploadInfo> getNcrClosureAttachmentUploadUrl({
+    required String companyId,
+    required String ncrId,
+    required String fileName,
+    String contentType = 'application/octet-stream',
+  }) async {
+    final callable = _functions.httpsCallable('getNcrClosureAttachmentUploadUrl');
+    final res = await callable.call({
+      'companyId': companyId,
+      'ncrId': ncrId,
+      'fileName': fileName,
+      'contentType': contentType,
+    });
+    final root = Map<String, dynamic>.from((res.data as Map?) ?? {});
+    return NcrClosureAttachmentUploadInfo(
+      uploadUrl: (root['uploadUrl'] ?? '').toString(),
+      storagePath: (root['storagePath'] ?? '').toString(),
+      contentType: (root['contentType'] ?? contentType).toString(),
+    );
+  }
+
+  /// M1-I12-D — vođeno zatvaranje neusaglašenosti (dokaz + CAPA odluka).
+  Future<Map<String, dynamic>> closeNcrWithExecutionEvidence({
+    required String companyId,
+    required String ncrId,
+    required String capaDecision,
+    required List<Map<String, String>> newAttachments,
+    String? capaNotRequiredReasonKey,
+    String? capaNotRequiredReasonOther,
+    String? closureNote,
+  }) async {
+    final callable = _functions.httpsCallable('closeNcrWithExecutionEvidence');
+    final res = await callable.call({
+      'companyId': companyId,
+      'ncrId': ncrId,
+      'capaDecision': capaDecision,
+      'newAttachments': newAttachments,
+      if (capaNotRequiredReasonKey != null &&
+          capaNotRequiredReasonKey.trim().isNotEmpty)
+        'capaNotRequiredReasonKey': capaNotRequiredReasonKey.trim(),
+      if (capaNotRequiredReasonOther != null &&
+          capaNotRequiredReasonOther.trim().isNotEmpty)
+        'capaNotRequiredReasonOther': capaNotRequiredReasonOther.trim(),
+      if (closureNote != null && closureNote.trim().isNotEmpty)
+        'closureNote': closureNote.trim(),
+    });
+    return Map<String, dynamic>.from(
+      (res.data as Map?) ?? const <String, dynamic>{},
+    );
+  }
+
+  /// M1-I12-D — evidencija zaustavljanja proizvodnje.
+  Future<Map<String, dynamic>> recordNcrProductionStop({
+    required String companyId,
+    required String ncrId,
+    required String machineLabel,
+    required String reason,
+    required String restartCondition,
+    required int separatedQty,
+    required String releaseApproverUserKey,
+    required String releaseApproverName,
+    String? separatedDescription,
+    String? productionOrderCode,
+    String? productLabel,
+  }) async {
+    final callable = _functions.httpsCallable('recordNcrProductionStop');
+    final res = await callable.call({
+      'companyId': companyId,
+      'ncrId': ncrId,
+      'machineLabel': machineLabel,
+      'reason': reason,
+      'restartCondition': restartCondition,
+      'separatedQty': separatedQty,
+      'releaseApproverUserKey': releaseApproverUserKey,
+      'releaseApproverName': releaseApproverName,
+      if (separatedDescription != null)
+        'separatedDescription': separatedDescription,
+      if (productionOrderCode != null)
+        'productionOrderCode': productionOrderCode,
+      if (productLabel != null) 'productLabel': productLabel,
+    });
+    return Map<String, dynamic>.from(
+      (res.data as Map?) ?? const <String, dynamic>{},
+    );
+  }
+
+  /// M1-I12-D — odobrenje nastavka proizvodnje nakon zaustavljanja.
+  Future<Map<String, dynamic>> approveNcrProductionStopRelease({
+    required String companyId,
+    required String ncrId,
+    required bool conditionMet,
+    required String releaseNote,
+  }) async {
+    final callable =
+        _functions.httpsCallable('approveNcrProductionStopRelease');
+    final res = await callable.call({
+      'companyId': companyId,
+      'ncrId': ncrId,
+      'conditionMet': conditionMet,
+      'releaseNote': releaseNote,
+    });
+    return Map<String, dynamic>.from(
+      (res.data as Map?) ?? const <String, dynamic>{},
+    );
+  }
+
+  /// M1-I12-B — aktivni korisnici kompanije za kontrolisanu dodjelu akcije.
+  Future<List<Map<String, dynamic>>> listUsersForNcrDispositionAssignment({
+    required String companyId,
+    required List<String> roleKeys,
+  }) async {
+    final callable =
+        _functions.httpsCallable('listUsersForNcrDispositionAssignment');
+    final res = await callable.call({
+      'companyId': companyId,
+      'roleKeys': roleKeys,
+    });
+    final m = Map<String, dynamic>.from((res.data as Map?) ?? {});
+    final raw = m['users'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
   }
 
   Future<List<QmsCapaRow>> listCapaForNcr({

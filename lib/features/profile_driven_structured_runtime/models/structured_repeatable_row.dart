@@ -40,6 +40,7 @@ class StructuredRepeatableRow {
     for (final key in [
       'productId',
       'materialId',
+      'componentMaterialId',
       'operatorId',
       'productionOrderId',
     ]) {
@@ -70,6 +71,11 @@ class StructuredRepeatableRow {
       case 'materialId':
         final code = (values['materialCodeSnapshot'] ?? '').toString().trim();
         final name = (values['materialNameSnapshot'] ?? '').toString().trim();
+        if (code.isNotEmpty && name.isNotEmpty) return '$code — $name';
+        return code.isNotEmpty ? code : (name.isEmpty ? null : name);
+      case 'componentMaterialId':
+        final code = (values['componentCodeSnapshot'] ?? '').toString().trim();
+        final name = (values['componentNameSnapshot'] ?? '').toString().trim();
         if (code.isNotEmpty && name.isNotEmpty) return '$code — $name';
         return code.isNotEmpty ? code : (name.isEmpty ? null : name);
       case 'operatorId':

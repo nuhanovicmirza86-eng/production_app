@@ -690,6 +690,7 @@ class _DevelopmentProjectsListScreenState
   void _showPortfolioInfoDialog() {
     final scheme = Theme.of(context).colorScheme;
     showDialog<void>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Pomoć — portfelj'),

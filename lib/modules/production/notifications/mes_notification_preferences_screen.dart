@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-/// Faza 3 MES — korisničke preference (tiši sati za S1/S2 push, dnevni digest e-poštom).
-/// Polja na [users]: [mesQuietHours], [mesDailyDigestEmail] (vidi Firestore rules).
+import 'mes_notification_prefs.dart';
+
+/// NOTIF-M1-D1 — Postavke → Obavijesti.
 class MesNotificationPreferencesScreen extends StatefulWidget {
   const MesNotificationPreferencesScreen({super.key});
 
@@ -14,12 +16,15 @@ class MesNotificationPreferencesScreen extends StatefulWidget {
 
 class _MesNotificationPreferencesScreenState
     extends State<MesNotificationPreferencesScreen> {
+  static final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
+    region: 'europe-west1',
+  );
   final _db = FirebaseFirestore.instance;
 
   bool _loading = true;
   bool _saving = false;
   String? _error;
-
+  MesNotificationPrefs _prefs = MesNotificationPrefs.allEnabled();
   bool _digestEmail = false;
   bool _quietEnabled = false;
   int _quietStart = 22;
@@ -42,15 +47,14 @@ class _MesNotificationPreferencesScreenState
       });
       return;
     }
-
     setState(() {
       _loading = true;
       _error = null;
     });
-
     try {
       final snap = await _db.collection('users').doc(u.uid).get();
       final d = snap.data() ?? {};
+      _prefs = MesNotificationPrefs.fromUser(d);
       final qh = d['mesQuietHours'];
       if (qh is Map) {
         _quietStart = _hour(qh['startHour'], fallback: 22);
@@ -63,11 +67,9 @@ class _MesNotificationPreferencesScreenState
       }
       _digestEmail = d['mesDailyDigestEmail'] == true;
     } catch (e) {
-      _error = e.toString();
+      _error = 'Postavke se nisu mogle učitati.';
     } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -80,20 +82,18 @@ class _MesNotificationPreferencesScreenState
   Future<void> _save() async {
     final u = _user;
     if (u == null) return;
-
     setState(() {
       _saving = true;
       _error = null;
     });
-
     try {
+      await _functions.httpsCallable('updateMesNotificationPreferences').call({
+        'prefs': _prefs.toPayload(),
+      });
       final patch = <String, dynamic>{
         'updatedAt': FieldValue.serverTimestamp(),
-        'updatedByUid': u.uid,
-        'updatedByEmail': u.email ?? '',
         'mesDailyDigestEmail': _digestEmail,
       };
-
       if (_quietEnabled) {
         patch['mesQuietHours'] = {
           'startHour': _quietStart,
@@ -103,7 +103,6 @@ class _MesNotificationPreferencesScreenState
       } else {
         patch['mesQuietHours'] = FieldValue.delete();
       }
-
       await _db.collection('users').doc(u.uid).update(patch);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -112,129 +111,200 @@ class _MesNotificationPreferencesScreenState
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _error = e.toString());
+        setState(() => _error = 'Postavke nisu sačuvane.');
       }
     } finally {
-      if (mounted) {
-        setState(() => _saving = false);
-      }
+      if (mounted) setState(() => _saving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('MES obavijesti'),
-      ),
+      appBar: AppBar(title: const Text('Obavijesti')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               children: [
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(
-                      _error!,
-                      style: TextStyle(color: Theme.of(context).colorScheme.error),
-                    ),
-                  ),
                 Text(
-                  'Push obavijesti niske ozbiljnosti (S1/S2) ne šalju se u zadatom noćnom prozoru. '
-                  'Hitne obavijesti (S3/S4) uvijek stižu.',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  'Odaberite koje informativne i upozoravajuće obavijesti želite primati. '
+                  'Obavezne akcije, sigurnost, HOLD, NCR / CAPA i verifikacije se ne mogu isključiti.',
+                  style: theme.textTheme.bodyMedium,
                 ),
-                const SizedBox(height: 16),
-                SwitchListTile(
-                  title: const Text('Tiši sati (S1/S2 push)'),
-                  subtitle: Text(
-                    _quietEnabled
-                        ? 'Od $_quietStart:00 do $_quietEnd:00 (Europe/Sarajevo)'
-                        : 'Isključeno',
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _error!,
+                    style: TextStyle(color: theme.colorScheme.error),
                   ),
-                  value: _quietEnabled,
-                  onChanged: _saving
-                      ? null
-                      : (v) => setState(() => _quietEnabled = v),
-                ),
-                if (_quietEnabled) ...[
-                  Row(
+                ],
+                const SizedBox(height: 16),
+                for (final cat in MesNotificationPrefs.categories) ...[
+                  _CategoryCard(
+                    category: cat,
+                    enabled: _prefs.isEnabled(cat.id),
+                    saving: _saving,
+                    onChanged: cat.canDisable
+                        ? (v) => setState(
+                              () => _prefs = _prefs.copyWithId(cat.id, v),
+                            )
+                        : null,
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                const SizedBox(height: 8),
+                Text('Dodatno', style: theme.textTheme.titleSmall),
+                const SizedBox(height: 8),
+                Card(
+                  child: Column(
                     children: [
-                      Expanded(
-                        child: DropdownButtonFormField<int>(
-                          key: ValueKey(
-                            'mes-quiet-start-$_quietEnabled-$_quietStart',
-                          ),
-                          decoration: const InputDecoration(
-                            labelText: 'Početak (sat)',
-                          ),
-                          initialValue: _quietStart,
-                          items: List.generate(
-                            24,
-                            (i) => DropdownMenuItem(value: i, child: Text('$i:00')),
-                          ),
-                          onChanged: _saving
-                              ? null
-                              : (v) {
-                                  if (v != null) {
-                                    setState(() => _quietStart = v);
-                                  }
-                                },
+                      SwitchListTile(
+                        title: const Text('Tiši sati'),
+                        subtitle: Text(
+                          _quietEnabled
+                              ? 'Push niže hitnosti od $_quietStart:00 do $_quietEnd:00. Kritične obavijesti i dalje stižu.'
+                              : 'Isključeno. Kritične obavijesti uvijek stižu.',
                         ),
+                        value: _quietEnabled,
+                        onChanged: _saving
+                            ? null
+                            : (v) => setState(() => _quietEnabled = v),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: DropdownButtonFormField<int>(
-                          key: ValueKey(
-                            'mes-quiet-end-$_quietEnabled-$_quietEnd',
+                      if (_quietEnabled)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<int>(
+                                  key: ValueKey('quiet-start-$_quietStart'),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Početak',
+                                  ),
+                                  initialValue: _quietStart,
+                                  items: List.generate(
+                                    24,
+                                    (i) => DropdownMenuItem(
+                                      value: i,
+                                      child: Text('$i:00'),
+                                    ),
+                                  ),
+                                  onChanged: _saving
+                                      ? null
+                                      : (v) {
+                                          if (v != null) {
+                                            setState(() => _quietStart = v);
+                                          }
+                                        },
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: DropdownButtonFormField<int>(
+                                  key: ValueKey('quiet-end-$_quietEnd'),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Kraj',
+                                  ),
+                                  initialValue: _quietEnd,
+                                  items: List.generate(
+                                    24,
+                                    (i) => DropdownMenuItem(
+                                      value: i,
+                                      child: Text('$i:00'),
+                                    ),
+                                  ),
+                                  onChanged: _saving
+                                      ? null
+                                      : (v) {
+                                          if (v != null) {
+                                            setState(() => _quietEnd = v);
+                                          }
+                                        },
+                                ),
+                              ),
+                            ],
                           ),
-                          decoration: const InputDecoration(
-                            labelText: 'Kraj (sat)',
-                          ),
-                          initialValue: _quietEnd,
-                          items: List.generate(
-                            24,
-                            (i) => DropdownMenuItem(value: i, child: Text('$i:00')),
-                          ),
-                          onChanged: _saving
-                              ? null
-                              : (v) {
-                                  if (v != null) {
-                                    setState(() => _quietEnd = v);
-                                  }
-                                },
                         ),
+                      SwitchListTile(
+                        title: const Text('Dnevni sažetak e-poštom'),
+                        subtitle: const Text(
+                          'Jedan dnevni sažetak nepročitanih obavijesti.',
+                        ),
+                        value: _digestEmail,
+                        onChanged: _saving
+                            ? null
+                            : (v) => setState(() => _digestEmail = v),
                       ),
                     ],
                   ),
-                ],
-                const Divider(height: 32),
-                SwitchListTile(
-                  title: const Text('Dnevni sažetak e-poštom'),
-                  subtitle: const Text(
-                    'Jedan e-mail oko 07:15 (Europe/Sarajevo) ako ima nepročitanih MES obavijesti u zadnjih 24 h. '
-                    'Potreban je SMTP na projektu.',
-                  ),
-                  value: _digestEmail,
-                  onChanged: _saving
-                      ? null
-                      : (v) => setState(() => _digestEmail = v),
                 ),
                 const SizedBox(height: 24),
-                FilledButton.icon(
+                FilledButton(
                   onPressed: _saving ? null : _save,
-                  icon: _saving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.save),
-                  label: Text(_saving ? 'Čuvanje…' : 'Sačuvaj'),
+                  child: Text(_saving ? 'Čuvanje…' : 'Sačuvaj'),
                 ),
               ],
             ),
+    );
+  }
+}
+
+class _CategoryCard extends StatelessWidget {
+  const _CategoryCard({
+    required this.category,
+    required this.enabled,
+    required this.saving,
+    required this.onChanged,
+  });
+
+  final MesNotificationCategory category;
+  final bool enabled;
+  final bool saving;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final locked = onChanged == null;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(4, 4, 4, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SwitchListTile(
+              title: Text(category.title),
+              subtitle: Text(category.subtitle),
+              value: locked ? true : enabled,
+              onChanged: saving || locked ? null : onChanged,
+            ),
+            if (category.lockReason != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.lock_outline,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        category.lockReason!,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

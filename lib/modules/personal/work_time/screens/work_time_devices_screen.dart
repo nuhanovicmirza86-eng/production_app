@@ -74,6 +74,7 @@ class _WorkTimeDevicesScreenState extends State<WorkTimeDevicesScreen> {
       }
     }
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(id == null ? 'Novi uređaj' : 'Uređaj'),

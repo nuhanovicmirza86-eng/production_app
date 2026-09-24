@@ -85,16 +85,7 @@ class FinalControlRecordPdf {
   }
 
   static String _controlledFormStatusLabel(String? raw) {
-    switch ((raw ?? '').trim().toLowerCase()) {
-      case 'approved':
-        return 'Aktivno';
-      case 'draft':
-        return 'Nacrt';
-      case 'obsolete':
-        return 'Van upotrebe';
-      default:
-        return _dash(raw);
-    }
+    return EvidencePdfQmsDocumentMarking.statusLabel(raw);
   }
 
   static List<pw.Widget> _documentControlBlock({
@@ -105,52 +96,14 @@ class FinalControlRecordPdf {
     required pw.Widget Function(List<pw.Widget>, List<pw.Widget>) twoCol,
     required pw.Widget Function(String, String) kv,
   }) {
-    final status = (fv['qmsControlledFormStatus'] ?? '').toString().trim();
-    final code = (fv['qmsControlledFormDocumentCode'] ?? '').toString().trim();
-    final title = (fv['qmsControlledFormTitle'] ?? '').toString().trim();
-    final linked = status.toLowerCase() == 'approved' &&
-        (code.isNotEmpty || title.isNotEmpty);
-
-    if (!linked) {
-      // Poruka već ispod naslova (EvidencePdfQmsDocumentMarking.underTitle).
-      return const [];
-    }
-
-    final rev = fv['qmsControlledFormRevision'];
-    final revLabel = rev == null ? '—' : rev.toString();
-    return [
-      sectionTitle('Kontrola dokumenta'),
-      twoCol(
-        [
-          kv('Oznaka obrasca', _dash(code)),
-          kv('Revizija', revLabel),
-          kv('Status', _controlledFormStatusLabel(status)),
-        ],
-        [
-          kv('Tip dokumenta', 'Obrazac / zapis kvaliteta'),
-          kv(
-            'Vlasnik',
-            _dash(fv['qmsControlledFormOwnerDepartment']?.toString()),
-          ),
-          kv(
-            'Retention',
-            _dash(fv['qmsControlledFormRetentionCategory']?.toString()),
-          ),
-        ],
-      ),
-      if (title.isNotEmpty)
-        pw.Padding(
-          padding: const pw.EdgeInsets.only(top: 2),
-          child: pw.Text(
-            title,
-            style: pw.TextStyle(
-              font: fontRegular,
-              fontSize: 7.5,
-              color: PdfColors.grey700,
-            ),
-          ),
-        ),
-    ];
+    return EvidencePdfQmsDocumentMarking.documentControlBlock(
+      fieldValues: fv,
+      fontRegular: fontRegular,
+      fontBold: fontBold,
+      sectionTitle: sectionTitle,
+      twoCol: twoCol,
+      kv: kv,
+    );
   }
 
   static String _statusLabel(String status) {
@@ -373,14 +326,8 @@ class FinalControlRecordPdf {
       }
     }
 
-    final operatorSession = _dash(
-      session.operatorDisplayName ?? session.operatorEmail,
-    );
-    final openedBy = _dash(
-      session.createdByDisplayName ?? session.createdByEmail,
-    );
-    final opEmail = (session.operatorEmail ?? '').trim();
-    final openedEmail = (session.createdByEmail ?? '').trim();
+    final operatorSession = _dash(session.operatorDisplayName);
+    final openedBy = _dash(session.createdByDisplayName);
 
     final doc = pw.Document(
       title: documentTitle,
@@ -512,17 +459,14 @@ class FinalControlRecordPdf {
             ),
             sectionTitle('Kontrolisani komadi'),
             ...lineWidgets,
-            sectionTitle('Operator audit'),
+            sectionTitle('Predaja i verifikacija'),
             twoCol(
               [
-                kv('Operater (sesija)', operatorSession),
-                if (opEmail.isNotEmpty) kv('E-mail operatera', opEmail),
+                kv('Operater', operatorSession),
                 kv('Kreirano', _formatDateTime(session.createdAt)),
               ],
               [
                 kv('Sesiju otvorio', openedBy),
-                if (openedEmail.isNotEmpty && openedEmail != opEmail)
-                  kv('E-mail (otvaranje)', openedEmail),
                 kv('Ispisano', _formatDateTime(now)),
               ],
             ),

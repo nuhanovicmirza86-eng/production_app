@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/access/production_access_helper.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../models/qms_list_models.dart';
 import '../widgets/qms_iatf_help.dart';
@@ -24,6 +25,9 @@ class _InspectionPlansListScreenState extends State<InspectionPlansListScreen> {
 
   String get _cid =>
       (widget.companyData['companyId'] ?? '').toString().trim();
+
+  String get _role =>
+      ProductionAccessHelper.normalizeRole(widget.companyData['role']);
 
   @override
   void initState() {
@@ -72,7 +76,8 @@ class _InspectionPlansListScreenState extends State<InspectionPlansListScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: ProductionAccessHelper.canManageQmsDefinitions(_role)
+          ? FloatingActionButton.extended(
         onPressed: () async {
           final ok = await Navigator.push<bool>(
             context,
@@ -84,7 +89,8 @@ class _InspectionPlansListScreenState extends State<InspectionPlansListScreen> {
         },
         icon: const Icon(Icons.add),
         label: const Text('Novi'),
-      ),
+      )
+          : null,
       body: RefreshIndicator(
         onRefresh: _load,
         child: _buildBody(context),

@@ -43,6 +43,10 @@ class FirstPieceApprovalReleaseDocument {
     this.qmsControlledFormRevision,
     this.qmsControlledFormStatus,
     this.qmsControlledFormTitle,
+    this.qmsControlledFormOwnerDepartment,
+    this.qmsControlledFormRetentionCategory,
+    this.qmsControlledFormApprovedAt,
+    this.qmsControlledFormApprovedByName,
   });
 
   final String documentTitle;
@@ -83,11 +87,15 @@ class FirstPieceApprovalReleaseDocument {
   final String? operatorDisplayName;
   final String? operatorEmail;
   final int? catalogVersion;
-  /// M1-I5-C6 — QMS oznaka obrasca (iz fieldValues sesije).
+  /// QMS-M2 — QMS oznaka obrasca (iz fieldValues sesije).
   final String? qmsControlledFormDocumentCode;
   final String? qmsControlledFormRevision;
   final String? qmsControlledFormStatus;
   final String? qmsControlledFormTitle;
+  final String? qmsControlledFormOwnerDepartment;
+  final String? qmsControlledFormRetentionCategory;
+  final String? qmsControlledFormApprovedAt;
+  final String? qmsControlledFormApprovedByName;
 
   factory FirstPieceApprovalReleaseDocument.fromMap(Map<String, dynamic> m) {
     DateTime? ts(dynamic v) {
@@ -179,6 +187,12 @@ class FirstPieceApprovalReleaseDocument {
       qmsControlledFormRevision: opt('qmsControlledFormRevision'),
       qmsControlledFormStatus: opt('qmsControlledFormStatus'),
       qmsControlledFormTitle: opt('qmsControlledFormTitle'),
+      qmsControlledFormOwnerDepartment:
+          opt('qmsControlledFormOwnerDepartment'),
+      qmsControlledFormRetentionCategory:
+          opt('qmsControlledFormRetentionCategory'),
+      qmsControlledFormApprovedAt: opt('qmsControlledFormApprovedAt'),
+      qmsControlledFormApprovedByName: opt('qmsControlledFormApprovedByName'),
     );
   }
 }

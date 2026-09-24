@@ -62,6 +62,7 @@ class DevelopmentProjectApprovalsSection extends StatelessWidget {
     if (linkedGate != null && linkedGate.isEmpty) linkedGate = null;
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialog) => AlertDialog(
@@ -223,6 +224,7 @@ class DevelopmentProjectApprovalsSection extends StatelessWidget {
   ) async {
     final noteCtrl = TextEditingController();
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(approved ? 'Odobri zahtjev' : 'Odbij zahtjev'),
@@ -287,6 +289,7 @@ class DevelopmentProjectApprovalsSection extends StatelessWidget {
     DevelopmentProjectApprovalModel approval,
   ) async {
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Povuci zahtjev'),

@@ -53,6 +53,7 @@ class DevelopmentProjectChangesSection extends StatelessWidget {
     if (linkedGate != null && linkedGate.isEmpty) linkedGate = null;
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialog) => AlertDialog(

@@ -39,6 +39,7 @@ Future<void> showFinanceTechnicalDetailDialog(
   Widget? footer,
 }) async {
   await showDialog<void>(
+      barrierDismissible: false,
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text(title),

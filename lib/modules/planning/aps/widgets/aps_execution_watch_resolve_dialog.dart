@@ -37,7 +37,8 @@ Future<ApsExecutionWatchResolveResult?> showApsExecutionWatchResolveDialog({
   required ApsExecutionWatchAlertView alert,
 }) {
   return showDialog<ApsExecutionWatchResolveResult>(
-    context: context,
+      barrierDismissible: false,
+      context: context,
     builder: (ctx) => _ApsExecutionWatchResolveDialog(alert: alert),
   );
 }

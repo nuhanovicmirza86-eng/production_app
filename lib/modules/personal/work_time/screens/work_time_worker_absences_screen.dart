@@ -83,6 +83,7 @@ class _WorkTimeWorkerAbsencesScreenState
     final noteC = TextEditingController();
 
     final result = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         return StatefulBuilder(

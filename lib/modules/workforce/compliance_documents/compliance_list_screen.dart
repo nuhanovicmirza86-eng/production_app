@@ -90,6 +90,7 @@ class _ComplianceListScreenState extends State<ComplianceListScreen> {
     DateTime? validUntil;
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSt) {

@@ -182,6 +182,7 @@ class _WorkTimePayrollExportScreenState
       }
       final csv = (r['csv'] ?? '').toString();
       await showDialog<void>(
+      barrierDismissible: false,
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('CSV sadržaj'),

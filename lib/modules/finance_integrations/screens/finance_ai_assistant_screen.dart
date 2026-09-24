@@ -280,6 +280,7 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
     required String title,
   }) async {
     await showDialog<void>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         return AlertDialog(
@@ -357,6 +358,7 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
     }
     final focusCtrl = TextEditingController();
     final focus = await showDialog<String?>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         return AlertDialog(
@@ -434,6 +436,7 @@ class _FinanceAiAssistantScreenState extends State<FinanceAiAssistantScreen> {
   ) async {
     final ctrl = TextEditingController(text: current?.assistantContext ?? '');
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         return AlertDialog(

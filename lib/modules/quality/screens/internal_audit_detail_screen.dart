@@ -113,6 +113,7 @@ class _InternalAuditDetailScreenState extends State<InternalAuditDetailScreen> {
     final desc = TextEditingController();
     final capa = TextEditingController();
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Novi nalaz'),
@@ -257,6 +258,7 @@ class _InternalAuditDetailScreenState extends State<InternalAuditDetailScreen> {
 
   Future<void> _confirmClose() async {
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Zatvori audit?'),
@@ -282,6 +284,7 @@ class _InternalAuditDetailScreenState extends State<InternalAuditDetailScreen> {
 
   Future<void> _confirmReopen() async {
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Ponovo otvori audit?'),

@@ -288,6 +288,7 @@ class _ApsOptimizationScreenState extends State<ApsOptimizationScreen> {
     if (run == null || !run.canApply) return;
 
     final confirmed = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: Row(
@@ -350,6 +351,7 @@ class _ApsOptimizationScreenState extends State<ApsOptimizationScreen> {
     if (run == null || !run.canDiscard) return;
 
     final confirmed = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(ApsGanttInfoCopy.optimizationDiscardAction),

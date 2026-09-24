@@ -1,5 +1,46 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+class ProductionStationWorkOrderRoutingStep {
+  const ProductionStationWorkOrderRoutingStep({
+    this.stepOrder,
+    this.operationCode,
+    this.operationName,
+    this.workCenterCode,
+    this.workCenterName,
+  });
+
+  final int? stepOrder;
+  final String? operationCode;
+  final String? operationName;
+  final String? workCenterCode;
+  final String? workCenterName;
+
+  factory ProductionStationWorkOrderRoutingStep.fromMap(
+    Map<String, dynamic>? raw,
+  ) {
+    final m = raw ?? const <String, dynamic>{};
+    int? order;
+    final so = m['stepOrder'];
+    if (so is num) {
+      order = so.toInt();
+    } else {
+      order = int.tryParse('$so');
+    }
+    String? s(dynamic v) {
+      final t = (v ?? '').toString().trim();
+      return t.isEmpty ? null : t;
+    }
+
+    return ProductionStationWorkOrderRoutingStep(
+      stepOrder: order,
+      operationCode: s(m['operationCode']),
+      operationName: s(m['operationName']),
+      workCenterCode: s(m['workCenterCode']),
+      workCenterName: s(m['workCenterName']),
+    );
+  }
+}
+
 class ProductionStationWorkOrderSnapshot {
   const ProductionStationWorkOrderSnapshot({
     required this.productionOrderCode,
@@ -18,6 +59,7 @@ class ProductionStationWorkOrderSnapshot {
     this.workCenterId,
     this.workCenterCode,
     this.workCenterName,
+    this.routingStep,
   });
 
   final String productionOrderCode;
@@ -36,12 +78,20 @@ class ProductionStationWorkOrderSnapshot {
   final String? workCenterId;
   final String? workCenterCode;
   final String? workCenterName;
+  final ProductionStationWorkOrderRoutingStep? routingStep;
 
   factory ProductionStationWorkOrderSnapshot.fromMap(Map<String, dynamic>? raw) {
     final m = raw ?? const <String, dynamic>{};
     double n(dynamic v) {
       if (v is num) return v.toDouble();
       return double.tryParse('$v') ?? 0;
+    }
+
+    ProductionStationWorkOrderRoutingStep? step;
+    if (m['routingStep'] is Map) {
+      step = ProductionStationWorkOrderRoutingStep.fromMap(
+        Map<String, dynamic>.from(m['routingStep'] as Map),
+      );
     }
 
     return ProductionStationWorkOrderSnapshot(
@@ -83,6 +133,7 @@ class ProductionStationWorkOrderSnapshot {
       workCenterName: (m['workCenterName'] ?? '').toString().trim().isEmpty
           ? null
           : (m['workCenterName'] ?? '').toString().trim(),
+      routingStep: step,
     );
   }
 }

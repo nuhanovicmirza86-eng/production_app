@@ -45,10 +45,10 @@ class MesNavigationContextService {
 
     final plantKey = _s(data['plantKey']);
     final normRole = ProductionAccessHelper.normalizeRole(role);
-    final globalTenantAdmin =
-        ProductionAccessHelper.isAdminRole(normRole) ||
-            ProductionAccessHelper.isSuperAdminRole(normRole);
-    if (plantKey.isEmpty && !globalTenantAdmin) return null;
+    if (plantKey.isEmpty &&
+        !ProductionAccessHelper.isCompanyWideContextRole(normRole)) {
+      return null;
+    }
 
     final companyDoc = await FirebaseFirestore.instance
         .collection('companies')

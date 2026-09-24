@@ -355,7 +355,7 @@ class ProductionAccessHelper {
       ProductionDashboardCard.productionOrders: ProductionAccessLevel.manage,
       ProductionDashboardCard.productionTracking: ProductionAccessLevel.manage,
       ProductionDashboardCard.stationPages: ProductionAccessLevel.manage,
-      ProductionDashboardCard.workCenters: ProductionAccessLevel.manage,
+      ProductionDashboardCard.workCenters: ProductionAccessLevel.view,
       ProductionDashboardCard.productionProcesses: ProductionAccessLevel.manage,
       ProductionDashboardCard.shifts: ProductionAccessLevel.manage,
       ProductionDashboardCard.downtime: ProductionAccessLevel.manage,
@@ -495,19 +495,19 @@ class ProductionAccessHelper {
       ProductionDashboardCard.advancedPlanning: ProductionAccessLevel.hidden,
     },
     roleQualityOperator: {
-      ProductionDashboardCard.products: ProductionAccessLevel.view,
-      ProductionDashboardCard.productionOrders: ProductionAccessLevel.view,
+      ProductionDashboardCard.products: ProductionAccessLevel.hidden,
+      ProductionDashboardCard.productionOrders: ProductionAccessLevel.hidden,
       ProductionDashboardCard.productionTracking: ProductionAccessLevel.hidden,
       ProductionDashboardCard.stationPages: ProductionAccessLevel.hidden,
       ProductionDashboardCard.workCenters: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.productionProcesses: ProductionAccessLevel.view,
+      ProductionDashboardCard.productionProcesses: ProductionAccessLevel.hidden,
       ProductionDashboardCard.shifts: ProductionAccessLevel.hidden,
       ProductionDashboardCard.downtime: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.ooe: ProductionAccessLevel.view,
+      ProductionDashboardCard.ooe: ProductionAccessLevel.hidden,
       ProductionDashboardCard.operonixAnalytics: ProductionAccessLevel.hidden,
       ProductionDashboardCard.problemReporting: ProductionAccessLevel.hidden,
       ProductionDashboardCard.processExecution: ProductionAccessLevel.hidden,
-      ProductionDashboardCard.reports: ProductionAccessLevel.view,
+      ProductionDashboardCard.reports: ProductionAccessLevel.hidden,
       ProductionDashboardCard.registrations: ProductionAccessLevel.hidden,
       ProductionDashboardCard.carbonFootprint: ProductionAccessLevel.hidden,
       ProductionDashboardCard.developmentGovernance: ProductionAccessLevel.hidden,
@@ -733,6 +733,34 @@ class ProductionAccessHelper {
     return r == roleAdmin || r == roleSuperAdmin;
   }
 
+  /// M1-I15-D-HOTFIX-01 — kontrolne evidencije koje Operater kvaliteta smije završiti.
+  static const List<String> qualityControlEvidenceProfileKeys = [
+    'packaging_control',
+    'final_control',
+    'in_process_quality_check',
+    'first_piece_approval',
+    'line_clearance',
+    'workspace_5s_cleaning',
+  ];
+
+  static bool isQualityControlEvidenceProfile(String profileKey) {
+    return qualityControlEvidenceProfileKeys.contains(profileKey.trim());
+  }
+
+  /// Ulaz u hub kontrolnih evidencija (isti operator hub kao Operativne evidencije).
+  static bool canAccessQualityControlEvidenceHub(String role) {
+    return normalizeRole(role) == roleQualityOperator;
+  }
+
+  /// Start/open/work gate — ista allowlista kao backend `canQualityOperatorWorkControlEvidence`.
+  static bool canQualityOperatorWorkControlEvidence({
+    required String role,
+    required String profileKey,
+  }) {
+    return normalizeRole(role) == roleQualityOperator &&
+        isQualityControlEvidenceProfile(profileKey);
+  }
+
   /// M2-C — read-only pregled zatvorenih profile-driven evidencija (supervizija).
   static bool canViewProfileDrivenEvidence(String role) {
     final r = normalizeRole(role);
@@ -742,6 +770,65 @@ class ProductionAccessHelper {
         r == roleLaboratoryManager ||
         r == roleLaboratoryTechnician ||
         r == roleQualityControl;
+  }
+
+  /// M1-I12-D — scoped pristup dodijeljenom izvršiocu dorade (bez QMS / evidencija read).
+  static bool canBeNcrReworkExecutorRole(String role) {
+    final r = normalizeRole(role);
+    return r == roleProductionOperator || r == roleShiftLead;
+  }
+
+  /// M1-I12-D — ponovna kontrola i zatvaranje NCR (samo kontrola kvaliteta).
+  static bool canRunNcrQualityRecheckRole(String role) {
+    final r = normalizeRole(role);
+    return r == roleQualityControl || r == roleQualityOperator;
+  }
+
+  /// M1-I12-D — inbox otvorenih akcija (bilo koji uloga s koracima u toku).
+  static bool canAccessNcrOpenActionsInbox(String role) {
+    final r = normalizeRole(role);
+    return canBeNcrReworkExecutorRole(r) ||
+        canRunNcrQualityRecheckRole(r) ||
+        r == roleProductionManager ||
+        isAdminRole(r) ||
+        r == roleSuperAdmin;
+  }
+
+  /// M1-I13-D — pregled poslovnog ledgera historije NCR akcija (Callable RBAC).
+  static bool canViewNcrActionHistory(String role) {
+    final r = normalizeRole(role);
+    return r == roleSuperAdmin ||
+        isAdminRole(r) ||
+        r == roleQualityControl ||
+        r == roleProductionManager ||
+        r == 'supervisor' ||
+        r == roleQualityOperator ||
+        r == roleLogisticsManager;
+  }
+
+  /// Pun QMS hub (master-data, izvještaji, audit) — ne operativni operater.
+  static bool hasFullQmsHubAccess(String role) {
+    final r = normalizeRole(role);
+    return r == roleSuperAdmin ||
+        isAdminRole(r) ||
+        r == roleQualityControl ||
+        r == roleProductionManager ||
+        r == 'supervisor';
+  }
+
+  /// Operativni QMS tok bez admin master-data.
+  static bool isQmsQualityOperatorRole(String role) {
+    return normalizeRole(role) == roleQualityOperator;
+  }
+
+  /// Da li uloga smije uređivati QMS master (planovi, PFMEA, upload dokumenata).
+  static bool canManageQmsDefinitions(String role) {
+    return hasFullQmsHubAccess(role);
+  }
+
+  /// CAPA lista — operater vidi samo dodijeljene sebi; menadžment vidi sve otvorene.
+  static bool canViewAllOpenCapa(String role) {
+    return hasFullQmsHubAccess(role);
   }
 
   /// Filter pogona na listi evidencija — samo [roleAdmin] / [roleSuperAdmin].

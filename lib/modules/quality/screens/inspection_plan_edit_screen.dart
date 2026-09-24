@@ -243,6 +243,7 @@ class _InspectionPlanEditScreenState extends State<InspectionPlanEditScreen> {
       final current = _parseRefs(_refs.text).toSet();
       final selected = <String>{...current};
       final ok = await showDialog<bool>(
+      barrierDismissible: false,
         context: context,
         builder: (ctx) {
           return StatefulBuilder(

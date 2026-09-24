@@ -36,7 +36,7 @@ class ProductionStationConfig {
     'final_control',
   ];
 
-  /// M1-F3 — catalog evidence operator runtime (pilot profili).
+  /// M1-F3 / M1-I15-C — catalog evidence operator runtime.
   static const List<String> catalogEvidenceRuntimeProfileKeys = [
     'production_counting',
     'packaging_control',
@@ -44,6 +44,11 @@ class ProductionStationConfig {
     'in_process_quality_check',
     'final_control',
     'material_preparation',
+    'operation_material_preparation',
+    'line_clearance',
+    'workspace_5s_cleaning',
+    'tool_changeover',
+    'batch_mixing',
   ];
 
   static bool isCatalogEvidenceRuntimeProfile(String profileKey) =>
@@ -272,6 +277,12 @@ class ProductionStationConfig {
       return true;
     }
     if (!active || !runtimeVisible) return false;
+    if (ProductionAccessHelper.canQualityOperatorWorkControlEvidence(
+      role: role,
+      profileKey: processProfileType,
+    )) {
+      return true;
+    }
     if (runtimeAllowedRoles.isEmpty) return false;
     return runtimeAllowedRoles.contains(role);
   }
@@ -470,6 +481,8 @@ class ProductionStationConfig {
         return 'Procesna kontrola kvaliteta';
       case 'material_preparation':
         return 'Priprema materijala';
+      case 'operation_material_preparation':
+        return 'Priprema materijala za operaciju';
       case 'standard_production':
       default:
         return 'Standardna proizvodnja';

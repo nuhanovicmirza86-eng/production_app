@@ -126,6 +126,7 @@ class _ProductionProcessesListScreenState
   Future<void> _confirmArchive(ProductionProcess p) async {
     if (!_canManage || p.isArchived) return;
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Arhivirati proces?'),

@@ -134,6 +134,9 @@ class _ProductionCompanyEvidenceAdminScreenState
       context,
       MaterialPageRoute<bool>(
         builder: (_) => ProductionEvidenceConfigFormScreen(
+          key: ValueKey(existing?.evidenceConfigId.trim().isNotEmpty == true
+              ? existing!.evidenceConfigId
+              : 'new-evidence'),
           companyData: widget.companyData,
           profileCatalog: catalog,
           canManage: _canManage,
@@ -218,9 +221,8 @@ class _ProductionCompanyEvidenceAdminScreenState
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    'Evidencije ne ulaze u limit proizvodnih ni mašinskih stanica. '
-                                    'Ista evidencija iz kataloga može biti aktivirana više puta — '
-                                    'nezavisno po pogonu i procesu.',
+                                    'Svaka evidencija ima vlastite postavke verifikacije. '
+                                    'Spremanje jedne evidencije ne mijenja drugu.',
                                     style: Theme.of(context).textTheme.bodyMedium,
                                   ),
                                   const SizedBox(height: 12),
@@ -246,6 +248,7 @@ class _ProductionCompanyEvidenceAdminScreenState
                               (c) => _EvidenceConfigCard(
                                 config: c,
                                 plantLabel: _plantLabels[c.plantKey] ?? c.plantKey,
+                                profileCatalog: _profileCatalog,
                                 canManage: _canManage,
                                 onTap: () => _openForm(existing: c),
                               ),
@@ -261,12 +264,14 @@ class _EvidenceConfigCard extends StatelessWidget {
   const _EvidenceConfigCard({
     required this.config,
     required this.plantLabel,
+    required this.profileCatalog,
     required this.canManage,
     required this.onTap,
   });
 
   final ProductionEvidenceConfig config;
   final String plantLabel;
+  final ProductionStationProfileCatalogResult? profileCatalog;
   final bool canManage;
   final VoidCallback onTap;
 
@@ -276,6 +281,9 @@ class _EvidenceConfigCard extends StatelessWidget {
     final profileLabel = config.profileNameSnapshot.isNotEmpty
         ? config.profileNameSnapshot
         : ProductionStationConfig.processProfileLabel(config.profileKey);
+    final verifierKeys = config.effectiveVerifierRoleKeys(
+      profileCatalog?.byKey(config.profileKey)?.verifierRoleKeys ?? const [],
+    );
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -324,6 +332,14 @@ class _EvidenceConfigCard extends StatelessWidget {
                 'Proces: ${config.processKey} · Faza: '
                 '${ProductionStationConfig.productionPhaseLabel(config.phaseKey)}',
               ),
+              if (verifierKeys.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Verifikacija: '
+                  '${verifierKeys.map(ProductionStationConfig.runtimeRoleLabel).join(', ')}',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
               if (config.runtimeVisible) ...[
                 const SizedBox(height: 4),
                 Text(

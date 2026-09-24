@@ -95,6 +95,7 @@ class _SkillsMatrixScreenState extends State<SkillsMatrixScreen> {
     DateTime? validUntilDate;
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSt) {

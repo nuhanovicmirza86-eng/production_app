@@ -17,6 +17,7 @@ import '../../logistics/receipt/screens/station1_packed_boxes_logistics_screen.d
 import '../../logistics/screens/logistics_hub_entry_screen.dart';
 import '../../personal/work_time/screens/work_time_hub_screen.dart';
 import '../../planning/aps/screens/aps_hub_screen.dart';
+import '../../quality/screens/ncr_open_actions_list_screen.dart';
 import '../../quality/screens/quality_hub_screen.dart';
 import '../../sustainability/screens/carbon_footprint_screen.dart';
 import '../../workforce/screens/workforce_dashboard_screen.dart';
@@ -229,6 +230,24 @@ class ProductionDashboardModuleCatalog {
               ),
             );
           }
+        }
+        if (access.hasModule('quality') &&
+            ProductionAccessHelper.canAccessNcrOpenActionsInbox(access.role) &&
+            !ProductionAccessHelper.canAccessQualityControlEvidenceHub(
+              access.role,
+            )) {
+          productionEntries.add(
+            ProductionDashboardModuleEntry(
+              id: 'production.ncr_open_actions',
+              icon: Icons.inbox_outlined,
+              title: 'Moje otvorene akcije',
+              subtitle:
+                  'NCR zadaci po ulozi — dorada, ponovna kontrola, odluke menadžera.',
+              onTap: () => open(
+                NcrOpenActionsListScreen(companyData: companyData),
+              ),
+            ),
+          );
         }
         if (access.hasModule('production') &&
             ProductionAccessHelper.canViewProfileDrivenEvidence(access.role)) {
@@ -472,8 +491,40 @@ class ProductionDashboardModuleCatalog {
       }
 
       final qualityEntries = <ProductionDashboardModuleEntry>[];
+      if ((access.hasModule('quality') || access.hasModule('production')) &&
+          ProductionAccessHelper.canAccessQualityControlEvidenceHub(
+            access.role,
+          )) {
+        qualityEntries.add(
+          ProductionDashboardModuleEntry(
+            id: 'quality.control_evidence',
+            icon: Icons.assignment_turned_in_outlined,
+            title: 'Kontrolne evidencije',
+            subtitle:
+                'Kontrola pakovanja, finalna kontrola, kontrola u procesu i odobrenje prvog komada.',
+            onTap: () => open(
+              ProductionEvidenceOperatorHubScreen(companyData: companyData),
+            ),
+          ),
+        );
+      }
       if (access.hasModule('quality') &&
           access.canViewCard(ProductionDashboardCard.qualityManagement)) {
+        if (access.hasModule('quality') &&
+            ProductionAccessHelper.canAccessNcrOpenActionsInbox(access.role)) {
+          qualityEntries.add(
+            ProductionDashboardModuleEntry(
+              id: 'quality.ncr_open_actions',
+              icon: Icons.inbox_outlined,
+              title: 'Moje otvorene akcije',
+              subtitle:
+                  'NCR zadaci — dorada, ponovna kontrola, zatvaranje.',
+              onTap: () => open(
+                NcrOpenActionsListScreen(companyData: companyData),
+              ),
+            ),
+          );
+        }
         qualityEntries.add(
           ProductionDashboardModuleEntry(
             id: 'quality.hub',

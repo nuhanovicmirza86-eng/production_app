@@ -15,6 +15,12 @@ class ProductionEvidenceConfig {
     'in_process_quality_check',
     'final_control',
     'material_preparation',
+    'operation_material_preparation',
+    'line_clearance',
+    'workspace_5s_cleaning',
+    'tool_changeover',
+    'batch_mixing',
+    'rework_and_painting',
   ];
 
   static bool isH3OperatorRuntimeProfile(String profileKey) =>
@@ -33,6 +39,7 @@ class ProductionEvidenceConfig {
   final bool active;
   final bool runtimeVisible;
   final List<String> runtimeAllowedRoles;
+  final List<String> verifierRoleKeys;
   final int? displayOrder;
   final ProductionStationDisplayOptions displayOptions;
   final bool controlledInputEnabled;
@@ -40,6 +47,8 @@ class ProductionEvidenceConfig {
   final String? controlledInputScope;
   /// M1-I4-D-D — samo oznaka obrasca; metapodaci iz odobrenog QMS obrasca.
   final String? controlledFormDocumentCode;
+  /// M1-I15-D-HOTFIX-19 — Brza lista / Proširena lista (samo 5S i čišćenje mašine).
+  final String? cleaningChecklistMode;
   final DateTime? archivedAt;
 
   const ProductionEvidenceConfig({
@@ -56,12 +65,14 @@ class ProductionEvidenceConfig {
     required this.active,
     required this.runtimeVisible,
     required this.runtimeAllowedRoles,
+    this.verifierRoleKeys = const [],
     this.displayOrder,
     this.displayOptions = const ProductionStationDisplayOptions(),
     this.controlledInputEnabled = false,
     this.controlledInputMode = 'off',
     this.controlledInputScope,
     this.controlledFormDocumentCode,
+    this.cleaningChecklistMode,
     this.archivedAt,
   });
 
@@ -74,6 +85,7 @@ class ProductionEvidenceConfig {
     'packaging_control',
     'in_process_quality_check',
     'final_control',
+    'operation_material_preparation',
   ];
 
   bool get supportsControlledFormDocumentCode =>
@@ -84,6 +96,14 @@ class ProductionEvidenceConfig {
 
   bool get isArchived => archivedAt != null;
 
+  /// HOTFIX-16 — verifier uloge samo ovog configa; prazno → katalog tog profila.
+  List<String> effectiveVerifierRoleKeys([
+    List<String> catalogDefaults = const [],
+  ]) {
+    if (verifierRoleKeys.isNotEmpty) return verifierRoleKeys;
+    return catalogDefaults;
+  }
+
   bool isRuntimeVisibleToRole(String role) {
     if (!active || isArchived || !runtimeVisible) return false;
     final r = ProductionAccessHelper.normalizeRole(role);
@@ -92,6 +112,13 @@ class ProductionEvidenceConfig {
         r == 'production_manager') {
       return true;
     }
+    if (ProductionAccessHelper.canQualityOperatorWorkControlEvidence(
+      role: r,
+      profileKey: profileKey,
+    )) {
+      return true;
+    }
+    if (verifierRoleKeys.contains(r)) return true;
     return runtimeAllowedRoles.contains(r);
   }
 
@@ -130,6 +157,14 @@ class ProductionEvidenceConfig {
         if (r.isNotEmpty) roles.add(r);
       }
     }
+    final verifierRaw = data['verifierRoleKeys'];
+    final verifierRoles = <String>[];
+    if (verifierRaw is List) {
+      for (final item in verifierRaw) {
+        final r = ProductionAccessHelper.normalizeRole(item);
+        if (r.isNotEmpty) verifierRoles.add(r);
+      }
+    }
     final displayOptionsRaw = data['displayOptions'];
     final displayOptions = displayOptionsRaw is Map
         ? ProductionStationDisplayOptions.fromMap(
@@ -166,6 +201,7 @@ class ProductionEvidenceConfig {
       active: data['active'] == true,
       runtimeVisible: data['runtimeVisible'] == true,
       runtimeAllowedRoles: roles,
+      verifierRoleKeys: verifierRoles,
       displayOrder: data['displayOrder'] is int
           ? data['displayOrder'] as int
           : int.tryParse('${data['displayOrder'] ?? ''}'),
@@ -181,6 +217,10 @@ class ProductionEvidenceConfig {
           (data['controlledFormDocumentCode'] ?? '').toString().trim().isEmpty
               ? null
               : (data['controlledFormDocumentCode'] ?? '').toString().trim(),
+      cleaningChecklistMode:
+          (data['cleaningChecklistMode'] ?? '').toString().trim().isEmpty
+              ? null
+              : (data['cleaningChecklistMode'] ?? '').toString().trim(),
       archivedAt: archivedAt,
     );
   }
@@ -200,6 +240,7 @@ class ProductionEvidenceConfig {
       'active': active,
       'runtimeVisible': runtimeVisible,
       if (runtimeVisible) 'runtimeAllowedRoles': runtimeAllowedRoles,
+      'verifierRoleKeys': verifierRoleKeys,
       if (displayOrder != null) 'displayOrder': displayOrder,
       ...displayOptions.toMap().isEmpty
           ? const <String, dynamic>{}
@@ -221,6 +262,14 @@ class ProductionEvidenceConfig {
     if (supportsControlledFormDocumentCode) {
       final code = (controlledFormDocumentCode ?? '').trim();
       payload['controlledFormDocumentCode'] = code;
+    }
+    final profile = profileKey.trim();
+    if (profile == 'workspace_5s_cleaning' || profile == 'line_clearance') {
+      final mode = (cleaningChecklistMode ?? '').trim();
+      payload['cleaningChecklistMode'] =
+          mode == 'quick' || mode == 'extended'
+              ? mode
+              : (profile == 'workspace_5s_cleaning' ? 'quick' : 'extended');
     }
     return payload;
   }

@@ -50,6 +50,7 @@ class DevelopmentProjectDocumentsSection extends StatelessWidget {
     String? linkedGate = doc?.linkedGate;
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialog) => AlertDialog(

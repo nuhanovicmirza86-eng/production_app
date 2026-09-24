@@ -12,6 +12,7 @@ Future<void> reoptimizeFcsWithOptionalDialog(
   }
   if (session.hasLocalGanttNudges) {
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         return AlertDialog(

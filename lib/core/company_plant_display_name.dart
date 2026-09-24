@@ -64,6 +64,18 @@ class CompanyPlantDisplayName {
     return pKey;
   }
 
+  /// UI / eksport: ljudski naziv, nikad sirovi `plantKey`.
+  static String forUi({
+    required String resolved,
+    required String plantKey,
+  }) {
+    final r = _s(resolved);
+    final k = _s(plantKey);
+    if (r.isEmpty || r == '-' || r == '—') return '—';
+    if (k.isNotEmpty && r == k) return '—';
+    return r;
+  }
+
   /// Pogoni za padajući izbor (vrijednost API-ja = [plantKey], prikaz = ljudski naziv).
   static Future<List<({String plantKey, String label})>> listSelectablePlants({
     required String companyId,

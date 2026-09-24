@@ -4,6 +4,7 @@ import 'package:printing/printing.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../services/qms_management_report_pdf.dart';
 import '../services/quality_callable_service.dart';
+import '../utils/qms_ncr_display_labels.dart';
 import '../widgets/qms_iatf_help.dart';
 
 /// Korak 5 QMS: jedan strani pregled + PDF za vodstvo (NCR, CAPA, trend, PFMEA).
@@ -276,7 +277,10 @@ class _QmsManagementReportScreenState extends State<QmsManagementReportScreen> {
         child: ListTile(
           dense: true,
           title: Text(
-            (m['ncrCode'] ?? m['id'] ?? '').toString(),
+            QmsNcrDisplayLabels.displayDocumentNumber(
+              ncrDocumentNo: m['ncrDocumentNo']?.toString(),
+              ncrCode: m['ncrCode']?.toString(),
+            ),
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
           subtitle: Text(

@@ -85,6 +85,7 @@ class _InternalSupplyOrderDetailScreenState
     }
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Potvrda preuzimanja na hubu'),
@@ -444,7 +445,8 @@ class _InternalSupplyOrderDetailScreenState
                                 : () async {
                                     final noteCtrl = TextEditingController();
                                     final ok = await showDialog<bool>(
-                                      context: context,
+      barrierDismissible: false,
+      context: context,
                                       builder: (ctx) => AlertDialog(
                                         title: const Text('Zatvori narudžbu'),
                                         content: TextField(

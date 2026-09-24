@@ -215,6 +215,7 @@ class _CapaDetailScreenState extends State<CapaDetailScreen> {
 
   Future<void> _confirmFailVerification() async {
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Negativna verifikacija'),

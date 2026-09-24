@@ -1,6 +1,7 @@
 import '../../../modules/production/station_pages/models/production_station_profile_catalog_entry.dart';
 import '../../profile_driven_structured_runtime/models/structured_profile_session.dart';
 import '../../profile_driven_structured_runtime/models/structured_repeatable_row.dart';
+import 'cleaning_handoff_persistence.dart';
 
 /// Mapiranje tableKey → Callable payload key (isti algoritam kao backend M1-F2).
 String catalogEvidenceTableKeyToPayloadKey(String tableKey) {
@@ -15,7 +16,9 @@ Map<String, dynamic> buildCatalogEvidenceUpdatePayload({
   required StructuredProfileSessionState state,
 }) {
   final payload = <String, dynamic>{
-    'fieldValues': Map<String, dynamic>.from(state.fieldValues),
+    'fieldValues': fieldValuesWithoutClientSnapshotKeys(
+      Map<String, dynamic>.from(state.fieldValues),
+    ),
   };
   for (final table in profile.repeatableTableDefinitions) {
     final payloadKey = catalogEvidenceTableKeyToPayloadKey(table.key);

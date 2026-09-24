@@ -482,6 +482,7 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
     final email = _s(requestData['email']);
 
     final confirmed = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Odbij zahtjev'),
@@ -536,6 +537,7 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
 
   Future<void> _openEditUserDialog(Map<String, dynamic> userData) async {
     final changed = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (_) =>
           EditUserDialog(userData: userData, companyId: _myCompanyId),

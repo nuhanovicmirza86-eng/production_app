@@ -270,55 +270,9 @@ class DowntimeEventModel {
     return out;
   }
 
-  factory DowntimeEventModel.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data();
-    if (data == null) {
-      return DowntimeEventModel(
-        id: doc.id,
-        companyId: '',
-        plantKey: '',
-        downtimeCode: '',
-        productionOrderId: '',
-        productionOrderCode: '',
-        workCenterId: '',
-        workCenterCode: '',
-        workCenterName: '',
-        processId: '',
-        processCode: '',
-        processName: '',
-        shiftId: '',
-        shiftName: '',
-        downtimeCategory: '',
-        downtimeReason: '',
-        description: '',
-        status: DowntimeEventStatus.open,
-        severity: DowntimeSeverity.medium,
-        startedAt: DateTime.fromMillisecondsSinceEpoch(0),
-        endedAt: null,
-        durationMinutes: null,
-        isPlanned: false,
-        affectsOee: true,
-        affectsOoe: true,
-        affectsTeep: true,
-        operatorId: '',
-        reportedBy: '',
-        reportedByName: '',
-        resolvedBy: '',
-        resolvedByName: '',
-        verifiedBy: '',
-        verifiedByName: '',
-        correctiveActionRequired: false,
-        correctiveActionId: '',
-        attachments: const [],
-        createdAt: null,
-        createdBy: '',
-        updatedAt: null,
-        updatedBy: '',
-      );
-    }
-
+  factory DowntimeEventModel.fromMap(String id, Map<String, dynamic> data) {
     return DowntimeEventModel(
-      id: doc.id,
+      id: id,
       companyId: _s(data['companyId']),
       plantKey: _s(data['plantKey']),
       downtimeCode: _s(data['downtimeCode']),
@@ -363,6 +317,14 @@ class DowntimeEventModel {
       updatedAt: _ts(data['updatedAt']),
       updatedBy: _s(data['updatedBy']),
     );
+  }
+
+  factory DowntimeEventModel.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data();
+    if (data == null) {
+      return DowntimeEventModel.fromMap(doc.id, const {});
+    }
+    return DowntimeEventModel.fromMap(doc.id, data);
   }
 
   /// Trajanje za prikaz: zatvoreni koriste [durationMinutes], otvoreni live od [startedAt].

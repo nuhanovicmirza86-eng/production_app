@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
 import '../services/quality_callable_service.dart';
+import '../utils/qms_ncr_display_labels.dart';
 import '../widgets/qms_iatf_help.dart';
 import '../widgets/qms_pickers.dart';
 import 'ncr_detail_screen.dart';
@@ -182,11 +183,23 @@ class _NcrClaimCreateScreenState extends State<NcrClaimCreateScreen> {
               labelText: 'Ozbiljnost',
               border: OutlineInputBorder(),
             ),
-            items: const [
-              DropdownMenuItem(value: 'LOW', child: Text('LOW')),
-              DropdownMenuItem(value: 'MEDIUM', child: Text('MEDIUM')),
-              DropdownMenuItem(value: 'HIGH', child: Text('HIGH')),
-              DropdownMenuItem(value: 'CRITICAL', child: Text('CRITICAL')),
+            items: [
+              DropdownMenuItem(
+                value: 'LOW',
+                child: Text(QmsNcrDisplayLabels.severity('LOW')),
+              ),
+              DropdownMenuItem(
+                value: 'MEDIUM',
+                child: Text(QmsNcrDisplayLabels.severity('MEDIUM')),
+              ),
+              DropdownMenuItem(
+                value: 'HIGH',
+                child: Text(QmsNcrDisplayLabels.severity('HIGH')),
+              ),
+              DropdownMenuItem(
+                value: 'CRITICAL',
+                child: Text(QmsNcrDisplayLabels.severity('CRITICAL')),
+              ),
             ],
             onChanged: (v) {
               if (v != null) setState(() => _severity = v);
@@ -206,7 +219,7 @@ class _NcrClaimCreateScreenState extends State<NcrClaimCreateScreen> {
             controller: _containment,
             maxLines: 3,
             decoration: const InputDecoration(
-              labelText: 'Containment / privremena mjera (opcionalno)',
+              labelText: 'Mjera zadržavanja (opcionalno)',
               border: OutlineInputBorder(),
             ),
           ),

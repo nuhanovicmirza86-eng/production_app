@@ -32,6 +32,7 @@ Future<void> _promptCloseDevelopmentProject(
   final companyId = (companyData['companyId'] ?? '').toString().trim();
   final plantKey = (companyData['plantKey'] ?? '').toString().trim();
   final ok = await showDialog<bool>(
+      barrierDismissible: false,
     context: context,
     builder: (ctx) => AlertDialog(
       title: const Text('Zatvori projekat'),
@@ -437,6 +438,7 @@ class DevelopmentProjectDetailsScreen extends StatelessWidget {
                             nav.pop();
                             if (!context.mounted) return;
                             await showDialog<void>(
+      barrierDismissible: false,
                               context: context,
                               builder: (ctx) => AlertDialog(
                                 title: const Text('AI sažetak projekta'),

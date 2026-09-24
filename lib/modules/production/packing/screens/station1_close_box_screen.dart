@@ -126,6 +126,7 @@ class _Station1CloseBoxScreenState extends State<Station1CloseBoxScreen> {
 
   Future<void> _addManual() async {
     final line = await showDialog<PackingBoxLine>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => _AddManualBoxLineDialog(
         companyId: _companyId,

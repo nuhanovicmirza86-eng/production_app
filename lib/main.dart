@@ -24,7 +24,10 @@ bool get _isDesktopNative =>
         defaultTargetPlatform == TargetPlatform.linux ||
         defaultTargetPlatform == TargetPlatform.macOS);
 
-bool get _pushSupported => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+bool get _nativePushSupported =>
+    !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+
+bool get _pushSupported => _nativePushSupported;
 
 final FlutterLocalNotificationsPlugin _prodLocalNotifs =
     FlutterLocalNotificationsPlugin();
@@ -180,7 +183,7 @@ Future<void> _showProductionForegroundNotification(RemoteMessage msg) async {
 }
 
 Future<void> _initProductionPushStack() async {
-  if (!_pushSupported) return;
+  if (!_nativePushSupported && !kIsWeb) return;
 
   try {
     await FirebaseMessaging.instance.setAutoInitEnabled(true);
@@ -188,27 +191,28 @@ Future<void> _initProductionPushStack() async {
     debugPrint('Production FCM setAutoInitEnabled: $e');
   }
 
-  if (Platform.isIOS) {
+  try {
     await FirebaseMessaging.instance.requestPermission(
       alert: true,
       badge: true,
       sound: true,
     );
+  } catch (e) {
+    debugPrint('Production FCM requestPermission: $e');
   }
 
-  await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
-    alert: true,
-    badge: true,
-    sound: true,
-  );
-
-  await _initProductionLocalNotifications();
-
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-    await _showProductionForegroundNotification(message);
-  });
+  if (_nativePushSupported) {
+    await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+    await _initProductionLocalNotifications();
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+      await _showProductionForegroundNotification(message);
+    });
+  }
 
   FirebaseMessaging.onMessageOpenedApp.listen(_handleProductionPushNavigation);
 

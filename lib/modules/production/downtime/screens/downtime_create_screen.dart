@@ -3,9 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../production_orders/models/production_order_model.dart';
-import '../../production_orders/services/production_order_service.dart';
 import '../../processes/models/production_process_model.dart';
-import '../../processes/services/production_process_service.dart';
 import '../../work_centers/models/work_center_model.dart';
 import '../../work_centers/services/work_center_service.dart';
 import '../models/downtime_event_model.dart';
@@ -27,9 +25,7 @@ class _DowntimeCreateScreenState extends State<DowntimeCreateScreen> {
   final _shiftIdCtrl = TextEditingController();
   final _shiftNameCtrl = TextEditingController();
 
-  final _orderService = ProductionOrderService();
   final _wcService = WorkCenterService();
-  final _processService = ProductionProcessService();
   final _downtimeService = DowntimeService();
 
   List<ProductionOrderModel> _orders = const [];
@@ -85,24 +81,84 @@ class _DowntimeCreateScreenState extends State<DowntimeCreateScreen> {
     }
   }
 
+  ProductionOrderModel _orderFromLookup({
+    required String id,
+    required String productionOrderCode,
+    required String productCode,
+    required String productName,
+    required String status,
+    required String workCenterId,
+    required String workCenterCode,
+  }) {
+    final epoch = DateTime.fromMillisecondsSinceEpoch(0);
+    return ProductionOrderModel(
+      id: id,
+      companyId: _companyId,
+      plantKey: _plantKey,
+      productionOrderCode: productionOrderCode,
+      status: status,
+      productId: '',
+      productCode: productCode,
+      productName: productName,
+      plannedQty: 0,
+      producedGoodQty: 0,
+      producedScrapQty: 0,
+      producedReworkQty: 0,
+      unit: '',
+      bomId: '',
+      bomVersion: '',
+      routingId: '',
+      routingVersion: '',
+      workCenterId: workCenterId.isEmpty ? null : workCenterId,
+      workCenterCode: workCenterCode.isEmpty ? null : workCenterCode,
+      createdAt: epoch,
+      createdBy: '',
+      updatedAt: epoch,
+      updatedBy: '',
+      hasCriticalChanges: false,
+    );
+  }
+
   Future<void> _loadMasters() async {
     if (_companyId.isEmpty || _plantKey.isEmpty) {
       setState(() => _loading = false);
       return;
     }
     try {
-      final orders = await _orderService.getRecentOrders(
-        companyId: _companyId,
-        plantKey: _plantKey,
-        limit: 100,
-      );
       final wcs = await _wcService.listWorkCentersForPlant(
         companyId: _companyId,
         plantKey: _plantKey,
       );
-      final procsSnap = await _processService
-          .watchProcesses(companyId: _companyId, plantKey: _plantKey)
-          .first;
+      final opts = await _downtimeService.listCreateOptions(
+        companyId: _companyId,
+        plantKey: _plantKey,
+      );
+      final orders = opts.orders
+          .map(
+            (o) => _orderFromLookup(
+              id: o.id,
+              productionOrderCode: o.productionOrderCode,
+              productCode: o.productCode,
+              productName: o.productName,
+              status: o.status,
+              workCenterId: o.workCenterId,
+              workCenterCode: o.workCenterCode,
+            ),
+          )
+          .toList();
+      final procsSnap = opts.processes
+          .map(
+            (p) => ProductionProcess.fromMap(p.id, {
+              'companyId': _companyId,
+              'plantKey': _plantKey,
+              'processCode': p.processCode,
+              'name': p.name,
+              'status': p.status,
+              'isActive': p.isActive,
+              'linkedWorkCenterIds': p.linkedWorkCenterIds,
+            }),
+          )
+          .toList();
 
       ProductionOrderModel? pickOrder;
       for (final o in orders) {

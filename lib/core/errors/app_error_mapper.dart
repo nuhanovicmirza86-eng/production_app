@@ -5,34 +5,45 @@ import 'package:flutter/foundation.dart';
 class AppErrorMapper {
   static String toMessage(Object error) {
     if (error is FirebaseFunctionsException) {
-      return _firebaseFunctionsMessage(error);
+      return _withoutTechLeak(_firebaseFunctionsMessage(error));
     }
 
     if (error is FirebaseException) {
+      String mapped;
       switch (error.code) {
         case 'permission-denied':
-          return _permissionDeniedMessage(error);
+          mapped = _permissionDeniedMessage(error);
+          break;
         case 'unauthenticated':
-          return 'Morate biti prijavljeni da biste nastavili.';
+          mapped = 'Morate biti prijavljeni da biste nastavili.';
+          break;
         case 'unavailable':
-          return 'Servis trenutno nije dostupan. Pokušajte ponovo.';
+          mapped = 'Servis trenutno nije dostupan. Pokušajte ponovo.';
+          break;
         case 'not-found':
-          return 'Traženi podatak nije pronađen.';
+          mapped = 'Traženi podatak nije pronađen.';
+          break;
         case 'already-exists':
-          return 'Podatak već postoji.';
+          mapped = 'Podatak već postoji.';
+          break;
         case 'failed-precondition':
-          return _failedPreconditionMessage(error);
+          mapped = _failedPreconditionMessage(error);
+          break;
         case 'deadline-exceeded':
-          return 'Zahtjev je istekao. Pokušajte ponovo.';
+          mapped = 'Zahtjev je istekao. Pokušajte ponovo.';
+          break;
         case 'cancelled':
-          return 'Akcija je prekinuta.';
+          mapped = 'Akcija je prekinuta.';
+          break;
         case 'invalid-argument':
-          return 'Uneseni podaci nisu ispravni.';
+          mapped = 'Uneseni podaci nisu ispravni.';
+          break;
         default:
-          return error.message?.trim().isNotEmpty == true
+          mapped = error.message?.trim().isNotEmpty == true
               ? error.message!
               : 'Došlo je do greške. Pokušajte ponovo.';
       }
+      return _withoutTechLeak(mapped);
     }
 
     final raw = error.toString().toLowerCase();
@@ -47,6 +58,19 @@ class AppErrorMapper {
 
     if (raw.contains('timeout')) {
       return 'Zahtjev je istekao. Pokušajte ponovo.';
+    }
+
+    if (raw.contains('loadlibrary') ||
+        raw.contains('deferredload') ||
+        raw.contains('part.js') ||
+        raw.contains('failed to load')) {
+      return 'Modul ekrana se nije uspio učitati. Osvježite stranicu (Ctrl+Shift+R) '
+          'ili kontaktirajte administratora.';
+    }
+
+    if (raw.contains('permission-denied') || raw.contains('permission denied')) {
+      return 'Nemate pristup ovim podacima za ovu ulogu ili pogon. '
+          'Provjerite dodijeljenu ulogu i pogon.';
     }
 
     if (raw.contains('invalid company context')) {
@@ -69,7 +93,45 @@ class AppErrorMapper {
       return 'Podaci nisu dostupni. Pokušajte ponovo.';
     }
 
+    if (error is Exception) {
+      final msg = error.toString();
+      const prefix = 'Exception: ';
+      if (msg.startsWith(prefix)) {
+        final inner = msg.substring(prefix.length).trim();
+        if (inner.isNotEmpty && !_isOpaqueRuntimeType(inner)) {
+          return _withoutTechLeak(inner);
+        }
+      }
+    }
+
+    final fallback = error.toString().trim();
+    if (fallback.isNotEmpty && !_isOpaqueRuntimeType(fallback)) {
+      return _withoutTechLeak(fallback);
+    }
+
     return 'Došlo je do greške. Pokušajte ponovo.';
+  }
+
+  static String _withoutTechLeak(String message) {
+    var t = message;
+    t = t.replaceAll(RegExp(r'permission-denied', caseSensitive: false), '');
+    t = t.replaceAll(RegExp(r'permission denied', caseSensitive: false), '');
+    t = t.replaceAll(RegExp(r'firestore\.rules', caseSensitive: false), '');
+    t = t.replaceAll(RegExp(r'\n+\(kod:.*?\)', caseSensitive: false), '');
+    t = t.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
+    if (t.isEmpty) {
+      return 'Nemate pristup ovim podacima za ovu ulogu ili pogon. '
+          'Provjerite dodijeljenu ulogu i pogon.';
+    }
+    return t;
+  }
+
+  static bool _isOpaqueRuntimeType(String s) {
+    final t = s.trim();
+    return t.isEmpty ||
+        t == 'Exception' ||
+        t.startsWith('Instance of ') ||
+        t.startsWith('minified:');
   }
 
   /// Callable (Cloud Functions) — nije Firestore `permission-denied` s klijenta.
@@ -78,11 +140,9 @@ class AppErrorMapper {
     final m = (e.message ?? '').trim();
     switch (e.code) {
       case 'permission-denied':
-        if (m.isNotEmpty) {
-          return kDebugMode ? '$m\n\n(kod: ${e.code})' : m;
-        }
-        return 'Nemaš dozvolu za ovu radnju (provjera na serveru). '
-            'Provjeri ulogu, da li korisnik pripada istoj firmi i da li je nalog aktivan.';
+        if (m.isNotEmpty) return m;
+        return 'Nemate pristup ovim podacima za ovu ulogu ili pogon. '
+            'Provjerite dodijeljenu ulogu i pogon.';
       case 'unauthenticated':
         return m.isNotEmpty
             ? m
@@ -98,9 +158,10 @@ class AppErrorMapper {
             ? m
             : 'Operacija nije dozvoljena u trenutnom stanju podataka.';
       case 'internal':
-        return m.isNotEmpty
-            ? m
-            : 'Greška na serveru. Pokušajte ponovo kasnije.';
+        if (m.isNotEmpty && m.toUpperCase() != 'INTERNAL') {
+          return kDebugMode ? '$m\n\n(kod: ${e.code})' : m;
+        }
+        return 'Nije moguće završiti zatvaranje neusaglašenosti. Pokušajte ponovo.';
       case 'unavailable':
         return 'Servis trenutno nije dostupan. Pokušajte ponovo.';
       case 'deadline-exceeded':
@@ -110,7 +171,7 @@ class AppErrorMapper {
             ? m
             : 'Kvota ili limit servisa je prekoračen. Pokušajte kasnije.';
       default:
-        if (m.isNotEmpty) {
+        if (m.isNotEmpty && m.toUpperCase() != 'INTERNAL') {
           return kDebugMode ? '$m\n\n(kod: ${e.code})' : m;
         }
         return 'Greška na serveru (${e.code}). Pokušajte ponovo.';
@@ -119,18 +180,8 @@ class AppErrorMapper {
 
   /// Jasno razlikuje Firestore security rules od ostalih uzroka.
   static String _permissionDeniedMessage(FirebaseException error) {
-    const base =
-        'Pristup podacima u bazi je odbijen (Firestore: permission-denied). '
-        'To su sigurnosna pravila, ne greška aplikacije. '
-        'Provjerite ulogu korisnika, da je nalog aktivan i da su deployana '
-        'ažurna firestore.rules na istom Firebase projektu.';
-    if (kDebugMode) {
-      final m = error.message?.trim();
-      if (m != null && m.isNotEmpty) {
-        return '$base\n\nTehnički detalj (debug): $m';
-      }
-    }
-    return base;
+    return 'Nemate pristup ovim podacima za ovu ulogu ili pogon. '
+        'Provjerite dodijeljenu ulogu i pogon.';
   }
 
   static String _failedPreconditionMessage(FirebaseException error) {

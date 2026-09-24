@@ -411,7 +411,8 @@ void showApsGanttInfoDialog(
   required String body,
 }) {
   showDialog<void>(
-    context: context,
+      barrierDismissible: false,
+      context: context,
     builder: (ctx) {
       final maxContentHeight = MediaQuery.sizeOf(ctx).height * 0.55;
       return AlertDialog(

@@ -41,6 +41,7 @@ class StructuredEntitySearchResult {
             data['employeeCode'] ??
             data['machineCode'] ??
             data['workbenchCode'] ??
+            data['workCenterCode'] ??
             data['code'] ??
             '')
         .toString()

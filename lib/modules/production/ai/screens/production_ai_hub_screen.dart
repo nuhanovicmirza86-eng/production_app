@@ -7,6 +7,9 @@ import '../../ai_analysis/screens/ai_analysis_screen.dart'
     show AiAnalysisScreen, aiStructuredAnalysisVisibleForRole;
 import '../../reports/screens/production_ai_report_screen.dart'
     show ProductionAiReportScreen, productionAiReportVisibleForRole;
+import 'operonix_ai_feedback_signals_screen.dart';
+import 'operonix_ai_operational_briefing_screen.dart';
+import 'operonix_ai_watchlist_screen.dart';
 import 'production_ai_chat_screen.dart';
 import 'production_tracking_assistant_screen.dart';
 
@@ -64,6 +67,12 @@ class ProductionAiHubScreen extends StatelessWidget {
         analyticsOn && aiStructuredAnalysisVisibleForRole(role);
     final showReportTile =
         reportOn && productionAiReportVisibleForRole(role);
+    final showFeedbackSignals =
+        chatOn && OperonixAiFeedbackSignalsScreen.canView(companyData);
+    final showWatchlist =
+        chatOn && OperonixAiWatchlistScreen.canView(companyData);
+    final showBriefing =
+        chatOn && OperonixAiOperationalBriefingScreen.canView(companyData);
 
     return Scaffold(
       appBar: AppBar(title: const Text(kOperonixAiAssistantTitle)),
@@ -84,12 +93,72 @@ class ProductionAiHubScreen extends StatelessWidget {
               child: ListTile(
                 leading: const Icon(Icons.chat_bubble_outline),
                 title: const Text('Razgovor s asistentom'),
-                subtitle: const Text(
-                  'Opća pitanja o proizvodnji, učinku i srodnim temama, u skladu s ulogom.',
+                subtitle: Text(
+                  ProductionModuleKeys.hasModule(
+                    companyData,
+                    ProductionModuleKeys.quality,
+                  )
+                      ? 'Pitanja o proizvodnji, QMS/NCR, evidencijama, '
+                          'izvještajima i učinku — u skladu s ulogom.'
+                      : 'Opća pitanja o proizvodnji, učinku i srodnim temama, '
+                          'u skladu s ulogom.',
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () =>
                     open(ProductionAiChatScreen(companyData: companyData)),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (showWatchlist) ...[
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.playlist_add_check_outlined),
+                title: const Text(kOperonixAiWatchlistCardTitle),
+                subtitle: const Text(
+                  'Proaktivni pregled najvećih rizika i prilika, '
+                  's jednom preporučenom prvom akcijom.',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => open(
+                  OperonixAiWatchlistScreen(companyData: companyData),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (showBriefing) ...[
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.wb_sunny_outlined),
+                title: const Text(kOperonixAiOperationalBriefingCardTitle),
+                subtitle: const Text(
+                  'Dnevni menadžerski sažetak rizika, prilika i '
+                  'otvorenih upozorenja Asistenta.',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => open(
+                  OperonixAiOperationalBriefingScreen(
+                    companyData: companyData,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (showFeedbackSignals) ...[
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.insights_outlined),
+                title: const Text('Signali povratnih informacija'),
+                subtitle: const Text(
+                  'Agregirani pregled ocjena Asistenta u odabranom periodu. '
+                  'Bez pohrane upita i odgovora.',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => open(
+                  OperonixAiFeedbackSignalsScreen(companyData: companyData),
+                ),
               ),
             ),
             const SizedBox(height: 8),

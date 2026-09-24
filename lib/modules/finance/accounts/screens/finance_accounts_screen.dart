@@ -98,6 +98,7 @@ class _FinanceAccountsScreenState extends State<FinanceAccountsScreen> {
 
   Future<void> _deactivate(FinanceAccount account) async {
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(FinanceStrings.t(ctx, 'deactivate_account')),

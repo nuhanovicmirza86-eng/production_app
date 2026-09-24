@@ -115,6 +115,137 @@ class PackagingUnitsBalanceIssue {
   final Set<String> errorFieldKeys;
 }
 
+/// packaging_control / in_process_quality_check — nema odbijenih / neprolaznih.
+const String noDefectReasonCode = 'BEZ_GRESKE';
+const String packagingNoDefectReasonCode = noDefectReasonCode;
+
+const Map<String, String> packagingDefectReasonLabels = {
+  noDefectReasonCode: 'Bez greške',
+  'VIZUELNA_GRESKA': 'Vizuelna greška',
+  'DIMENZIJA': 'Dimenzija / tolerancija',
+  'BOJA_POVRŠINA': 'Boja / površina',
+  'OŠTEĆENJE': 'Oštećenje',
+  'KONTAMINACIJA': 'Kontaminacija',
+  'NEUSKLADEN_BOM': 'Neusklađenost s specifikacijom',
+  'OSTALO': 'Ostalo',
+};
+
+String packagingDefectReasonLabel(String? code) {
+  final c = (code ?? '').trim();
+  if (c.isEmpty) return '—';
+  return packagingDefectReasonLabels[c] ?? c;
+}
+
+/// Fail qty = 0 → Bez greške; fail qty > 0 → obavezan stvarni razlog.
+void syncZeroFailDefectReasonCode({
+  required Map<String, String?> enumSelections,
+  required dynamic failQty,
+}) {
+  final failed = packagingQuantityOrZero(failQty);
+  if (failed <= 0) {
+    enumSelections['defectReasonCode'] = noDefectReasonCode;
+    return;
+  }
+  final current = (enumSelections['defectReasonCode'] ?? '').trim();
+  if (current == noDefectReasonCode) {
+    enumSelections['defectReasonCode'] = null;
+  }
+}
+
+String? zeroFailDefectReasonIssue({
+  required dynamic failQty,
+  required String? defectReasonCode,
+  required String failMessage,
+}) {
+  final failed = packagingQuantityOrZero(failQty);
+  if (failed <= 0) return null;
+  final reason = (defectReasonCode ?? '').trim();
+  if (reason.isEmpty || reason == noDefectReasonCode) {
+    return failMessage;
+  }
+  return null;
+}
+
+/// Odbijeno = 0 → Bez greške; Odbijeno > 0 → obavezan stvarni razlog.
+void syncPackagingDefectReasonCode({
+  required Map<String, String?> enumSelections,
+  required dynamic unitsRejected,
+}) {
+  syncZeroFailDefectReasonCode(
+    enumSelections: enumSelections,
+    failQty: unitsRejected,
+  );
+}
+
+String? packagingDefectReasonIssue({
+  required dynamic unitsRejected,
+  required String? defectReasonCode,
+}) {
+  return zeroFailDefectReasonIssue(
+    failQty: unitsRejected,
+    defectReasonCode: defectReasonCode,
+    failMessage: 'Unesite stvarni razlog greške jer postoje odbijeni komadi.',
+  );
+}
+
+/// Ne prolazi = 0 → Bez greške; Ne prolazi > 0 → obavezan stvarni razlog.
+void syncInspectionDefectReasonCode({
+  required Map<String, String?> enumSelections,
+  required dynamic qtyFail,
+}) {
+  syncZeroFailDefectReasonCode(
+    enumSelections: enumSelections,
+    failQty: qtyFail,
+  );
+}
+
+String? inspectionDefectReasonIssue({
+  required dynamic qtyFail,
+  required String? defectReasonCode,
+}) {
+  return zeroFailDefectReasonIssue(
+    failQty: qtyFail,
+    defectReasonCode: defectReasonCode,
+    failMessage:
+        'Unesite stvarni razlog greške jer postoje komadi koji ne prolaze.',
+  );
+}
+
+const String finalControlNoDefectReasonCode = noDefectReasonCode;
+
+/// Škart 0 + Dorada 0 → Bez greške; Škart > 0 ili Dorada > 0 → stvarni razlog.
+void syncFinalControlDefectReasonCode({
+  required Map<String, String?> enumSelections,
+  required dynamic scrapQty,
+  required dynamic reworkQty,
+}) {
+  final failed = packagingQuantityOrZero(scrapQty) +
+      packagingQuantityOrZero(reworkQty);
+  if (failed <= 0) {
+    enumSelections['defectReason'] = noDefectReasonCode;
+    return;
+  }
+  final current = (enumSelections['defectReason'] ?? '').trim();
+  if (current == noDefectReasonCode) {
+    enumSelections['defectReason'] = null;
+  }
+}
+
+String? finalControlDefectReasonIssue({
+  required dynamic scrapQty,
+  required dynamic reworkQty,
+  required String? defectReason,
+}) {
+  final failed = packagingQuantityOrZero(scrapQty) +
+      packagingQuantityOrZero(reworkQty);
+  if (failed <= 0) return null;
+  final reason = (defectReason ?? '').trim();
+  if (reason.isEmpty || reason == noDefectReasonCode) {
+    return 'Unesite stvarni razlog greške jer postoji škart ili dorada.';
+  }
+  return null;
+}
+
 /// Provjereno == Prihvaćeno + Odbijeno (prazno = 0).
 PackagingUnitsBalanceIssue? packagingUnitsBalanceIssue({
   required dynamic unitsChecked,

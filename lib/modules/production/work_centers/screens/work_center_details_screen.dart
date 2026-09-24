@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../ai/models/operonix_ai_entity_chat_binding.dart';
+import '../../ai/widgets/operonix_ai_assistant_navigator.dart';
 import '../../production_orders/models/production_order_model.dart';
 import '../../production_orders/screens/production_order_details_screen.dart';
 import '../../production_orders/services/production_order_service.dart';
@@ -108,6 +110,7 @@ class _WorkCenterDetailsScreenState extends State<WorkCenterDetailsScreen> {
     if (wc == null || !_canManage) return;
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Deaktivirati radni centar?'),
@@ -232,8 +235,8 @@ class _WorkCenterDetailsScreenState extends State<WorkCenterDetailsScreen> {
                   WorkCenterInfoIcon(
                     title: 'Nalozi na ovom centru',
                     message:
-                        'Lista prikazuje naloge čije je polje workCenterId jednako ovom radnom centru. '
-                        'Dodjelu mijenjate u detaljima proizvodnog naloga (Postavi radni centar / resurse).',
+                        'Lista prikazuje naloge dodijeljene ovom radnom centru. '
+                        'Dodjelu mijenjate u detaljima proizvodnog naloga.',
                   ),
                 ],
               ),
@@ -310,12 +313,31 @@ class _WorkCenterDetailsScreenState extends State<WorkCenterDetailsScreen> {
     );
   }
 
+  OperonixAiEntityChatBinding? _workCenterAiChatBinding() {
+    final wc = _wc;
+    if (wc == null) return null;
+    final code = wc.workCenterCode.trim();
+    if (code.isEmpty) return null;
+    final name = wc.name.trim();
+    final label = name.isEmpty ? code : '$code · $name';
+    return OperonixAiEntityChatBinding(
+      kind: OperonixAiEntityChatKind.machine,
+      businessKey: code,
+      displayLabel: label,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Radni centar'),
         actions: [
+          if (_wc != null)
+            OperonixAiAskAssistantAppBarAction(
+              companyData: widget.companyData,
+              entityBinding: _workCenterAiChatBinding(),
+            ),
           IconButton(
             icon: const Icon(Icons.info_outline),
             tooltip: WorkCenterHelpTexts.overviewTitle,
@@ -452,9 +474,7 @@ class _WorkCenterDetailsScreenState extends State<WorkCenterDetailsScreen> {
                   helpBody: WorkCenterHelpTexts.auditBody,
                 ),
                 _kv('Kreirano', _fmtDate(_wc!.createdAt)),
-                _kv('Kreirao', _wc!.createdBy.isEmpty ? '—' : _wc!.createdBy),
                 _kv('Ažurirano', _fmtDate(_wc!.updatedAt)),
-                _kv('Ažurirao', _wc!.updatedBy.isEmpty ? '—' : _wc!.updatedBy),
                 const SizedBox(height: 24),
                 if (_canManage)
                   Row(

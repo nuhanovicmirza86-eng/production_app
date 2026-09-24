@@ -67,9 +67,19 @@ ProductionEvidenceConfigUiError mapProductionEvidenceConfigError(Object error) {
 
   final lower = raw.toLowerCase();
 
+  if (lower.contains('ulogu za verifikaciju') ||
+      lower.contains('uloga nije dozvoljena za verifikaciju') ||
+      lower.contains('uloge za verifikaciju')) {
+    return const ProductionEvidenceConfigUiError(
+      snackMessage: _kGenericSaveFail,
+      fieldKey: 'verifierRoles',
+      fieldMessage: 'Odaberite najmanje jednu ulogu za verifikaciju.',
+    );
+  }
+
   if (lower.contains('runtimeallowedroles') ||
       lower.contains('barem jednu ulogu') ||
-      lower.contains('najmanje jednu')) {
+      lower.contains('najmanje jednu dozvoljenu ulogu')) {
     return const ProductionEvidenceConfigUiError(
       snackMessage: _kGenericSaveFail,
       fieldKey: 'roles',

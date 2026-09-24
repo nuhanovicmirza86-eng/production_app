@@ -116,6 +116,7 @@ class _WarehouseHubScreenState extends State<WarehouseHubScreen> {
     var canShip = true;
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setLocal) {
@@ -270,6 +271,7 @@ class _WarehouseHubScreenState extends State<WarehouseHubScreen> {
     var isActive = row.isActive;
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setLocal) {

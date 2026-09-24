@@ -4,14 +4,23 @@ import 'package:flutter/material.dart';
 import '../../../../core/ai/production_ai_context_scope.dart';
 import '../../../../core/branding/operonix_ai_branding.dart'
     show kOperonixAiChatScreenTitle;
+import '../models/operonix_ai_entity_chat_binding.dart';
 import '../services/firebase_callable_user_message.dart';
 import '../services/production_ai_chat_service.dart';
+import '../widgets/operonix_ai_assistant_feedback_bar.dart';
+import '../widgets/operonix_ai_assistant_navigator.dart';
 
 class _ChatLine {
   final bool isUser;
   final String text;
+  /// Stabilan ključ za feedback stanje (jednom po AI odgovoru).
+  final String? feedbackKey;
 
-  const _ChatLine({required this.isUser, required this.text});
+  const _ChatLine({
+    required this.isUser,
+    required this.text,
+    this.feedbackKey,
+  });
 }
 
 /// Slobodni razgovor s asistentom — odvojeno od operativnog pomoćnika za praćenje.
@@ -20,10 +29,18 @@ class ProductionAiChatScreen extends StatefulWidget {
     super.key,
     required this.companyData,
     this.initialInputText,
+    this.entityBinding,
+    this.autoAskWithBinding = false,
   });
 
   final Map<String, dynamic> companyData;
   final String? initialInputText;
+
+  /// AI-M2-G3 — context binding s detalj ekrana (F routing preko poslovnog ključa).
+  final OperonixAiEntityChatBinding? entityBinding;
+
+  /// Jednom pošalji starter pitanje s bindingom (bez ručnog tipkanja ID-a).
+  final bool autoAskWithBinding;
 
   @override
   State<ProductionAiChatScreen> createState() => _ProductionAiChatScreenState();
@@ -34,8 +51,45 @@ class _ProductionAiChatScreenState extends State<ProductionAiChatScreen> {
   final _input = TextEditingController();
   final _scroll = ScrollController();
   final _lines = <_ChatLine>[];
+  int _feedbackSeq = 0;
   bool _loading = false;
+  bool _autoAskStarted = false;
   String? _error;
+
+  OperonixAiEntityChatBinding? get _binding {
+    final b = widget.entityBinding;
+    if (b == null || !b.isReady) return null;
+    return b;
+  }
+
+  String get _companyId =>
+      (widget.companyData['companyId'] ?? '').toString().trim();
+
+  String? get _plantKey {
+    final v = (widget.companyData['plantKey'] ?? '').toString().trim();
+    return v.isEmpty ? null : v;
+  }
+
+  String? get _plantDisplayName {
+    final v = (widget.companyData['plantDisplayName'] ??
+            widget.companyData['plantName'] ??
+            '')
+        .toString()
+        .trim();
+    return v.isEmpty ? null : v;
+  }
+
+  /// Rolling 30 dana — metapodatak za feedback (bez čuvanja sadržaja chata).
+  ({String from, String to}) get _feedbackPeriod {
+    final now = DateTime.now();
+    final to = DateTime(now.year, now.month, now.day);
+    final from = to.subtract(const Duration(days: 30));
+    String fmt(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}-'
+        '${d.month.toString().padLeft(2, '0')}-'
+        '${d.day.toString().padLeft(2, '0')}';
+    return (from: fmt(from), to: fmt(to));
+  }
 
   @override
   void initState() {
@@ -43,6 +97,13 @@ class _ProductionAiChatScreenState extends State<ProductionAiChatScreen> {
     final pre = widget.initialInputText;
     if (pre != null && pre.trim().isNotEmpty) {
       _input.text = pre.trim();
+    }
+    if (widget.autoAskWithBinding && _binding != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _autoAskStarted) return;
+        _autoAskStarted = true;
+        _sendVisible(_binding!.starterQuestion);
+      });
     }
   }
 
@@ -56,20 +117,46 @@ class _ProductionAiChatScreenState extends State<ProductionAiChatScreen> {
   Future<void> _send() async {
     final t = _input.text.trim();
     if (t.isEmpty || _loading) return;
+    _input.clear();
+    await _sendVisible(t);
+  }
+
+  /// [visibleText] ide u bubble; Callable dobija routable poruku s bindingom.
+  Future<void> _sendVisible(String visibleText) async {
+    final visible = visibleText.trim();
+    if (visible.isEmpty || _loading) return;
+
+    final routable = _binding?.toRoutableMessage(visible) ?? visible;
 
     setState(() {
-      _lines.add(_ChatLine(isUser: true, text: t));
-      _input.clear();
+      _lines.add(_ChatLine(isUser: true, text: visible));
       _error = null;
       _loading = true;
     });
     _scrollToEnd();
 
     try {
-      final reply = await _svc.sendMessage(t);
+      final prior = _lines.length > 1
+          ? _lines.sublist(0, _lines.length - 1)
+          : const <_ChatLine>[];
+      final turns = <Map<String, String>>[
+        for (final line in prior)
+          if (line.text.trim().isNotEmpty)
+            {
+              'role': line.isUser ? 'user' : 'assistant',
+              'text': line.text.trim(),
+            },
+      ];
+      final clipped =
+          turns.length > 20 ? turns.sublist(turns.length - 20) : turns;
+      final reply = await _svc.sendMessage(
+        routable,
+        conversationTurns: clipped,
+      );
       if (!mounted) return;
+      final key = 'fb_${++_feedbackSeq}';
       setState(() {
-        _lines.add(_ChatLine(isUser: false, text: reply));
+        _lines.add(_ChatLine(isUser: false, text: reply, feedbackKey: key));
         _loading = false;
       });
     } on FirebaseFunctionsException catch (e) {
@@ -103,6 +190,8 @@ class _ProductionAiChatScreenState extends State<ProductionAiChatScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final keyboardBottom = MediaQuery.viewInsetsOf(context).bottom;
+    final period = _feedbackPeriod;
+    final binding = _binding;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -113,6 +202,7 @@ class _ProductionAiChatScreenState extends State<ProductionAiChatScreen> {
         padding: EdgeInsets.only(bottom: keyboardBottom),
         child: Column(
           children: [
+            if (binding != null) OperonixAiEntityContextChip(binding: binding),
             if (_error != null)
               Material(
                 color: theme.colorScheme.errorContainer,
@@ -130,9 +220,12 @@ class _ProductionAiChatScreenState extends State<ProductionAiChatScreen> {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: Text(
-                          ProductionAiContextScope.hintForEmptyChat(
-                            widget.companyData,
-                          ),
+                          binding != null
+                              ? 'Asistent koristi kontekst: ${binding.displayLabel}. '
+                                  'Možete dopisati pitanje ili pričekati odgovor na početni upit.'
+                              : ProductionAiContextScope.hintForEmptyChat(
+                                  widget.companyData,
+                                ),
                           style: theme.textTheme.bodyLarge?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -173,7 +266,27 @@ class _ProductionAiChatScreenState extends State<ProductionAiChatScreen> {
                               color: bg,
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Text(line.text, style: TextStyle(color: fg)),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(line.text, style: TextStyle(color: fg)),
+                                if (!line.isUser &&
+                                    line.feedbackKey != null &&
+                                    _companyId.isNotEmpty)
+                                  OperonixAiAssistantFeedbackBar(
+                                    key: ValueKey(line.feedbackKey),
+                                    companyId: _companyId,
+                                    plantKey: _plantKey,
+                                    plantDisplayName: _plantDisplayName,
+                                    module: binding?.feedbackModule ??
+                                        'production',
+                                    contract:
+                                        binding?.feedbackContract ?? 'aiChat',
+                                    periodFrom: period.from,
+                                    periodTo: period.to,
+                                  ),
+                              ],
+                            ),
                           ),
                         );
                       },

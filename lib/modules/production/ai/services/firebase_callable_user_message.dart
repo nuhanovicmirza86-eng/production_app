@@ -8,6 +8,12 @@ String firebaseCallableUserMessage(FirebaseFunctionsException e) {
   final raw = (e.message ?? '').trim();
   final code = e.code.trim().toLowerCase();
 
+  // AI-M3-UI-LANG-01 — never surface raw field names to BCS UI.
+  final lower = raw.toLowerCase();
+  if (lower.contains('datefrom') || lower.contains('dateto')) {
+    return 'Odaberite period za prikaz liste praćenja.';
+  }
+
   if (raw.isNotEmpty && raw.toUpperCase() != 'INTERNAL') {
     return raw;
   }

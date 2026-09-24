@@ -90,6 +90,7 @@ class _FinanceSalesInvoiceDetailScreenState
     DateTime dueDate = DateTime.now().add(const Duration(days: 30));
     DateTime? issueDate = DateTime.now();
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
@@ -155,6 +156,7 @@ class _FinanceSalesInvoiceDetailScreenState
 
   Future<void> _cancel() async {
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(FinanceStrings.t(ctx, 'cancel_invoice')),

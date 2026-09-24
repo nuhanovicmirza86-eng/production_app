@@ -1,26 +1,40 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/access/production_access_helper.dart';
+import '../../production/station_pages/screens/production_evidence_operator_hub_screen.dart';
 import '../widgets/qms_iatf_help.dart';
-import 'qms_screens_bundle.dart' deferred as qms;
+import 'capa_tracking_screen.dart';
+import 'control_plans_list_screen.dart';
+import 'execute_inspection_screen.dart';
+import 'inspection_plans_list_screen.dart';
+import 'inspection_results_list_screen.dart';
+import 'internal_audit_list_screen.dart';
+import 'ncr_claim_create_screen.dart';
+import 'ncr_action_history_hub_screen.dart';
+import 'ncr_list_screen.dart';
+import 'ncr_open_actions_list_screen.dart';
+import 'quality_dashboard_screen.dart';
+import 'quality_documentation_screen.dart';
+import 'qms_management_report_screen.dart';
+import 'qms_methodology_reference_screen.dart';
+import 'qms_pfmea_list_screen.dart';
 
 /// Centralni ulaz u QMS modul (pretplata `quality` + uloga iz matrice).
-///
-/// Ekrani destinacija učitavaju se **odgođeno** ([qms]) da prvi prikaz Huba ne vuče
-/// sve QMS biblioteke odjednom (brži prvi frame, manji posao za JIT u debugu).
 class QualityHubScreen extends StatelessWidget {
   final Map<String, dynamic> companyData;
 
   const QualityHubScreen({super.key, required this.companyData});
 
-  Future<void> _pushQms(
+  String get _role =>
+      ProductionAccessHelper.normalizeRole(companyData['role']);
+
+  Future<void> _push(
     BuildContext context,
-    Widget Function() page,
+    Widget page,
   ) async {
-    await qms.loadLibrary();
-    if (!context.mounted) return;
-    Navigator.push<void>(
+    await Navigator.push<void>(
       context,
-      MaterialPageRoute<void>(builder: (_) => page()),
+      MaterialPageRoute<void>(builder: (_) => page),
     );
   }
 
@@ -37,15 +51,43 @@ class QualityHubScreen extends StatelessWidget {
       String? iatfMessage,
       Future<void> Function() onTap,
     })>[
+      if (ProductionAccessHelper.canAccessQualityControlEvidenceHub(_role))
+        (
+          icon: Icons.fact_check_outlined,
+          title: 'Kontrolne evidencije',
+          subtitle:
+              'Kontrola pakovanja, finalna kontrola, kontrola u procesu i odobrenje prvog komada.',
+          iatfTitle: 'Kontrolne evidencije',
+          iatfMessage:
+              'Operativni ulaz u kontrolne evidencije koje Operater kvaliteta smije završiti.',
+          onTap: () => _push(
+            context,
+            ProductionEvidenceOperatorHubScreen(companyData: cd),
+          ),
+        ),
+      if (ProductionAccessHelper.canAccessNcrOpenActionsInbox(_role))
+        (
+          icon: Icons.inbox_outlined,
+          title: 'Moje otvorene akcije',
+          subtitle:
+              'NCR zadaci po ulozi — dorada, ponovna kontrola, zatvaranje.',
+          iatfTitle: 'Moje otvorene akcije',
+          iatfMessage:
+              'Jedinstveni inbox otvorenih koraka NCR toka — direktan ulaz u zadatak.',
+          onTap: () => _push(
+            context,
+            NcrOpenActionsListScreen(companyData: cd),
+          ),
+        ),
       (
         icon: Icons.menu_book_outlined,
         title: 'Metodologija · IATF',
         subtitle: 'Reakcijski plan, CAPA, PFMEA, ocjene rizika',
         iatfTitle: 'Metodologija',
         iatfMessage: QmsIatfStrings.methodologyWhy,
-        onTap: () => _pushQms(
+        onTap: () => _push(
           context,
-          () => qms.QmsMethodologyReferenceScreen(),
+          const QmsMethodologyReferenceScreen(),
         ),
       ),
       (
@@ -54,20 +96,20 @@ class QualityHubScreen extends StatelessWidget {
         subtitle: 'Ključni brojevi, otvorena neslaganja i CAPA',
         iatfTitle: 'Pregled kvaliteta',
         iatfMessage: QmsIatfStrings.dashboard,
-        onTap: () => _pushQms(
+        onTap: () => _push(
           context,
-          () => qms.QualityDashboardScreen(companyData: cd),
+          QualityDashboardScreen(companyData: cd),
         ),
       ),
       (
         icon: Icons.folder_special_outlined,
         title: 'Dokumentacija',
-        subtitle: 'Radni uputi, pakovanje, obrasci — kasnije vezano na proizvode',
+        subtitle: 'Radne upute, pakovanje, obrasci — pregled dokumenata',
         iatfTitle: 'Dokumentacija',
         iatfMessage: QmsIatfStrings.documentationHub,
-        onTap: () => _pushQms(
+        onTap: () => _push(
           context,
-          () => qms.QualityDocumentationScreen(companyData: cd),
+          QualityDocumentationScreen(companyData: cd),
         ),
       ),
       (
@@ -76,9 +118,9 @@ class QualityHubScreen extends StatelessWidget {
         subtitle: 'NCR, CAPA, trend OK/NOK, top PFMEA · PDF',
         iatfTitle: 'Izvještaj za vodstvo',
         iatfMessage: QmsIatfStrings.managementReport,
-        onTap: () => _pushQms(
+        onTap: () => _push(
           context,
-          () => qms.QmsManagementReportScreen(companyData: cd),
+          QmsManagementReportScreen(companyData: cd),
         ),
       ),
       (
@@ -87,9 +129,9 @@ class QualityHubScreen extends StatelessWidget {
         subtitle: 'S, O, D, RPN, AP · po proizvodu',
         iatfTitle: 'PFMEA u QMS-u',
         iatfMessage: QmsIatfStrings.listPfmea,
-        onTap: () => _pushQms(
+        onTap: () => _push(
           context,
-          () => qms.QmsPfmeaListScreen(companyData: cd),
+          QmsPfmeaListScreen(companyData: cd),
         ),
       ),
       (
@@ -99,9 +141,9 @@ class QualityHubScreen extends StatelessWidget {
         iatfTitle: 'Kontrolni plan (APQP)',
         iatfMessage:
             '${QmsIatfStrings.kpiControlPlans}\n\n${QmsIatfStrings.termApqp}',
-        onTap: () => _pushQms(
+        onTap: () => _push(
           context,
-          () => qms.ControlPlansListScreen(companyData: cd),
+          ControlPlansListScreen(companyData: cd),
         ),
       ),
       (
@@ -110,9 +152,9 @@ class QualityHubScreen extends StatelessWidget {
         subtitle: 'Ulaz / u procesu / finalno',
         iatfTitle: 'Plan kontrole',
         iatfMessage: QmsIatfStrings.kpiInspectionPlans,
-        onTap: () => _pushQms(
+        onTap: () => _push(
           context,
-          () => qms.InspectionPlansListScreen(companyData: cd),
+          InspectionPlansListScreen(companyData: cd),
         ),
       ),
       (
@@ -122,9 +164,9 @@ class QualityHubScreen extends StatelessWidget {
         iatfTitle: 'Izvršenje kontrole',
         iatfMessage:
             '${QmsIatfStrings.executeInspection}\n\n${QmsIatfStrings.termTraceability}',
-        onTap: () => _pushQms(
+        onTap: () => _push(
           context,
-          () => qms.ExecuteInspectionScreen(companyData: cd),
+          ExecuteInspectionScreen(companyData: cd),
         ),
       ),
       (
@@ -133,9 +175,9 @@ class QualityHubScreen extends StatelessWidget {
         subtitle: 'Zadnji OK/NOK, lot, plan, datum',
         iatfTitle: 'Povijest kontrola',
         iatfMessage: QmsIatfStrings.listInspectionResults,
-        onTap: () => _pushQms(
+        onTap: () => _push(
           context,
-          () => qms.InspectionResultsListScreen(companyData: cd),
+          InspectionResultsListScreen(companyData: cd),
         ),
       ),
       (
@@ -144,9 +186,9 @@ class QualityHubScreen extends StatelessWidget {
         subtitle: 'NCR · izvor CUSTOMER',
         iatfTitle: 'Reklamacija kupca',
         iatfMessage: QmsIatfStrings.claimCustomer,
-        onTap: () => _pushQms(
+        onTap: () => _push(
           context,
-          () => qms.NcrClaimCreateScreen(
+          NcrClaimCreateScreen(
             companyData: cd,
             claimSource: 'CUSTOMER',
           ),
@@ -158,9 +200,9 @@ class QualityHubScreen extends StatelessWidget {
         subtitle: 'NCR · izvor SUPPLIER (SCAR)',
         iatfTitle: 'Reklamacija dobavljača',
         iatfMessage: QmsIatfStrings.claimSupplier,
-        onTap: () => _pushQms(
+        onTap: () => _push(
           context,
-          () => qms.NcrClaimCreateScreen(
+          NcrClaimCreateScreen(
             companyData: cd,
             claimSource: 'SUPPLIER',
           ),
@@ -169,23 +211,38 @@ class QualityHubScreen extends StatelessWidget {
       (
         icon: Icons.report_gmailerrorred_outlined,
         title: 'NCR',
-        subtitle: 'Svi neskladi',
+        subtitle: 'Neusklađenosti',
         iatfTitle: 'NCR (nesklad)',
         iatfMessage: QmsIatfStrings.listNcr,
-        onTap: () => _pushQms(
+        onTap: () => _push(
           context,
-          () => qms.NcrListScreen(companyData: cd),
+          NcrListScreen(companyData: cd),
         ),
       ),
+      if (ProductionAccessHelper.canViewNcrActionHistory(_role))
+        (
+          icon: Icons.history_toggle_off,
+          title: 'Historija akcija NCR-a',
+          subtitle:
+              'Poslovni zapis akcija — dorada, dodjela, rokovi i izvor.',
+          iatfTitle: 'Historija akcija NCR-a',
+          iatfMessage:
+              'Append-only ledger akcija na neusaglašenostima — odvojeno od '
+              'IATF audit traga i hodograma trenutnog koraka.',
+          onTap: () => _push(
+            context,
+            NcrActionHistoryHubScreen(companyData: cd),
+          ),
+        ),
       (
         icon: Icons.task_alt_outlined,
         title: 'CAPA',
         subtitle: 'Korektivne akcije',
         iatfTitle: 'CAPA',
         iatfMessage: QmsIatfStrings.listCapa,
-        onTap: () => _pushQms(
+        onTap: () => _push(
           context,
-          () => qms.CapaTrackingScreen(companyData: cd),
+          CapaTrackingScreen(companyData: cd),
         ),
       ),
       (
@@ -194,9 +251,9 @@ class QualityHubScreen extends StatelessWidget {
         subtitle: 'IATF 9.2 · nalazi i veza na CAPA',
         iatfTitle: 'Interni audit',
         iatfMessage: QmsIatfStrings.listInternalAudits,
-        onTap: () => _pushQms(
+        onTap: () => _push(
           context,
-          () => qms.InternalAuditListScreen(companyData: cd),
+          InternalAuditListScreen(companyData: cd),
         ),
       ),
     ];

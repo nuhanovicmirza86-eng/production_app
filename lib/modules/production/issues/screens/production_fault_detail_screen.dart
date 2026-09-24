@@ -203,6 +203,7 @@ class _ProductionFaultDetailScreenState extends State<ProductionFaultDetailScree
   Future<void> _confirmCancel() async {
     final reasonCtrl = TextEditingController();
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         return AlertDialog(

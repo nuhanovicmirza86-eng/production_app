@@ -10,7 +10,8 @@ Future<String?> showFinanceReasonPromptDialog({
   String? confirmLabel,
 }) {
   return showDialog<String>(
-    context: context,
+      barrierDismissible: false,
+      context: context,
     builder: (ctx) => _FinanceReasonPromptDialog(
       title: title,
       hint: hint,

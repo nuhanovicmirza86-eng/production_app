@@ -35,9 +35,9 @@ void main() {
     expect(row.scopeType, 'company');
   });
 
-  test('PDF status map: approved→Aktivno, obsolete→Van upotrebe', () {
+  test('PDF status map: approved→Odobreno, obsolete→Van upotrebe', () {
     expect(QmsDisplayFormatters.qmsControlledFormStatus('draft'), 'Nacrt');
-    expect(QmsDisplayFormatters.qmsControlledFormStatus('approved'), 'Aktivno');
+    expect(QmsDisplayFormatters.qmsControlledFormStatus('approved'), 'Odobreno');
     expect(
       QmsDisplayFormatters.qmsControlledFormStatus('obsolete'),
       'Van upotrebe',

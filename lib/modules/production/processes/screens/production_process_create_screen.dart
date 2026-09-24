@@ -136,6 +136,7 @@ class _ProductionProcessCreateScreenState extends State<ProductionProcessCreateS
   Future<void> _pickWorkCenters() async {
     final selected = Set<String>.from(_linkedWcIds);
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         return StatefulBuilder(

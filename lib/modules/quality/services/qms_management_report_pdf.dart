@@ -4,6 +4,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../../../core/pdf/operonix_industrial_letterhead_pdf.dart';
 import '../../../core/pdf/operonix_pdf_footer.dart';
+import '../utils/qms_ncr_display_labels.dart';
 
 /// PDF za [getQmsManagementReport] (korak 5 QMS — izvještaj za vodstvo).
 class QmsManagementReportPdf {
@@ -216,7 +217,10 @@ class QmsManagementReportPdf {
           return pw.TableRow(
             children: [
               _cell(
-                _s(m['ncrCode']).isEmpty ? '—' : _s(m['ncrCode']),
+                QmsNcrDisplayLabels.displayDocumentNumber(
+                  ncrDocumentNo: m['ncrDocumentNo']?.toString(),
+                  ncrCode: m['ncrCode']?.toString(),
+                ),
                 reg,
                 false,
               ),

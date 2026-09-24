@@ -1,3 +1,5 @@
+import '../../../modules/production/station_work/models/production_station_work_session.dart';
+
 class ProfileDrivenEvidenceSummaryFields {
   const ProfileDrivenEvidenceSummaryFields({
     this.workBathName,
@@ -117,6 +119,122 @@ class ProfileDrivenEvidenceSummaryFields {
   }
 }
 
+/// M1-I14-E — facet za filter Operacija (bez raw routingStepId).
+class ProfileDrivenEvidenceOperationFacet {
+  const ProfileDrivenEvidenceOperationFacet({
+    required this.key,
+    required this.label,
+    this.routingStepOrder,
+    this.routingStepOperationName,
+    this.routingStepOperationCode,
+  });
+
+  final String key;
+  final String label;
+  final int? routingStepOrder;
+  final String? routingStepOperationName;
+  final String? routingStepOperationCode;
+
+  bool get isNone => key == 'none';
+
+  factory ProfileDrivenEvidenceOperationFacet.fromMap(Map<String, dynamic>? raw) {
+    final m = raw ?? const <String, dynamic>{};
+    int? stepOrder;
+    final so = m['routingStepOrder'];
+    if (so is num) {
+      stepOrder = so.toInt();
+    } else {
+      stepOrder = int.tryParse('${so ?? ''}');
+    }
+    return ProfileDrivenEvidenceOperationFacet(
+      key: (m['key'] ?? '').toString().trim(),
+      label: (m['label'] ?? '').toString().trim(),
+      routingStepOrder: stepOrder,
+      routingStepOperationName: _opt(m['routingStepOperationName']),
+      routingStepOperationCode: _opt(m['routingStepOperationCode']),
+    );
+  }
+
+  static String? _opt(dynamic v) {
+    final t = (v ?? '').toString().trim();
+    return t.isEmpty ? null : t;
+  }
+}
+
+class ProfileDrivenEvidenceListResult {
+  const ProfileDrivenEvidenceListResult({
+    required this.items,
+    this.operationFacets = const [],
+  });
+
+  final List<ProfileDrivenEvidenceListItem> items;
+  final List<ProfileDrivenEvidenceOperationFacet> operationFacets;
+}
+
+/// M1-I14-C/D — read-only order kontekst iz orderSnapshot (supervision lista).
+class ProfileDrivenEvidenceOrderContext {
+  const ProfileDrivenEvidenceOrderContext({
+    required this.hasSnapshot,
+    this.productionOrderCode,
+    this.productCode,
+    this.productName,
+    this.routingVersion,
+    this.routingId,
+    this.operationName,
+    this.workCenterCode,
+    this.workCenterName,
+    this.bomVersion,
+    this.routingStepOrder,
+    this.routingStepOperationCode,
+    this.routingStepOperationName,
+  });
+
+  final bool hasSnapshot;
+  final String? productionOrderCode;
+  final String? productCode;
+  final String? productName;
+  final String? routingVersion;
+  final String? routingId;
+  final String? operationName;
+  final String? workCenterCode;
+  final String? workCenterName;
+  final String? bomVersion;
+  final int? routingStepOrder;
+  final String? routingStepOperationCode;
+  final String? routingStepOperationName;
+
+  factory ProfileDrivenEvidenceOrderContext.fromMap(Map<String, dynamic>? raw) {
+    final m = raw ?? const <String, dynamic>{};
+    int? stepOrder;
+    final so = m['routingStepOrder'];
+    if (so is num) {
+      stepOrder = so.toInt();
+    } else {
+      stepOrder = int.tryParse('${so ?? ''}');
+    }
+    return ProfileDrivenEvidenceOrderContext(
+      hasSnapshot: m['hasSnapshot'] == true,
+      productionOrderCode: _s(m['productionOrderCode']),
+      productCode: _s(m['productCode']),
+      productName: _s(m['productName']),
+      routingVersion: _s(m['routingVersion']),
+      routingId: _s(m['routingId']),
+      operationName: _s(m['operationName']),
+      workCenterCode: _s(m['workCenterCode']),
+      workCenterName: _s(m['workCenterName']),
+      bomVersion: _s(m['bomVersion']),
+      routingStepOrder: stepOrder,
+      routingStepOperationCode: _s(m['routingStepOperationCode']),
+      routingStepOperationName: _s(m['routingStepOperationName']),
+    );
+  }
+
+  static String? _s(dynamic v) {
+    final t = (v ?? '').toString().trim();
+    return t.isEmpty ? null : t;
+  }
+}
+
 class ProfileDrivenEvidenceListItem {
   const ProfileDrivenEvidenceListItem({
     required this.sessionId,
@@ -133,6 +251,7 @@ class ProfileDrivenEvidenceListItem {
     this.operatorEmail,
     required this.status,
     required this.summaryFields,
+    required this.orderContext,
   });
 
   final String sessionId;
@@ -149,6 +268,7 @@ class ProfileDrivenEvidenceListItem {
   final String? operatorEmail;
   final String status;
   final ProfileDrivenEvidenceSummaryFields summaryFields;
+  final ProfileDrivenEvidenceOrderContext orderContext;
 
   String get summaryLine {
     final s = summaryFields;
@@ -228,6 +348,11 @@ class ProfileDrivenEvidenceListItem {
             ? Map<String, dynamic>.from(m['summaryFields'] as Map)
             : null,
       ),
+      orderContext: ProfileDrivenEvidenceOrderContext.fromMap(
+        m['orderContext'] is Map
+            ? Map<String, dynamic>.from(m['orderContext'] as Map)
+            : null,
+      ),
     );
   }
 }
@@ -270,6 +395,7 @@ class ProfileDrivenEvidenceSessionDetail {
     this.packagingCheckLines = const [],
     this.inspectionLines = const [],
     this.controlledItems = const [],
+    this.orderSnapshot,
   });
 
   final String sessionId;
@@ -309,6 +435,7 @@ class ProfileDrivenEvidenceSessionDetail {
   final List<Map<String, dynamic>> packagingCheckLines;
   final List<Map<String, dynamic>> inspectionLines;
   final List<Map<String, dynamic>> controlledItems;
+  final ProductionStationWorkOrderSnapshot? orderSnapshot;
 
   bool get isReworkAndPainting => processProfileType == 'rework_and_painting';
 
@@ -354,6 +481,13 @@ class ProfileDrivenEvidenceSessionDetail {
       warning = Map<String, dynamic>.from(m['controlledInputWarning'] as Map);
     }
 
+    ProductionStationWorkOrderSnapshot? orderSnapshot;
+    if (m['orderSnapshot'] is Map) {
+      orderSnapshot = ProductionStationWorkOrderSnapshot.fromMap(
+        Map<String, dynamic>.from(m['orderSnapshot'] as Map),
+      );
+    }
+
     return ProfileDrivenEvidenceSessionDetail(
       sessionId: (m['sessionId'] ?? '').toString().trim(),
       companyId: (m['companyId'] ?? '').toString().trim(),
@@ -395,6 +529,7 @@ class ProfileDrivenEvidenceSessionDetail {
       packagingCheckLines: _parseRowList(m['packaging_check_lines']),
       inspectionLines: _parseRowList(m['inspection_lines']),
       controlledItems: _parseRowList(m['controlled_items']),
+      orderSnapshot: orderSnapshot,
     );
   }
 
@@ -483,4 +618,46 @@ String formatFieldValue(dynamic v) {
   }
   final s = v.toString().trim();
   return s.isEmpty ? '—' : s;
+}
+
+/// M1-I15-D-HOTFIX-14 — poslovni audit red (bez UID u UI).
+class ProductionEvidenceAuditItem {
+  const ProductionEvidenceAuditItem({
+    required this.action,
+    required this.actionLabel,
+    required this.summary,
+    required this.performedByName,
+    required this.performedByRoleLabel,
+    this.performedAt,
+    this.rowLabel,
+    this.productionOrderCode,
+  });
+
+  final String action;
+  final String actionLabel;
+  final String summary;
+  final String performedByName;
+  final String performedByRoleLabel;
+  final DateTime? performedAt;
+  final String? rowLabel;
+  final String? productionOrderCode;
+
+  factory ProductionEvidenceAuditItem.fromMap(Map<String, dynamic> map) {
+    return ProductionEvidenceAuditItem(
+      action: (map['action'] ?? '').toString().trim(),
+      actionLabel: (map['actionLabel'] ?? '').toString().trim(),
+      summary: (map['summary'] ?? '').toString().trim(),
+      performedByName: (map['performedByName'] ?? '').toString().trim(),
+      performedByRoleLabel:
+          (map['performedByRoleLabel'] ?? '').toString().trim(),
+      performedAt: _ts(map['performedAt']),
+      rowLabel: (map['rowLabel'] ?? '').toString().trim().isEmpty
+          ? null
+          : (map['rowLabel'] ?? '').toString().trim(),
+      productionOrderCode:
+          (map['productionOrderCode'] ?? '').toString().trim().isEmpty
+          ? null
+          : (map['productionOrderCode'] ?? '').toString().trim(),
+    );
+  }
 }

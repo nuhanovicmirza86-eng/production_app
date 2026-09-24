@@ -14,8 +14,19 @@ class StructuredProfileSessionService {
 
   Future<ProductionStationWorkSession> startSession({
     required String companyId,
-    required int stationSlot,
+    int? stationSlot,
+    String? evidenceConfigId,
   }) {
+    final eid = evidenceConfigId?.trim();
+    if (eid != null && eid.isNotEmpty) {
+      return _sessionCallables.startProductionEvidenceWorkSession(
+        companyId: companyId,
+        evidenceConfigId: eid,
+      );
+    }
+    if (stationSlot == null || stationSlot < 1) {
+      throw ArgumentError('stationSlot ili evidenceConfigId je obavezan.');
+    }
     return _sessionCallables.startProductionStationWorkSession(
       companyId: companyId,
       stationSlot: stationSlot,

@@ -51,7 +51,12 @@ class _CompanyPlantLabelTextState extends State<CompanyPlantLabelText> {
       plantKey: pk,
     );
     if (!mounted) return;
-    setState(() => _label = resolved);
+    setState(() {
+      _label = CompanyPlantDisplayName.forUi(
+        resolved: resolved,
+        plantKey: pk,
+      );
+    });
   }
 
   @override
@@ -64,5 +69,28 @@ class _CompanyPlantLabelTextState extends State<CompanyPlantLabelText> {
       return Text('${widget.prefix}…', style: widget.style);
     }
     return Text('${widget.prefix}$_label', style: widget.style);
+  }
+}
+
+/// Isti plant-scoped red na Operativa / Analitika / OOE / OEE.
+class CompanyPlantContextLine extends StatelessWidget {
+  const CompanyPlantContextLine({
+    super.key,
+    required this.companyId,
+    required this.plantKey,
+  });
+
+  final String companyId;
+  final String plantKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return CompanyPlantLabelText(
+      companyId: companyId,
+      plantKey: plantKey,
+      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+    );
   }
 }

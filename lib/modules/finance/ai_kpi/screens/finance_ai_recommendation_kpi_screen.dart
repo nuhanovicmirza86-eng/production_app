@@ -192,6 +192,7 @@ class _FinanceAiRecommendationKpiScreenState
 
   void _showContractInfo(BuildContext context, FinanceAiRecommendationKpiSnapshot snap) {
     showDialog<void>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(FinanceStrings.t(ctx, 'kpi_contract_info_title')),

@@ -112,6 +112,8 @@ class QmsDocumentRow {
   final String? externalUrl;
   final String? approvedAtIso;
   final String? approvedByUid;
+  final String? approvedByNameSnapshot;
+  final String? approvedByEmailSnapshot;
   final String? obsoleteAtIso;
   final String? obsoleteByUid;
   final String? updatedAtIso;
@@ -136,6 +138,8 @@ class QmsDocumentRow {
     this.externalUrl,
     this.approvedAtIso,
     this.approvedByUid,
+    this.approvedByNameSnapshot,
+    this.approvedByEmailSnapshot,
     this.obsoleteAtIso,
     this.obsoleteByUid,
     this.updatedAtIso,
@@ -174,6 +178,8 @@ class QmsDocumentRow {
       externalUrl: m['externalUrl']?.toString(),
       approvedAtIso: m['approvedAt']?.toString(),
       approvedByUid: m['approvedByUid']?.toString(),
+      approvedByNameSnapshot: m['approvedByNameSnapshot']?.toString(),
+      approvedByEmailSnapshot: m['approvedByEmailSnapshot']?.toString(),
       obsoleteAtIso: m['obsoleteAt']?.toString(),
       obsoleteByUid: m['obsoleteByUid']?.toString(),
       updatedAtIso: m['updatedAt']?.toString(),
@@ -220,6 +226,7 @@ class QmsInspectionResultRow {
 class QmsNcrRow {
   final String id;
   final String ncrCode;
+  final String? ncrDocumentNo;
   final String source;
   final String status;
   final String severity;
@@ -236,6 +243,7 @@ class QmsNcrRow {
   const QmsNcrRow({
     required this.id,
     required this.ncrCode,
+    this.ncrDocumentNo,
     required this.source,
     required this.status,
     required this.severity,
@@ -254,6 +262,7 @@ class QmsNcrRow {
     return QmsNcrRow(
       id: (m['id'] ?? '').toString(),
       ncrCode: (m['ncrCode'] ?? '').toString(),
+      ncrDocumentNo: m['ncrDocumentNo']?.toString(),
       source: (m['source'] ?? '').toString(),
       status: (m['status'] ?? '').toString(),
       severity: (m['severity'] ?? '').toString(),

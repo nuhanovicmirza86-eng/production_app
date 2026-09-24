@@ -169,6 +169,7 @@ class _DevelopmentProjectCreateScreenState
             onPressed: () {
               final scheme = Theme.of(context).colorScheme;
               showDialog<void>(
+      barrierDismissible: false,
                 context: context,
                 builder: (ctx) => AlertDialog(
                   title: const Text('Novi projekat'),

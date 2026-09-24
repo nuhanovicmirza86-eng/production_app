@@ -1,17 +1,35 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/company_plant_display_name.dart';
+import '../../../modules/production/ai/models/operonix_ai_entity_chat_binding.dart';
+import '../../../modules/production/ai/widgets/operonix_ai_assistant_navigator.dart';
 import '../../../modules/production/station_pages/models/production_station_profile_field.dart';
 import '../../../modules/quality/screens/ncr_detail_screen.dart';
+import '../../../modules/quality/services/quality_callable_service.dart';
+import '../../../modules/quality/utils/ncr_next_disposition_catalog.dart';
+import '../../../modules/quality/utils/qms_ncr_display_labels.dart';
+import '../../../modules/quality/widgets/ncr_action_hodogram_model.dart';
+import '../../../modules/quality/widgets/ncr_action_hodogram_timeline.dart';
+import '../../../modules/quality/widgets/qms_iatf_help.dart';
+import '../../catalog_evidence_runtime/utils/line_clearance_line_name.dart';
+import '../../catalog_evidence_runtime/utils/line_clearance_verification.dart';
+import '../../catalog_evidence_runtime/utils/omp_material_lot_source_display.dart';
 import '../../catalog_evidence_runtime/utils/operator_evidence_ux_standard.dart';
+import '../../profile_driven_structured_runtime/utils/structured_piece_quantity.dart';
+import '../../../modules/production/bom/bom_item_traceability.dart';
 import '../export/first_piece_approval_pdf_actions.dart';
 import '../export/final_control_record_pdf_actions.dart';
 import '../export/in_process_quality_check_record_pdf_actions.dart';
+import '../export/operation_material_preparation_record_pdf_actions.dart';
 import '../models/profile_driven_evidence_session.dart';
 import '../services/profile_driven_evidence_callable_service.dart';
+import '../utils/evidence_order_context_display.dart';
+import '../utils/evidence_detail_handoff.dart';
 import '../utils/profile_driven_evidence_detail_display.dart';
 import '../utils/profile_driven_evidence_rework_labels.dart';
+import '../widgets/evidence_order_routing_context_card.dart';
 import '../widgets/profile_driven_evidence_structured_table.dart';
+import '../widgets/qms_controlled_form_help.dart';
 
 /// M2-C — read-only detalj zatvorene profile-driven evidencije.
 class ProfileDrivenEvidenceDetailScreen extends StatefulWidget {
@@ -35,12 +53,18 @@ class _ProfileDrivenEvidenceDetailScreenState
   final _firstPiecePdfActions = FirstPieceApprovalPdfActions();
   final _inProcessPdfActions = InProcessQualityCheckRecordPdfActions();
   final _finalControlPdfActions = FinalControlRecordPdfActions();
+  final _operationMaterialPrepPdfActions =
+      OperationMaterialPreparationRecordPdfActions();
 
   bool _loading = true;
   bool _pdfBusy = false;
   Object? _error;
   ProfileDrivenEvidenceSessionDetail? _session;
+  List<ProductionEvidenceAuditItem> _auditItems = const [];
+  Object? _auditError;
   String? _plantLabel;
+  final _qualitySvc = QualityCallableService();
+  Map<String, dynamic>? _outcomeNcrSummary;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -68,10 +92,36 @@ class _ProfileDrivenEvidenceDetailScreenState
           plantKey: session.plantKey,
         );
       }
+      Map<String, dynamic>? ncrSummary;
+      final ncrId = (session.outcomeNcrId ?? '').trim();
+      if (ncrId.isNotEmpty) {
+        try {
+          ncrSummary = await _qualitySvc.getQmsNonConformanceMap(
+            companyId: _companyId,
+            ncrId: ncrId,
+          );
+        } catch (_) {
+          ncrSummary = null;
+        }
+      }
+      var auditItems = const <ProductionEvidenceAuditItem>[];
+      Object? auditError;
+      try {
+        auditItems = await _service.listProductionEvidenceSessionAuditTrail(
+          companyId: _companyId,
+          sessionId: widget.sessionId,
+        );
+      } catch (e) {
+        auditError = e;
+        auditItems = const [];
+      }
       if (!mounted) return;
       setState(() {
         _session = session;
         _plantLabel = plantLabel;
+        _outcomeNcrSummary = ncrSummary;
+        _auditItems = auditItems;
+        _auditError = auditError;
         _loading = false;
       });
     } catch (e) {
@@ -94,10 +144,42 @@ class _ProfileDrivenEvidenceDetailScreenState
   List<ProductionStationProfileField> get _operatorFields =>
       _fieldDefs.where((f) => f.isOperatorEditable).toList(growable: false);
 
-  List<ProductionStationProfileField> get _operatorFieldsForDisplay =>
-      _operatorFields
-          .where((field) => !profileEvidenceShouldHideDetailFieldKey(field.key))
-          .toList(growable: false);
+  List<ProductionStationProfileField> get _operatorFieldsForDisplay {
+    final isOmp = (_session?.processProfileType ?? '').trim() ==
+        'operation_material_preparation';
+    return _operatorFields
+        .where((field) => !profileEvidenceShouldHideDetailFieldKey(field.key))
+        // M1-I11-B/C — lot + klasifikacija u sekciji „Lot / sljedivost”.
+        .where(
+          (field) =>
+              !isOmp ||
+              (field.key != 'materialLot' &&
+                  field.key != 'materialLotSource' &&
+                  field.key != 'inventoryLotDocId' &&
+                  field.key != ompBomItemKindSnapshot &&
+                  field.key != ompTraceabilityModeSnapshot &&
+                  field.key != ompLotRequiredSnapshot),
+        )
+        .where((field) {
+          if (field.key != lineClearanceLineNameFieldKey) return true;
+          return isLineClearanceLineNameFallbackVisible(
+            fieldValues: _session?.fieldValues,
+          );
+        })
+        .where((field) {
+          final profile = (_session?.processProfileType ?? '').trim();
+          if (profile == lineClearanceProfileKey) {
+            if (lineClearanceHiddenOrderFieldKeys.contains(field.key)) {
+              return false;
+            }
+          }
+          return field.isVisibleGiven(
+            fieldValues: _session?.fieldValues ?? const {},
+            enumSelections: const {},
+          );
+        })
+        .toList(growable: false);
+  }
 
   List<ProductionStationProfileField> get _masterDataFieldsForDisplay =>
       _fieldDefs
@@ -118,9 +200,13 @@ class _ProfileDrivenEvidenceDetailScreenState
 
   String _plantDisplayLabel(ProfileDrivenEvidenceSessionDetail session) {
     final label = (_plantLabel ?? '').trim();
-    if (label.isNotEmpty) return label;
+    if (label.isNotEmpty &&
+        !QmsNcrDisplayLabels.isTechnicalPlantKey(label)) {
+      return label;
+    }
     final key = session.plantKey.trim();
     if (key.isEmpty) return '—';
+    if (QmsNcrDisplayLabels.isTechnicalPlantKey(key)) return '—';
     if (profileEvidenceLooksLikeInternalDocumentId(key)) return '—';
     return key;
   }
@@ -146,6 +232,13 @@ class _ProfileDrivenEvidenceDetailScreenState
         s.status.trim().toLowerCase() == 'closed';
   }
 
+  bool get _canExportOperationMaterialPrepPdf {
+    final s = _session;
+    if (s == null) return false;
+    return s.processProfileType == 'operation_material_preparation' &&
+        s.status.trim().toLowerCase() == 'closed';
+  }
+
   Future<void> _runEvidencePdf(
     Future<void> Function() action,
   ) async {
@@ -153,6 +246,17 @@ class _ProfileDrivenEvidenceDetailScreenState
     setState(() => _pdfBusy = true);
     try {
       await action();
+      try {
+        await _service.recordProductionEvidencePdfGenerated(
+          companyId: _companyId,
+          sessionId: widget.sessionId,
+        );
+        final items = await _service.listProductionEvidenceSessionAuditTrail(
+          companyId: _companyId,
+          sessionId: widget.sessionId,
+        );
+        if (mounted) setState(() => _auditItems = items);
+      } catch (_) {}
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -165,8 +269,171 @@ class _ProfileDrivenEvidenceDetailScreenState
 
   String get _plantLabelForPdf {
     final label = (_plantLabel ?? '').trim();
-    if (label.isNotEmpty) return label;
-    return (_session?.plantKey ?? '').trim();
+    if (label.isNotEmpty &&
+        !QmsNcrDisplayLabels.isTechnicalPlantKey(label)) {
+      return label;
+    }
+    final key = (_session?.plantKey ?? '').trim();
+    if (key.isEmpty ||
+        QmsNcrDisplayLabels.isTechnicalPlantKey(key) ||
+        profileEvidenceLooksLikeInternalDocumentId(key)) {
+      return '—';
+    }
+    return key;
+  }
+
+  String _sessionStatusLabel(ProfileDrivenEvidenceSessionDetail session) {
+    return EvidenceDetailHandoff.statusLabelFor(session);
+  }
+
+  Widget _predajaIVerifikacijaSection(
+    ProfileDrivenEvidenceSessionDetail session,
+  ) {
+    final savedBy = EvidenceDetailHandoff.performedByName(
+      fieldValues: session.fieldValues,
+      auditItems: _auditItems,
+    );
+    final verifiedBy = EvidenceDetailHandoff.verifiedByName(
+      fieldValues: session.fieldValues,
+      auditItems: _auditItems,
+    );
+    return _sectionCard(
+      title: EvidenceDetailHandoff.sectionTitle,
+      children: [
+        _kvRow(
+          EvidenceDetailHandoff.performedByLabel,
+          savedBy.isEmpty ? '—' : savedBy,
+        ),
+        _kvRow(
+          EvidenceDetailHandoff.performedAtLabel,
+          formatEvidenceDateTime(
+            EvidenceDetailHandoff.performedAt(auditItems: _auditItems),
+          ),
+        ),
+        _kvRow(
+          EvidenceDetailHandoff.verifiedByLabel,
+          verifiedBy.isEmpty ? '—' : verifiedBy,
+        ),
+        _kvRow(
+          EvidenceDetailHandoff.verifiedAtLabel,
+          formatEvidenceDateTime(
+            EvidenceDetailHandoff.verifiedAt(
+              session: session,
+              auditItems: _auditItems,
+            ),
+          ),
+        ),
+        _kvRow(
+          EvidenceDetailHandoff.statusLabel,
+          _sessionStatusLabel(session),
+        ),
+        if (session.processProfileType.trim() == lineClearanceProfileKey) ...[
+          _kvRow(
+            lineClearanceSiteConditionCheckedLabel,
+            formatEvidenceYesNoOrDash(
+              session.fieldValues[lineClearanceSiteConditionCheckedKey],
+            ),
+          ),
+          _kvRow(
+            lineClearanceReadyForWorkLabel,
+            formatEvidenceYesNoOrDash(
+              session.fieldValues[lineClearanceReadyForWorkKey],
+            ),
+          ),
+          if ((session.fieldValues[lineClearanceReadinessCorrectionKey] ?? '')
+              .toString()
+              .trim()
+              .isNotEmpty)
+            _kvRow(
+              lineClearanceReadinessCorrectionLabel,
+              session.fieldValues[lineClearanceReadinessCorrectionKey]
+                  .toString()
+                  .trim(),
+            ),
+        ],
+      ],
+    );
+  }
+
+  Widget _evidenceAuditTrailSection() {
+    if (_auditError != null) {
+      return _sectionCard(
+        title: 'Historija i audit trag',
+        children: [
+          const Text('Historija nije učitana. Pokušajte ponovo.'),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: _load,
+              child: const Text('Pokušaj ponovo'),
+            ),
+          ),
+        ],
+      );
+    }
+    if (_auditItems.isEmpty) {
+      return _sectionCard(
+        title: 'Historija i audit trag',
+        children: const [
+          Text('Još nema zabilježenih radnji za ovu evidenciju.'),
+        ],
+      );
+    }
+    return _sectionCard(
+      title: 'Historija i audit trag',
+      children: [
+        for (var i = 0; i < _auditItems.length; i++) ...[
+          if (i > 0) const Divider(height: 20),
+          _auditTrailRow(_auditItems[i]),
+        ],
+      ],
+    );
+  }
+
+  String _bsAuditVisibleText(String raw) {
+    return raw.replaceAll(RegExp(r'\bOperator\b'), 'Operater');
+  }
+
+  Widget _auditTrailRow(ProductionEvidenceAuditItem item) {
+    final name = item.performedByName.trim().isEmpty
+        ? 'Korisnik'
+        : item.performedByName.trim();
+    final role = _bsAuditVisibleText(item.performedByRoleLabel.trim());
+    final when = formatEvidenceDateTime(item.performedAt);
+    final rawTitle = item.actionLabel.trim().isNotEmpty
+        ? item.actionLabel.trim()
+        : item.summary;
+    final title = _bsAuditVisibleText(rawTitle);
+    final summary = _bsAuditVisibleText(item.summary.trim());
+    if (EvidenceDetailHandoff.looksLikeInternalEvidenceText(name) ||
+        EvidenceDetailHandoff.looksLikeInternalEvidenceText(title) ||
+        EvidenceDetailHandoff.looksLikeInternalEvidenceText(summary)) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 4),
+        Text(
+          role.isEmpty ? name : '$name · $role',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        Text(
+          when,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        if (summary.isNotEmpty && summary != title)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              summary,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+      ],
+    );
   }
 
   Widget _sectionCard({
@@ -189,7 +456,11 @@ class _ProfileDrivenEvidenceDetailScreenState
     );
   }
 
-  Widget _kvRow(String label, String value) {
+  Widget _kvRow(
+    String label,
+    String value, {
+    QmsAbbrevTerm? abbrev,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
@@ -197,11 +468,19 @@ class _ProfileDrivenEvidenceDetailScreenState
         children: [
           SizedBox(
             width: 160,
-            child: Text(
-              label,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: Theme.of(context).hintColor),
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    label,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).hintColor,
+                        ),
+                  ),
+                ),
+                if (abbrev != null)
+                  QmsAbbrevInfoIcon(term: abbrev, size: 16),
+              ],
             ),
           ),
           Expanded(
@@ -241,68 +520,198 @@ class _ProfileDrivenEvidenceDetailScreenState
     final containment = (session.outcomeContainmentAction ?? '').trim();
     final holdApplied = session.outcomeHoldApplied;
     final holdSkip = (session.outcomeHoldSkipReason ?? '').trim();
+    final ncr = _outcomeNcrSummary;
+    final nextKey = (ncr?['nextDispositionActionKey'] ?? '').toString().trim();
+    final nextLabel = (ncr?['nextDispositionActionLabel'] ?? '').toString().trim();
+    final nextOwner = (ncr?['nextDispositionOwner'] ?? '').toString().trim();
+    final nextDue = (ncr?['nextDispositionDueAt'] ?? '').toString().trim();
+    final nextReason = (ncr?['nextDispositionReason'] ?? '').toString().trim();
+    final nextRole =
+        (ncr?['nextDispositionRoleLabel'] ?? '').toString().trim();
+    final nextPriority =
+        (ncr?['nextDispositionPriorityLabel'] ?? '').toString().trim();
+    final nextTask = (ncr?['nextDispositionTask'] ?? '').toString().trim();
+    final nextNote = (ncr?['nextDispositionNote'] ?? '').toString().trim();
+    final actions = NcrNextDispositionCatalog.actionsForProfile(
+      session.processProfileType,
+    );
 
     return _sectionCard(
-      title: 'Neusaglašenost (NCR)',
+      title: 'Neusaglašenost',
       children: [
-        Row(
-          children: [
-            Chip(
-              label: Text(
-                ncrCode.isEmpty ? 'NCR otvoren' : ncrCode,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              backgroundColor: Colors.orange.shade100,
+        NcrActionHodogramTimeline(
+          snapshot: NcrActionHodogramLogic.build(
+            NcrHodogramInput(
+              outcomeKey: (session.outcomeKey ?? '').trim().isEmpty
+                  ? null
+                  : session.outcomeKey,
+              outcomeLabel: label.isEmpty ? null : label,
+              containmentAction: containment.isEmpty ? null : containment,
+              holdApplied: holdApplied,
+              holdSkipReason: holdSkip.isEmpty ? null : holdSkip,
+              ncrCode: ncrCode.isEmpty ? null : ncrCode,
+              hasNcr: true,
+              fromEvidenceSession: true,
+              nextDispositionActionKey: nextKey.isEmpty ? null : nextKey,
+              nextDispositionActionLabel:
+                  nextLabel.isEmpty ? null : nextLabel,
+              nextDispositionOwner: nextOwner.isEmpty ? null : nextOwner,
+              nextDispositionDueAt: nextDue.isEmpty ? null : nextDue,
+              nextDispositionReason: nextReason.isEmpty ? null : nextReason,
+              nextDispositionRoleLabel: nextRole.isEmpty ? null : nextRole,
+              nextDispositionPriorityLabel:
+                  nextPriority.isEmpty ? null : nextPriority,
+              nextDispositionTask: nextTask.isEmpty ? null : nextTask,
+              nextDispositionNote: nextNote.isEmpty ? null : nextNote,
+              nextDispositionPhase: (ncr?['nextDispositionPhase'] ?? '')
+                      .toString()
+                      .trim()
+                      .isEmpty
+                  ? null
+                  : (ncr?['nextDispositionPhase'] ?? '').toString(),
+              nextDispositionExecutor:
+                  (ncr?['nextDispositionExecutor'] ?? '').toString().trim().isEmpty
+                      ? null
+                      : (ncr?['nextDispositionExecutor'] ?? '').toString(),
+              nextDispositionExecutorRoleLabel:
+                  (ncr?['nextDispositionExecutorRoleLabel'] ?? '')
+                          .toString()
+                          .trim()
+                          .isEmpty
+                      ? null
+                      : (ncr?['nextDispositionExecutorRoleLabel'] ?? '')
+                          .toString(),
+              ncrStatus: (ncr?['status'] ?? '').toString(),
             ),
-            if (label.isNotEmpty) ...[
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  label,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ),
-            ],
-          ],
+          ),
+          onFocusNextAction: () => _openNcrForNextAction(session, null),
+          compact: true,
         ),
+        const SizedBox(height: 12),
+        if (ncrCode.isNotEmpty)
+          _kvRow('Broj NCR-a', ncrCode, abbrev: QmsAbbrevTerm.ncr),
+        if (label.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          _kvRow('Ishod', label),
+        ],
         if (containment.isNotEmpty) ...[
           const SizedBox(height: 8),
-          _kvRow('Containment / zadržavanje', containment),
+          _kvRow('Mjera zadržavanja', containment),
         ],
         if (holdApplied) ...[
           const SizedBox(height: 4),
-          _kvRow('WMS HOLD', 'Primijenjen'),
+          _kvRow(
+            'Zadržavanje lota (WMS)',
+            'Primijenjeno',
+            abbrev: QmsAbbrevTerm.wms,
+          ),
         ] else if (holdSkip.isNotEmpty) ...[
           const SizedBox(height: 4),
           _kvRow(
-            'WMS HOLD',
+            'Zadržavanje lota (WMS)',
             holdSkip == 'lot_not_provided'
-                ? 'Nije primijenjen (nema lota na evidenciji)'
-                : 'Nije primijenjen ($holdSkip)',
+                ? 'Nije primijenjeno (nema lota na evidenciji)'
+                : 'Nije primijenjeno',
+            abbrev: QmsAbbrevTerm.wms,
           ),
         ],
-        const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton.tonalIcon(
-            onPressed: () {
-              final ncrId = (session.outcomeNcrId ?? '').trim();
-              if (ncrId.isEmpty) return;
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => NcrDetailScreen(
-                    companyData: widget.companyData,
-                    ncrId: ncrId,
-                  ),
+        if (nextKey.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text(
+            'Sljedeća akcija',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
-              );
-            },
-            icon: const Icon(Icons.open_in_new),
-            label: const Text('Otvori NCR u QMS'),
           ),
+          const SizedBox(height: 6),
+          _kvRow(
+            'Akcija',
+            nextLabel.isNotEmpty
+                ? nextLabel
+                : NcrNextDispositionCatalog.labelForKey(nextKey),
+          ),
+          if (nextRole.isNotEmpty) _kvRow('Odgovorna uloga', nextRole),
+          if (nextOwner.isNotEmpty) _kvRow('Odgovorna osoba', nextOwner),
+          if (nextDue.isNotEmpty)
+            _kvRow('Rok', NcrActionHodogramLogic.formatDueBs(nextDue)),
+          if (nextPriority.isNotEmpty) _kvRow('Prioritet', nextPriority),
+          if (nextTask.isNotEmpty)
+            _kvRow('Zadatak', nextTask)
+          else if (nextReason.isNotEmpty)
+            _kvRow('Obrazloženje', nextReason),
+          if (nextNote.isNotEmpty) _kvRow('Napomena', nextNote),
+        ] else ...[
+          const SizedBox(height: 12),
+          Text(
+            'Preporučene akcije',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  'Odaberi unaprijed definisanu akciju. '
+                  'Otvara se unos u neusaglašenosti — zapis se ne zatvara automatski.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+              const QmsAbbrevInfoIcon(term: QmsAbbrevTerm.ncr, size: 16),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...actions.map((a) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: OutlinedButton.icon(
+                onPressed: () => _openNcrForNextAction(session, a),
+                icon: Icon(a.icon),
+                label: Text(a.labelHr),
+              ),
+            );
+          }),
+        ],
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            FilledButton.tonalIcon(
+              onPressed: () => _openNcrForNextAction(session, null),
+              icon: const Icon(Icons.open_in_new),
+              label: const Text('Otvori neusaglašenost u QMS'),
+            ),
+            const QmsAbbrevInfoIcon(term: QmsAbbrevTerm.qms, size: 18),
+          ],
         ),
       ],
     );
+  }
+
+  Future<void> _openNcrForNextAction(
+    ProfileDrivenEvidenceSessionDetail session,
+    NcrNextDispositionAction? preferred,
+  ) async {
+    final ncrId = (session.outcomeNcrId ?? '').trim();
+    if (ncrId.isEmpty) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => NcrDetailScreen(
+          companyData: widget.companyData,
+          ncrId: ncrId,
+          preferredNextAction: preferred,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    await _load();
+  }
+
+  Widget _orderRoutingContextSection(ProfileDrivenEvidenceSessionDetail session) {
+    final snap = session.orderSnapshot;
+    if (snap == null) return const SizedBox.shrink();
+    return EvidenceOrderRoutingContextCard(snapshot: snap);
   }
 
   Widget _buildBody(ProfileDrivenEvidenceSessionDetail session) {
@@ -319,6 +728,24 @@ class _ProfileDrivenEvidenceDetailScreenState
       return _buildFinalControlBody(session);
     }
     return _buildFlatProfileBody(session);
+  }
+
+  bool get _showQmsMarkingBanner {
+    final s = _session;
+    if (s == null) return false;
+    const keys = {
+      'first_piece_approval',
+      'packaging_control',
+      'in_process_quality_check',
+      'final_control',
+      'operation_material_preparation',
+    };
+    return keys.contains(s.processProfileType.trim());
+  }
+
+  Widget _qmsMarkingBannerIfNeeded(ProfileDrivenEvidenceSessionDetail session) {
+    if (!_showQmsMarkingBanner) return const SizedBox.shrink();
+    return QmsControlledFormMarkingBanner(fieldValues: session.fieldValues);
   }
 
   String _formatQtyInt(num? value) {
@@ -344,7 +771,6 @@ class _ProfileDrivenEvidenceDetailScreenState
     final s = session.summaryFields;
     final lines = session.inspectionLines;
     final unit = (s.unit ?? '').trim();
-    final catalogVer = session.catalogVersion;
     final productCtx = _resolveInProcessProductContext(session);
     final orderCode = (s.productionOrderCode ??
             session.fieldValues['productionOrderCode'] ??
@@ -369,6 +795,8 @@ class _ProfileDrivenEvidenceDetailScreenState
 
     return ListView(
       children: [
+        _orderRoutingContextSection(session),
+        _qmsMarkingBannerIfNeeded(session),
         _buildOutcomeActionCard(session),
         _sectionCard(
           title: 'Osnovni podaci',
@@ -376,34 +804,13 @@ class _ProfileDrivenEvidenceDetailScreenState
             _kvRow('Profil', session.profileDisplayName),
             _kvRow('Stanica', station),
             _kvRow('Pogon', _plantDisplayLabel(session)),
-            _kvRow(
-              'Status',
-              session.status == 'closed' ? 'Završeno' : session.status,
-            ),
+            _kvRow('Status', _sessionStatusLabel(session)),
             _kvRow('Početak', formatEvidenceDateTime(session.startedAt)),
             _kvRow('Završetak', formatEvidenceDateTime(session.endedAt)),
-            if (catalogVer != null)
-              _kvRow('Verzija kataloga profila', '$catalogVer'),
           ],
         ),
-        if (catalogVer != null && catalogVer < 17)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: Material(
-              color: Theme.of(context).colorScheme.errorContainer,
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  'Ova evidencija je snimljena s katalogom v$catalogVer. '
-                  'Nove sesije trebaju katalog v17+ (Mjesto rada).',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onErrorContainer,
-                  ),
-                ),
-              ),
-            ),
-          ),
+        _predajaIVerifikacijaSection(session),
+        _evidenceAuditTrailSection(),
         _sectionCard(
           title: 'Proizvodni kontekst',
           children: [
@@ -414,6 +821,12 @@ class _ProfileDrivenEvidenceDetailScreenState
             _kvRow('Proizvod', productCtx.displayName),
             _kvRow('Šifra proizvoda', productCtx.code),
             _kvRow('Naziv proizvoda', productCtx.name),
+            _kvRow(
+              'Operacija',
+              EvidenceOrderContextDisplay.operationStepLabelForEvidenceDetail(
+                session.orderSnapshot,
+              ),
+            ),
             _kvRow('Mjesto rada', workContextLabel),
             if (workContextRaw == 'machine' || machineName.isNotEmpty)
               _kvRow(
@@ -518,30 +931,6 @@ class _ProfileDrivenEvidenceDetailScreenState
               ],
             ],
           ),
-        _sectionCard(
-          title: 'Operator audit',
-          children: [
-            _kvRow(
-              'Operater',
-              (session.operatorDisplayName ?? session.operatorEmail ?? '—')
-                  .trim(),
-            ),
-            _kvRow(
-              'E-mail operatera',
-              (session.operatorEmail ?? '—').trim(),
-            ),
-            _kvRow(
-              'Sesiju otvorio',
-              (session.createdByDisplayName ?? session.createdByEmail ?? '—')
-                  .trim(),
-            ),
-            _kvRow(
-              'E-mail (otvaranje)',
-              (session.createdByEmail ?? '—').trim(),
-            ),
-            _kvRow('Kreirano', formatEvidenceDateTime(session.createdAt)),
-          ],
-        ),
         const SizedBox(height: 24),
       ],
     );
@@ -557,7 +946,6 @@ class _ProfileDrivenEvidenceDetailScreenState
     final s = session.summaryFields;
     final lines = session.controlledItems;
     final unit = (s.unit ?? '').trim();
-    final catalogVer = session.catalogVersion;
     final productCtx = _resolveFinalControlProductContext(session);
     final orderCode = (s.productionOrderCode ??
             session.fieldValues['productionOrderCode'] ??
@@ -590,6 +978,8 @@ class _ProfileDrivenEvidenceDetailScreenState
 
     return ListView(
       children: [
+        _orderRoutingContextSection(session),
+        _qmsMarkingBannerIfNeeded(session),
         _buildOutcomeActionCard(session),
         if (bannerText != null)
           Padding(
@@ -617,16 +1007,13 @@ class _ProfileDrivenEvidenceDetailScreenState
             _kvRow('Profil', session.profileDisplayName),
             _kvRow('Evidencija', station),
             _kvRow('Pogon', _plantDisplayLabel(session)),
-            _kvRow(
-              'Status',
-              session.status == 'closed' ? 'Završeno' : session.status,
-            ),
+            _kvRow('Status', _sessionStatusLabel(session)),
             _kvRow('Početak', formatEvidenceDateTime(session.startedAt)),
             _kvRow('Završetak', formatEvidenceDateTime(session.endedAt)),
-            if (catalogVer != null)
-              _kvRow('Verzija kataloga profila', '$catalogVer'),
           ],
         ),
+        _predajaIVerifikacijaSection(session),
+        _evidenceAuditTrailSection(),
         _sectionCard(
           title: 'Proizvodni kontekst',
           children: [
@@ -637,6 +1024,12 @@ class _ProfileDrivenEvidenceDetailScreenState
             _kvRow('Proizvod', productCtx.displayName),
             _kvRow('Šifra proizvoda', productCtx.code),
             _kvRow('Naziv proizvoda', productCtx.name),
+            _kvRow(
+              'Operacija',
+              EvidenceOrderContextDisplay.operationStepLabelForEvidenceDetail(
+                session.orderSnapshot,
+              ),
+            ),
           ],
         ),
         _sectionCard(
@@ -708,30 +1101,6 @@ class _ProfileDrivenEvidenceDetailScreenState
               ],
             ],
           ),
-        _sectionCard(
-          title: 'Operator audit',
-          children: [
-            _kvRow(
-              'Operater',
-              (session.operatorDisplayName ?? session.operatorEmail ?? '—')
-                  .trim(),
-            ),
-            _kvRow(
-              'E-mail operatera',
-              (session.operatorEmail ?? '—').trim(),
-            ),
-            _kvRow(
-              'Sesiju otvorio',
-              (session.createdByDisplayName ?? session.createdByEmail ?? '—')
-                  .trim(),
-            ),
-            _kvRow(
-              'E-mail (otvaranje)',
-              (session.createdByEmail ?? '—').trim(),
-            ),
-            _kvRow('Kreirano', formatEvidenceDateTime(session.createdAt)),
-          ],
-        ),
         const SizedBox(height: 24),
       ],
     );
@@ -916,6 +1285,8 @@ class _ProfileDrivenEvidenceDetailScreenState
 
     return ListView(
       children: [
+        _orderRoutingContextSection(session),
+        _qmsMarkingBannerIfNeeded(session),
         _buildOutcomeActionCard(session),
         _sectionCard(
           title: 'Osnovni podaci',
@@ -923,11 +1294,13 @@ class _ProfileDrivenEvidenceDetailScreenState
             _kvRow('Profil', session.profileDisplayName),
             _kvRow('Stanica', station),
             _kvRow('Pogon', _plantDisplayLabel(session)),
-            _kvRow('Status', session.status == 'closed' ? 'Završeno' : session.status),
+            _kvRow('Status', _sessionStatusLabel(session)),
             _kvRow('Početak', formatEvidenceDateTime(session.startedAt)),
             _kvRow('Završetak', formatEvidenceDateTime(session.endedAt)),
           ],
         ),
+        _predajaIVerifikacijaSection(session),
+        _evidenceAuditTrailSection(),
         _sectionCard(
           title: 'Kontrola pakovanja',
           children: [
@@ -936,7 +1309,7 @@ class _ProfileDrivenEvidenceDetailScreenState
               controllerName.isEmpty ? '—' : controllerName,
             ),
             _kvRow(
-              'Operater pakovanja',
+              'Operater proizvodnje',
               packagingOperator.isEmpty ? '—' : packagingOperator,
             ),
             _kvRow(checkedLabel, _formatQtyInt(s.quantity)),
@@ -976,6 +1349,10 @@ class _ProfileDrivenEvidenceDetailScreenState
                     case 'unitsAccepted':
                     case 'unitsRejected':
                       return evidenceRowText(row[key]);
+                    case 'defectReasonCode':
+                      return packagingDefectReasonLabel(
+                        (row[key] ?? '').toString(),
+                      );
                     case 'labelCorrect':
                     case 'sealIntact':
                       final v = row[key];
@@ -1006,13 +1383,28 @@ class _ProfileDrivenEvidenceDetailScreenState
             : (session.stationSlot != null
                   ? 'Stanica ${session.stationSlot}'
                   : '—');
-    final operatorName =
-        (session.operatorDisplayName ?? session.operatorEmail ?? '—').trim();
-    final createdBy =
-        (session.createdByDisplayName ?? session.createdByEmail ?? '—').trim();
+    final isOmp =
+        session.processProfileType.trim() == 'operation_material_preparation';
+    final lotSourceLabel = isOmp
+        ? ompMaterialLotSourceDisplayLabel(session.fieldValues)
+        : null;
+    final lotValue = (session.fieldValues['materialLot'] ?? '').toString().trim();
+    final lotRequired = isOmp && ompLotIsRequired(session.fieldValues);
+    final kindLabel = isOmp
+        ? bomItemKindLabelBs(
+            (session.fieldValues[ompBomItemKindSnapshot] ?? '').toString(),
+          )
+        : null;
+    final modeLabel = isOmp
+        ? bomTraceabilityModeLabelBs(
+            (session.fieldValues[ompTraceabilityModeSnapshot] ?? '').toString(),
+          )
+        : null;
 
     return ListView(
       children: [
+        _orderRoutingContextSection(session),
+        _qmsMarkingBannerIfNeeded(session),
         _buildOutcomeActionCard(session),
         _sectionCard(
           title: 'Osnovni podaci',
@@ -1020,43 +1412,37 @@ class _ProfileDrivenEvidenceDetailScreenState
             _kvRow('Profil', session.profileDisplayName),
             _kvRow('Stanica', station),
             _kvRow('Pogon', _plantDisplayLabel(session)),
-            _kvRow('Status', session.status == 'closed' ? 'Završeno' : session.status),
+            _kvRow('Status', _sessionStatusLabel(session)),
             _kvRow('Početak', formatEvidenceDateTime(session.startedAt)),
             _kvRow('Završetak', formatEvidenceDateTime(session.endedAt)),
-            if (session.catalogVersion != null)
-              _kvRow('Verzija kataloga profila', '${session.catalogVersion}'),
           ],
         ),
+        _predajaIVerifikacijaSection(session),
+        _evidenceAuditTrailSection(),
+        if (isOmp)
+          _sectionCard(
+            title: 'Lot / sljedivost',
+            children: [
+              if (kindLabel != null) _kvRow('Vrsta stavke', kindLabel),
+              if (modeLabel != null) _kvRow('Način sljedivosti', modeLabel),
+              _kvRow(
+                'Lot obavezan',
+                bomLotRequiredLabelBs(lotRequired),
+              ),
+              if (!lotRequired)
+                _kvRow('Lot / šarža', ompLotNotRequiredBanner)
+              else ...[
+                if (lotValue.isNotEmpty) _kvRow('Lot / šarža', lotValue),
+                if (lotValue.isNotEmpty && lotSourceLabel != null)
+                  _kvRow('Izvor lota', lotSourceLabel),
+              ],
+            ],
+          ),
         _fieldSection('Unesena polja', _operatorFieldsForDisplay),
         if (_masterDataFieldsForDisplay.isNotEmpty)
           _fieldSection(
             'Podaci iz master šifrarnika',
             _masterDataFieldsForDisplay,
-          ),
-        _sectionCard(
-          title: 'Operator audit',
-          children: [
-            _kvRow('Operater', operatorName),
-            if (session.operatorEmail != null &&
-                session.operatorEmail!.trim().isNotEmpty)
-              _kvRow('E-mail operatera', session.operatorEmail!),
-            _kvRow('Sesiju otvorio', createdBy),
-            if (session.createdByEmail != null &&
-                session.createdByEmail!.trim().isNotEmpty)
-              _kvRow('E-mail (otvaranje)', session.createdByEmail!),
-            _kvRow('Kreirano', formatEvidenceDateTime(session.createdAt)),
-          ],
-        ),
-        if (session.controlledInputWarning != null &&
-            session.controlledInputWarning!.isNotEmpty)
-          _sectionCard(
-            title: 'Upozorenje kontrolisanog unosa',
-            children: session.controlledInputWarning!.entries.map((e) {
-              return _kvRow(
-                e.key,
-                profileEvidenceDetailSanitizedValue(e.value),
-              );
-            }).toList(),
           ),
         const SizedBox(height: 24),
       ],
@@ -1070,27 +1456,24 @@ class _ProfileDrivenEvidenceDetailScreenState
             : (session.stationSlot != null
                   ? 'Stanica ${session.stationSlot}'
                   : '—');
-    final operatorName =
-        (session.operatorDisplayName ?? session.operatorEmail ?? '—').trim();
-    final createdBy =
-        (session.createdByDisplayName ?? session.createdByEmail ?? '—').trim();
     final s = session.summaryFields;
 
     return ListView(
       children: [
+        _orderRoutingContextSection(session),
         _sectionCard(
           title: 'Osnovni podaci',
           children: [
             _kvRow('Profil', session.profileDisplayName),
             _kvRow('Stanica', station),
             _kvRow('Pogon', _plantDisplayLabel(session)),
-            _kvRow('Status', session.status == 'closed' ? 'Završeno' : session.status),
+            _kvRow('Status', _sessionStatusLabel(session)),
             _kvRow('Početak', formatEvidenceDateTime(session.startedAt)),
             _kvRow('Završetak', formatEvidenceDateTime(session.endedAt)),
-            if (session.catalogVersion != null)
-              _kvRow('Verzija kataloga profila', '${session.catalogVersion}'),
           ],
         ),
+        _predajaIVerifikacijaSection(session),
+        _evidenceAuditTrailSection(),
         _sectionCard(
           title: 'Zaglavlje operacije',
           children: [
@@ -1249,22 +1632,36 @@ class _ProfileDrivenEvidenceDetailScreenState
             ),
           ],
         ),
-        _sectionCard(
-          title: 'Operator audit',
-          children: [
-            _kvRow('Operater', operatorName),
-            if (session.operatorEmail != null &&
-                session.operatorEmail!.trim().isNotEmpty)
-              _kvRow('E-mail operatera', session.operatorEmail!),
-            _kvRow('Sesiju otvorio', createdBy),
-            if (session.createdByEmail != null &&
-                session.createdByEmail!.trim().isNotEmpty)
-              _kvRow('E-mail (otvaranje)', session.createdByEmail!),
-            _kvRow('Kreirano', formatEvidenceDateTime(session.createdAt)),
-          ],
-        ),
         const SizedBox(height: 24),
       ],
+    );
+  }
+
+  OperonixAiEntityChatBinding? _evidenceAiChatBinding() {
+    final session = _session;
+    if (session == null) return null;
+    final sessionKey = session.sessionId.trim().isNotEmpty
+        ? session.sessionId.trim()
+        : widget.sessionId.trim();
+    if (sessionKey.isEmpty) return null;
+
+    final order = (session.summaryFields.productionOrderCode ??
+            session.fieldValues['productionOrderCode']?.toString() ??
+            session.orderSnapshot?.productionOrderCode ??
+            '')
+        .toString()
+        .trim();
+    final profile = session.profileDisplayName.trim();
+    final parts = <String>[
+      if (profile.isNotEmpty) profile,
+      if (order.isNotEmpty) order,
+    ];
+    final label = parts.isEmpty ? 'Zatvorena evidencija' : parts.join(' · ');
+
+    return OperonixAiEntityChatBinding(
+      kind: OperonixAiEntityChatKind.evidenceSession,
+      businessKey: sessionKey,
+      displayLabel: label,
     );
   }
 
@@ -1471,11 +1868,90 @@ class _ProfileDrivenEvidenceDetailScreenState
                     )
                   : const Icon(Icons.picture_as_pdf_outlined),
             ),
+          if (_canExportOperationMaterialPrepPdf)
+            PopupMenuButton<String>(
+              tooltip:
+                  'PDF evidencijskog zapisnika pripreme materijala za operaciju',
+              enabled: !_loading && !_pdfBusy,
+              onSelected: (value) {
+                Future<void> Function()? action;
+                switch (value) {
+                  case 'preview':
+                    action = () => _operationMaterialPrepPdfActions.preview(
+                          companyId: _companyId,
+                          sessionId: widget.sessionId,
+                          companyData: widget.companyData,
+                          plantDisplayName: _plantLabelForPdf,
+                          session: _session,
+                        );
+                    break;
+                  case 'download':
+                    action =
+                        () => _operationMaterialPrepPdfActions.downloadOrShare(
+                              companyId: _companyId,
+                              sessionId: widget.sessionId,
+                              companyData: widget.companyData,
+                              plantDisplayName: _plantLabelForPdf,
+                              session: _session,
+                            );
+                    break;
+                  case 'print':
+                    action = () => _operationMaterialPrepPdfActions.print(
+                          companyId: _companyId,
+                          sessionId: widget.sessionId,
+                          companyData: widget.companyData,
+                          plantDisplayName: _plantLabelForPdf,
+                          session: _session,
+                        );
+                    break;
+                  case 'share':
+                    action = () => _operationMaterialPrepPdfActions.share(
+                          companyId: _companyId,
+                          sessionId: widget.sessionId,
+                          companyData: widget.companyData,
+                          plantDisplayName: _plantLabelForPdf,
+                          session: _session,
+                        );
+                    break;
+                }
+                if (action != null) _runEvidencePdf(action);
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'preview',
+                  child: Text('Pregled PDF'),
+                ),
+                PopupMenuItem(
+                  value: 'download',
+                  child: Text('Preuzmi PDF'),
+                ),
+                PopupMenuItem(
+                  value: 'print',
+                  child: Text('Print PDF'),
+                ),
+                PopupMenuItem(
+                  value: 'share',
+                  child: Text('Pošalji PDF'),
+                ),
+              ],
+              icon: _pdfBusy
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.picture_as_pdf_outlined),
+            ),
           IconButton(
             tooltip: 'Osvježi',
             onPressed: _loading ? null : _load,
             icon: const Icon(Icons.refresh),
           ),
+          if (!_loading && _error == null && _session != null)
+            OperonixAiAskAssistantAppBarAction(
+              companyData: widget.companyData,
+              entityBinding: _evidenceAiChatBinding(),
+            ),
         ],
       ),
       body: _loading

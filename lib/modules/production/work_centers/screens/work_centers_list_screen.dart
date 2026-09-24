@@ -30,6 +30,9 @@ class _WorkCentersListScreenState extends State<WorkCentersListScreen> {
 
   late String _selectedPlantKey;
   List<({String plantKey, String label})> _plants = const [];
+  bool _listLoading = true;
+  String? _listError;
+  List<WorkCenter> _items = const [];
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -40,7 +43,27 @@ class _WorkCentersListScreenState extends State<WorkCentersListScreen> {
   String get _role =>
       ProductionAccessHelper.normalizeRole(widget.companyData['role']);
 
+  bool get _isPlantScopedList {
+    return _role == ProductionAccessHelper.roleProductionManager ||
+        _role == ProductionAccessHelper.roleShiftLead;
+  }
+
+  bool get _canSwitchPlant {
+    if (_isPlantScopedList) return false;
+    if (ProductionAccessHelper.isCompanyWideContextRole(_role) ||
+        ProductionAccessHelper.isAdminRole(_role) ||
+        ProductionAccessHelper.isSuperAdminRole(_role)) {
+      return true;
+    }
+    return _sessionPlantKey.isEmpty;
+  }
+
   bool get _canManage => ProductionAccessHelper.canManage(
+    role: _role,
+    card: ProductionDashboardCard.workCenters,
+  );
+
+  bool get _canViewList => ProductionAccessHelper.canView(
     role: _role,
     card: ProductionDashboardCard.workCenters,
   );
@@ -58,15 +81,78 @@ class _WorkCentersListScreenState extends State<WorkCentersListScreen> {
       companyId: _companyId,
     );
     if (!mounted) return;
+    var allowed = list;
+    if (!_canSwitchPlant && _sessionPlantKey.isNotEmpty) {
+      allowed = list
+          .where((p) => p.plantKey == _sessionPlantKey)
+          .toList();
+      if (allowed.isEmpty) {
+        allowed = [
+          (plantKey: _sessionPlantKey, label: _sessionPlantKey),
+        ];
+      }
+    }
     setState(() {
-      _plants = list;
-      if (_selectedPlantKey.isEmpty && list.isNotEmpty) {
-        _selectedPlantKey = list.first.plantKey;
-      } else if (list.isNotEmpty &&
-          !list.any((p) => p.plantKey == _selectedPlantKey)) {
-        _selectedPlantKey = list.first.plantKey;
+      _plants = allowed;
+      if (!_canSwitchPlant && _sessionPlantKey.isNotEmpty) {
+        _selectedPlantKey = _sessionPlantKey;
+      } else if (_selectedPlantKey.isEmpty && allowed.isNotEmpty) {
+        _selectedPlantKey = allowed.first.plantKey;
+      } else if (allowed.isNotEmpty &&
+          !allowed.any((p) => p.plantKey == _selectedPlantKey)) {
+        _selectedPlantKey = allowed.first.plantKey;
       }
     });
+    await _reloadList();
+  }
+
+  Future<void> _reloadList() async {
+    if (_companyId.isEmpty || _selectedPlantKey.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _listLoading = false;
+        _listError = null;
+        _items = const [];
+      });
+      return;
+    }
+    if (!_canViewList) {
+      if (!mounted) return;
+      setState(() {
+        _listLoading = false;
+        _listError =
+            'Nemate pristup radnim centrima za ovu ulogu ili pogon. '
+            'Provjerite dodijeljenu ulogu i pogon.';
+        _items = const [];
+      });
+      return;
+    }
+    setState(() {
+      _listLoading = true;
+      _listError = null;
+    });
+    try {
+      final list = await _service.listWorkCentersForPlant(
+        companyId: _companyId,
+        plantKey: _selectedPlantKey,
+        onlyActive: false,
+      );
+      if (!mounted) return;
+      setState(() {
+        _items = list;
+        _listLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _listLoading = false;
+        _listError = _canViewList
+            ? AppErrorMapper.toMessage(e)
+            : 'Nemate pristup radnim centrima za ovu ulogu ili pogon. '
+                'Provjerite dodijeljenu ulogu i pogon.';
+        _items = const [];
+      });
+    }
   }
 
   String _plantLabel(String key) {
@@ -146,6 +232,7 @@ class _WorkCentersListScreenState extends State<WorkCentersListScreen> {
                     ),
                   ),
                 );
+                await _reloadList();
               },
               icon: const Icon(Icons.add),
               label: const Text('Dodaj'),
@@ -180,6 +267,7 @@ class _WorkCentersListScreenState extends State<WorkCentersListScreen> {
                     onChanged: (v) {
                       if (v == null) return;
                       setState(() => _selectedPlantKey = v);
+                      _reloadList();
                     },
                   ),
                   const SizedBox(height: 10),
@@ -326,125 +414,150 @@ class _WorkCentersListScreenState extends State<WorkCentersListScreen> {
           ),
           const Divider(height: 1),
           Expanded(
-            child: StreamBuilder<List<WorkCenter>>(
-              stream: _service.watchWorkCenters(
-                companyId: _companyId,
-                plantKey: _selectedPlantKey,
-              ),
-              builder: (context, snap) {
-                if (snap.hasError) {
-                  return Center(
-                    child: Padding(
+            child: RefreshIndicator(
+              onRefresh: _reloadList,
+              child: _listLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _listError != null
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.all(24),
-                      child: Text(
-                        AppErrorMapper.toMessage(snap.error!),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  );
-                }
-                if (!snap.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final filtered = _applyFilters(snap.data!).toList();
-                if (filtered.isEmpty) {
-                  return Center(
-                    child: Text(
-                      snap.data!.isEmpty
-                          ? 'Nema radnih centara na ovom pogonu. ${_canManage ? 'Dodajte prvi zapis.' : ''}'
-                          : 'Nema zapisa za trenutne filtere.',
-                      textAlign: TextAlign.center,
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, i) {
-                    final wc = filtered[i];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.push<void>(
-                            context,
-                            MaterialPageRoute<void>(
-                              builder: (_) => WorkCenterDetailsScreen(
-                                companyData: widget.companyData,
-                                workCenterId: wc.id,
-                                plantKey: _selectedPlantKey,
-                              ),
-                            ),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            '${wc.workCenterCode} | ${wc.name}',
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ),
-                                        if (!wc.active)
-                                          Container(
-                                            margin: const EdgeInsets.only(
-                                              left: 6,
-                                            ),
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: Colors.grey.shade300,
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                            child: const Text(
-                                              'Neaktivan',
-                                              style: TextStyle(fontSize: 12),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  WorkCenterInfoIcon(
-                                    title: WorkCenterHelpTexts.listCardTitle,
-                                    message: WorkCenterHelpTexts.listCardBody,
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text('Tip: ${WorkCenter.labelForType(wc.type)}'),
-                              Text(
-                                'Status: ${WorkCenter.labelForStatus(wc.status)}',
-                              ),
-                              Text('Kapacitet: ${_fmtCapacity(wc)}'),
-                              Text('Ciklus: ${_fmtCycle(wc)}'),
-                              Text('OEE: ${wc.isOeeRelevant ? 'Da' : 'Ne'}'),
-                              Text('Pogon: ${_plantLabel(wc.plantKey)}'),
-                            ],
-                          ),
+                      children: [
+                        const SizedBox(height: 48),
+                        Text(
+                          _listError!,
+                          textAlign: TextAlign.center,
                         ),
-                      ),
-                    );
-                  },
-                );
-              },
+                      ],
+                    )
+                  : Builder(
+                      builder: (context) {
+                        final filtered = _applyFilters(_items).toList();
+                        if (filtered.isEmpty) {
+                          return ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.all(24),
+                            children: [
+                              const SizedBox(height: 48),
+                              Text(
+                                _items.isEmpty
+                                    ? 'Nema radnih centara na ovom pogonu. ${_canManage ? 'Dodajte prvi zapis.' : ''}'
+                                    : 'Nema zapisa za trenutne filtere.',
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          );
+                        }
+
+                        return ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, i) {
+                            final wc = filtered[i];
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: InkWell(
+                                onTap: () async {
+                                  await Navigator.push<void>(
+                                    context,
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => WorkCenterDetailsScreen(
+                                        companyData: widget.companyData,
+                                        workCenterId: wc.id,
+                                        plantKey: _selectedPlantKey,
+                                      ),
+                                    ),
+                                  );
+                                  await _reloadList();
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(14),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Expanded(
+                                            child: Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    '${wc.workCenterCode} | ${wc.name}',
+                                                    style: const TextStyle(
+                                                      fontSize: 16,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (!wc.active)
+                                                  Container(
+                                                    margin:
+                                                        const EdgeInsets.only(
+                                                      left: 6,
+                                                    ),
+                                                    padding:
+                                                        const EdgeInsets
+                                                            .symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4,
+                                                    ),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors
+                                                          .grey
+                                                          .shade300,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                        8,
+                                                      ),
+                                                    ),
+                                                    child: const Text(
+                                                      'Neaktivan',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                          WorkCenterInfoIcon(
+                                            title:
+                                                WorkCenterHelpTexts.listCardTitle,
+                                            message:
+                                                WorkCenterHelpTexts.listCardBody,
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Tip: ${WorkCenter.labelForType(wc.type)}',
+                                      ),
+                                      Text(
+                                        'Status: ${WorkCenter.labelForStatus(wc.status)}',
+                                      ),
+                                      Text('Kapacitet: ${_fmtCapacity(wc)}'),
+                                      Text('Ciklus: ${_fmtCycle(wc)}'),
+                                      Text(
+                                        'OEE: ${wc.isOeeRelevant ? 'Da' : 'Ne'}',
+                                      ),
+                                      Text(
+                                        'Pogon: ${_plantLabel(wc.plantKey)}',
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
             ),
           ),
         ],

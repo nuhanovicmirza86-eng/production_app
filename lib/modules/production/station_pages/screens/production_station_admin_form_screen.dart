@@ -136,6 +136,7 @@ class _ProductionStationAdminFormScreenState
 
   void _showInfo(String title, String body) {
     showDialog<void>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(title),

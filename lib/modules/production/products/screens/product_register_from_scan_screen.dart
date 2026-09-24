@@ -67,7 +67,8 @@ class _ProductRegisterFromScanScreenState
       if (!mounted) return;
       if (existing != null) {
         await showDialog<void>(
-          context: context,
+      barrierDismissible: false,
+      context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Kod je već u sistemu'),
             content: Text(

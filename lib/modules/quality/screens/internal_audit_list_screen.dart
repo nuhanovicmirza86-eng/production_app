@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/access/production_access_helper.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../models/internal_audit_models.dart';
 import '../services/internal_audit_callable_service.dart';
@@ -51,6 +52,9 @@ class _InternalAuditListScreenState extends State<InternalAuditListScreen> {
 
   String get _cid =>
       (widget.companyData['companyId'] ?? '').toString().trim();
+
+  String get _role =>
+      ProductionAccessHelper.normalizeRole(widget.companyData['role']);
 
   @override
   void initState() {
@@ -167,11 +171,13 @@ class _InternalAuditListScreenState extends State<InternalAuditListScreen> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: ProductionAccessHelper.canManageQmsDefinitions(_role)
+          ? FloatingActionButton.extended(
         onPressed: _openCreate,
         icon: const Icon(Icons.add),
         label: const Text('Novi audit'),
-      ),
+      )
+          : null,
       body: RefreshIndicator(
         onRefresh: _load,
         child: _buildBody(context),

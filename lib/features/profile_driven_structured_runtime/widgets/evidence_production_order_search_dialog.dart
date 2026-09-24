@@ -15,7 +15,8 @@ Future<StructuredScanResolveResult?> showEvidenceProductionOrderSearchDialog({
   required ProductionEvidenceEntitySearchCallableService searchService,
 }) {
   return showDialog<StructuredScanResolveResult>(
-    context: context,
+      barrierDismissible: false,
+      context: context,
     builder: (ctx) => _EvidenceProductionOrderSearchDialog(
       companyId: companyId,
       searchService: searchService,

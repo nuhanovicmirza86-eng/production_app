@@ -146,7 +146,8 @@ class _ProfileDrivenEvidenceListScreenState
       final lastEndedAtByGroupKey = <String, DateTime?>{};
       final recordCountByGroupKey = <String, int>{};
       if (groupedKeys.isNotEmpty) {
-        final items = await _evidenceService.listProfileDrivenEvidenceSessions(
+        final listResult =
+            await _evidenceService.listProfileDrivenEvidenceSessions(
           companyId: _companyId,
           plantKey: _canPickPlant
               ? (_plantFilterKey?.trim().isEmpty ?? true
@@ -155,7 +156,7 @@ class _ProfileDrivenEvidenceListScreenState
               : (_userPlantKey.trim().isEmpty ? null : _userPlantKey),
           limit: 100,
         );
-        for (final item in items) {
+        for (final item in listResult.items) {
           final gKey = '${item.processProfileType}|${item.plantKey}';
           if (!groupedKeys.contains(gKey)) continue;
           recordCountByGroupKey[gKey] = (recordCountByGroupKey[gKey] ?? 0) + 1;

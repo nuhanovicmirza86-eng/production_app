@@ -160,7 +160,8 @@ class FinanceDocumentLinksScreen extends StatelessWidget {
 
     try {
       await showDialog<void>(
-        context: context,
+      barrierDismissible: false,
+      context: context,
         builder: (ctx) {
           return AlertDialog(
             title: Text(existing == null ? 'Nova veza dokumenta' : 'Uredi vezu'),

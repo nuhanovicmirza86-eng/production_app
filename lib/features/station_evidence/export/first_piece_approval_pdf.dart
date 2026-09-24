@@ -98,25 +98,30 @@ class FirstPieceApprovalPdf {
     pw.Widget kv(String label, String value) {
       final v = value.trim().isEmpty ? '—' : value.trim();
       return pw.Padding(
-        padding: const pw.EdgeInsets.only(bottom: 6),
+        padding: const pw.EdgeInsets.only(bottom: 2.5),
         child: pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.SizedBox(
-              width: 150,
+              width: 148,
               child: pw.Text(
                 label,
                 style: pw.TextStyle(
                   font: fontBold,
-                  fontSize: 9,
+                  fontSize: 8.5,
                   color: PdfColors.grey800,
+                  height: 1.15,
                 ),
               ),
             ),
             pw.Expanded(
               child: pw.Text(
                 v,
-                style: pw.TextStyle(font: fontRegular, fontSize: 9),
+                style: pw.TextStyle(
+                  font: fontRegular,
+                  fontSize: 8.5,
+                  height: 1.15,
+                ),
               ),
             ),
           ],
@@ -126,12 +131,12 @@ class FirstPieceApprovalPdf {
 
     pw.Widget sectionTitle(String title) {
       return pw.Padding(
-        padding: const pw.EdgeInsets.only(top: 10, bottom: 6),
+        padding: const pw.EdgeInsets.only(top: 6, bottom: 3),
         child: pw.Text(
           title,
           style: pw.TextStyle(
             font: fontBold,
-            fontSize: 11,
+            fontSize: 10,
             color: PdfColor.fromInt(0xFF0B1F3A),
           ),
         ),
@@ -152,7 +157,8 @@ class FirstPieceApprovalPdf {
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(36),
+        // M1-I10-C — kompaktnije margine da sadržaj stane na 1 stranicu.
+        margin: const pw.EdgeInsets.fromLTRB(28, 24, 28, 28),
         footer: (ctx) => OperonixPdfFooter.multiPageFooter(ctx, fontRegular),
         build: (ctx) {
           return [
@@ -162,14 +168,14 @@ class FirstPieceApprovalPdf {
                 fontB: fontBold,
                 data: printIdentity.toLetterheadData(companyData),
                 logoBytes: printIdentity.logoBytes,
-                maxLogoHeight: 52,
+                maxLogoHeight: 40,
               ),
-              pw.SizedBox(height: 10),
+              pw.SizedBox(height: 6),
             ] else
               OperonixIndustrialLetterheadPdf.strip(logoBytes: operonixLogoBytes),
             pw.Text(
               document.documentTitle,
-              style: pw.TextStyle(font: fontBold, fontSize: 16),
+              style: pw.TextStyle(font: fontBold, fontSize: 14),
             ),
             ...EvidencePdfQmsDocumentMarking.underTitle(
               fieldValues: {
@@ -179,20 +185,28 @@ class FirstPieceApprovalPdf {
                     document.qmsControlledFormRevision,
                 'qmsControlledFormStatus': document.qmsControlledFormStatus,
                 'qmsControlledFormTitle': document.qmsControlledFormTitle,
+                'qmsControlledFormOwnerDepartment':
+                    document.qmsControlledFormOwnerDepartment,
+                'qmsControlledFormRetentionCategory':
+                    document.qmsControlledFormRetentionCategory,
+                'qmsControlledFormApprovedAt':
+                    document.qmsControlledFormApprovedAt,
+                'qmsControlledFormApprovedByName':
+                    document.qmsControlledFormApprovedByName,
               },
               fontRegular: fontRegular,
               fontBold: fontBold,
             ),
-            pw.SizedBox(height: 12),
+            pw.SizedBox(height: 6),
             pw.Container(
               width: double.infinity,
               padding: const pw.EdgeInsets.symmetric(
-                vertical: 14,
-                horizontal: 12,
+                vertical: 7,
+                horizontal: 10,
               ),
               decoration: pw.BoxDecoration(
                 color: bannerColor,
-                borderRadius: pw.BorderRadius.circular(4),
+                borderRadius: pw.BorderRadius.circular(3),
               ),
               child: pw.Center(
                 child: pw.Text(
@@ -200,9 +214,9 @@ class FirstPieceApprovalPdf {
                   textAlign: pw.TextAlign.center,
                   style: pw.TextStyle(
                     font: fontBold,
-                    fontSize: 14,
+                    fontSize: 11,
                     color: PdfColors.white,
-                    letterSpacing: 0.6,
+                    letterSpacing: 0.4,
                   ),
                 ),
               ),
@@ -217,18 +231,18 @@ class FirstPieceApprovalPdf {
             kv('Naziv proizvoda', document.productName),
             kv('Mašina / radno mjesto', document.machineName),
             if (productImageBytes != null && productImageBytes.isNotEmpty) ...[
-              pw.SizedBox(height: 4),
+              pw.SizedBox(height: 2),
               pw.Align(
                 alignment: pw.Alignment.centerLeft,
                 child: pw.Container(
-                  height: 90,
+                  height: 56,
                   child: pw.Image(
                     pw.MemoryImage(productImageBytes),
                     fit: pw.BoxFit.contain,
                   ),
                 ),
               ),
-              pw.SizedBox(height: 6),
+              pw.SizedBox(height: 3),
             ],
             if (lot.isNotEmpty) kv('Serija / lot', lot),
             kv('Komada za kontrolu', _formatQty(document.qtySubmitted)),
@@ -251,8 +265,6 @@ class FirstPieceApprovalPdf {
                   ? '—'
                   : document.createdByDisplayName!,
             ),
-            if ((document.createdByEmail ?? '').trim().isNotEmpty)
-              kv('E-mail (otvaranje)', document.createdByEmail!),
             kv('Kreirano', _formatDateTime(document.createdAt)),
             kv('Ispisano', _formatDateTime(now)),
           ];

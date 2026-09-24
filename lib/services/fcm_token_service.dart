@@ -6,6 +6,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
+/// Web Push javni ključ (Firebase → Cloud Messaging → Web configuration).
+/// Prazno: SDK koristi certifikat iz projekta. Override: `--dart-define=OPERONIX_WEB_VAPID_KEY=...`
+const String kOperonixWebPushVapidKey = String.fromEnvironment(
+  'OPERONIX_WEB_VAPID_KEY',
+);
+
 /// Isti backend callable kao Maintenance (`registerFcmToken`) — jedan `users` dokument.
 class FcmTokenService {
   FcmTokenService._();
@@ -24,8 +30,15 @@ class FcmTokenService {
   String? _pendingUid;
 
   bool get _isSupportedPlatform {
-    if (kIsWeb) return false;
+    if (kIsWeb) return true;
     return Platform.isAndroid || Platform.isIOS;
+  }
+
+  String _platformName() {
+    if (kIsWeb) return 'web';
+    if (Platform.isAndroid) return 'android';
+    if (Platform.isIOS) return 'ios';
+    return 'unknown';
   }
 
   void reset() {
@@ -47,6 +60,18 @@ class FcmTokenService {
       await FirebaseMessaging.instance.setAutoInitEnabled(true);
     } catch (e) {
       debugPrint('FCM initialize setAutoInitEnabled error: $e');
+    }
+
+    if (kIsWeb) {
+      try {
+        await FirebaseMessaging.instance.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      } catch (e) {
+        debugPrint('FCM web requestPermission error: $e');
+      }
     }
 
     _tokenRefreshSub ??= FirebaseMessaging.instance.onTokenRefresh.listen((
@@ -117,7 +142,7 @@ class FcmTokenService {
                 region: 'europe-west1',
               ).httpsCallable('registerFcmToken').call({
                 'token': token,
-                'platform': Platform.isAndroid ? 'android' : 'ios',
+                'platform': _platformName(),
               });
 
           if (FirebaseAuth.instance.currentUser?.uid == currentUser.uid) {
@@ -163,7 +188,14 @@ class FcmTokenService {
   Future<String> _getTokenWithRetry() async {
     for (int i = 0; i < 6; i++) {
       try {
-        final token = (await FirebaseMessaging.instance.getToken() ?? '')
+        final token = (await FirebaseMessaging.instance.getToken(
+                  vapidKey: kIsWeb
+                      ? (kOperonixWebPushVapidKey.isEmpty
+                          ? null
+                          : kOperonixWebPushVapidKey)
+                      : null,
+                ) ??
+                '')
             .trim();
         if (token.isNotEmpty) return token;
       } catch (e) {

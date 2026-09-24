@@ -108,6 +108,7 @@ class _DevelopmentProjectReleaseReadinessSectionState
             );
 
       await showDialog<void>(
+      barrierDismissible: false,
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text(res.ok ? 'Spremnost ($_targetGate)' : 'Blokade ($_targetGate)'),
@@ -150,6 +151,7 @@ class _DevelopmentProjectReleaseReadinessSectionState
 
   Future<void> _recordRelease() async {
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Release u proizvodnju'),

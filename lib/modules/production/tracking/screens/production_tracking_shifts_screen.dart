@@ -113,6 +113,7 @@ class _ProductionTrackingShiftsScreenState
     final notesCtrl = TextEditingController(text: current?.notes ?? '');
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         return AlertDialog(

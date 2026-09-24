@@ -6,6 +6,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/user_display_label.dart';
 import '../../../../core/access/production_access_helper.dart';
+import '../../ai/models/operonix_ai_entity_chat_binding.dart';
+import '../../ai/widgets/operonix_ai_assistant_navigator.dart';
 import '../../execution/screens/production_execution_screen.dart';
 import '../../execution/services/production_execution_service.dart';
 import '../../ooe/ooe_help_texts.dart';
@@ -326,6 +328,7 @@ class _ProductionOrderDetailsScreenState
 
   Future<void> _confirmCompleteOrder(ProductionOrderModel order) async {
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Završi nalog'),
@@ -371,6 +374,7 @@ class _ProductionOrderDetailsScreenState
 
   Future<void> _confirmCloseOrder(ProductionOrderModel order) async {
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Zatvori nalog'),
@@ -416,6 +420,7 @@ class _ProductionOrderDetailsScreenState
 
   Future<void> _confirmCancelOrder(ProductionOrderModel order) async {
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Otkaži nalog'),
@@ -564,6 +569,7 @@ class _ProductionOrderDetailsScreenState
     if (!mounted) return;
 
     final confirmedQty = await showDialog<double>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => _PackagingQtyForLabelDialog(
         order: order,
@@ -1379,6 +1385,18 @@ class _ProductionOrderDetailsScreenState
     );
   }
 
+  OperonixAiEntityChatBinding? _orderAiChatBinding() {
+    final order = _order;
+    if (order == null) return null;
+    final code = order.productionOrderCode.trim();
+    if (code.isEmpty) return null;
+    return OperonixAiEntityChatBinding(
+      kind: OperonixAiEntityChatKind.productionOrder,
+      businessKey: code,
+      displayLabel: code,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final order = _order;
@@ -1388,10 +1406,15 @@ class _ProductionOrderDetailsScreenState
         title: const Text('Detalji proizvodnog naloga'),
         actions: [
           if (_order != null) ...[
+            OperonixAiAskAssistantAppBarAction(
+              companyData: widget.companyData,
+              entityBinding: _orderAiChatBinding(),
+            ),
             IconButton(
               tooltip: 'Sljedljivost (IATF)',
               onPressed: () {
                 showDialog<void>(
+      barrierDismissible: false,
                   context: context,
                   builder: (ctx) => ProductionOrderTraceabilityDialog(
                     companyId: _companyId,

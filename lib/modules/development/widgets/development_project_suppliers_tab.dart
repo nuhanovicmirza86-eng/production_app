@@ -172,6 +172,7 @@ class DevelopmentProjectSuppliersTab extends StatelessWidget {
     DevelopmentProjectSupplierModel s,
   ) async {
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Ukloni dobavljača'),

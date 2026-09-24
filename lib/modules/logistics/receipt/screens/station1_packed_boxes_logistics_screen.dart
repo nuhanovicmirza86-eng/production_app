@@ -34,6 +34,7 @@ class _Station1PackedBoxesLogisticsScreenState
 
   void _showHelp() {
     showDialog<void>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Upakovane kutije — Stanica 1'),

@@ -5,6 +5,7 @@ import '../../station_pages/models/production_station_config.dart';
 import '../../station_pages/models/production_station_profile_catalog_entry.dart';
 import '../../station_work/screens/profile_driven_work_screen.dart';
 import '../../../../features/catalog_evidence_runtime/screens/catalog_evidence_station_screen.dart';
+import '../../../../features/profile_driven_structured_runtime/screens/structured_profile_driven_work_screen.dart';
 
 /// M1-H3 — operator ulaz u company evidence runtime.
 class ProductionEvidenceOperatorLaunchScreen extends StatelessWidget {
@@ -52,6 +53,18 @@ class ProductionEvidenceOperatorLaunchScreen extends StatelessWidget {
         evidenceConfig: evidenceConfig,
         profile: profile,
         profileCatalogVersion: profileCatalogVersion,
+        onCloseStation: onClose,
+      );
+    }
+
+    if (ProductionStationConfig.isStructuredProfileDrivenRuntimeProfile(
+          profile.profileKey,
+        ) &&
+        profile.isComplete) {
+      return StructuredProfileDrivenWorkScreen.companyEvidence(
+        companyData: companyData,
+        evidenceConfig: evidenceConfig,
+        profile: profile,
         onCloseStation: onClose,
       );
     }

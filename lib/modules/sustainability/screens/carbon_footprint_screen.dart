@@ -384,6 +384,7 @@ class _SetupTabState extends State<_SetupTab> {
 
   void _help(BuildContext context, String title, String body) {
     showDialog<void>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(title),
@@ -720,6 +721,7 @@ class _QuotasTabState extends State<_QuotasTab> {
 
   void _help(String title, String body) {
     showDialog<void>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(title),
@@ -1015,6 +1017,7 @@ class _ActivitiesTab extends StatelessWidget {
                 icon: const Icon(Icons.info_outline),
                 onPressed: () {
                   showDialog<void>(
+      barrierDismissible: false,
                     context: context,
                     builder: (dctx) => AlertDialog(
                       title: const Text('Aktivnosti'),
@@ -1209,6 +1212,7 @@ class _FactorsTab extends StatelessWidget {
                 icon: const Icon(Icons.info_outline),
                 onPressed: () {
                   showDialog<void>(
+      barrierDismissible: false,
                     context: context,
                     builder: (dctx) => AlertDialog(
                       title: const Text('Referentni faktori'),
@@ -1795,6 +1799,7 @@ class _RegulatoryTab extends StatelessWidget {
                     icon: const Icon(Icons.info_outline),
                     onPressed: () {
                       showDialog<void>(
+      barrierDismissible: false,
                         context: context,
                         builder: (dctx) => AlertDialog(
                           title: Text(title),

@@ -308,6 +308,7 @@ class _PartnersScreenState extends State<PartnersScreen>
     final oa = s.operationalAuto;
     if (oa == null) return;
     showDialog<void>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Automatski skor: ${s.code}'),
@@ -377,6 +378,7 @@ class _PartnersScreenState extends State<PartnersScreen>
 
   Future<void> _confirmRefreshAllSuppliersOperational() async {
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Osvježi automatski skor (svi dobavljači)'),
@@ -1072,6 +1074,7 @@ class _PartnersScreenState extends State<PartnersScreen>
             icon: const Icon(Icons.info_outline_rounded),
             onPressed: () {
               showDialog(
+      barrierDismissible: false,
                 context: context,
                 builder: (_) => AlertDialog(
                   title: const Text('Kupci i dobavljači'),

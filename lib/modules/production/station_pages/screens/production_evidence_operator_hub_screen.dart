@@ -86,6 +86,14 @@ class _ProductionEvidenceOperatorHubScreenState
         )) {
           continue;
         }
+        if (ProductionAccessHelper.canAccessQualityControlEvidenceHub(
+              _userRole,
+            ) &&
+            !ProductionAccessHelper.isQualityControlEvidenceProfile(
+              config.profileKey,
+            )) {
+          continue;
+        }
         if (!config.isRuntimeVisibleToRole(_userRole)) continue;
 
         final profile = ProductionOperatorProfileResolver.resolveForEvidenceConfig(
@@ -148,7 +156,11 @@ class _ProductionEvidenceOperatorHubScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Operativne evidencije'),
+        title: Text(
+          ProductionAccessHelper.canAccessQualityControlEvidenceHub(_userRole)
+              ? 'Kontrolne evidencije'
+              : 'Operativne evidencije',
+        ),
         actions: [
           IconButton(
             onPressed: _loading ? null : _load,
@@ -248,8 +260,14 @@ class _ProductionEvidenceOperatorHubScreenState
         return Icons.fact_check_outlined;
       case 'final_control':
         return Icons.verified_user_outlined;
+      case 'line_clearance':
+        return Icons.cleaning_services_outlined;
+      case 'workspace_5s_cleaning':
+        return Icons.grid_view_outlined;
       case 'material_preparation':
         return Icons.inventory_outlined;
+      case 'operation_material_preparation':
+        return Icons.precision_manufacturing_outlined;
       default:
         return Icons.assignment_outlined;
     }

@@ -9,6 +9,7 @@ import '../models/structured_repeatable_row.dart';
 import '../services/production_evidence_entity_search_service.dart';
 import '../utils/structured_datetime_value.dart';
 import '../utils/structured_piece_quantity.dart';
+import '../../catalog_evidence_runtime/utils/evidence_input_empty.dart';
 import '../../catalog_evidence_runtime/utils/operator_evidence_ux_standard.dart';
 import 'operator_work_log_row_layout.dart';
 import 'structured_datetime_field.dart';
@@ -26,6 +27,12 @@ class StructuredRepeatableTableSection extends StatelessWidget {
     required this.onRowsChanged,
     this.enabled = true,
     this.headerProductSelection,
+    this.tableNotice,
+    this.entitySearchOverrides = const {},
+    this.fieldOverrides = const {},
+    this.recentEntitySuggestions = const {},
+    this.recentEntitySuggestionLabels = const {},
+    this.plantDisplayLabel,
   });
 
   final StructuredRepeatableTableDefinition tableDef;
@@ -40,6 +47,21 @@ class StructuredRepeatableTableSection extends StatelessWidget {
   /// packaging_control: proizvod iz zaglavlja — red ga nasljeđuje (M1-I2-F5).
   final StructuredEntitySelection? headerProductSelection;
 
+  /// M1-I14-F — npr. banner sastavnice iznad tabele.
+  final Widget? tableNotice;
+
+  /// Override pretrage po ključu kolone (npr. productId → BOM-first).
+  final Map<String, StructuredEntitySearchFn> entitySearchOverrides;
+
+  final Map<String, ProductionStationProfileField> fieldOverrides;
+
+  final Map<String, List<StructuredEntitySearchResult>> recentEntitySuggestions;
+
+  final Map<String, String> recentEntitySuggestionLabels;
+
+  /// Ljudski naziv pogona (npr. Brizganje (BR)).
+  final String? plantDisplayLabel;
+
   bool get _inheritsProductFromHeader {
     if (!isPackagingCheckLinesTable(tableDef.key)) return false;
     final sel = headerProductSelection;
@@ -50,7 +72,9 @@ class StructuredRepeatableTableSection extends StatelessWidget {
     if (OperatorWorkLogRowLayout.isOperatorWorkLogTable(tableDef.key)) {
       return OperatorWorkLogRowLayout.dialogColumns(tableDef.columns);
     }
-    final columns = tableDef.operatorColumns;
+    final columns = tableDef.operatorColumns
+        .map((c) => fieldOverrides[c.key] ?? c)
+        .toList(growable: false);
     if (!_inheritsProductFromHeader) return columns;
     return columns
         .where((c) => c.key.trim() != 'productId')
@@ -98,12 +122,14 @@ class StructuredRepeatableTableSection extends StatelessWidget {
         continue;
       }
       if (col.type == 'enum') {
-        enumSelections[col.key] = raw?.toString();
+        enumSelections[col.key] =
+            isEvidenceFormPlaceholder(raw?.toString()) ? null : raw?.toString();
       } else if (OperatorEvidenceUxStandard.isInspectionLinesTable(
             tableDef.key,
           ) &&
           col.key == 'checkpointName') {
-        enumSelections[col.key] = raw?.toString();
+        enumSelections[col.key] =
+            isEvidenceFormPlaceholder(raw?.toString()) ? null : raw?.toString();
       } else if (col.type == 'datetime') {
         dateTimes[col.key] = StructuredDateTimeValue.parse(raw);
       } else if (col.type == 'number' || _isTextLike(col.type)) {
@@ -112,7 +138,7 @@ class StructuredRepeatableTableSection extends StatelessWidget {
               ? ''
               : (col.type == 'number'
                   ? formatStructuredPieceQuantity(raw)
-                  : raw.toString()),
+                  : sanitizeEvidenceFormInput(raw.toString())),
         );
       }
     }
@@ -140,14 +166,72 @@ class StructuredRepeatableTableSection extends StatelessWidget {
       _applyEntitySnapshotsToDraft(draft, 'productId', inherited);
     }
 
+    if (isPackagingCheckLinesTable(tableDef.key)) {
+      syncPackagingDefectReasonCode(
+        enumSelections: enumSelections,
+        unitsRejected: textControllers['unitsRejected']?.text ??
+            draft.values['unitsRejected'],
+      );
+    }
+    if (OperatorEvidenceUxStandard.isInspectionLinesTable(tableDef.key)) {
+      syncInspectionDefectReasonCode(
+        enumSelections: enumSelections,
+        qtyFail: textControllers['qtyFail']?.text ?? draft.values['qtyFail'],
+      );
+    }
+    if (isControlledItemsTable(tableDef.key) ||
+        needsControlledItemsQtyBalance(
+          tableKey: tableDef.key,
+          profileKey: profile.profileKey,
+          columnKeys: _rowDialogColumns.map((c) => c.key),
+        )) {
+      syncFinalControlDefectReasonCode(
+        enumSelections: enumSelections,
+        scrapQty: textControllers['scrapQty']?.text ?? draft.values['scrapQty'],
+        reworkQty:
+            textControllers['reworkQty']?.text ?? draft.values['reworkQty'],
+      );
+    }
+
     final scrollController = ScrollController();
     String? validationError;
     final fieldErrors = <String>{};
     final saved = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setLocal) {
+            if (isPackagingCheckLinesTable(tableDef.key)) {
+              syncPackagingDefectReasonCode(
+                enumSelections: enumSelections,
+                unitsRejected: textControllers['unitsRejected']?.text ??
+                    draft.values['unitsRejected'],
+              );
+            }
+            if (OperatorEvidenceUxStandard.isInspectionLinesTable(
+              tableDef.key,
+            )) {
+              syncInspectionDefectReasonCode(
+                enumSelections: enumSelections,
+                qtyFail: textControllers['qtyFail']?.text ??
+                    draft.values['qtyFail'],
+              );
+            }
+            if (isControlledItemsTable(tableDef.key) ||
+                needsControlledItemsQtyBalance(
+                  tableKey: tableDef.key,
+                  profileKey: profile.profileKey,
+                  columnKeys: _rowDialogColumns.map((c) => c.key),
+                )) {
+              syncFinalControlDefectReasonCode(
+                enumSelections: enumSelections,
+                scrapQty: textControllers['scrapQty']?.text ??
+                    draft.values['scrapQty'],
+                reworkQty: textControllers['reworkQty']?.text ??
+                    draft.values['reworkQty'],
+              );
+            }
             String fieldLabel(ProductionStationProfileField col) {
               if (OperatorWorkLogRowLayout.isOperatorWorkLogTable(tableDef.key)) {
                 return OperatorWorkLogRowLayout.displayLabel(col);
@@ -307,6 +391,19 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                     ..addAll(issue.errorFieldKeys);
                   return false;
                 }
+                final defectIssue = packagingDefectReasonIssue(
+                  unitsRejected:
+                      textControllers['unitsRejected']?.text ??
+                      draft.values['unitsRejected'],
+                  defectReasonCode: enumSelections['defectReasonCode'],
+                );
+                if (defectIssue != null) {
+                  validationError = defectIssue;
+                  fieldErrors
+                    ..clear()
+                    ..add('defectReasonCode');
+                  return false;
+                }
               }
               // M1-I5-C4B — add + edit; detekcija po key/profilu/kolonama.
               if (needsControlledItemsQtyBalance(
@@ -331,6 +428,20 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                     ..addAll(issue.errorFieldKeys);
                   return false;
                 }
+                final defectIssue = finalControlDefectReasonIssue(
+                  scrapQty: textControllers['scrapQty']?.text ??
+                      draft.values['scrapQty'],
+                  reworkQty: textControllers['reworkQty']?.text ??
+                      draft.values['reworkQty'],
+                  defectReason: enumSelections['defectReason'],
+                );
+                if (defectIssue != null) {
+                  validationError = defectIssue;
+                  fieldErrors
+                    ..clear()
+                    ..add('defectReason');
+                  return false;
+                }
               }
               if (OperatorEvidenceUxStandard.isInspectionLinesTable(
                 tableDef.key,
@@ -353,6 +464,18 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                   fieldErrors
                     ..clear()
                     ..addAll(['qtyInspected', 'qtyPass', 'qtyFail']);
+                  return false;
+                }
+                final defectIssue = inspectionDefectReasonIssue(
+                  qtyFail: textControllers['qtyFail']?.text ??
+                      draft.values['qtyFail'],
+                  defectReasonCode: enumSelections['defectReasonCode'],
+                );
+                if (defectIssue != null) {
+                  validationError = defectIssue;
+                  fieldErrors
+                    ..clear()
+                    ..add('defectReasonCode');
                   return false;
                 }
               }
@@ -511,10 +634,12 @@ class StructuredRepeatableTableSection extends StatelessWidget {
               title: Text(
                 existing == null ? 'Dodaj red — ${tableDef.label}' : 'Uredi red',
               ),
+              contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
               content: SizedBox(
                 width: 520,
                 child: SingleChildScrollView(
                   controller: scrollController,
+                  padding: const EdgeInsets.only(top: 8),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -552,11 +677,13 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                         ),
                       if (_inheritsProductFromHeader)
                         Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.only(top: 4, bottom: 12),
                           child: InputDecorator(
                             decoration: const InputDecoration(
                               labelText: 'Proizvod (iz zaglavlja)',
                               border: OutlineInputBorder(),
+                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                              contentPadding: EdgeInsets.fromLTRB(12, 16, 12, 12),
                             ),
                             child: Text(
                               headerProductSelection!.displayLabel,
@@ -774,27 +901,29 @@ class StructuredRepeatableTableSection extends StatelessWidget {
     }
 
     if (col.isEntitySearchSelect) {
+      final overrideSearch = entitySearchOverrides[col.key];
       return StructuredEntitySearchField(
         field: col,
         companyId: companyId,
         plantKey: plantKey,
+        plantDisplayLabel: plantDisplayLabel,
         enabled: enabled,
         initialSelection: entitySelections[col.key],
         labelOverride: label,
         requiredOverride: required,
-        searchFn: (query) => searchService.searchByCallable(
-          callableName: col.entitySearchCallable ?? 'searchProducts',
-          companyId: companyId,
-          query: query,
-          assignedPlantKey:
-              col.entitySearchCallable == 'searchPlantOperators' ||
-                      col.entitySearchCallable ==
-                          'searchProductionMachines' ||
-                      col.entitySearchCallable ==
-                          'searchProductionWorkbenches'
-                  ? plantKey
-                  : null,
-        ),
+        recentSuggestions: recentEntitySuggestions[col.key] ?? const [],
+        recentSuggestionsLabel: recentEntitySuggestionLabels[col.key],
+        searchFn: overrideSearch ??
+            ((query) => searchService.searchByCallable(
+                  callableName: col.entitySearchCallable ?? 'searchProducts',
+                  companyId: companyId,
+                  query: query,
+                  assignedPlantKey:
+                      ProductionEvidenceEntitySearchCallableService
+                              .usesAssignedPlantKey(col.entitySearchCallable)
+                          ? plantKey
+                          : null,
+                )),
         onChanged: (selection) {
           entitySelections[col.key] = selection;
           if (selection != null) {
@@ -866,17 +995,65 @@ class StructuredRepeatableTableSection extends StatelessWidget {
           options = col.enumValues;
         }
       }
+      final packagingDefect = isPackagingCheckLinesTable(tableDef.key) &&
+          col.key == 'defectReasonCode';
+      final inspectionDefect =
+          OperatorEvidenceUxStandard.isInspectionLinesTable(tableDef.key) &&
+              col.key == 'defectReasonCode';
+      final finalControlDefect = (isControlledItemsTable(tableDef.key) ||
+              needsControlledItemsQtyBalance(
+                tableKey: tableDef.key,
+                profileKey: profile.profileKey,
+                columnKeys: _rowDialogColumns.map((c) => c.key),
+              )) &&
+          col.key == 'defectReason';
+      final zeroFailDefect =
+          packagingDefect || inspectionDefect || finalControlDefect;
+      var zeroFailReasonLocked = false;
+      if (zeroFailDefect) {
+        if (!options.contains(noDefectReasonCode)) {
+          options = [noDefectReasonCode, ...options];
+        }
+        if (finalControlDefect) {
+          final scrap = textControllers['scrapQty']?.text ??
+              draft.values['scrapQty'];
+          final rework = textControllers['reworkQty']?.text ??
+              draft.values['reworkQty'];
+          zeroFailReasonLocked = packagingQuantityOrZero(scrap) +
+                  packagingQuantityOrZero(rework) <=
+              0;
+        } else {
+          final failQty = packagingDefect
+              ? (textControllers['unitsRejected']?.text ??
+                  draft.values['unitsRejected'])
+              : (textControllers['qtyFail']?.text ?? draft.values['qtyFail']);
+          zeroFailReasonLocked = packagingQuantityOrZero(failQty) <= 0;
+        }
+        if (zeroFailReasonLocked) {
+          options = const [noDefectReasonCode];
+        } else {
+          options = options
+              .where((value) => value != noDefectReasonCode)
+              .toList(growable: false);
+        }
+      }
       String labelFor(String value) {
-        if (OperatorEvidenceUxStandard.isInspectionLinesTable(tableDef.key) &&
-            col.key == 'defectReasonCode') {
+        if (packagingDefect || finalControlDefect) {
+          return packagingDefectReasonLabel(value);
+        }
+        if (inspectionDefect) {
           return OperatorEvidenceUxStandard.defectReasonLabel(value);
         }
         return col.enumLabelFor(value);
       }
 
+      final enumRequired =
+          required || (zeroFailDefect && !zeroFailReasonLocked);
+      final enumEnabled = enabled && !zeroFailReasonLocked;
+
       return InputDecorator(
         decoration: InputDecoration(
-          labelText: required ? '$label *' : label,
+          labelText: enumRequired ? '$label *' : label,
           border: const OutlineInputBorder(),
           errorText: fieldError,
         ),
@@ -888,7 +1065,7 @@ class StructuredRepeatableTableSection extends StatelessWidget {
               if (v == null || v.isEmpty) return null;
               return options.contains(v) ? v : null;
             }(),
-            hint: const Text('Odaberite…'),
+            hint: Text(evidenceSelectHint()),
             items: options
                 .map(
                   (value) => DropdownMenuItem<String>(
@@ -897,7 +1074,7 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                   ),
                 )
                 .toList(growable: false),
-            onChanged: enabled
+            onChanged: enumEnabled
                 ? (value) {
                     enumSelections[col.key] = value;
                     onChanged();
@@ -947,7 +1124,7 @@ class StructuredRepeatableTableSection extends StatelessWidget {
     final controller = textControllers.putIfAbsent(
       col.key,
       () => TextEditingController(
-        text: draft.values[col.key]?.toString() ?? '',
+        text: sanitizeEvidenceFormInput(draft.values[col.key]?.toString()),
       ),
     );
     final pieceQty = col.type == 'number' && isStructuredPieceQuantityField(col.key);
@@ -996,6 +1173,10 @@ class StructuredRepeatableTableSection extends StatelessWidget {
                 ),
               ],
             ),
+            if (tableNotice != null) ...[
+              const SizedBox(height: 8),
+              tableNotice!,
+            ],
             const SizedBox(height: 12),
             if (rows.isEmpty)
               Text(
@@ -1195,6 +1376,20 @@ String? validateStructuredTables({
         );
         if (balanceError != null) return balanceError;
       }
+      if (isControlledItemsTable(table.key) ||
+          needsControlledItemsQtyBalance(
+            tableKey: table.key,
+            columnKeys: table.columns.map((c) => c.key),
+          )) {
+        final defectIssue = finalControlDefectReasonIssue(
+          scrapQty: row.values['scrapQty'],
+          reworkQty: row.values['reworkQty'],
+          defectReason: (row.values['defectReason'] ?? '').toString(),
+        );
+        if (defectIssue != null) {
+          return '${table.label}, red ${rowIndex + 1}: $defectIssue';
+        }
+      }
       if (table.key == 'inspection_lines') {
         final inspected = _parseQty(row.values['qtyInspected']);
         final pass = _parseQty(row.values['qtyPass']);
@@ -1202,6 +1397,13 @@ String? validateStructuredTables({
         if ((pass + fail - inspected).abs() > 0.000001) {
           return '${table.label}, red ${rowIndex + 1}: '
               'Zbroj prolaza i neprolaza mora biti jednak kontrolisanoj količini.';
+        }
+        final defectIssue = inspectionDefectReasonIssue(
+          qtyFail: row.values['qtyFail'],
+          defectReasonCode: (row.values['defectReasonCode'] ?? '').toString(),
+        );
+        if (defectIssue != null) {
+          return '${table.label}, red ${rowIndex + 1}: $defectIssue';
         }
       }
       if (OperatorWorkLogRowLayout.isOperatorWorkLogTable(table.key)) {
@@ -1248,13 +1450,25 @@ String? validateStructuredHeader({
     )) {
       continue;
     }
+    if (field.key == 'lineName' &&
+        ((entitySelections['workCenterId']?.entityId ?? '').trim().isNotEmpty ||
+            (state.fieldValues['workCenterId'] ?? '')
+                .toString()
+                .trim()
+                .isNotEmpty)) {
+      continue;
+    }
     if (!field.required) continue;
     if (field.isEntitySelect || field.isEntitySearchSelect) {
       final sel = entitySelections[field.key];
-      if (sel == null || sel.entityId.isEmpty) {
-        return structuredRequiredFieldMessage(field.label);
+      if (sel != null && sel.entityId.isNotEmpty) {
+        continue;
       }
-      continue;
+      final fromState = state.fieldValues[field.key]?.toString().trim() ?? '';
+      if (isUsableEvidenceEntityId(fromState)) {
+        continue;
+      }
+      return structuredRequiredFieldMessage(field.label);
     }
     if (field.type == 'enum') {
       final v = enumSelections[field.key] ?? state.fieldValues[field.key]?.toString();

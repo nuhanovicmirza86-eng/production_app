@@ -16,14 +16,29 @@ class DowntimeAnalyticsExport {
     return v;
   }
 
+  static String _plantLine({
+    required String plantKey,
+    String? plantDisplayName,
+  }) {
+    final display = (plantDisplayName ?? '').trim();
+    final key = plantKey.trim();
+    if (display.isEmpty || display == key) return '—';
+    return display;
+  }
+
   static String buildCsv({
     required DowntimeAnalyticsReport report,
     required String companyId,
     required String plantKey,
+    String? plantDisplayName,
   }) {
+    final plantLine = _plantLine(
+      plantKey: plantKey,
+      plantDisplayName: plantDisplayName,
+    );
     final sb = StringBuffer();
     sb.writeln(
-      '${_esc('Zastoji — analitika')};${_esc(companyId)};${_esc(plantKey)}',
+      '${_esc('Zastoji — analitika')};${_esc('Pogon')};${_esc(plantLine)}',
     );
     sb.writeln(
       '${_esc('Period')};${_esc(report.rangeStart.toIso8601String())};${_esc(report.rangeEndExclusive.toIso8601String())}',
@@ -105,22 +120,29 @@ class DowntimeAnalyticsExport {
     required DowntimeAnalyticsReport report,
     required String companyId,
     required String plantKey,
+    String? plantDisplayName,
   }) async {
+    final plantLine = _plantLine(
+      plantKey: plantKey,
+      plantDisplayName: plantDisplayName,
+    );
     final csv = buildCsv(
       report: report,
       companyId: companyId,
       plantKey: plantKey,
+      plantDisplayName: plantDisplayName,
     );
     final dir = await getTemporaryDirectory();
-    final safePlant = plantKey.trim().isEmpty ? 'plant' : plantKey.trim();
     final fn =
-        'zastoji_analitika_${safePlant}_${DateTime.now().millisecondsSinceEpoch}.csv';
+        'zastoji_analitika_pogon_${DateTime.now().millisecondsSinceEpoch}.csv';
     final path = '${dir.path}/$fn';
     final f = File(path);
     await f.writeAsString(csv, encoding: utf8);
     await Share.shareXFiles(
       [XFile(path)],
-      text: 'Analitika zastoja (CSV)',
+      text: plantLine == '—'
+          ? 'Analitika zastoja (CSV)'
+          : 'Analitika zastoja — Pogon: $plantLine (CSV)',
     );
   }
 }

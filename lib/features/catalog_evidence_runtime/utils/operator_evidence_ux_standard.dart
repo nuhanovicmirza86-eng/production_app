@@ -35,6 +35,7 @@ abstract final class OperatorEvidenceUxStandard {
 
   /// Mapiranje katalog `defectReasonCode` → operator label (bez nove backend šeme).
   static const Map<String, String> inspectionDefectReasonLabels = {
+    'BEZ_GRESKE': 'Bez greške',
     'DIMENZIJA': 'Dimenzija van tolerancije',
     'OŠTEĆENJE': 'Oštećenje površine',
     'BOJA_POVRŠINA': 'Pogrešna boja / nijansa',

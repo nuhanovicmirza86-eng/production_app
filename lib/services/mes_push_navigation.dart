@@ -4,9 +4,14 @@ import 'package:production_app/modules/auth/register/screens/pending_users_scree
 import 'package:production_app/modules/finance_integrations/screens/finance_ai_assistant_screen.dart';
 import 'package:production_app/modules/finance_integrations/screens/finance_controlling_hub_screen.dart';
 import 'package:production_app/modules/production/notifications/mes_inbox_screen.dart';
+import 'package:production_app/modules/production/notifications/open_pending_evidence_verification.dart';
+import 'package:production_app/modules/production/ai/screens/operonix_ai_operational_briefing_screen.dart';
+import 'package:production_app/modules/production/ai/screens/operonix_ai_watchlist_screen.dart';
+import 'package:production_app/modules/production/ai/screens/production_ai_hub_screen.dart';
 import 'package:production_app/modules/production/ooe/screens/ooe_dashboard_screen.dart';
 import 'package:production_app/modules/production/ooe/screens/ooe_shift_summary_screen.dart';
 import 'package:production_app/modules/production/production_orders/screens/production_order_details_screen.dart';
+import 'package:production_app/modules/quality/utils/ncr_open_action_navigation.dart';
 import 'package:production_app/modules/quality/screens/quality_hub_screen.dart';
 import 'package:production_app/modules/quality/screens/ncr_detail_screen.dart';
 
@@ -21,10 +26,14 @@ class MesPushNavigation {
   static Future<void> handleData(
     Map<String, dynamic> data,
     GlobalKey<NavigatorState> navigatorKey,
+  ) =>
+      handleWithNavigator(data, navigatorKey.currentState);
+
+  static Future<void> handleWithNavigator(
+    Map<String, dynamic> data,
+    NavigatorState? nav,
   ) async {
     if (_ps(data['type']) != 'MES_NOTIFICATION') return;
-
-    final nav = navigatorKey.currentState;
     if (nav == null) return;
 
     final cd = await MesNavigationContextService.loadForCurrentUser();
@@ -95,6 +104,15 @@ class MesPushNavigation {
                 ? _ps(data['ncrId'])
                 : entityId;
         if (ncrId.isNotEmpty) {
+          if (_ps(data['actionKind']).isNotEmpty) {
+            await openNcrActionFromMesExtra(
+              nav.context,
+              companyData: cd,
+              extra: data,
+              ncrId: ncrId,
+            );
+            break;
+          }
           await nav.push<void>(
             MaterialPageRoute<void>(
               builder: (_) => NcrDetailScreen(
@@ -107,6 +125,26 @@ class MesPushNavigation {
           await nav.push<void>(
             MaterialPageRoute<void>(
               builder: (_) => QualityHubScreen(companyData: cd),
+            ),
+          );
+        }
+        break;
+      case 'ncr_action_task':
+        final ncrActionId =
+            (entityType == 'non_conformance' && entityId.isNotEmpty)
+                ? entityId
+                : (_ps(data['ncrId']).isNotEmpty ? _ps(data['ncrId']) : entityId);
+        if (ncrActionId.isNotEmpty) {
+          await openNcrActionFromMesExtra(
+            nav.context,
+            companyData: cd,
+            extra: data,
+            ncrId: ncrActionId,
+          );
+        } else {
+          await nav.push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => MesInboxScreen(companyData: cd),
             ),
           );
         }
@@ -146,6 +184,63 @@ class MesPushNavigation {
             builder: (_) => MesInboxScreen(companyData: cd),
           ),
         );
+        break;
+      case 'evidence_verification':
+        await openPendingEvidenceVerification(
+          navigator: nav,
+          companyData: cd,
+          payload: data,
+        );
+        break;
+      case 'operonix_ai_watchlist':
+        String? alertKey = _ps(data['entityId']);
+        if (alertKey.isEmpty) {
+          // FCM / local payload may flatten extra
+          alertKey = _ps(data['alertKey']);
+        }
+        if (alertKey.isEmpty) alertKey = null;
+        if (OperonixAiWatchlistScreen.canView(cd)) {
+          await nav.push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => OperonixAiWatchlistScreen(
+                companyData: cd,
+                highlightAlertKey: alertKey,
+              ),
+            ),
+          );
+        }
+        break;
+      case 'operonix_ai_operational_briefing':
+        // AI-M3-G4 — soft notify → briefing screen (plant scope from inbox).
+        final briefingPlant = _ps(data['plantKey']);
+        String? plantLabel;
+        final ex = data['plantDisplayName'];
+        if (ex != null) {
+          final s = _ps(ex);
+          if (s.isNotEmpty) plantLabel = s;
+        }
+        if (plantLabel == null) {
+          final flat = _ps(data['extraPlantDisplayName']);
+          if (flat.isNotEmpty) plantLabel = flat;
+        }
+        if (OperonixAiOperationalBriefingScreen.canView(cd)) {
+          await nav.push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => OperonixAiOperationalBriefingScreen(
+                companyData: cd,
+                initialPlantKey:
+                    briefingPlant.isEmpty ? null : briefingPlant,
+                initialPlantLabel: plantLabel,
+              ),
+            ),
+          );
+        } else {
+          await nav.push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => ProductionAiHubScreen(companyData: cd),
+            ),
+          );
+        }
         break;
       case 'finance_ai_assistant':
         final by = _ps(data['businessYearId']);

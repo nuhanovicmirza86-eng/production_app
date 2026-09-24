@@ -15,6 +15,7 @@ class ProductionStationProfileCatalogEntry {
   final List<Map<String, dynamic>> validations;
   final Map<String, dynamic> sessionBehavior;
   final List<Map<String, dynamic>> repeatableTables;
+  final Map<String, dynamic> verification;
 
   const ProductionStationProfileCatalogEntry({
     required this.profileKey,
@@ -30,6 +31,7 @@ class ProductionStationProfileCatalogEntry {
     this.validations = const [],
     this.sessionBehavior = const {},
     this.repeatableTables = const [],
+    this.verification = const {},
   });
 
   bool get isComplete => definitionStatus == 'complete';
@@ -76,6 +78,7 @@ class ProductionStationProfileCatalogEntry {
       }
     }
     final sessionBehaviorRaw = data['sessionBehavior'];
+    final verificationRaw = data['verification'];
     final repeatableTablesRaw = data['repeatableTables'];
     final repeatableTables = <Map<String, dynamic>>[];
     if (repeatableTablesRaw is List) {
@@ -104,8 +107,34 @@ class ProductionStationProfileCatalogEntry {
           ? Map<String, dynamic>.from(sessionBehaviorRaw)
           : const {},
       repeatableTables: repeatableTables,
+      verification: verificationRaw is Map
+          ? Map<String, dynamic>.from(verificationRaw)
+          : const {},
     );
   }
+
+  List<String> get verifierRoleKeys {
+    final raw = verification['verifierRoleKeys'];
+    if (raw is! List) return const [];
+    return raw
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  bool get hasSignedLoggedInVerifier {
+    if (verification['signedByLoggedInUser'] == true) return true;
+    return fields.any((f) => f.signedByLoggedInUser);
+  }
+
+  String get signedVerifierFieldKey {
+    final fromBlock = (verification['verifierFieldKey'] ?? '').toString().trim();
+    if (fromBlock.isNotEmpty) return fromBlock;
+    return 'verifiedByEmployeeId';
+  }
+
+  String get signedVerifierDeniedMessage =>
+      'Verifikacija nije dostupna za vašu ulogu.';
 
   List<String> get allowedUnits {
     final raw = units['allowedUnits'];

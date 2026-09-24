@@ -6,7 +6,9 @@ import '../../../core/ui/standard_table_components.dart';
 import '../../../modules/production/station_pages/models/production_station_profile_catalog_entry.dart';
 import '../../../modules/production/station_pages/models/production_station_profile_field.dart';
 import '../../../modules/production/station_work/models/production_station_work_session.dart';
-import '../../station_evidence/screens/profile_driven_evidence_detail_screen.dart';
+import '../../../modules/quality/utils/ncr_rework_executor_navigation.dart';
+import '../../station_evidence/utils/evidence_order_context_display.dart';
+import '../utils/omp_material_lot_source_display.dart';
 
 /// Veličina kolone u standardnoj tabeli evidencija (flex + mobile min-width).
 enum CatalogEvidenceColumnSize {
@@ -349,6 +351,9 @@ String _tableLabelForFieldKey(String key) {
       return 'Procesna tačka';
     case 'dosedQuantity':
       return 'Količina';
+    case 'packagingOperatorEmployeeId':
+    case 'packagingOperatorNameSnapshot':
+      return 'Operater proizvodnje';
     default:
       return key;
   }
@@ -453,6 +458,8 @@ double catalogEvidenceColumnMinWidth(
       return 96;
     case 'order':
       return 92;
+    case 'operation':
+      return 140;
     case 'disposition':
       return 100;
     case 'product':
@@ -542,9 +549,11 @@ List<CatalogEvidenceTableColumn> catalogEvidenceTableColumnsForProfile(
       ];
       break;
     case 'final_control':
+      // M1-I14-E-HOTFIX-01 — Operacija u Pregled evidencija (stanica Finalna kontrola).
       businessColumns = [
         _textColumn(id: 'order', label: 'Nalog'),
         _textColumn(id: 'product', label: 'Proizvod', size: CatalogEvidenceColumnSize.wide),
+        _textColumn(id: 'operation', label: 'Operacija', size: CatalogEvidenceColumnSize.wide),
         _textColumn(id: 'disposition', label: 'Dispozicija'),
       ];
       break;
@@ -557,6 +566,28 @@ List<CatalogEvidenceTableColumn> catalogEvidenceTableColumnsForProfile(
         _textColumn(id: 'prep_type', label: 'Tip pripreme'),
         _numericColumn(id: 'prepared_qty', label: 'Količina'),
         _textColumn(id: 'unit', label: 'Jed.', size: CatalogEvidenceColumnSize.narrow),
+      ];
+      break;
+    case 'operation_material_preparation':
+      businessColumns = [
+        _textColumn(id: 'order', label: 'Nalog'),
+        _textColumn(id: 'operation_phase', label: 'Faza'),
+        _textColumn(id: 'work_location', label: 'Mjesto rada', size: CatalogEvidenceColumnSize.wide),
+        _textColumn(id: 'material', label: 'Materijal', size: CatalogEvidenceColumnSize.wide),
+        _textColumn(id: 'material_lot', label: 'Lot / šarža'),
+        _textColumn(id: 'prep_purpose', label: 'Svrha'),
+        _numericColumn(id: 'prepared_qty', label: 'Količina'),
+        _textColumn(id: 'unit', label: 'Jed.', size: CatalogEvidenceColumnSize.narrow),
+      ];
+      break;
+    case 'workspace_5s_cleaning':
+      businessColumns = [
+        _textColumn(
+          id: 'workplace_zone',
+          label: 'Zona / radno mjesto',
+          size: CatalogEvidenceColumnSize.wide,
+        ),
+        _textColumn(id: 'outcome', label: 'Ishod'),
       ];
       break;
     default:
@@ -706,6 +737,11 @@ String _cellText(
       final code = (values['productionOrderCode'] ?? '').toString().trim();
       // Nikad ne prikazuj Firestore document ID kao nalog.
       return code.isEmpty ? '—' : code;
+    case 'operation':
+      // M1-I14-E-HOTFIX-01 — isti label kao detalj (bez raw routingStepId).
+      return EvidenceOrderContextDisplay.operationStepLabelForEvidenceDetail(
+        session.orderSnapshot,
+      );
     case 'product':
       final name = (values['productNameSnapshot'] ?? '').toString().trim();
       if (name.isNotEmpty) return name;
@@ -723,13 +759,24 @@ String _cellText(
       final matCode = (values['materialCodeSnapshot'] ?? '').toString().trim();
       return matCode.isEmpty ? '—' : matCode;
     case 'material_lot':
-      final lot = (values['materialLot'] ?? '').toString().trim();
-      return lot.isEmpty ? '—' : lot;
+      return ompMaterialLotListDisplay(values);
     case 'prep_type':
       return _fieldDisplayValue(
         profile,
         'preparationType',
         values['preparationType'],
+      );
+    case 'prep_purpose':
+      return _fieldDisplayValue(
+        profile,
+        'preparationPurpose',
+        values['preparationPurpose'],
+      );
+    case 'operation_phase':
+      return _fieldDisplayValue(
+        profile,
+        'operationPhaseKey',
+        values['operationPhaseKey'],
       );
     case 'prepared_qty':
       return _fieldDisplayValue(
@@ -797,6 +844,12 @@ String _cellText(
         'operatorComment',
         values['operatorComment'],
       );
+    case 'workplace_zone':
+      final zone = (values['workplaceZoneNameSnapshot'] ?? '').toString().trim();
+      if (zone.isNotEmpty) return zone;
+      return '—';
+    case 'outcome':
+      return _fieldDisplayValue(profile, 'outcome', values['outcome']);
     default:
       if (_profileOperatorTableFieldKeys(profile.profileKey)
           .contains(column.id)) {
@@ -866,7 +919,7 @@ class _CatalogEvidenceTableCell extends StatelessWidget {
 }
 
 /// Donji tabelarni pregled zatvorenih evidencija (M1-F0 standard).
-class CatalogEvidenceRecordsTable extends StatelessWidget {
+class CatalogEvidenceRecordsTable extends StatefulWidget {
   const CatalogEvidenceRecordsTable({
     super.key,
     required this.companyData,
@@ -888,12 +941,58 @@ class CatalogEvidenceRecordsTable extends StatelessWidget {
   final ProductionStationWorkSession? activeSession;
   final bool loading;
 
-  List<ProductionStationWorkSession> get _rows {
-    final rows = List<ProductionStationWorkSession>.from(sessions);
-    if (activeSession != null && activeSession!.isActive) {
-      rows.insert(0, activeSession!);
+  @override
+  State<CatalogEvidenceRecordsTable> createState() =>
+      _CatalogEvidenceRecordsTableState();
+}
+
+class _CatalogEvidenceRecordsTableState
+    extends State<CatalogEvidenceRecordsTable> {
+  /// M1-I14-E-HOTFIX-01 — null = Sve operacije; inače kanonski label.
+  String? _operationFilterLabel;
+
+  bool get _showsOperationFilter =>
+      widget.profile.profileKey.trim() == 'final_control';
+
+  List<ProductionStationWorkSession> get _baseRows {
+    final rows = List<ProductionStationWorkSession>.from(widget.sessions);
+    if (widget.activeSession != null && widget.activeSession!.isActive) {
+      rows.insert(0, widget.activeSession!);
     }
     return rows;
+  }
+
+  List<ProductionStationWorkSession> get _rows {
+    final rows = _baseRows;
+    final filter = _operationFilterLabel;
+    if (!_showsOperationFilter || filter == null) return rows;
+    return rows
+        .where(
+          (s) =>
+              EvidenceOrderContextDisplay.operationStepLabelForEvidenceDetail(
+                    s.orderSnapshot,
+                  ) ==
+                  filter,
+        )
+        .toList(growable: false);
+  }
+
+  List<String> get _operationFacetLabels {
+    final labels = <String>{};
+    for (final s in _baseRows) {
+      labels.add(
+        EvidenceOrderContextDisplay.operationStepLabelForEvidenceDetail(
+          s.orderSnapshot,
+        ),
+      );
+    }
+    final sorted = labels.toList()..sort();
+    // „Nije evidentirano” na kraju radi čitljivosti filtera.
+    sorted.remove(EvidenceOrderContextDisplay.notRecorded);
+    if (labels.contains(EvidenceOrderContextDisplay.notRecorded)) {
+      sorted.add(EvidenceOrderContextDisplay.notRecorded);
+    }
+    return sorted;
   }
 
   Widget _buildHeaderLabel({
@@ -990,7 +1089,7 @@ class CatalogEvidenceRecordsTable extends StatelessWidget {
   }) {
     if (column.id == 'status') {
       return StandardTableStatusBadge(
-        label: _cellText(column, session, profile),
+        label: _cellText(column, session, widget.profile),
       );
     }
     if (column.id == 'details') {
@@ -999,7 +1098,7 @@ class CatalogEvidenceRecordsTable extends StatelessWidget {
       );
     }
     return Text(
-      _cellText(column, session, profile),
+      _cellText(column, session, widget.profile),
       style: cellStyle,
       textAlign: column.align,
       maxLines: 2,
@@ -1011,13 +1110,10 @@ class CatalogEvidenceRecordsTable extends StatelessWidget {
     BuildContext context,
     ProductionStationWorkSession session,
   ) {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => ProfileDrivenEvidenceDetailScreen(
-          companyData: companyData,
-          sessionId: session.id,
-        ),
-      ),
+    NcrReworkExecutorNavigation.openEvidenceSessionOrExecutorReworkTask(
+      context: context,
+      companyData: widget.companyData,
+      sessionId: session.id,
     );
   }
 
@@ -1116,9 +1212,10 @@ class CatalogEvidenceRecordsTable extends StatelessWidget {
     required BuildContext context,
     required ColorScheme cs,
   }) {
-    final effectiveLimit = recordLimitOptions.contains(recordLimit)
-        ? recordLimit
-        : catalogEvidenceDefaultRecordLimit;
+    final effectiveLimit =
+        widget.recordLimitOptions.contains(widget.recordLimit)
+            ? widget.recordLimit
+            : catalogEvidenceDefaultRecordLimit;
 
     return DropdownButton<int>(
       value: effectiveLimit,
@@ -1128,7 +1225,7 @@ class CatalogEvidenceRecordsTable extends StatelessWidget {
       style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: cs.onSurface,
           ),
-      items: recordLimitOptions
+      items: widget.recordLimitOptions
           .map(
             (n) => DropdownMenuItem<int>(
               value: n,
@@ -1136,11 +1233,50 @@ class CatalogEvidenceRecordsTable extends StatelessWidget {
             ),
           )
           .toList(growable: false),
-      onChanged: loading
+      onChanged: widget.loading
           ? null
           : (value) {
               if (value == null || value == effectiveLimit) return;
-              onRecordLimitChanged(value);
+              widget.onRecordLimitChanged(value);
+            },
+    );
+  }
+
+  Widget _buildOperationFilterSelector({
+    required BuildContext context,
+    required ColorScheme cs,
+  }) {
+    final facets = _operationFacetLabels;
+    // Ako je odabrani facet nestao iz podataka, vrati na „Sve”.
+    final effective = _operationFilterLabel != null &&
+            facets.contains(_operationFilterLabel)
+        ? _operationFilterLabel
+        : null;
+
+    return DropdownButton<String?>(
+      value: effective,
+      isDense: true,
+      underline: const SizedBox.shrink(),
+      icon: Icon(Icons.arrow_drop_down, color: cs.onSurfaceVariant),
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: cs.onSurface,
+          ),
+      hint: const Text('Operacija'),
+      items: [
+        const DropdownMenuItem<String?>(
+          value: null,
+          child: Text('Sve operacije'),
+        ),
+        for (final label in facets)
+          DropdownMenuItem<String?>(
+            value: label,
+            child: Text(label),
+          ),
+      ],
+      onChanged: widget.loading
+          ? null
+          : (value) {
+              setState(() => _operationFilterLabel = value);
             },
     );
   }
@@ -1156,8 +1292,11 @@ class CatalogEvidenceRecordsTable extends StatelessWidget {
       style: theme.textTheme.titleMedium,
     );
     final selector = _buildRecordLimitSelector(context: context, cs: cs);
+    final operationFilter = _showsOperationFilter
+        ? _buildOperationFilterSelector(context: context, cs: cs)
+        : null;
     final countText = Text(
-      loading
+      widget.loading
           ? 'Učitavanje…'
           : rowCount == 0
           ? 'Nema zapisa za prikaz.'
@@ -1180,7 +1319,15 @@ class CatalogEvidenceRecordsTable extends StatelessWidget {
               const SizedBox(height: 6),
               Align(
                 alignment: Alignment.centerLeft,
-                child: selector,
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    ?operationFilter,
+                    selector,
+                  ],
+                ),
               ),
               const SizedBox(height: 4),
               countText,
@@ -1195,6 +1342,10 @@ class CatalogEvidenceRecordsTable extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(child: title),
+                if (operationFilter != null) ...[
+                  operationFilter,
+                  const SizedBox(width: 12),
+                ],
                 selector,
               ],
             ),
@@ -1210,7 +1361,7 @@ class CatalogEvidenceRecordsTable extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final columns = catalogEvidenceTableColumnsForProfile(profile);
+    final columns = catalogEvidenceTableColumnsForProfile(widget.profile);
     final borderColor = StandardTableMetrics.borderColor(cs);
     final headerBackground = StandardTableMetrics.headerBackground(cs);
     final rowBackground = StandardTableMetrics.rowBackground(cs);

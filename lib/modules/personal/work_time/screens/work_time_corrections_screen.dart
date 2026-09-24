@@ -69,6 +69,7 @@ class _WorkTimeCorrectionsScreenState extends State<WorkTimeCorrectionsScreen> {
     final reason = TextEditingController();
     final hours = TextEditingController();
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Zahtjev za korekciju'),

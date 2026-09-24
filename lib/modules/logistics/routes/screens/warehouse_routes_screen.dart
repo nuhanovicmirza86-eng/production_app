@@ -130,6 +130,7 @@ class _WarehouseRoutesScreenState extends State<WarehouseRoutesScreen> {
     }
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setLocal) {

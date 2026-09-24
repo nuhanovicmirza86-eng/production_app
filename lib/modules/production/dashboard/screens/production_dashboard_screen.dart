@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:production_app/services/mes_push_navigation.dart';
 import 'package:production_app/core/branding/operonix_ai_branding.dart';
 import 'package:production_app/core/theme/operonix_production_brand.dart';
 import 'package:production_app/screens/about_screen.dart';
@@ -32,7 +34,12 @@ import '../../../finance_integrations/utils/finance_permissions.dart';
 import '../../../logistics/screens/logistics_hub_entry_screen.dart';
 import '../../../sustainability/screens/carbon_footprint_screen.dart';
 import '../../ai/screens/production_ai_hub_screen.dart';
+import '../../notifications/mes_attention_home_card.dart';
+import '../../notifications/mes_inbox_attention.dart';
+import '../../notifications/mes_inbox_in_app_banner.dart';
+import '../../notifications/mes_inbox_presentation.dart';
 import '../../notifications/mes_inbox_screen.dart';
+import '../../notifications/mes_notification_prefs.dart';
 import '../../ooe/screens/ooe_dashboard_screen.dart';
 import '../../products/screens/products_list_screen.dart';
 import '../../production_orders/screens/production_orders_list_screen.dart';
@@ -41,8 +48,10 @@ import '../../tracking/models/production_operator_tracking_entry.dart';
 import '../../tracking/screens/production_operator_tracking_screen.dart';
 import '../../tracking/screens/production_operator_tracking_station_screen.dart';
 import '../../tracking/screens/production_preparation_station_screen.dart';
+import '../../station_pages/screens/production_evidence_operator_hub_screen.dart';
 import '../../station_pages/widgets/station_page_active_gate.dart';
 import '../../qr/production_qr_scan_flow.dart';
+import '../../../quality/screens/ncr_open_actions_list_screen.dart';
 import '../../../quality/screens/quality_hub_screen.dart';
 import '../models/production_dashboard_layout.dart';
 import '../models/production_dashboard_module.dart';
@@ -81,6 +90,19 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
   ProductionDashboardLayout _dashboardLayout =
       ProductionDashboardLayout.standard;
   StreamSubscription<ProductionDashboardLayout>? _dashboardLayoutSub;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _inboxAttentionSub;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _notifPrefsSub;
+  MesNotificationPrefs _notifPrefs = MesNotificationPrefs.allEnabled();
+  List<Map<String, dynamic>> _lastInboxRows = const [];
+  MesInboxAttentionCounts _inboxAttention = const MesInboxAttentionCounts(
+    newCount: 0,
+    waitingActionCount: 0,
+  );
+  final Set<String> _seenInboxIds = <String>{};
+  bool _inboxAttentionReady = false;
+  int _inboxTabIndex = -1;
+  MesInboxArrival? _inAppArrival;
+  Timer? _inAppBannerTimer;
 
   Map<String, dynamic> get companyData => widget.companyData;
 
@@ -110,13 +132,157 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         if (!mounted) return;
         setState(() => _dashboardLayout = layout);
       });
+      _listenInboxAttention(uid);
+      _listenNotifPrefs(uid);
     }
+  }
+
+  void _listenInboxAttention(String uid) {
+    _inboxAttentionSub?.cancel();
+    _inboxAttentionSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('mes_inbox')
+        .orderBy('createdAt', descending: true)
+        .limit(200)
+        .snapshots()
+        .listen((snap) {
+      final rows = snap.docs.map((d) => d.data()).toList(growable: false);
+      _lastInboxRows = rows;
+      final counts = MesInboxAttention.countsFromRows(
+        rows,
+        prefs: _notifPrefs,
+      );
+      final arrivals = <MesInboxArrival>[];
+      if (_inboxAttentionReady) {
+        for (final d in snap.docs) {
+          if (_seenInboxIds.contains(d.id)) continue;
+          final data = d.data();
+          if (!MesInboxAttention.isVisibleInThisApp(data)) continue;
+          if (!_notifPrefs.allowsRow(data)) continue;
+          final copy = MesInboxPresentation.fromRow(data);
+          arrivals.add(
+            MesInboxArrival(
+              docId: d.id,
+              title: copy.title,
+              waitingAction: copy.waitingAction,
+              row: data,
+            ),
+          );
+        }
+      }
+      _seenInboxIds
+        ..clear()
+        ..addAll(snap.docs.map((d) => d.id));
+      _inboxAttentionReady = true;
+      if (!mounted) return;
+      setState(() => _inboxAttention = counts);
+      if (arrivals.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _showInAppArrival(arrivals.first);
+        });
+      }
+    });
+  }
+
+  bool get _isOnInboxScreen =>
+      _inboxTabIndex >= 0 && _index == _inboxTabIndex;
+
+  void _selectShellIndex(int i) {
+    final onInbox = _inboxTabIndex >= 0 && i == _inboxTabIndex;
+    if (onInbox) {
+      _inAppBannerTimer?.cancel();
+      _inAppBannerTimer = null;
+    }
+    setState(() {
+      _index = i;
+      if (onInbox) _inAppArrival = null;
+    });
+  }
+
+  void _openInboxTab() {
+    _selectShellIndex(_inboxTabIndex >= 0 ? _inboxTabIndex : 1);
+  }
+
+  void _dismissInAppArrival() {
+    _inAppBannerTimer?.cancel();
+    _inAppBannerTimer = null;
+    if (!mounted) {
+      _inAppArrival = null;
+      return;
+    }
+    if (_inAppArrival == null) return;
+    setState(() => _inAppArrival = null);
+  }
+
+  void _openInAppArrival(MesInboxArrival arrival) {
+    _dismissInAppArrival();
+    if (arrival.waitingAction) {
+      MesPushNavigation.handleWithNavigator(
+        MesInboxAttention.rowToPushData(arrival.row),
+        Navigator.maybeOf(context, rootNavigator: true),
+      );
+    } else {
+      _openInboxTab();
+    }
+  }
+
+  void _showInAppArrival(MesInboxArrival arrival) {
+    ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+    if (!MesInboxAttention.shouldShowInAppBanner(
+      isOnInboxScreen: _isOnInboxScreen,
+    )) {
+      return;
+    }
+    _inAppBannerTimer?.cancel();
+    setState(() => _inAppArrival = arrival);
+    _inAppBannerTimer = Timer(MesInboxAttention.inAppBannerVisibleFor, () {
+      if (!mounted) return;
+      setState(() => _inAppArrival = null);
+    });
+  }
+
+  Widget _withInAppArrivalBanner(Widget child) {
+    return MesInboxInAppBannerLayer(
+      arrival: _inAppArrival,
+      onOpen: () {
+        final arrival = _inAppArrival;
+        if (arrival == null) return;
+        _openInAppArrival(arrival);
+      },
+      onDismiss: _dismissInAppArrival,
+      child: child,
+    );
   }
 
   @override
   void dispose() {
+    _inAppBannerTimer?.cancel();
     _dashboardLayoutSub?.cancel();
+    _inboxAttentionSub?.cancel();
+    _notifPrefsSub?.cancel();
     super.dispose();
+  }
+
+  void _listenNotifPrefs(String uid) {
+    _notifPrefsSub?.cancel();
+    _notifPrefsSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .snapshots()
+        .listen((snap) {
+      final next = MesNotificationPrefs.fromUser(snap.data());
+      if (!mounted) return;
+      final counts = MesInboxAttention.countsFromRows(
+        _lastInboxRows,
+        prefs: next,
+      );
+      setState(() {
+        _notifPrefs = next;
+        _inboxAttention = counts;
+      });
+    });
   }
 
   Future<void> _setDashboardLayout(ProductionDashboardLayout layout) async {
@@ -246,6 +412,8 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             onDashboardLayoutChanged: _setDashboardLayout,
             moduleSections: sections,
             dashboardAccess: access,
+            attentionCounts: _inboxAttention,
+            onOpenInbox: _openInboxTab,
           );
         },
         destination: const NavigationDestination(
@@ -259,10 +427,11 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     items.add(
       _ProdNavItem(
         builder: (_) => MesInboxScreen(companyData: cd),
-        destination: const NavigationDestination(
-          icon: Icon(Icons.notifications_outlined),
-          selectedIcon: Icon(Icons.notifications),
+        destination: NavigationDestination(
+          icon: MesInboxNavBadge(counts: _inboxAttention, outlined: true),
+          selectedIcon: MesInboxNavBadge(counts: _inboxAttention, outlined: false),
           label: 'Obavijesti',
+          tooltip: MesInboxAttention.badgeTooltip(_inboxAttention),
         ),
       ),
     );
@@ -348,6 +517,21 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             icon: Icon(Icons.receipt_long_outlined),
             selectedIcon: Icon(Icons.receipt_long),
             label: 'Narudžbe',
+          ),
+        ),
+      );
+    }
+
+    if ((_hasModule('quality') || _hasModule('production')) &&
+        ProductionAccessHelper.canAccessQualityControlEvidenceHub(_role)) {
+      items.add(
+        _ProdNavItem(
+          builder: (_) =>
+              ProductionEvidenceOperatorHubScreen(companyData: cd),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.fact_check_outlined),
+            selectedIcon: Icon(Icons.fact_check),
+            label: 'Kontrolne evidencije',
           ),
         ),
       );
@@ -756,6 +940,29 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                         },
                       ),
                     ],
+                    if (_hasModule('quality') &&
+                        ProductionAccessHelper.canAccessNcrOpenActionsInbox(
+                          _role,
+                        )) ...[
+                      const SizedBox(height: 10),
+                      ProductionDashboardActionTile(
+                        icon: Icons.inbox_outlined,
+                        title: 'Moje otvorene akcije',
+                        subtitle:
+                            'NCR zadaci — dorada, ponovna kontrola, odluke',
+                        onTap: () {
+                          _shellScaffoldKey.currentState?.closeDrawer();
+                          Navigator.push<void>(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (_) => NcrOpenActionsListScreen(
+                                companyData: cd,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                     if (ProductionModuleKeys.hasModule(cd, ProductionModuleKeys.development) &&
                         _canViewCard(
                           ProductionDashboardCard.developmentGovernance,
@@ -860,11 +1067,12 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     final fullNav = _buildFullNav(context);
     final isWide = _isWideLayout(context);
     final nav = isWide ? fullNav : _buildMobileNav(fullNav);
+    _inboxTabIndex = nav.indexWhere((e) => e.destination.label == 'Obavijesti');
     final safeIndex = (_index >= 0 && _index < nav.length) ? _index : 0;
     final current = nav[safeIndex].builder(context);
 
     if (isWide) {
-      return Scaffold(
+      return _withInAppArrivalBanner(Scaffold(
         key: _shellScaffoldKey,
         drawer: kIsWeb ? _webProductionDrawer(context) : null,
         body: SafeArea(
@@ -880,7 +1088,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                       )
                     : null,
                 selectedIndex: safeIndex,
-                onDestinationSelected: (i) => setState(() => _index = i),
+                onDestinationSelected: _selectShellIndex,
                 labelType: NavigationRailLabelType.all,
                 destinations: _toRailDestinations(nav),
                 scrollable: true,
@@ -895,12 +1103,12 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             ],
           ),
         ),
-      );
+      ));
     }
 
     final showBottomNav = nav.length >= 2;
 
-    return Scaffold(
+    return _withInAppArrivalBanner(Scaffold(
       body: SafeArea(
         child: IndexedStack(
           index: safeIndex,
@@ -910,11 +1118,11 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       bottomNavigationBar: showBottomNav
           ? NavigationBar(
               selectedIndex: safeIndex,
-              onDestinationSelected: (i) => setState(() => _index = i),
+              onDestinationSelected: _selectShellIndex,
               destinations: nav.map((e) => e.destination).toList(),
             )
           : null,
-    );
+    ));
   }
 
   Future<void> _openProductionQrScan(BuildContext context) async {
@@ -937,6 +1145,8 @@ class _ProductionHomePage extends StatelessWidget {
   final ValueChanged<ProductionDashboardLayout> onDashboardLayoutChanged;
   final List<ProductionDashboardModuleSection> moduleSections;
   final ProductionDashboardAccess dashboardAccess;
+  final MesInboxAttentionCounts attentionCounts;
+  final VoidCallback onOpenInbox;
 
   const _ProductionHomePage({
     required this.companyData,
@@ -950,6 +1160,8 @@ class _ProductionHomePage extends StatelessWidget {
     required this.onDashboardLayoutChanged,
     required this.moduleSections,
     required this.dashboardAccess,
+    required this.attentionCounts,
+    required this.onOpenInbox,
   });
 
   @override
@@ -986,6 +1198,13 @@ class _ProductionHomePage extends StatelessWidget {
             plantKey: plantKey,
             companyLine: companyLine,
           ),
+          if (attentionCounts.hasAttention) ...[
+            SizedBox(height: gap),
+            MesAttentionHomeCard(
+              counts: attentionCounts,
+              onOpenInbox: onOpenInbox,
+            ),
+          ],
           SizedBox(height: gap),
           const _SectionTitle(title: 'Brze akcije'),
           SizedBox(height: gap * 0.35),

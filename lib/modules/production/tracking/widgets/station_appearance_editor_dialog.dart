@@ -12,7 +12,8 @@ Future<StationScreenAppearance?> showStationAppearanceEditorDialog({
   bool allowCustomColors = false,
 }) {
   return showDialog<StationScreenAppearance>(
-    context: context,
+      barrierDismissible: false,
+      context: context,
     builder: (ctx) => _StationAppearanceEditorBody(
       seed: current,
       allowCustomColors: allowCustomColors,
@@ -77,6 +78,7 @@ class _StationAppearanceEditorBodyState extends State<_StationAppearanceEditorBo
     required ValueChanged<Color> onDone,
   }) async {
     await showDialog<void>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         Color working = initial;

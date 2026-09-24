@@ -106,6 +106,7 @@ class _DevelopmentPortfolioSuppliersTabState
   Future<void> _openPickProjectForNewSupplier() async {
     DevelopmentProjectModel? chosen;
     await showDialog<void>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         return AlertDialog(

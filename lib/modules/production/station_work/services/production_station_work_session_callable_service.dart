@@ -12,6 +12,18 @@ class ActiveStructuredSessionResult {
   final Map<String, List<Map<String, dynamic>>> structuredTables;
 }
 
+class StartProductionEvidenceWorkSessionResult {
+  const StartProductionEvidenceWorkSessionResult({
+    required this.session,
+    this.resumed = false,
+    this.structuredTables = const {},
+  });
+
+  final ProductionStationWorkSession session;
+  final bool resumed;
+  final Map<String, List<Map<String, dynamic>>> structuredTables;
+}
+
 String productionStationWorkSessionErrorMessage(Object error) {
   if (error is FirebaseFunctionsException) {
     final msg = (error.message ?? '').trim();
@@ -66,24 +78,113 @@ class ProductionStationWorkSessionCallableService {
     required String companyId,
     required String evidenceConfigId,
   }) async {
+    final result = await startProductionEvidenceWorkSessionDetailed(
+      companyId: companyId,
+      evidenceConfigId: evidenceConfigId,
+    );
+    return result.session;
+  }
+
+  Future<StartProductionEvidenceWorkSessionResult>
+  startProductionEvidenceWorkSessionDetailed({
+    required String companyId,
+    required String evidenceConfigId,
+  }) async {
+    try {
+      final res = await _functions
+          .httpsCallable('startProductionEvidenceWorkSession')
+          .call<Map<String, dynamic>>({
+            'companyId': companyId.trim(),
+            'evidenceConfigId': evidenceConfigId.trim(),
+          });
+      final data = res.data;
+      if (data['success'] != true) {
+        throw Exception('Pokretanje evidencije nije uspjelo.');
+      }
+      final raw = data['session'];
+      if (raw is! Map) {
+        throw Exception('Nepotpun odgovor servera.');
+      }
+      final id = (data['sessionId'] ?? '').toString().trim();
+      return StartProductionEvidenceWorkSessionResult(
+        session: ProductionStationWorkSession.fromMap(
+          id,
+          Map<String, dynamic>.from(raw),
+        ),
+        resumed: data['resumed'] == true,
+        structuredTables: _parseStructuredTables(data['structuredTables']),
+      );
+    } on FirebaseFunctionsException catch (error) {
+      if (error.code != 'already-exists') rethrow;
+      final active = await getActiveProductionEvidenceWorkSession(
+        companyId: companyId,
+        evidenceConfigId: evidenceConfigId,
+      );
+      if (active == null) rethrow;
+      return StartProductionEvidenceWorkSessionResult(
+        session: active.session,
+        resumed: true,
+        structuredTables: active.structuredTables,
+      );
+    }
+  }
+
+  Future<ActiveStructuredSessionResult?> getActiveProductionEvidenceWorkSession({
+    required String companyId,
+    required String evidenceConfigId,
+  }) async {
     final res = await _functions
-        .httpsCallable('startProductionEvidenceWorkSession')
+        .httpsCallable('getActiveProductionEvidenceWorkSession')
         .call<Map<String, dynamic>>({
           'companyId': companyId.trim(),
           'evidenceConfigId': evidenceConfigId.trim(),
         });
     final data = res.data;
     if (data['success'] != true) {
-      throw Exception('Pokretanje evidencije nije uspjelo.');
+      throw Exception('Učitavanje sesije nije uspjelo.');
     }
     final raw = data['session'];
-    if (raw is! Map) {
-      throw Exception('Nepotpun odgovor servera.');
-    }
-    return ProductionStationWorkSession.fromMap(
-      (data['sessionId'] ?? '').toString(),
-      Map<String, dynamic>.from(raw),
+    if (raw == null) return null;
+    if (raw is! Map) return null;
+    final id = (data['sessionId'] ?? '').toString().trim();
+    if (id.isEmpty) return null;
+    return ActiveStructuredSessionResult(
+      session: ProductionStationWorkSession.fromMap(
+        id,
+        Map<String, dynamic>.from(raw),
+      ),
+      structuredTables: _parseStructuredTables(data['structuredTables']),
     );
+  }
+
+  Future<List<ProductionStationWorkSession>>
+  listClosedProductionEvidenceWorkSessions({
+    required String companyId,
+    required String evidenceConfigId,
+    int limit = 25,
+  }) async {
+    final res = await _functions
+        .httpsCallable('listClosedProductionEvidenceWorkSessions')
+        .call<Map<String, dynamic>>({
+          'companyId': companyId.trim(),
+          'evidenceConfigId': evidenceConfigId.trim(),
+          'limit': limit,
+        });
+    final data = res.data;
+    if (data['success'] != true) {
+      throw Exception('Učitavanje zapisa nije uspjelo.');
+    }
+    final rawItems = data['items'];
+    if (rawItems is! List) return const [];
+    return rawItems
+        .whereType<Map>()
+        .map((item) {
+          final map = Map<String, dynamic>.from(item);
+          final id = (map['id'] ?? map['sessionId'] ?? '').toString().trim();
+          return ProductionStationWorkSession.fromMap(id, map);
+        })
+        .where((session) => session.id.isNotEmpty)
+        .toList(growable: false);
   }
 
   Future<({ProductionStationWorkSession session, String? trackingEntryId})>

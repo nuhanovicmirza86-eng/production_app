@@ -98,6 +98,7 @@ class _TrainingListScreenState extends State<TrainingListScreen> {
     DateTime? completed;
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSt) {

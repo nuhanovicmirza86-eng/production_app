@@ -1,3 +1,4 @@
+import '../../catalog_evidence_runtime/utils/omp_material_lot_source_display.dart';
 import '../../../modules/production/station_pages/models/production_station_profile_field.dart';
 import '../models/profile_driven_evidence_session.dart';
 
@@ -8,6 +9,11 @@ const Set<String> profileEvidenceDetailHiddenFieldKeys = {
   'operatorDisplayName',
   'createdAt',
   'updatedAt',
+  // M1-I11-B — interna WMS referenca; u Detaljima samo poslovni snapshoti.
+  'inventoryLotDocId',
+  'siteConditionChecked',
+  'readyForWork',
+  'readinessCorrection',
 };
 
 const Set<String> profileEvidenceDetailRedundantSnapshotKeys = {
@@ -28,9 +34,18 @@ const Set<String> profileEvidenceDetailRedundantSnapshotKeys = {
   // Prikazuje se preko machineId → machineNameSnapshot.
   'machineNameSnapshot',
   'machineCodeSnapshot',
+  // Prikazuje se preko workCenterId → workCenterNameSnapshot.
+  'workCenterNameSnapshot',
+  'workCenterCodeSnapshot',
   // Prikazuje se preko workbenchId → workbenchNameSnapshot.
   'workbenchNameSnapshot',
   'workbenchCodeSnapshot',
+  // Prikazuje se preko workplaceZoneId → workplaceZoneNameSnapshot.
+  'workplaceZoneNameSnapshot',
+  'workplaceZoneOther',
+  'performedByNameSnapshot',
+  'verifiedByNameSnapshot',
+  'verifiedByRoleSnapshot',
   // Sažetak: Mašina:… / Radni sto:… — vidi entity polja + workContextType.
   'workLocationNameSnapshot',
 };
@@ -45,7 +60,11 @@ const Map<String, String> _entityIdToSnapshotField = {
   'inspectorEmployeeId': 'inspectorNameSnapshot',
   'productionOperatorEmployeeId': 'productionOperatorNameSnapshot',
   'machineId': 'machineNameSnapshot',
+  'workCenterId': 'workCenterNameSnapshot',
   'workbenchId': 'workbenchNameSnapshot',
+  'workplaceZoneId': 'workplaceZoneNameSnapshot',
+  'performedByEmployeeId': 'performedByNameSnapshot',
+  'verifiedByEmployeeId': 'verifiedByNameSnapshot',
 };
 
 bool profileEvidenceShouldHideDetailFieldKey(String key) {
@@ -83,6 +102,10 @@ bool profileEvidenceLooksLikeInternalDocumentId(String value) {
   if (text.isEmpty) return false;
   if (text.contains('@') || text.contains(' ')) return false;
   if (RegExp(r'^\d{1,2}\.\d{1,2}\.\d{4}').hasMatch(text)) return false;
+  // Tehnički plantKey (npr. PLANT_2) — nikad korisnički prikaz.
+  if (RegExp(r'^PLANT_\d+$', caseSensitive: false).hasMatch(text)) {
+    return true;
+  }
   if (RegExp(r'^[A-Z][A-Z0-9_]*[-_]').hasMatch(text)) return false;
   if (text.length >= 18 && RegExp(r'^[A-Za-z0-9]+$').hasMatch(text)) {
     return true;
@@ -168,7 +191,17 @@ String profileEvidenceDetailFieldDisplayValue({
     return formatEvidenceDateTime(_parseDateTime(raw));
   }
 
+  if (field.type == 'boolean') {
+    if (raw == true || raw == 'true' || raw == 1 || raw == '1') return 'DA';
+    if (raw == false || raw == 'false' || raw == 0 || raw == '0') return 'NE';
+    return '—';
+  }
+
   if (field.type == 'enum') {
+    if (field.key == 'materialLotSource') {
+      final label = ompMaterialLotSourceDisplayLabel(session.fieldValues);
+      if (label != null) return label;
+    }
     if (field.key == 'treatmentType') {
       for (final key in [
         'treatmentTypeLabelSnapshot',

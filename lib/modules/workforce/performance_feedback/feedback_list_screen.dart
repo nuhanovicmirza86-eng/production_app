@@ -143,6 +143,7 @@ class _FeedbackListScreenState extends State<FeedbackListScreen>
       icon: const Icon(Icons.link_off_outlined),
       onPressed: () {
         showDialog<void>(
+      barrierDismissible: false,
           context: dialogContext,
           builder: (ctx) => AlertDialog(
             title: const Text(WorkforceHelpTexts.linkedAccountTitle),
@@ -287,6 +288,7 @@ class _FeedbackListScreenState extends State<FeedbackListScreen>
     int? score;
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSt) {
@@ -493,6 +495,7 @@ class _FeedbackListScreenState extends State<FeedbackListScreen>
     var efficiency = 3;
 
     final dialogResult = await showDialog<String>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSt) {

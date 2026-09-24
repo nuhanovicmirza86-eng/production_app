@@ -20,6 +20,11 @@ String productionEvidenceEntitySearchErrorMessage(Object error) {
       lower.contains('ne šalje iz klijenta')) {
     return 'Pretraga trenutno nije dostupna. Pokušajte ponovo.';
   }
+  if (lower.contains('nepodržana pretraga') ||
+      lower.contains('searchworkcenters') ||
+      lower.contains('searchproduction')) {
+    return 'Pretraga nije dostupna. Ako radni centar nije u šifrarniku, unesite Naziv linije.';
+  }
   return raw;
 }
 
@@ -65,6 +70,8 @@ class ProductionEvidenceEntitySearchCallableService {
     required String companyId,
     required String query,
     String? assignedPlantKey,
+    List<String>? roleKeys,
+    List<String>? recentIds,
     int limit = 20,
   }) async {
     final payload = <String, dynamic>{
@@ -75,6 +82,20 @@ class ProductionEvidenceEntitySearchCallableService {
     final stationPlant = assignedPlantKey?.trim();
     if (stationPlant != null && stationPlant.isNotEmpty) {
       payload['assignedPlantKey'] = stationPlant;
+    }
+    final roles = (roleKeys ?? const <String>[])
+        .map((r) => r.trim())
+        .where((r) => r.isNotEmpty)
+        .toList(growable: false);
+    if (roles.isNotEmpty) {
+      payload['roleKeys'] = roles;
+    }
+    final ids = (recentIds ?? const <String>[])
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toList(growable: false);
+    if (ids.isNotEmpty) {
+      payload['recentIds'] = ids;
     }
     final res = await _functions
         .httpsCallable('searchPlantOperators')
@@ -115,6 +136,39 @@ class ProductionEvidenceEntitySearchCallableService {
     }
     final res = await _functions
         .httpsCallable('searchProductionMachines')
+        .call<Map<String, dynamic>>(payload);
+    return _parseItems(res.data);
+  }
+
+  static bool usesAssignedPlantKey(String? callableName) {
+    switch ((callableName ?? '').trim()) {
+      case 'searchPlantOperators':
+      case 'searchProductionMachines':
+      case 'searchProductionWorkbenches':
+      case 'searchWorkCenters':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  Future<List<StructuredEntitySearchResult>> searchWorkCenters({
+    required String companyId,
+    required String query,
+    String? assignedPlantKey,
+    int limit = 20,
+  }) async {
+    final payload = <String, dynamic>{
+      'companyId': companyId.trim(),
+      'query': query.trim(),
+      'limit': limit,
+    };
+    final stationPlant = assignedPlantKey?.trim();
+    if (stationPlant != null && stationPlant.isNotEmpty) {
+      payload['assignedPlantKey'] = stationPlant;
+    }
+    final res = await _functions
+        .httpsCallable('searchWorkCenters')
         .call<Map<String, dynamic>>(payload);
     return _parseItems(res.data);
   }
@@ -162,6 +216,7 @@ class ProductionEvidenceEntitySearchCallableService {
     required String companyId,
     required String query,
     String? assignedPlantKey,
+    List<String>? roleKeys,
     int limit = 20,
   }) {
     switch (callableName.trim()) {
@@ -182,6 +237,7 @@ class ProductionEvidenceEntitySearchCallableService {
           companyId: companyId,
           query: query,
           assignedPlantKey: assignedPlantKey,
+          roleKeys: roleKeys,
           limit: limit,
         );
       case 'searchProductionOrders':
@@ -204,8 +260,15 @@ class ProductionEvidenceEntitySearchCallableService {
           assignedPlantKey: assignedPlantKey,
           limit: limit,
         );
+      case 'searchWorkCenters':
+        return searchWorkCenters(
+          companyId: companyId,
+          query: query,
+          assignedPlantKey: assignedPlantKey,
+          limit: limit,
+        );
       default:
-        throw Exception('Nepodržana pretraga: $callableName');
+        throw Exception('Pretraga nije dostupna za ovo polje.');
     }
   }
 

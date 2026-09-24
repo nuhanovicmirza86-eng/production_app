@@ -59,7 +59,8 @@ class DevelopmentDemoPortfolioProjectCard extends StatelessWidget {
               icon: Icon(Icons.info_outline, color: scheme.outline),
               onPressed: () {
                 showDialog<void>(
-                  context: context,
+      barrierDismissible: false,
+      context: context,
                   builder: (ctx) => AlertDialog(
                     title: const Text('Primjer u portfelju'),
                     content: Text(

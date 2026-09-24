@@ -2,7 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../bom/bom_item_traceability.dart';
 import '../../bom/services/bom_service.dart';
+import '../../bom/widgets/bom_item_traceability_form_fields.dart';
 import '../services/product_lookup_service.dart';
 import '../services/product_service.dart';
 import '../widgets/product_details_auxiliary_tabs.dart';
@@ -368,6 +370,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     }
 
     final confirmed = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
@@ -465,6 +468,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     List<ProductLookupItem> searchResults = [];
     bool isSearching = false;
     bool dialogClosed = false;
+    String? bomItemKind = bomItemKindDefault;
+    String? traceabilityMode = bomTraceabilityModeDefault;
+    bool? lotRequired = bomLotRequiredDefault;
 
     final searchController = TextEditingController();
     final qtyController = TextEditingController();
@@ -561,6 +567,18 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
 
               if (!(formKey.currentState?.validate() ?? false)) return;
 
+              final classErr = validateBomItemTraceabilityForSave(
+                kind: bomItemKind,
+                mode: traceabilityMode,
+                lotRequired: lotRequired,
+              );
+              if (classErr != null) {
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  SnackBar(content: Text(classErr)),
+                );
+                return;
+              }
+
               safeDialogSetState(() {
                 _isSavingBomItem = true;
               });
@@ -580,6 +598,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                       : unitController.text.trim(),
                   createdBy: _userId,
                   note: noteController.text.trim(),
+                  bomItemKind: bomItemKind!,
+                  traceabilityMode: traceabilityMode!,
+                  lotRequired: lotRequired!,
                 );
 
                 if (!mounted || dialogClosed || !dialogContext.mounted) {
@@ -797,6 +818,27 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                             hintText: 'opcionalno',
                           ),
                         ),
+                        const SizedBox(height: 16),
+                        BomItemTraceabilityFormFields(
+                          kind: bomItemKind,
+                          mode: traceabilityMode,
+                          lotRequired: lotRequired,
+                          onChanged: ({
+                            String? nextKind,
+                            String? nextMode,
+                            bool? nextLotRequired,
+                          }) {
+                            safeDialogSetState(() {
+                              if (nextKind != null) bomItemKind = nextKind;
+                              if (nextMode != null) {
+                                traceabilityMode = nextMode;
+                              }
+                              if (nextLotRequired != null) {
+                                lotRequired = nextLotRequired;
+                              }
+                            });
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -840,6 +882,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     final qtyController = TextEditingController(text: _s(item['qtyPerUnit']));
     final unitController = TextEditingController(text: _s(item['unit']));
     final noteController = TextEditingController(text: _s(item['note']));
+    final resolved = resolveBomItemTraceability(item);
+    String? bomItemKind = resolved.kind;
+    String? traceabilityMode = resolved.mode;
+    bool? lotRequired = resolved.lotRequired;
 
     final saved = await showDialog<bool>(
       context: context,
@@ -863,6 +909,18 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
             Future<void> save() async {
               if (!(formKey.currentState?.validate() ?? false)) return;
 
+              final classErr = validateBomItemTraceabilityForSave(
+                kind: bomItemKind,
+                mode: traceabilityMode,
+                lotRequired: lotRequired,
+              );
+              if (classErr != null) {
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  SnackBar(content: Text(classErr)),
+                );
+                return;
+              }
+
               safeDialogSetState(() {
                 _isSavingBomItem = true;
               });
@@ -880,6 +938,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                   unit: unitController.text.trim(),
                   note: noteController.text.trim(),
                   updatedBy: _userId,
+                  bomItemKind: bomItemKind!,
+                  traceabilityMode: traceabilityMode!,
+                  lotRequired: lotRequired!,
                 );
 
                 if (!mounted || dialogClosed || !dialogContext.mounted) {
@@ -970,6 +1031,27 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                             hintText: 'opcionalno',
                           ),
                         ),
+                        const SizedBox(height: 16),
+                        BomItemTraceabilityFormFields(
+                          kind: bomItemKind,
+                          mode: traceabilityMode,
+                          lotRequired: lotRequired,
+                          onChanged: ({
+                            String? nextKind,
+                            String? nextMode,
+                            bool? nextLotRequired,
+                          }) {
+                            safeDialogSetState(() {
+                              if (nextKind != null) bomItemKind = nextKind;
+                              if (nextMode != null) {
+                                traceabilityMode = nextMode;
+                              }
+                              if (nextLotRequired != null) {
+                                lotRequired = nextLotRequired;
+                              }
+                            });
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -1008,6 +1090,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     if (itemId.isEmpty) return;
 
     final confirmed = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
@@ -1314,6 +1397,20 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                   Text(
                     '${_s(_bomItems[i]['componentCode'])} • '
                     '${_s(_bomItems[i]['qtyPerUnit'])} ${_s(_bomItems[i]['unit'])}',
+                  ),
+                  Builder(
+                    builder: (_) {
+                      final t = resolveBomItemTraceability(_bomItems[i]);
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          '${bomItemKindLabelBs(t.kind)} · '
+                          '${bomTraceabilityModeLabelBs(t.mode)} · '
+                          'Lot: ${bomLotRequiredLabelBs(t.lotRequired)}',
+                          style: const TextStyle(color: Colors.black54),
+                        ),
+                      );
+                    },
                   ),
                   if (_s(_bomItems[i]['note']).isNotEmpty)
                     Padding(

@@ -188,6 +188,7 @@ class _FinanceControllingDashboardTabState
     String title = 'AI uvid — KPI',
   }) async {
     await showDialog<void>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         return AlertDialog(
@@ -217,6 +218,7 @@ class _FinanceControllingDashboardTabState
     if (_companyId.isEmpty || widget.businessYearId.trim().isEmpty) return;
     final focusCtrl = TextEditingController();
     final focus = await showDialog<String?>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         return AlertDialog(
@@ -369,6 +371,7 @@ class _FinanceControllingDashboardTabState
     var saving = false;
 
     await showDialog<void>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) {
         return StatefulBuilder(

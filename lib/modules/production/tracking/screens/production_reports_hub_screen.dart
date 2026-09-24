@@ -159,7 +159,7 @@ class ProductionReportsHubScreen extends StatelessWidget {
             ),
             _ReportTile(
               icon: Icons.warning_amber_outlined,
-              title: 'NCR — neskladi',
+              title: 'NCR - Neusklađenosti',
               subtitle: 'Evidencija i statusi (IATF 10.2).',
               onTap: () => _openQms(
                 context,

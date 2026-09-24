@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/ui/company_plant_label_text.dart';
 import '../../tracking/services/production_tracking_assets_service.dart';
 import '../models/ooe_live_status.dart';
 import '../ooe_help_texts.dart';
@@ -224,26 +225,34 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
     final live = OoeLiveService();
 
     final hint = widget.analyticsContextHint?.trim();
+    final appBarFg = Theme.of(context).appBarTheme.foregroundColor ??
+        Theme.of(context).colorScheme.onSurface;
     return Scaffold(
       appBar: AppBar(
-        title: hint == null || hint.isEmpty
-            ? const Text('OOE — praćenje uživo')
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('OOE — praćenje uživo'),
-                  Text(
-                    hint,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: (Theme.of(context).appBarTheme.foregroundColor ??
-                              Theme.of(context).colorScheme.onSurface)
-                          .withValues(alpha: 0.82),
-                    ),
-                  ),
-                ],
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('OOE — praćenje uživo'),
+            CompanyPlantLabelText(
+              companyId: _companyId,
+              plantKey: _plantKey,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: appBarFg.withValues(alpha: 0.88),
               ),
+            ),
+            if (hint != null && hint.isNotEmpty)
+              Text(
+                hint,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: appBarFg.withValues(alpha: 0.82),
+                ),
+              ),
+          ],
+        ),
         actions: [
           OoeInfoIcon(
             tooltip: OoeHelpTexts.liveDashboardTooltip,
@@ -443,6 +452,11 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
                           color: Theme.of(context).colorScheme.outline,
                         ),
                         const SizedBox(height: 16),
+                        CompanyPlantContextLine(
+                          companyId: _companyId,
+                          plantKey: _plantKey,
+                        ),
+                        const SizedBox(height: 12),
                         Text(
                           'Nema live zapisa za ovaj pogon',
                           style: Theme.of(context).textTheme.titleMedium,
@@ -476,6 +490,13 @@ class _OoeDashboardScreenState extends State<OoeDashboardScreen> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                    child: CompanyPlantContextLine(
+                      companyId: _companyId,
+                      plantKey: _plantKey,
+                    ),
+                  ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
                     child: SegmentedButton<_LineLayout>(

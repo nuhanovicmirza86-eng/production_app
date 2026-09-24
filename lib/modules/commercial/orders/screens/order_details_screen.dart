@@ -127,6 +127,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   Future<void> _confirmClose() async {
     final go = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Zatvori narudžbu'),
@@ -180,6 +181,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   Future<void> _confirmCancel() async {
     final reasonController = TextEditingController();
     final go = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Otkaži narudžbu'),

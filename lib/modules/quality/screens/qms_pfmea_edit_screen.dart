@@ -205,6 +205,7 @@ class _QmsPfmeaEditScreenState extends State<QmsPfmeaEditScreen> {
   Future<void> _confirmDelete() async {
     if (_isNew) return;
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Obrisati PFMEA red?'),

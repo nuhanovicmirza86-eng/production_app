@@ -358,6 +358,7 @@ class _DevelopmentLaunchIntelligenceTabState
       nav.pop();
       if (!context.mounted) return;
       await showDialog<void>(
+      barrierDismissible: false,
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text(redTeam ? 'AI Red Team' : 'AI sažetak'),

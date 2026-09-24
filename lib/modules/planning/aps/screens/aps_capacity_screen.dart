@@ -185,6 +185,7 @@ class _ApsCapacityScreenState extends State<ApsCapacityScreen> {
     if (scenario == null) return;
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Proračunaj kapacitet'),

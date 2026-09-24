@@ -334,6 +334,7 @@ class _WorkforcePerformanceNormDetailScreenState
       return;
     }
     final confirmed = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Aktiviraj normativ'),
@@ -382,6 +383,7 @@ class _WorkforcePerformanceNormDetailScreenState
   Future<void> _archive() async {
     final reasonController = TextEditingController();
     final reason = await showDialog<String>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Arhiviraj normativ'),

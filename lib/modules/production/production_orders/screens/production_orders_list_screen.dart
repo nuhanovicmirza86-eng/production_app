@@ -950,7 +950,8 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
 
         void infoAction() {
           showDialog(
-            context: context,
+      barrierDismissible: false,
+      context: context,
             builder: (_) => AlertDialog(
               title: const Text('Proizvodni nalozi'),
               content: const Text(

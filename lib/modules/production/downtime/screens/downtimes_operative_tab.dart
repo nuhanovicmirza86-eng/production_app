@@ -6,9 +6,11 @@ import '../../../../core/user_display_label.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/operational_business_year_context.dart';
 import '../../../../core/theme/operonix_production_brand.dart';
+import '../../../../core/ui/company_plant_label_text.dart';
 import '../../work_centers/models/work_center_model.dart';
 import '../../work_centers/services/work_center_service.dart';
 import '../../production_orders/screens/production_order_details_screen.dart';
+import '../downtime_business_display.dart';
 import '../models/downtime_event_model.dart';
 import '../services/downtime_service.dart';
 import 'downtime_details_screen.dart';
@@ -53,6 +55,9 @@ class _DowntimesOperativeTabState extends State<DowntimesOperativeTab> {
   bool _filtersExpanded = false;
   bool _appliedInitialFromParent = false;
   String? _prefetchedListUserSignature;
+  bool _listLoading = true;
+  String? _listError;
+  List<DowntimeEventModel> _events = const [];
 
   void _openProductionOrder(
     BuildContext context,
@@ -88,11 +93,6 @@ class _DowntimesOperativeTabState extends State<DowntimesOperativeTab> {
   String get _role =>
       ProductionAccessHelper.normalizeRole(widget.companyData['role']);
 
-  bool get _canManage => ProductionAccessHelper.canManage(
-    role: _role,
-    card: ProductionDashboardCard.downtime,
-  );
-
   bool get _canViewOrders => ProductionAccessHelper.canView(
     role: _role,
     card: ProductionDashboardCard.productionOrders,
@@ -115,6 +115,41 @@ class _DowntimesOperativeTabState extends State<DowntimesOperativeTab> {
   void initState() {
     super.initState();
     _loadWorkCenters();
+    _reloadEvents();
+  }
+
+  Future<void> _reloadEvents() async {
+    if (_companyId.isEmpty || _plantKey.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _listLoading = false;
+        _listError = null;
+        _events = const [];
+      });
+      return;
+    }
+    setState(() {
+      _listLoading = true;
+      _listError = null;
+    });
+    try {
+      final list = await _service.listDowntimeEvents(
+        companyId: _companyId,
+        plantKey: _plantKey,
+      );
+      if (!mounted) return;
+      setState(() {
+        _events = list;
+        _listLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _listLoading = false;
+        _listError = AppErrorMapper.toMessage(e);
+        _events = const [];
+      });
+    }
   }
 
   Future<void> _loadWorkCenters() async {
@@ -281,35 +316,44 @@ class _DowntimesOperativeTabState extends State<DowntimesOperativeTab> {
       );
     }
 
-    return StreamBuilder<List<DowntimeEventModel>>(
-      stream: _service.watchDowntimeEvents(
-        companyId: _companyId,
-        plantKey: _plantKey,
-      ),
-      builder: (context, snap) {
-        if (snap.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(AppErrorMapper.toMessage(snap.error!)),
-            ),
-          );
-        }
-        if (!snap.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    if (_listLoading && _events.isEmpty && _listError == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_listError != null && _events.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_listError!, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _reloadEvents,
+                child: const Text('Pokušaj ponovo'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
-        final all = snap.data!;
-        final filtered = _applyFilters(all).toList();
-        _maybePrefetchListUsers(filtered);
-        final now = DateTime.now();
-        final kpi = DowntimeKpiSummary.compute(events: all, nowLocal: now);
+    final all = _events;
+    final filtered = _applyFilters(all).toList();
+    _maybePrefetchListUsers(filtered);
+    final now = DateTime.now();
+    final kpi = DowntimeKpiSummary.compute(events: all, nowLocal: now);
 
-        return RefreshIndicator(
-          onRefresh: () async => setState(() {}),
+    return RefreshIndicator(
+      onRefresh: _reloadEvents,
           child: ListView(
             padding: const EdgeInsets.all(12),
             children: [
+              CompanyPlantContextLine(
+                companyId: _companyId,
+                plantKey: _plantKey,
+              ),
+              const SizedBox(height: 8),
               LayoutBuilder(
                 builder: (context, c) {
                   final w = c.maxWidth;
@@ -499,7 +543,7 @@ class _DowntimesOperativeTabState extends State<DowntimesOperativeTab> {
                 Padding(
                   padding: const EdgeInsets.all(24),
                   child: Text(
-                    'Nema zastoja za prikaz. ${_canManage ? 'Pritisnite + za prijavu.' : ''}',
+                    'Nema zastoja za prikaz.',
                     textAlign: TextAlign.center,
                   ),
                 )
@@ -516,8 +560,8 @@ class _DowntimesOperativeTabState extends State<DowntimesOperativeTab> {
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
                       isThreeLine: true,
-                      onTap: () {
-                        Navigator.of(context).push<void>(
+                      onTap: () async {
+                        await Navigator.of(context).push<void>(
                           MaterialPageRoute<void>(
                             builder: (_) => DowntimeDetailsScreen(
                               companyData: widget.companyData,
@@ -525,6 +569,7 @@ class _DowntimesOperativeTabState extends State<DowntimesOperativeTab> {
                             ),
                           ),
                         );
+                        if (mounted) await _reloadEvents();
                       },
                       leading: CircleAvatar(
                         backgroundColor: _statusColor(e.status).withOpacity(0.15),
@@ -534,14 +579,14 @@ class _DowntimesOperativeTabState extends State<DowntimesOperativeTab> {
                         ),
                       ),
                       title: Text(
-                        '${e.downtimeCode} · ${DowntimeEventStatus.labelHr(e.status)}',
+                        '${DowntimeBusinessDisplay.codeLabel(e.downtimeCode)} · ${DowntimeEventStatus.labelHr(e.status)}',
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(
                         '${e.workCenterCode.isNotEmpty ? e.workCenterCode : '—'} · '
                         '${e.processCode.isNotEmpty ? e.processCode : '—'}\n'
                         '${e.downtimeReason.isNotEmpty ? e.downtimeReason : e.downtimeCategory} · '
-                        '$durLabel · ${UserDisplayLabel.personLine(e.reportedByName, e.reportedBy)}',
+                        '$durLabel · ${DowntimeBusinessDisplay.personLabel(storedName: e.reportedByName, storedId: e.reportedBy)}',
                       ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -568,7 +613,5 @@ class _DowntimesOperativeTabState extends State<DowntimesOperativeTab> {
             ],
           ),
         );
-      },
-    );
   }
 }

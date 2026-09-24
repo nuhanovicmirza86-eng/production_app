@@ -16,7 +16,7 @@ extension QmsDocumentKindLabels on QmsDocumentKind {
       };
 
   String get shortLabel => switch (this) {
-        QmsDocumentKind.workInstruction => 'Radni uputi',
+        QmsDocumentKind.workInstruction => 'Radne upute',
         QmsDocumentKind.packingInstruction => 'Pakovanje',
         QmsDocumentKind.form => 'Obrasci',
         QmsDocumentKind.other => 'Ostalo',

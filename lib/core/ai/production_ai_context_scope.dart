@@ -115,9 +115,26 @@ class ProductionAiContextScope {
   static String hintForEmptyChat(Map<String, dynamic> companyData) {
     final keys = allowedContextKeys(companyData);
     if (keys.isEmpty) {
-      return 'Odgovori slijede vašu ulogu i uključene dijelove aplikacije. Točni brojevi i izvještaji ovisi o povezanim podacima.';
+      return 'Odgovori slijede vašu ulogu i uključene dijelove aplikacije. '
+          'Točni brojevi i izvještaji ovise o povezanim podacima u tvrtki.';
     }
-    return 'Zapitati možete o sljedećim područjima: ${allowedLabels(companyData).join(', ')}.';
+    final areas = allowedLabels(companyData).join(', ');
+    final buffer = StringBuffer(
+      'Možete pitati o: $areas.',
+    );
+    if (keys.contains('quality_qms')) {
+      buffer.write(
+        ' Primjeri: Koji su najveći QMS rizici? Koji NCR se ponavlja? '
+        'Koje evidencije najčešće završavaju negativnim ishodom? '
+        'Koje prilike za poboljšanje vidiš iz izvještaja?',
+      );
+    } else {
+      buffer.write(
+        ' Primjeri: trend proizvodnje, zastoji, nalozi, učinak — '
+        'u granicama vaše uloge i pretplate.',
+      );
+    }
+    return buffer.toString();
   }
 
   static List<String> allowedLabels(Map<String, dynamic> companyData) {

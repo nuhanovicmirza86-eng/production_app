@@ -497,6 +497,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                     icon: const Icon(Icons.info_outline_rounded),
                     onPressed: () {
                       showDialog(
+      barrierDismissible: false,
                         context: context,
                         builder: (_) => AlertDialog(
                           title: const Text('Narudžbe'),
@@ -571,6 +572,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
               icon: const Icon(Icons.info_outline_rounded),
               onPressed: () {
                 showDialog(
+      barrierDismissible: false,
                   context: context,
                   builder: (_) => AlertDialog(
                     title: const Text('Narudžbe'),

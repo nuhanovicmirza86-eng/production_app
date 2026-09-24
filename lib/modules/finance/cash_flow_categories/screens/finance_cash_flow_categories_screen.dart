@@ -90,6 +90,7 @@ class _FinanceCashFlowCategoriesScreenState
 
   Future<void> _deactivate(FinanceCashFlowCategory category) async {
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(FinanceStrings.t(ctx, 'deactivate_category')),

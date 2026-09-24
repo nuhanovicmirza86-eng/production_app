@@ -6,12 +6,19 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../../core/access/production_access_helper.dart';
 import '../../../core/company_plant_display_name.dart';
+import '../../../modules/production/bom/services/bom_service.dart';
+import '../../../modules/production/station_pages/models/production_evidence_config.dart';
 import '../../../modules/production/station_pages/models/production_station_config.dart';
 import '../../../modules/production/station_pages/models/production_station_profile_catalog_entry.dart';
+import '../../../modules/production/station_pages/models/production_station_profile_field.dart';
 import '../../../modules/production/station_pages/services/production_controlled_input_master_callable_service.dart';
 import '../../../modules/production/station_work/models/production_station_work_session.dart';
 import '../../../modules/production/station_work/services/production_station_work_session_callable_service.dart';
 import '../../../modules/production/station_work/services/production_station_work_session_service.dart';
+import '../../catalog_evidence_runtime/utils/controlled_evidence_person_role_keys.dart';
+import '../../catalog_evidence_runtime/utils/evidence_input_empty.dart';
+import '../../catalog_evidence_runtime/utils/final_control_bom_product_picker.dart';
+import '../../catalog_evidence_runtime/utils/operation_material_preparation_bom_picker.dart';
 import '../models/structured_entity_search_result.dart';
 import '../models/structured_profile_session.dart';
 import '../models/structured_repeatable_row.dart';
@@ -29,12 +36,23 @@ class StructuredProfileDrivenWorkScreen extends StatefulWidget {
     required this.stationConfig,
     required this.profile,
     this.onCloseStation,
-  });
+  }) : evidenceConfig = null;
+
+  const StructuredProfileDrivenWorkScreen.companyEvidence({
+    super.key,
+    required this.companyData,
+    required this.evidenceConfig,
+    required this.profile,
+    this.onCloseStation,
+  }) : stationConfig = null;
 
   final Map<String, dynamic> companyData;
-  final ProductionStationConfig stationConfig;
+  final ProductionStationConfig? stationConfig;
+  final ProductionEvidenceConfig? evidenceConfig;
   final ProductionStationProfileCatalogEntry profile;
   final VoidCallback? onCloseStation;
+
+  bool get isCompanyEvidence => evidenceConfig != null;
 
   @override
   State<StructuredProfileDrivenWorkScreen> createState() =>
@@ -47,6 +65,7 @@ class _StructuredProfileDrivenWorkScreenState
   final _structuredService = StructuredProfileSessionService();
   final _searchService = ProductionEvidenceEntitySearchCallableService();
   final _masterCallables = ProductionControlledInputMasterCallableService();
+  final _bomService = BomService();
 
   StructuredProfileSessionState _state = StructuredProfileSessionState();
   final Map<String, StructuredEntitySelection?> _headerEntitySelections = {};
@@ -62,6 +81,9 @@ class _StructuredProfileDrivenWorkScreenState
   String _plantDisplayLabel = '';
   ProductionStationWorkSession? _closedSession;
 
+  OmpBomPickerState _fcBomPicker = const OmpBomPickerState();
+  String? _fcBomLoadedForProductId;
+
   bool get _supportsOsWindowChrome =>
       !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.windows ||
@@ -71,7 +93,9 @@ class _StructuredProfileDrivenWorkScreenState
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
 
-  String get _plantKey => widget.stationConfig.assignedPlantKey.trim();
+  String get _plantKey => widget.isCompanyEvidence
+      ? widget.evidenceConfig!.plantKey.trim()
+      : widget.stationConfig!.assignedPlantKey.trim();
 
   String get _userPlantKey =>
       (widget.companyData['plantKey'] ?? '').toString().trim();
@@ -93,7 +117,9 @@ class _StructuredProfileDrivenWorkScreenState
         (f.entityCollection ?? '').trim() == 'process_work_baths',
   );
 
-  String get _stationContextLabel => widget.stationConfig.title;
+  String get _stationContextLabel => widget.isCompanyEvidence
+      ? widget.evidenceConfig!.displayName.trim()
+      : widget.stationConfig!.title;
 
   String get _plantContextLabel {
     final label = _plantDisplayLabel.trim();
@@ -203,6 +229,14 @@ class _StructuredProfileDrivenWorkScreenState
     );
   }
 
+  String get _runtimeTitle => widget.isCompanyEvidence
+      ? widget.evidenceConfig!.displayName
+      : widget.stationConfig!.title;
+
+  int? get _stationSlot => widget.isCompanyEvidence
+      ? null
+      : widget.stationConfig!.effectiveStationSlot;
+
   List<StructuredRepeatableTableDefinition> get _tables =>
       widget.profile.repeatableTableDefinitions;
 
@@ -219,10 +253,11 @@ class _StructuredProfileDrivenWorkScreenState
   }
 
   Future<void> _reloadStructuredStateForActiveSession() async {
+    if (widget.isCompanyEvidence) return;
     try {
       final loaded = await _structuredService.loadActiveState(
         companyId: _companyId,
-        stationSlot: widget.stationConfig.effectiveStationSlot,
+        stationSlot: _stationSlot ?? 0,
       );
       if (!mounted || loaded == null) return;
       setState(() {
@@ -239,7 +274,9 @@ class _StructuredProfileDrivenWorkScreenState
       session.fieldValues ?? const {},
     );
     _syncHeaderControllersFromState();
+    _applyReworkHeaderFromOrderSelection();
     unawaited(_reloadStructuredStateForActiveSession());
+    unawaited(_reloadReworkBomPicker());
   }
 
   @override
@@ -339,6 +376,8 @@ class _StructuredProfileDrivenWorkScreenState
     _headerEntitySelections.clear();
     _headerEnumSelections.clear();
     _headerDateTimes.clear();
+    _fcBomPicker = const OmpBomPickerState();
+    _fcBomLoadedForProductId = null;
     for (final c in _headerTextControllers.values) {
       c.clear();
     }
@@ -348,23 +387,29 @@ class _StructuredProfileDrivenWorkScreenState
     for (final field in widget.profile.structuredHeaderFields) {
       final raw = _state.fieldValues[field.key];
       if (field.isEntitySelect || field.isEntitySearchSelect) {
-        if (raw == null) {
+        if (!isUsableEvidenceEntityId(raw?.toString())) {
           _headerEntitySelections[field.key] = null;
+          if (raw != null) _state.fieldValues.remove(field.key);
           continue;
         }
-        final id = raw.toString().trim();
-        _headerEntitySelections[field.key] = StructuredEntitySelection(
+        _headerEntitySelections[field.key] = evidenceActiveEntitySelection(
           fieldKey: field.key,
-          entityId: id,
-          displayLabel: id,
+          rawValue: raw.toString(),
+          fieldValues: _state.fieldValues,
+          existing: _headerEntitySelections[field.key],
         );
       } else if (field.type == 'enum') {
-        _headerEnumSelections[field.key] = raw?.toString();
+        final value = raw?.toString();
+        _headerEnumSelections[field.key] =
+            isEvidenceFormPlaceholder(value) ? null : value;
       } else if (field.type == 'datetime') {
         _headerDateTimes[field.key] = StructuredDateTimeValue.parse(raw);
       } else if (field.type == 'number' || _isTextLike(field.type)) {
+        final text = raw is num
+            ? raw.toString()
+            : sanitizeEvidenceFormInput(raw?.toString());
         _headerTextControllers.putIfAbsent(field.key, TextEditingController.new)
-          ..text = raw?.toString() ?? '';
+          ..text = text;
       }
     }
   }
@@ -396,6 +441,173 @@ class _StructuredProfileDrivenWorkScreenState
         }
       }
     }
+  }
+
+  void _applyReworkHeaderFromOrderSelection() {
+    final order = _headerEntitySelections['productionOrderId'];
+    if (order == null) {
+      _headerEntitySelections.remove('productId');
+      _fcBomPicker = const OmpBomPickerState();
+      _fcBomLoadedForProductId = null;
+      unawaited(_reloadReworkBomPicker());
+      return;
+    }
+    final productId = (order.raw['productId'] ?? '').toString().trim();
+    final productCode = (order.raw['productCode'] ?? '').toString().trim();
+    final productName = (order.raw['productName'] ??
+            order.raw['displayName'] ??
+            '')
+        .toString()
+        .trim();
+    if (productId.isNotEmpty) {
+      final productRaw = {
+        'id': productId,
+        'productCode': productCode,
+        'productName': productName,
+        'displayName': productName,
+      };
+      _headerEntitySelections['productId'] = StructuredEntitySelection(
+        fieldKey: 'productId',
+        entityId: productId,
+        displayLabel:
+            StructuredEntitySearchResult.productDisplayLabel(productRaw),
+        raw: productRaw,
+      );
+    } else {
+      _headerEntitySelections.remove('productId');
+    }
+    unawaited(_reloadReworkBomPicker());
+  }
+
+  Future<void> _reloadReworkBomPicker() async {
+    final productId =
+        (_headerEntitySelections['productId']?.entityId ?? '').trim();
+    if (productId.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _fcBomPicker = const OmpBomPickerState();
+        _fcBomLoadedForProductId = null;
+      });
+      return;
+    }
+    if (_fcBomLoadedForProductId == productId &&
+        (_fcBomPicker.mode == OmpBomPickerMode.bomBound ||
+            _fcBomPicker.mode == OmpBomPickerMode.softFallback)) {
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _fcBomPicker = OmpBomPickerState(
+        mode: OmpBomPickerMode.loading,
+        productId: productId,
+      );
+    });
+    final next = await loadFinalControlBomProductPickerState(
+      bomService: _bomService,
+      companyId: _companyId,
+      productId: productId,
+    );
+    if (!mounted) return;
+    setState(() {
+      _fcBomPicker = next;
+      _fcBomLoadedForProductId = productId;
+    });
+  }
+
+  Future<List<StructuredEntitySearchResult>> _searchReworkProduct(
+    String query,
+  ) async {
+    if (_fcBomPicker.isBomBound) {
+      final headerSel = _headerEntitySelections['productId'];
+      StructuredEntitySearchResult? orderProduct;
+      if (headerSel != null && headerSel.entityId.trim().isNotEmpty) {
+        orderProduct = StructuredEntitySearchResult(
+          id: headerSel.entityId.trim(),
+          displayLabel: headerSel.displayLabel,
+          secondaryLabel: 'Proizvod naloga',
+          raw: Map<String, dynamic>.from(headerSel.raw),
+        );
+      }
+      final choices = buildFinalControlBomProductChoices(
+        bom: _fcBomPicker,
+        orderProduct: orderProduct,
+      );
+      return filterOmpBomSearchResults(items: choices, query: query);
+    }
+    return _searchService.searchByCallable(
+      callableName: 'searchProducts',
+      companyId: _companyId,
+      query: query,
+    );
+  }
+
+  Future<List<StructuredEntitySearchResult>> _searchReworkOperator(
+    String query,
+  ) {
+    return _searchService.searchPlantOperators(
+      companyId: _companyId,
+      query: query,
+      assignedPlantKey: _plantKey,
+      roleKeys: controlledEvidenceRoleKeysForPersonField('operatorId') ??
+          const [],
+    );
+  }
+
+  ProductionStationProfileField _reworkRowProductFieldOverride(
+    ProductionStationProfileField base, {
+    required int minSearchChars,
+    required String helperText,
+  }) {
+    return base.copyWith(
+      minSearchChars: minSearchChars,
+      helperText: helperText,
+    );
+  }
+
+  ProductionStationProfileField _reworkOperatorFieldOverride(
+    ProductionStationProfileField base,
+  ) {
+    return base.copyWith(
+      minSearchChars: 0,
+      helperText: controlledEvidencePersonHelperText('operatorId'),
+    );
+  }
+
+  Widget? _buildReworkBomTableNotice(BuildContext context, String tableKey) {
+    if (tableKey != 'processed_items' && tableKey != 'scrap_items') {
+      return null;
+    }
+    final cs = Theme.of(context).colorScheme;
+    if (_fcBomPicker.mode == OmpBomPickerMode.loading) {
+      return Text(
+        'Učitavanje sastavnice…',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+      );
+    }
+    if (_fcBomPicker.isBomBound) {
+      final ver = _fcBomPicker.bomVersion.isEmpty
+          ? ''
+          : ' (${_fcBomPicker.bomVersion})';
+      return Text(
+        'Proizvod se nudi iz primarne sastavnice$ver — '
+        '${_fcBomPicker.items.length} stavki (+ proizvod naloga). '
+        'Katalog se koristi samo ako sastavnica nije dostupna.',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+      );
+    }
+    if (_fcBomPicker.isSoftFallback) {
+      return Text(
+        _fcBomPicker.errorMessage ?? finalControlBomNoBomMessage,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: cs.tertiary,
+            ),
+      );
+    }
+    return null;
   }
 
   void _showValidationError(String message) {
@@ -433,7 +645,10 @@ class _StructuredProfileDrivenWorkScreenState
       });
       await _structuredService.startSession(
         companyId: _companyId,
-        stationSlot: widget.stationConfig.effectiveStationSlot,
+        stationSlot: _stationSlot,
+        evidenceConfigId: widget.isCompanyEvidence
+            ? widget.evidenceConfig!.evidenceConfigId
+            : null,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -469,6 +684,7 @@ class _StructuredProfileDrivenWorkScreenState
     }
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Završi evidenciju'),
@@ -525,6 +741,7 @@ class _StructuredProfileDrivenWorkScreenState
         setState(() {
           _headerEntitySelections[field.key] = selection;
           _state.fieldValues[field.key] = selection.entityId;
+          _applyReworkHeaderFromOrderSelection();
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Nalog: ${selection.displayLabel}')),
@@ -564,7 +781,7 @@ class _StructuredProfileDrivenWorkScreenState
   Widget build(BuildContext context) {
     if (!_plantAccessOk) {
       return Scaffold(
-        appBar: AppBar(title: Text(widget.stationConfig.title)),
+        appBar: AppBar(title: Text(_runtimeTitle)),
         body: const Center(
           child: Text('Nemate pristup ovoj stanici za dodijeljeni pogon.'),
         ),
@@ -572,10 +789,15 @@ class _StructuredProfileDrivenWorkScreenState
     }
 
     return StreamBuilder<ProductionStationWorkSession?>(
-      stream: _sessionStream.watchActiveSession(
-        companyId: _companyId,
-        stationSlot: widget.stationConfig.effectiveStationSlot,
-      ),
+      stream: widget.isCompanyEvidence
+          ? _sessionStream.watchActiveSessionForEvidence(
+              companyId: _companyId,
+              evidenceConfigId: widget.evidenceConfig!.evidenceConfigId,
+            )
+          : _sessionStream.watchActiveSession(
+              companyId: _companyId,
+              stationSlot: _stationSlot ?? 0,
+            ),
       builder: (context, snapshot) {
         final session = _closedSession ?? snapshot.data;
         if (session != null && session.isActive) {
@@ -586,7 +808,7 @@ class _StructuredProfileDrivenWorkScreenState
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(widget.stationConfig.title),
+            title: Text(_runtimeTitle),
           ),
           body: AbsorbPointer(
             absorbing: _busy,
@@ -614,6 +836,9 @@ class _StructuredProfileDrivenWorkScreenState
                       profile: widget.profile,
                       companyId: _companyId,
                       plantKey: _plantKey,
+                      plantDisplayLabel: _plantDisplayLabel.trim().isEmpty
+                          ? null
+                          : _plantDisplayLabel.trim(),
                       state: _state,
                       workBaths: _workBaths,
                       searchService: _searchService,
@@ -624,7 +849,10 @@ class _StructuredProfileDrivenWorkScreenState
                       enabled: formEnabled,
                       masterLoading: _masterLoading,
                       masterError: _masterError,
-                      onFieldChanged: () => setState(() {}),
+                      onFieldChanged: () {
+                        _applyReworkHeaderFromOrderSelection();
+                        setState(() {});
+                      },
                       onScanResolved: _applyScanResult,
                     ),
                     ..._tables.map(
@@ -635,9 +863,80 @@ class _StructuredProfileDrivenWorkScreenState
                           profile: widget.profile,
                           companyId: _companyId,
                           plantKey: _plantKey,
+                          plantDisplayLabel: _plantDisplayLabel.trim().isEmpty
+                              ? null
+                              : _plantDisplayLabel.trim(),
                           rows: _state.rowsFor(table.key),
                           searchService: _searchService,
                           enabled: formEnabled,
+                          tableNotice:
+                              _buildReworkBomTableNotice(context, table.key),
+                          entitySearchOverrides: {
+                            if (table.key == 'processed_items' ||
+                                table.key == 'scrap_items')
+                              'productId': _searchReworkProduct,
+                            if (table.key == 'operator_work_logs' ||
+                                table.key == 'scrap_items')
+                              'operatorId': _searchReworkOperator,
+                          },
+                          fieldOverrides: {
+                            if (table.key == 'processed_items' ||
+                                table.key == 'scrap_items') ...{
+                              if (_fcBomPicker.isBomBound)
+                                for (final col in table.columns)
+                                  if (col.key == 'productId')
+                                    col.key: _reworkRowProductFieldOverride(
+                                      col,
+                                      minSearchChars: 0,
+                                      helperText:
+                                          'Odaberite proizvod naloga ili stavku '
+                                          'iz primarne sastavnice (šifra / naziv).',
+                                    ),
+                              if (_fcBomPicker.isSoftFallback)
+                                for (final col in table.columns)
+                                  if (col.key == 'productId')
+                                    col.key: _reworkRowProductFieldOverride(
+                                      col,
+                                      minSearchChars: 2,
+                                      helperText:
+                                          'Sastavnica nije dostupna — kontrolisani '
+                                          'izbor iz šireg kataloga (privremeno).',
+                                    ),
+                            },
+                            if (table.key == 'operator_work_logs' ||
+                                table.key == 'scrap_items')
+                              for (final col in table.columns)
+                                if (col.key == 'operatorId')
+                                  col.key: _reworkOperatorFieldOverride(col),
+                          },
+                          recentEntitySuggestions: {
+                            if ((table.key == 'processed_items' ||
+                                    table.key == 'scrap_items') &&
+                                _fcBomPicker.isBomBound)
+                              'productId': buildFinalControlBomProductChoices(
+                                bom: _fcBomPicker,
+                                orderProduct: () {
+                                  final sel =
+                                      _headerEntitySelections['productId'];
+                                  if (sel == null ||
+                                      sel.entityId.trim().isEmpty) {
+                                    return null;
+                                  }
+                                  return StructuredEntitySearchResult(
+                                    id: sel.entityId.trim(),
+                                    displayLabel: sel.displayLabel,
+                                    secondaryLabel: 'Proizvod naloga',
+                                    raw: Map<String, dynamic>.from(sel.raw),
+                                  );
+                                }(),
+                              ),
+                          },
+                          recentEntitySuggestionLabels: {
+                            if ((table.key == 'processed_items' ||
+                                    table.key == 'scrap_items') &&
+                                _fcBomPicker.isBomBound)
+                              'productId': 'Proizvodi iz sastavnice',
+                          },
                           onRowsChanged: (rows) {
                             setState(() => _state.setRows(table.key, rows));
                           },

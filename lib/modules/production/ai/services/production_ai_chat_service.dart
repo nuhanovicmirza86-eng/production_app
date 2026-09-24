@@ -9,7 +9,10 @@ class ProductionAiChatService {
 
   final FirebaseFunctions _functions;
 
-  Future<String> sendMessage(String message) async {
+  Future<String> sendMessage(
+    String message, {
+    List<Map<String, String>> conversationTurns = const [],
+  }) async {
     final m = message.trim();
     if (m.isEmpty) {
       throw StateError('Poruka je prazna.');
@@ -19,12 +22,14 @@ class ProductionAiChatService {
     final raw = await callable.call<Map<String, dynamic>>({
       'message': m,
       'clientContext': 'production',
+      'clientLocalHour': DateTime.now().hour,
+      if (conversationTurns.isNotEmpty) 'conversationTurns': conversationTurns,
     });
     final data = raw.data;
     if (data['success'] != true) {
       throw StateError('Chat nije uspio.');
     }
-    final text = (data['response'] ?? '').toString().trim();
+    final text = (data['answer'] ?? data['response'] ?? '').toString().trim();
     if (text.isEmpty) {
       throw StateError('Prazan odgovor.');
     }

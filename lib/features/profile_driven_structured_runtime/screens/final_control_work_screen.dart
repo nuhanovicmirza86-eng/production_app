@@ -12,6 +12,7 @@ import '../../../modules/production/station_pages/models/production_station_prof
 import '../../../modules/production/station_work/models/production_station_work_session.dart';
 import '../../../modules/production/station_work/services/production_station_work_session_callable_service.dart';
 import '../../../modules/production/station_work/services/production_station_work_session_service.dart';
+import '../../catalog_evidence_runtime/utils/evidence_input_empty.dart';
 import '../../catalog_evidence_runtime/utils/evidence_outcome_action_helper.dart';
 import '../models/structured_entity_search_result.dart';
 import '../models/structured_profile_session.dart';
@@ -190,23 +191,29 @@ class _FinalControlWorkScreenState extends State<FinalControlWorkScreen> {
     for (final field in widget.profile.structuredHeaderFields) {
       final raw = _state.fieldValues[field.key];
       if (field.isEntitySelect || field.isEntitySearchSelect) {
-        if (raw == null) {
+        if (!isUsableEvidenceEntityId(raw?.toString())) {
           _headerEntitySelections[field.key] = null;
+          if (raw != null) _state.fieldValues.remove(field.key);
           continue;
         }
-        final id = raw.toString().trim();
-        _headerEntitySelections[field.key] = StructuredEntitySelection(
+        _headerEntitySelections[field.key] = evidenceActiveEntitySelection(
           fieldKey: field.key,
-          entityId: id,
-          displayLabel: id,
+          rawValue: raw.toString(),
+          fieldValues: _state.fieldValues,
+          existing: _headerEntitySelections[field.key],
         );
       } else if (field.type == 'enum') {
-        _headerEnumSelections[field.key] = raw?.toString();
+        final value = raw?.toString();
+        _headerEnumSelections[field.key] =
+            isEvidenceFormPlaceholder(value) ? null : value;
       } else if (field.type == 'datetime') {
         _headerDateTimes[field.key] = StructuredDateTimeValue.parse(raw);
       } else if (field.type == 'number' || _isTextLike(field.type)) {
+        final text = raw is num
+            ? raw.toString()
+            : sanitizeEvidenceFormInput(raw?.toString());
         _headerTextControllers.putIfAbsent(field.key, TextEditingController.new)
-          ..text = raw?.toString() ?? '';
+          ..text = text;
       }
     }
   }
@@ -318,6 +325,7 @@ class _FinalControlWorkScreenState extends State<FinalControlWorkScreen> {
     }
 
     final ok = await showDialog<bool>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Završi kontrolu'),
@@ -389,7 +397,7 @@ class _FinalControlWorkScreenState extends State<FinalControlWorkScreen> {
       barrierDismissible: false,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Mjera zadržavanja (containment)'),
+          title: const Text('Mjera zadržavanja'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -408,7 +416,7 @@ class _FinalControlWorkScreenState extends State<FinalControlWorkScreen> {
                   maxLines: 3,
                   maxLength: 4000,
                   decoration: const InputDecoration(
-                    labelText: 'Containment / zadržavanje',
+                    labelText: 'Mjera zadržavanja',
                     border: OutlineInputBorder(),
                   ),
                   autofocus: true,
@@ -612,6 +620,9 @@ class _FinalControlWorkScreenState extends State<FinalControlWorkScreen> {
                       profile: widget.profile,
                       companyId: _companyId,
                       plantKey: _plantKey,
+                      plantDisplayLabel: _plantDisplayLabel.trim().isEmpty
+                          ? null
+                          : _plantDisplayLabel.trim(),
                       state: _state,
                       workBaths: const [],
                       searchService: _searchService,
@@ -631,6 +642,9 @@ class _FinalControlWorkScreenState extends State<FinalControlWorkScreen> {
                           profile: widget.profile,
                           companyId: _companyId,
                           plantKey: _plantKey,
+                          plantDisplayLabel: _plantDisplayLabel.trim().isEmpty
+                              ? null
+                              : _plantDisplayLabel.trim(),
                           rows: _state.rowsFor(table.key),
                           searchService: _searchService,
                           enabled: formEnabled,

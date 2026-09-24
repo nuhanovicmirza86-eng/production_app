@@ -691,6 +691,7 @@ class _ProductionTrackingAssistantScreenState
 
   void _showAssistantScopeHelp(BuildContext context) {
     showDialog<void>(
+      barrierDismissible: false,
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Informacije'),

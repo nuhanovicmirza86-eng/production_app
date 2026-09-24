@@ -1,10 +1,20 @@
 import '../../../modules/production/station_pages/models/production_station_config.dart';
 
-/// Profili s M2 read Callable pregledom zatvorenih zapisa.
+/// Profili s M2 read Callable pregledom zatvorenih zapisa (parity s backend SUPPORTED_PROFILES).
 const profileDrivenEvidenceReadSupportedProfiles = {
   'chemical_dosing',
   'wastewater_treatment',
   'rework_and_painting',
+  'packaging_control',
+  'material_preparation',
+  'operation_material_preparation',
+  'in_process_quality_check',
+  'final_control',
+  'line_clearance',
+  'tool_changeover',
+  'first_piece_approval',
+  'batch_mixing',
+  'production_counting',
 };
 
 /// Jedna kartica na hub ekranu — tip evidencije po pogonu (ne pojedinačni zapis).

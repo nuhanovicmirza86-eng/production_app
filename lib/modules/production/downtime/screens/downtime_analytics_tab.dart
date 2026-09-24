@@ -5,6 +5,7 @@ import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/operational_business_year_context.dart';
 import '../../../../core/theme/operonix_production_brand.dart';
+import '../../../../core/ui/company_plant_label_text.dart';
 import '../../ooe/screens/ooe_daily_overview_screen.dart';
 import '../../ooe/screens/ooe_dashboard_screen.dart';
 import '../../ooe/services/ooe_machine_target_service.dart';
@@ -258,7 +259,10 @@ class _DowntimeAnalyticsTabState extends State<DowntimeAnalyticsTab> {
       setState(() {
         _report = rep;
         _machineTargetRows = mtRows;
-        _plantDisplayName = plantLabel;
+        _plantDisplayName = CompanyPlantDisplayName.forUi(
+          resolved: plantLabel,
+          plantKey: _plantKey,
+        );
         _oeeBudgetMinutes = budget;
         _loading = false;
       });
@@ -346,6 +350,11 @@ class _DowntimeAnalyticsTabState extends State<DowntimeAnalyticsTab> {
       child: ListView(
         padding: const EdgeInsets.all(12),
         children: [
+          CompanyPlantContextLine(
+            companyId: _companyId,
+            plantKey: _plantKey,
+          ),
+          const SizedBox(height: 8),
           Text(
             'Period: ${_fmtDate(range.start)} — ${_fmtDate(range.end.subtract(const Duration(days: 1)))}',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
@@ -414,6 +423,7 @@ class _DowntimeAnalyticsTabState extends State<DowntimeAnalyticsTab> {
                   report: rep,
                   companyId: _companyId,
                   plantKey: _plantKey,
+                  plantDisplayName: _plantDisplayName,
                 ),
                 icon: const Icon(Icons.ios_share_outlined),
                 label: const Text('CSV'),
