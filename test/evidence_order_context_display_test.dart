@@ -36,7 +36,7 @@ void main() {
   test('operationLabelFromSnapshot hides unspecified routing id', () {
     expect(
       EvidenceOrderContextDisplay.operationLabelFromSnapshot(snap),
-      '2 · Montaža',
+      'Montaža',
     );
   });
 
