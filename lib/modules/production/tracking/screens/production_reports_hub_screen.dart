@@ -124,7 +124,7 @@ class ProductionReportsHubScreen extends StatelessWidget {
                 icon: Icons.hub_outlined,
                 title: 'AI analiza — strukturirani podaci',
                 subtitle:
-                    'SCADA / OEE / tok proizvodnje (Callable runAiAnalysis, ne chat).',
+                    'SCADA, OEE i tok proizvodnje za odabrani period.',
                 onTap: () {
                   Navigator.push<void>(
                     context,

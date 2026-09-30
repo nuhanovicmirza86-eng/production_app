@@ -5,10 +5,13 @@ import '../../../../core/ai/production_ai_context_scope.dart';
 import '../../../../core/branding/operonix_ai_branding.dart'
     show kOperonixAiChatScreenTitle;
 import '../models/operonix_ai_entity_chat_binding.dart';
+import '../operonix_ai_ux_copy.dart';
 import '../services/firebase_callable_user_message.dart';
 import '../services/production_ai_chat_service.dart';
 import '../widgets/operonix_ai_assistant_feedback_bar.dart';
 import '../widgets/operonix_ai_assistant_navigator.dart';
+import '../widgets/operonix_ai_chat_composer.dart';
+import '../widgets/operonix_ai_inline_error.dart';
 
 class _ChatLine {
   final bool isUser;
@@ -55,6 +58,8 @@ class _ProductionAiChatScreenState extends State<ProductionAiChatScreen> {
   bool _loading = false;
   bool _autoAskStarted = false;
   String? _error;
+  String? _lastVisibleForRetry;
+  String? _lastRoutableForRetry;
 
   OperonixAiEntityChatBinding? get _binding {
     final b = widget.entityBinding;
@@ -121,24 +126,40 @@ class _ProductionAiChatScreenState extends State<ProductionAiChatScreen> {
     await _sendVisible(t);
   }
 
+  Future<void> _retryLast() async {
+    final visible = (_lastVisibleForRetry ?? '').trim();
+    final routable = (_lastRoutableForRetry ?? visible).trim();
+    if (visible.isEmpty || routable.isEmpty || _loading) return;
+    await _sendVisible(visible, isRetry: true);
+  }
+
   /// [visibleText] ide u bubble; Callable dobija routable poruku s bindingom.
-  Future<void> _sendVisible(String visibleText) async {
+  Future<void> _sendVisible(String visibleText, {bool isRetry = false}) async {
     final visible = visibleText.trim();
     if (visible.isEmpty || _loading) return;
 
-    final routable = _binding?.toRoutableMessage(visible) ?? visible;
+    final routable = isRetry
+        ? ((_lastRoutableForRetry ?? '').trim().isEmpty
+            ? (_binding?.toRoutableMessage(visible) ?? visible)
+            : _lastRoutableForRetry!.trim())
+        : (_binding?.toRoutableMessage(visible) ?? visible);
+
+    _lastVisibleForRetry = visible;
+    _lastRoutableForRetry = routable;
 
     setState(() {
-      _lines.add(_ChatLine(isUser: true, text: visible));
+      if (!isRetry) {
+        _lines.add(_ChatLine(isUser: true, text: visible));
+      }
       _error = null;
       _loading = true;
     });
     _scrollToEnd();
 
     try {
-      final prior = _lines.length > 1
+      final prior = _lines.isNotEmpty && _lines.last.isUser
           ? _lines.sublist(0, _lines.length - 1)
-          : const <_ChatLine>[];
+          : List<_ChatLine>.from(_lines);
       final turns = <Map<String, String>>[
         for (final line in prior)
           if (line.text.trim().isNotEmpty)
@@ -158,6 +179,7 @@ class _ProductionAiChatScreenState extends State<ProductionAiChatScreen> {
       setState(() {
         _lines.add(_ChatLine(isUser: false, text: reply, feedbackKey: key));
         _loading = false;
+        _error = null;
       });
     } on FirebaseFunctionsException catch (e) {
       if (!mounted) return;
@@ -165,11 +187,11 @@ class _ProductionAiChatScreenState extends State<ProductionAiChatScreen> {
         _loading = false;
         _error = firebaseCallableUserMessage(e);
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = kOperonixAiTransientReplyUnavailable;
       });
     }
     _scrollToEnd();
@@ -203,17 +225,6 @@ class _ProductionAiChatScreenState extends State<ProductionAiChatScreen> {
         child: Column(
           children: [
             if (binding != null) OperonixAiEntityContextChip(binding: binding),
-            if (_error != null)
-              Material(
-                color: theme.colorScheme.errorContainer,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Text(
-                    _error!,
-                    style: TextStyle(color: theme.colorScheme.onErrorContainer),
-                  ),
-                ),
-              ),
             Expanded(
               child: _lines.isEmpty
                   ? Center(
@@ -236,12 +247,21 @@ class _ProductionAiChatScreenState extends State<ProductionAiChatScreen> {
                   : ListView.builder(
                       controller: _scroll,
                       padding: const EdgeInsets.all(16),
-                      itemCount: _lines.length + (_loading ? 1 : 0),
+                      itemCount: _lines.length +
+                          (_loading ? 1 : 0) +
+                          (_error != null ? 1 : 0),
                       itemBuilder: (context, i) {
                         if (_loading && i == _lines.length) {
                           return const Padding(
                             padding: EdgeInsets.all(8),
                             child: LinearProgressIndicator(),
+                          );
+                        }
+                        if (_error != null &&
+                            i == _lines.length + (_loading ? 1 : 0)) {
+                          return OperonixAiInlineError(
+                            message: _error!,
+                            onRetry: _loading ? null : _retryLast,
                           );
                         }
                         final line = _lines[i];
@@ -292,34 +312,10 @@ class _ProductionAiChatScreenState extends State<ProductionAiChatScreen> {
                       },
                     ),
             ),
-            SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _input,
-                        minLines: 1,
-                        maxLines: 4,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => _send(),
-                        decoration: const InputDecoration(
-                          hintText: 'Poruka…',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.filled(
-                      onPressed: _loading ? null : _send,
-                      icon: const Icon(Icons.send),
-                    ),
-                  ],
-                ),
-              ),
+            OperonixAiChatComposer(
+              controller: _input,
+              onSend: _send,
+              loading: _loading,
             ),
           ],
         ),

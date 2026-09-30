@@ -8,14 +8,16 @@ import '../../../../core/ai/production_ai_context_scope.dart';
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/saas/production_module_keys.dart';
+import '../../ai/operonix_ai_ux_copy.dart';
+import '../../ai/services/firebase_callable_user_message.dart';
+import '../../ai/widgets/operonix_ai_filter_result_page.dart';
+import '../../ai/widgets/operonix_ai_inline_error.dart';
 import '../ai_analysis_payloads.dart';
 import '../models/ai_analysis_domain.dart';
 import '../services/ai_analysis_service.dart';
 import '../services/ai_analysis_snapshot_service.dart';
 
-/// Strukturirana AI analiza (Callable [runAiAnalysis]) — odvojeno od slobodnog chata.
-///
-/// Payload može biti demo ili učitavanje iz Firestorea (praćenje / nalozi) za odabrani period.
+/// Strukturirana AI analiza — odvojeno od slobodnog chata.
 class AiAnalysisScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
 
@@ -41,6 +43,8 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
   late DateTime _end;
   String? _markdown;
   String? _error;
+  bool _emptyResult = false;
+  bool _filtersExpanded = false;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -230,11 +234,11 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
         _payload = payload;
         _snapshotLoading = false;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _snapshotLoading = false;
-        _error = e.toString();
+        _error = kOperonixAiTransientReplyUnavailable;
       });
     }
   }
@@ -264,11 +268,11 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
         _payload = payload;
         _snapshotLoading = false;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _snapshotLoading = false;
-        _error = e.toString();
+        _error = kOperonixAiTransientReplyUnavailable;
       });
     }
   }
@@ -298,20 +302,22 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
         _payload = payload;
         _snapshotLoading = false;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _snapshotLoading = false;
-        _error = e.toString();
+        _error = kOperonixAiTransientReplyUnavailable;
       });
     }
   }
 
   void _applyDemoPayload() {
+    if (!showOperonixAiDemoActions()) return;
     setState(() {
       _payload = _demoPayloadForDomain(_domain);
       _error = null;
       _markdown = null;
+      _emptyResult = false;
     });
   }
 
@@ -419,16 +425,32 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
       setState(() => _error = 'Ova domena analize nije u dometu tvoje uloge (pretplata + prava pristupa).');
       return;
     }
-    if (_payload == null) {
-      setState(() => _error = 'Učitaj demo podatke ili pripremi payload iz aplikacije.');
-      return;
-    }
-
     setState(() {
       _loading = true;
       _error = null;
       _markdown = null;
+      _emptyResult = false;
     });
+
+    if (_payload == null) {
+      await _loadPayloadForCurrentDomain();
+      if (!mounted) return;
+      if (_error != null) {
+        setState(() => _loading = false);
+        return;
+      }
+    }
+
+    final payload = _payload;
+    if (payload == null || isStructuredAnalysisPayloadEmpty(payload)) {
+      setState(() {
+        _loading = false;
+        _emptyResult = true;
+        _error = null;
+        _markdown = null;
+      });
+      return;
+    }
 
     try {
       final r = await _svc.run(
@@ -436,7 +458,7 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
         plantKey: pkCall.isEmpty ? null : pkCall,
         allowEmptyPlantKey: _callableAllowsEmptyPlant,
         domain: _domain,
-        payload: _payload!,
+        payload: payload,
         analysisFocus: _focusCtrl.text.trim().isEmpty
             ? null
             : _focusCtrl.text.trim(),
@@ -450,15 +472,77 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.message ?? e.code;
+        _error = firebaseCallableUserMessage(e);
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = kOperonixAiTransientReplyUnavailable;
       });
     }
+  }
+
+  Future<void> _loadPayloadForCurrentDomain() async {
+    switch (_domain) {
+      case AiAnalysisDomain.oee:
+        await _loadOeeFromTracking();
+        break;
+      case AiAnalysisDomain.scada:
+        await _loadScadaFromTracking();
+        break;
+      case AiAnalysisDomain.productionFlow:
+        await _loadFlowFromOrders();
+        break;
+      case AiAnalysisDomain.generic:
+      case AiAnalysisDomain.qms:
+        break;
+    }
+  }
+
+  String get _filterPlantSummary {
+    if (_isCompanyWideContextUser) {
+      final scoped = (_analysisPlantScopeKey ?? '').trim();
+      if (scoped.isEmpty) return 'Svi pogoni';
+      for (final e in _plantChoices) {
+        if (e.plantKey == scoped) return e.label;
+      }
+      return 'Odabrani pogon';
+    }
+    final name = (widget.companyData['plantDisplayName'] ??
+            widget.companyData['plantName'] ??
+            '')
+        .toString()
+        .trim();
+    return name.isEmpty ? 'Pogon' : name;
+  }
+
+  String get _filterSummary {
+    final dates = formatOperonixFilterDateRange(_start, _end);
+    return '$_filterPlantSummary · $dates · ${_domainSummaryLabel(_domain)}';
+  }
+
+  void _showAnalysisHelp(BuildContext context) {
+    showDialog<void>(
+      barrierDismissible: false,
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Informacije'),
+        content: const SingleChildScrollView(
+          child: Text(
+            'Strukturirana analiza koristi operativne podatke za odabrani period i domenu. '
+            'Odaberite filtere, zatim pokrenite analizu. '
+            'Ako u odabranom periodu nema unosa, prikazuje se prazno stanje — to nije greška servisa.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Zatvori'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -472,8 +556,7 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
-              'Strukturirana AI analiza zahtijeva modul ai_assistant_production '
-              'ili legacy ai_assistant (enabledModules).',
+              'Strukturirana AI analiza nije uključena za ovu tvrtku.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -485,315 +568,222 @@ class _AiAnalysisScreenState extends State<AiAnalysisScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('AI analiza (strukturirani podaci)')),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            flex: 2,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Ovo nije chat. Šalje se JSON (SCADA / OEE / tok / QMS) na Callable '
-                    'runAiAnalysis. Za učitavanje iz baze odaberi period (najviše '
-                    '$_maxInclusivePeriodDays dan) ili koristi demo podatke.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (_showPlantScopeSelector) ...[
-                    Text(
-                      'Doseg analize',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    if (!_plantChoicesLoaded)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        child: LinearProgressIndicator(),
-                      )
-                    else
-                      InputDecorator(
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 4,
-                          ),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String?>(
-                            isExpanded: true,
-                            value: _dropdownPlantValue,
-                            items: [
-                              const DropdownMenuItem<String?>(
-                                value: null,
-                                child: Text('Svi pogoni (cijela tvrtka)'),
-                              ),
-                              ..._plantChoices.map(
-                                (e) => DropdownMenuItem<String?>(
-                                  value: e.plantKey,
-                                  child: Text(e.label),
-                                ),
-                              ),
-                            ],
-                            onChanged: _busy
-                                ? null
-                                : (v) {
-                                    setState(() {
-                                      _analysisPlantScopeKey =
-                                          v == null || v.trim().isEmpty
-                                          ? null
-                                          : v.trim();
-                                      _payload = null;
-                                      _markdown = null;
-                                    });
-                                  },
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Za učitavanje OEE, operativnog snimka ili toka iz baze odaberi jedan pogon. '
-                      'Domene Generički i QMS mogu i bez odabranog pogona (doseg cijele tvrtke).',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _busy ? null : _pickStart,
-                          icon: const Icon(Icons.calendar_today, size: 18),
-                          label: Text(
-                            'Od: ${_start.year}-${_start.month.toString().padLeft(2, '0')}-${_start.day.toString().padLeft(2, '0')}',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _busy ? null : _pickEnd,
-                          icon: const Icon(Icons.event, size: 18),
-                          label: Text(
-                            'Do: ${_end.year}-${_end.month.toString().padLeft(2, '0')}-${_end.day.toString().padLeft(2, '0')}',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (!_periodOrderOk) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'Početni datum mora biti prije krajnjeg.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.error,
-                      ),
-                    ),
-                  ] else if (_periodExceedsFirestoreLimit) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'Period: ${_inclusiveCalendarDays()} dana — za učitavanje iz '
-                      'Firestorea najviše $_maxInclusivePeriodDays dan (uključivo).',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.error,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Domena',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<AiAnalysisDomain>(
-                        value: _domain,
-                        isExpanded: true,
-                        items: AiAnalysisDomain.values
-                            .map(
-                              (d) => DropdownMenuItem(
-                                value: d,
-                                child: Text(_domainLabel(d)),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: _busy
-                            ? null
-                            : (v) {
-                                if (v == null) return;
-                                setState(() {
-                                  _domain = v;
-                                  _payload = null;
-                                  _markdown = null;
-                                });
-                              },
-                      ),
-                    ),
-                  ),
-                  if (!_domainAllowedForRole) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'Ova domena nije u dometu tvoje uloge. Odaberi drugu domenu ili se obrati administratoru.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.error,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _focusCtrl,
-                    enabled: !_busy,
-                    decoration: const InputDecoration(
-                      labelText: 'Prioritet analize (opcionalno)',
-                      hintText: 'npr. Naglasi zastoje',
-                      border: OutlineInputBorder(),
-                    ),
-                    maxLines: 2,
-                    textInputAction: TextInputAction.done,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Podaci iz aplikacije',
-                    style: theme.textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      FilledButton.tonalIcon(
-                        onPressed: (_busy ||
-                                !_periodOrderOk ||
-                                _periodExceedsFirestoreLimit)
-                            ? null
-                            : _loadOeeFromTracking,
-                        icon: const Icon(Icons.speed, size: 18),
-                        label: const Text('OEE iz praćenja'),
-                      ),
-                      FilledButton.tonalIcon(
-                        onPressed: (_busy ||
-                                !_periodOrderOk ||
-                                _periodExceedsFirestoreLimit)
-                            ? null
-                            : _loadScadaFromTracking,
-                        icon: const Icon(Icons.dashboard_customize, size: 18),
-                        label: const Text('Operativni snimak (faze)'),
-                      ),
-                      FilledButton.tonalIcon(
-                        onPressed: (_busy ||
-                                !_periodOrderOk ||
-                                _periodExceedsFirestoreLimit)
-                            ? null
-                            : _loadFlowFromOrders,
-                        icon: const Icon(Icons.account_tree_outlined, size: 18),
-                        label: const Text('Tok iz naloga'),
-                      ),
-                    ],
-                  ),
-                  if (_snapshotLoading) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Učitavanje iz Firestorea…',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: _busy ? null : _applyDemoPayload,
-                        icon: const Icon(Icons.data_object, size: 18),
-                        label: const Text('Učitaj demo podatke'),
-                      ),
-                      const SizedBox(width: 8),
-                      if (_payload != null)
-                        Expanded(
-                          child: Text(
-                            'Payload: ${_payload!.length} ključeva',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton.icon(
-                    onPressed: (_busy || !_domainAllowedForRole) ? null : _run,
-                    icon: _loading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.analytics_outlined),
-                    label: Text(_loading ? 'Analiza…' : 'Pokreni analizu'),
-                  ),
-                  if (_error != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      _error!,
-                      style: TextStyle(color: theme.colorScheme.error),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            flex: 3,
-            child: _markdown == null
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Text(
-                        _snapshotLoading
-                            ? 'Učitavanje podataka…'
-                            : _loading
-                                ? ''
-                                : 'Odaberi period, učitaj podatke ili demo, zatim pokreni analizu.',
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  )
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: MarkdownBody(
-                      data: _markdown!,
-                      selectable: true,
-                    ),
-                  ),
+      appBar: AppBar(
+        title: const Text('AI analiza (strukturirani podaci)'),
+        actions: [
+          IconButton(
+            tooltip: 'Informacije',
+            icon: const Icon(Icons.info_outline),
+            onPressed: () => _showAnalysisHelp(context),
           ),
         ],
       ),
+      body: OperonixAiFilterResultPage(
+        filtersExpanded: _filtersExpanded,
+        filterSummary: _filterSummary,
+        onToggleFilters: _busy
+            ? () {}
+            : () => setState(() => _filtersExpanded = !_filtersExpanded),
+        filterControls: _buildFilterControls(theme),
+        action: FilledButton.icon(
+          onPressed: (_busy || !_domainAllowedForRole) ? null : _run,
+          icon: _loading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.analytics_outlined),
+          label: Text(_loading ? 'Analiza…' : 'Pokreni analizu'),
+        ),
+        bodyBelowAction: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_error != null) OperonixAiInlineError(message: _error!),
+            if (_emptyResult)
+              const OperonixAiEmptyPeriodNotice(
+                message: kOperonixAiEmptyAnalysisPeriod,
+              ),
+            if (_loading && _markdown == null) ...[
+              const SizedBox(height: 16),
+              const LinearProgressIndicator(),
+            ],
+            if (_markdown != null) ...[
+              const SizedBox(height: 16),
+              MarkdownBody(
+                data: _markdown!,
+                selectable: true,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterControls(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_showPlantScopeSelector) ...[
+          Text(
+            'Doseg analize',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          if (!_plantChoicesLoaded)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: LinearProgressIndicator(),
+            )
+          else
+            InputDecorator(
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String?>(
+                  isExpanded: true,
+                  value: _dropdownPlantValue,
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('Svi pogoni (cijela tvrtka)'),
+                    ),
+                    ..._plantChoices.map(
+                      (e) => DropdownMenuItem<String?>(
+                        value: e.plantKey,
+                        child: Text(e.label),
+                      ),
+                    ),
+                  ],
+                  onChanged: _busy
+                      ? null
+                      : (v) {
+                          setState(() {
+                            _analysisPlantScopeKey =
+                                v == null || v.trim().isEmpty ? null : v.trim();
+                            _payload = null;
+                            _markdown = null;
+                            _emptyResult = false;
+                          });
+                        },
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
+        ],
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _busy ? null : _pickStart,
+                icon: const Icon(Icons.calendar_today, size: 18),
+                label: Text(
+                  'Od: ${_start.year}-${_start.month.toString().padLeft(2, '0')}-${_start.day.toString().padLeft(2, '0')}',
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _busy ? null : _pickEnd,
+                icon: const Icon(Icons.event, size: 18),
+                label: Text(
+                  'Do: ${_end.year}-${_end.month.toString().padLeft(2, '0')}-${_end.day.toString().padLeft(2, '0')}',
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (!_periodOrderOk) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Početni datum mora biti prije krajnjeg.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          ),
+        ] else if (_periodExceedsFirestoreLimit) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Period: ${_inclusiveCalendarDays()} dana — najviše '
+            '$_maxInclusivePeriodDays dan (uključivo).',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          ),
+        ],
+        const SizedBox(height: 16),
+        InputDecorator(
+          decoration: const InputDecoration(
+            labelText: 'Domena',
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 12),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<AiAnalysisDomain>(
+              value: _domain,
+              isExpanded: true,
+              items: AiAnalysisDomain.values
+                  .map(
+                    (d) => DropdownMenuItem(
+                      value: d,
+                      child: Text(_domainLabel(d)),
+                    ),
+                  )
+                  .toList(),
+              onChanged: _busy
+                  ? null
+                  : (v) {
+                      if (v == null) return;
+                      setState(() {
+                        _domain = v;
+                        _payload = null;
+                        _markdown = null;
+                        _emptyResult = false;
+                      });
+                    },
+            ),
+          ),
+        ),
+        if (!_domainAllowedForRole) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Ova domena nije u dometu tvoje uloge. Odaberi drugu domenu ili se obrati administratoru.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        TextField(
+          controller: _focusCtrl,
+          enabled: !_busy,
+          decoration: const InputDecoration(
+            labelText: 'Prioritet analize (opcionalno)',
+            hintText: 'npr. Naglasi zastoje',
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 2,
+          textInputAction: TextInputAction.done,
+        ),
+        if (showOperonixAiDemoActions()) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _busy ? null : _applyDemoPayload,
+            icon: const Icon(Icons.data_object, size: 18),
+            label: const Text('Učitaj demo podatke'),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -821,5 +811,20 @@ String _domainLabel(AiAnalysisDomain d) {
       return 'Generički';
     case AiAnalysisDomain.qms:
       return 'QMS / kvaliteta';
+  }
+}
+
+String _domainSummaryLabel(AiAnalysisDomain d) {
+  switch (d) {
+    case AiAnalysisDomain.scada:
+      return 'SCADA';
+    case AiAnalysisDomain.oee:
+      return 'OEE/KPI';
+    case AiAnalysisDomain.productionFlow:
+      return 'Tok';
+    case AiAnalysisDomain.generic:
+      return 'Generički';
+    case AiAnalysisDomain.qms:
+      return 'QMS';
   }
 }

@@ -210,6 +210,9 @@ class StandardFilterPanel extends StatelessWidget {
   final Widget child;
   final String title;
 
+  /// Collapsed one-line selection summary (plant · dates · domain).
+  final String? summary;
+
   const StandardFilterPanel({
     super.key,
     required this.expanded,
@@ -217,11 +220,13 @@ class StandardFilterPanel extends StatelessWidget {
     required this.onToggle,
     required this.child,
     this.title = 'Filteri',
+    this.summary,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final summaryText = (summary ?? '').trim();
     return Material(
       color: cs.surface,
       elevation: 0,
@@ -240,13 +245,31 @@ class StandardFilterPanel extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: cs.onSurface,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                        if (summaryText.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            summaryText,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.25,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   if (activeCount > 0)

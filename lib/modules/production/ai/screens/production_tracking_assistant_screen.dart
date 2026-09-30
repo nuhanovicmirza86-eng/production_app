@@ -8,9 +8,12 @@ import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/branding/operonix_ai_branding.dart';
 import '../../../../core/company_plant_display_name.dart';
 import '../models/production_ai_chat_message.dart';
+import '../operonix_ai_ux_copy.dart';
 import '../services/firebase_callable_user_message.dart';
 import '../services/production_ai_chat_persistence.dart';
 import '../services/production_tracking_assistant_client_service.dart';
+import '../widgets/operonix_ai_chat_composer.dart';
+import '../widgets/operonix_ai_inline_error.dart';
 
 /// Operativni asistent nad praćenjem proizvodnje (Callable [productionTrackingAssistant]).
 class ProductionTrackingAssistantScreen extends StatefulWidget {
@@ -53,6 +56,7 @@ class _ProductionTrackingAssistantScreenState
   final List<ProductionAiChatMessage> _turns = [];
   bool _loading = false;
   bool _restored = false;
+  String? _lastPrompt;
 
   /// Za [isCompanyWideContextRole]: [null] = Callable bez [plantKey] (cijela tvrtka).
   /// Ne inicijalizirati iz sesijskog pogona — korisnik eksplicitno bira filter u UI.
@@ -283,8 +287,8 @@ class _ProductionTrackingAssistantScreenState
     }
   }
 
-  Future<void> _ask() async {
-    final q = _prompt.text.trim();
+  Future<void> _ask({bool retry = false}) async {
+    final q = retry ? (_lastPrompt ?? '').trim() : _prompt.text.trim();
     if (q.isEmpty || _loading || !_restored) return;
 
     if (!_canUseChatPersistence) {
@@ -326,15 +330,22 @@ class _ProductionTrackingAssistantScreenState
       return;
     }
 
+    _lastPrompt = q;
     setState(() {
-      _turns.add(ProductionAiChatMessage.user(q));
-      if (_turns.length > 40) {
-        _turns.removeRange(0, _turns.length - 40);
+      if (retry) {
+        if (_turns.isNotEmpty && _turns.last.isError) {
+          _turns.removeLast();
+        }
+      } else {
+        _turns.add(ProductionAiChatMessage.user(q));
+        if (_turns.length > 40) {
+          _turns.removeRange(0, _turns.length - 40);
+        }
+        _prompt.clear();
       }
       _loading = true;
     });
     _schedulePersist();
-    _prompt.clear();
     _scrollToEnd();
 
     try {
@@ -365,10 +376,14 @@ class _ProductionTrackingAssistantScreenState
       });
       _schedulePersist();
       _scrollToEnd();
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
-        _turns.add(ProductionAiChatMessage.error(e.toString()));
+        _turns.add(
+          const ProductionAiChatMessage.error(
+            kOperonixAiTransientReplyUnavailable,
+          ),
+        );
         _loading = false;
       });
       _schedulePersist();
@@ -419,24 +434,12 @@ class _ProductionTrackingAssistantScreenState
         ),
       );
     } else if (m.isError) {
-      bubble = Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: scheme.errorContainer.withValues(alpha: 0.5),
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(16),
-            topRight: Radius.circular(16),
-            bottomRight: Radius.circular(16),
-            bottomLeft: Radius.circular(4),
-          ),
-          border: Border.all(color: scheme.error.withValues(alpha: 0.4)),
-        ),
-        child: SelectableText(
-          m.text,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: scheme.onErrorContainer,
-          ),
-        ),
+      final isLast = _turns.isNotEmpty && identical(m, _turns.last);
+      bubble = OperonixAiInlineError(
+        message: m.text,
+        onRetry: (isLast && !_loading)
+            ? () => unawaited(_ask(retry: true))
+            : null,
       );
     } else {
       bubble = Container(
@@ -481,43 +484,11 @@ class _ProductionTrackingAssistantScreenState
     Widget inputBar() {
       return Material(
         color: scheme.surface,
-        elevation: 8,
-        shadowColor: Colors.black26,
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: _prompt,
-                  enabled: !_loading && _restored,
-                  minLines: 1,
-                  maxLines: 5,
-                  decoration: const InputDecoration(
-                    labelText: 'Pitanje',
-                    hintText: 'Npr. Koji je omjer škarta ovaj tjedan?',
-                    alignLabelWithHint: true,
-                  ),
-                  onSubmitted: (_) => _ask(),
-                ),
-                const SizedBox(height: 10),
-                FilledButton.icon(
-                  onPressed: (_loading || !_restored) ? null : _ask,
-                  icon: _loading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.psychology_outlined),
-                  label: Text(_loading ? 'Odgovor…' : 'Pošalji'),
-                ),
-              ],
-            ),
-          ),
+        child: OperonixAiChatComposer(
+          controller: _prompt,
+          onSend: () => unawaited(_ask()),
+          enabled: _restored,
+          loading: _loading,
         ),
       );
     }

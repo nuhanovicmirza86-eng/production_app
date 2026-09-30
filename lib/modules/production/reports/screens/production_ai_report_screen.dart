@@ -8,6 +8,10 @@ import '../../../../core/ai/production_ai_context_scope.dart';
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/saas/production_module_keys.dart';
+import '../../ai/operonix_ai_ux_copy.dart';
+import '../../ai/services/firebase_callable_user_message.dart';
+import '../../ai/widgets/operonix_ai_filter_result_page.dart';
+import '../../ai/widgets/operonix_ai_inline_error.dart';
 import '../services/production_ai_report_service.dart';
 
 /// AI izvještaj za proizvodnju (Callable + Gemini na backendu).
@@ -30,6 +34,8 @@ class _ProductionAiReportScreenState extends State<ProductionAiReportScreen> {
   bool _loading = false;
   String? _markdown;
   String? _error;
+  bool _emptyResult = false;
+  bool _filtersExpanded = false;
 
   String get _companyId =>
       (widget.companyData['companyId'] ?? '').toString().trim();
@@ -179,6 +185,7 @@ class _ProductionAiReportScreenState extends State<ProductionAiReportScreen> {
       _loading = true;
       _error = null;
       _markdown = null;
+      _emptyResult = false;
     });
 
     try {
@@ -197,15 +204,79 @@ class _ProductionAiReportScreenState extends State<ProductionAiReportScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.message ?? e.code;
+        _error = firebaseCallableUserMessage(e);
       });
-    } catch (e) {
+    } on StateError catch (e) {
+      if (!mounted) return;
+      final empty = e.message.contains('Prazan');
+      setState(() {
+        _loading = false;
+        _emptyResult = empty;
+        _error = empty ? null : kOperonixAiTransientReplyUnavailable;
+      });
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = kOperonixAiTransientReplyUnavailable;
       });
     }
+  }
+
+  String get _filterPlantSummary {
+    if (_isCompanyWideContextUser) {
+      final scoped = (_reportPlantScopeKey ?? '').trim();
+      if (scoped.isNotEmpty) {
+        for (final e in _plantChoices) {
+          if (e.plantKey == scoped) return e.label;
+        }
+      }
+      final sess = _sessionPlantKey;
+      if (sess.isNotEmpty) {
+        for (final e in _plantChoices) {
+          if (e.plantKey == sess) return e.label;
+        }
+      }
+      final name = (widget.companyData['plantDisplayName'] ??
+              widget.companyData['plantName'] ??
+              '')
+          .toString()
+          .trim();
+      if (name.isNotEmpty) return name;
+      return scoped.isEmpty && sess.isEmpty ? 'Odaberi pogon' : 'Pogon';
+    }
+    final name = (widget.companyData['plantDisplayName'] ??
+            widget.companyData['plantName'] ??
+            '')
+        .toString()
+        .trim();
+    return name.isEmpty ? 'Pogon' : name;
+  }
+
+  String get _filterSummary {
+    return '$_filterPlantSummary · ${formatOperonixFilterDateRange(_start, _end)}';
+  }
+
+  void _showReportHelp(BuildContext context) {
+    showDialog<void>(
+      barrierDismissible: false,
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Informacije'),
+        content: const SingleChildScrollView(
+          child: Text(
+            'Izvještaj koristi operativno praćenje i proizvodne naloge za odabrani pogon i period '
+            '(najviše 31 dan). Ako u tom rasponu nema unosa, prikazuje se prazno stanje — to nije greška servisa.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Zatvori'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -221,8 +292,7 @@ class _ProductionAiReportScreenState extends State<ProductionAiReportScreen> {
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
-              'AI izvještaji zahtijevaju ai_assistant, ai_assistant_production '
-              'ili add-on ai_reports (enabledModules).',
+              'AI izvještaj nije uključen za ovu tvrtku.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -234,181 +304,169 @@ class _ProductionAiReportScreenState extends State<ProductionAiReportScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('AI izvještaj — proizvodnja')),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Odaberi period (najviše 31 dan). Podaci: operativno praćenje '
-                  '(workDate) i uzorak proizvodnih naloga (createdAt).',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (_showPlantScopeSelector) ...[
-                  Text(
-                    'Pogon za izvještaj',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  if (!_plantChoicesLoaded)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: LinearProgressIndicator(),
-                    )
-                  else
-                    InputDecorator(
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 4,
-                        ),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String?>(
-                          isExpanded: true,
-                          value: _dropdownReportPlantValue,
-                          hint: const Text('Odaberi pogon'),
-                          items: _plantChoices
-                              .map(
-                                (e) => DropdownMenuItem<String?>(
-                                  value: e.plantKey,
-                                  child: Text(e.label),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: _loading
-                              ? null
-                              : (v) {
-                                  setState(() {
-                                    _reportPlantScopeKey =
-                                        v == null || v.trim().isEmpty
-                                        ? null
-                                        : v.trim();
-                                  });
-                                },
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Sažetak se odnosi na jedan pogon (praćenje i nalozi u tom kontekstu).',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _loading ? null : _pickStart,
-                        icon: const Icon(Icons.calendar_today, size: 18),
-                        label: Text(
-                          'Od: ${_start.year}-${_start.month.toString().padLeft(2, '0')}-${_start.day.toString().padLeft(2, '0')}',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _loading ? null : _pickEnd,
-                        icon: const Icon(Icons.event, size: 18),
-                        label: Text(
-                          'Do: ${_end.year}-${_end.month.toString().padLeft(2, '0')}-${_end.day.toString().padLeft(2, '0')}',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (!_periodOrderOk) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Početni datum mora biti prije krajnjeg.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.error,
-                    ),
-                  ),
-                ] else if (_periodExceedsLimit) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Period: ${_inclusiveCalendarDays()} dana — najviše '
-                    '$_maxInclusivePeriodDays dan (uključivo).',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.error,
-                    ),
-                  ),
-                ],
-                if (!_reportAllowedByRbac) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Nemaš u aplikaciji pristup praćenju ni nalozima u dometu uloge — izvještaj nije dostupan.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.error,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  onPressed: (_loading ||
-                          !_periodOrderOk ||
-                          _periodExceedsLimit ||
-                          !_reportAllowedByRbac)
-                      ? null
-                      : _generate,
-                  icon: _loading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.auto_awesome),
-                  label: Text(_loading ? 'Generiranje…' : 'Generiraj izvještaj'),
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    _error!,
-                    style: TextStyle(color: theme.colorScheme.error),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: _markdown == null
-                ? Center(
-                    child: Text(
-                      _loading
-                          ? ''
-                          : 'Odaberi period i generiraj izvještaj.',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  )
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: MarkdownBody(
-                      data: _markdown!,
-                      selectable: true,
-                    ),
-                  ),
+      appBar: AppBar(
+        title: const Text('AI izvještaj — proizvodnja'),
+        actions: [
+          IconButton(
+            tooltip: 'Informacije',
+            icon: const Icon(Icons.info_outline),
+            onPressed: () => _showReportHelp(context),
           ),
         ],
       ),
+      body: OperonixAiFilterResultPage(
+        filtersExpanded: _filtersExpanded,
+        filterSummary: _filterSummary,
+        onToggleFilters: _loading
+            ? () {}
+            : () => setState(() => _filtersExpanded = !_filtersExpanded),
+        filterControls: _buildFilterControls(theme),
+        action: FilledButton.icon(
+          onPressed: (_loading ||
+                  !_periodOrderOk ||
+                  _periodExceedsLimit ||
+                  !_reportAllowedByRbac)
+              ? null
+              : _generate,
+          icon: _loading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.auto_awesome),
+          label: Text(_loading ? 'Generiranje…' : 'Generiraj izvještaj'),
+        ),
+        bodyBelowAction: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_error != null) OperonixAiInlineError(message: _error!),
+            if (_emptyResult)
+              const OperonixAiEmptyPeriodNotice(
+                message: kOperonixAiEmptyReportPeriod,
+              ),
+            if (_loading && _markdown == null) ...[
+              const SizedBox(height: 16),
+              const LinearProgressIndicator(),
+            ],
+            if (_markdown != null) ...[
+              const SizedBox(height: 16),
+              MarkdownBody(
+                data: _markdown!,
+                selectable: true,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterControls(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_showPlantScopeSelector) ...[
+          Text(
+            'Pogon za izvještaj',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          if (!_plantChoicesLoaded)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: LinearProgressIndicator(),
+            )
+          else
+            InputDecorator(
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String?>(
+                  isExpanded: true,
+                  value: _dropdownReportPlantValue,
+                  hint: const Text('Odaberi pogon'),
+                  items: _plantChoices
+                      .map(
+                        (e) => DropdownMenuItem<String?>(
+                          value: e.plantKey,
+                          child: Text(e.label),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: _loading
+                      ? null
+                      : (v) {
+                          setState(() {
+                            _reportPlantScopeKey =
+                                v == null || v.trim().isEmpty ? null : v.trim();
+                            _emptyResult = false;
+                          });
+                        },
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
+        ],
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _loading ? null : _pickStart,
+                icon: const Icon(Icons.calendar_today, size: 18),
+                label: Text(
+                  'Od: ${_start.year}-${_start.month.toString().padLeft(2, '0')}-${_start.day.toString().padLeft(2, '0')}',
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _loading ? null : _pickEnd,
+                icon: const Icon(Icons.event, size: 18),
+                label: Text(
+                  'Do: ${_end.year}-${_end.month.toString().padLeft(2, '0')}-${_end.day.toString().padLeft(2, '0')}',
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (!_periodOrderOk) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Početni datum mora biti prije krajnjeg.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          ),
+        ] else if (_periodExceedsLimit) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Period: ${_inclusiveCalendarDays()} dana — najviše '
+            '$_maxInclusivePeriodDays dan (uključivo).',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          ),
+        ],
+        if (!_reportAllowedByRbac) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Nemaš u aplikaciji pristup praćenju ni nalozima u dometu uloge — izvještaj nije dostupan.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
