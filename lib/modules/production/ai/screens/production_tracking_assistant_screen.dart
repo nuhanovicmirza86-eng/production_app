@@ -12,6 +12,7 @@ import '../operonix_ai_ux_copy.dart';
 import '../services/firebase_callable_user_message.dart';
 import '../services/production_ai_chat_persistence.dart';
 import '../services/production_tracking_assistant_client_service.dart';
+import '../widgets/operonix_ai_assistant_conversation_layout.dart';
 import '../widgets/operonix_ai_chat_composer.dart';
 import '../widgets/operonix_ai_inline_error.dart';
 
@@ -57,6 +58,7 @@ class _ProductionTrackingAssistantScreenState
   bool _loading = false;
   bool _restored = false;
   String? _lastPrompt;
+  bool _scopeExpanded = false;
 
   /// Za [isCompanyWideContextRole]: [null] = Callable bez [plantKey] (cijela tvrtka).
   /// Ne inicijalizirati iz sesijskog pogona — korisnik eksplicitno bira filter u UI.
@@ -128,6 +130,15 @@ class _ProductionTrackingAssistantScreenState
     final t = s.trim();
     if (_plantChoices.any((e) => e.plantKey == t)) return t;
     return null;
+  }
+
+  String get _scopeSummary {
+    final scoped = (_assistantPlantScopeKey ?? '').trim();
+    if (scoped.isEmpty) return 'Svi pogoni (cijela tvrtka)';
+    for (final e in _plantChoices) {
+      if (e.plantKey == scoped) return e.label;
+    }
+    return 'Odabrani pogon';
   }
 
   @override
@@ -514,131 +525,44 @@ class _ProductionTrackingAssistantScreenState
         padding: EdgeInsets.only(bottom: keyboardBottom),
         child: !_restored
             ? const Center(child: CircularProgressIndicator())
-            : Column(
-                children: [
-                  if (_showPlantScopeSelector) ...[
+            : OperonixAiAssistantConversationLayout(
+                scrollController: _scroll,
+                showScope: _showPlantScopeSelector,
+                scopeExpanded: _scopeExpanded,
+                scopeSummary: _scopeSummary,
+                onToggleScope: _loading
+                    ? () {}
+                    : () => setState(() => _scopeExpanded = !_scopeExpanded),
+                scopeControls: _buildScopeControls(theme),
+                conversation: [
+                  _buildIntroSection(context, theme, scheme),
+                  for (final m in _turns)
+                    _buildMessageBubble(context, m, scheme, theme),
+                  if (_loading)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Row(
                         children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  'Doseg asistenta',
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                tooltip: 'Više informacije o dosegu',
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(
-                                  minWidth: 40,
-                                  minHeight: 40,
-                                ),
-                                icon: Icon(
-                                  Icons.info_outline,
-                                  color: scheme.onSurfaceVariant,
-                                  size: 22,
-                                ),
-                                onPressed: () =>
-                                    _showAssistantScopeHelp(context),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          if (!_plantChoicesLoaded)
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 8),
-                              child: LinearProgressIndicator(),
-                            )
-                          else
-                            InputDecorator(
-                              decoration: const InputDecoration(
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 4,
-                                ),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String?>(
-                                  isExpanded: true,
-                                  value: _dropdownPlantValue,
-                                  items: [
-                                    const DropdownMenuItem<String?>(
-                                      value: null,
-                                      child: Text('Svi pogoni (cijela tvrtka)'),
-                                    ),
-                                    ..._plantChoices.map(
-                                      (e) => DropdownMenuItem<String?>(
-                                        value: e.plantKey,
-                                        child: Text(e.label),
-                                      ),
-                                    ),
-                                  ],
-                                  onChanged: _loading
-                                      ? null
-                                      : (v) =>
-                                            unawaited(_onAssistantScopeChanged(v)),
-                                ),
-                              ),
+                          SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: scheme.primary,
                             ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Asistent priprema odgovor…',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ],
-                  Expanded(
-                    child: ListView.builder(
-                      controller: _scroll,
-                      keyboardDismissBehavior:
-                          ScrollViewKeyboardDismissBehavior.onDrag,
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                      itemCount: 1 + _turns.length + (_loading ? 1 : 0),
-                      itemBuilder: (context, i) {
-                        if (i == 0) {
-                          return _buildIntroSection(context, theme, scheme);
-                        }
-                        if (i <= _turns.length) {
-                          return _buildMessageBubble(
-                            context,
-                            _turns[i - 1],
-                            scheme,
-                            theme,
-                          );
-                        }
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Row(
-                            children: [
-                              SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: scheme.primary,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Asistent priprema odgovor…',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  inputBar(),
                 ],
+                composer: inputBar(),
               ),
       ),
     );
@@ -675,6 +599,43 @@ class _ProductionTrackingAssistantScreenState
             child: const Text('Zatvori'),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildScopeControls(ThemeData theme) {
+    if (!_plantChoicesLoaded) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: LinearProgressIndicator(),
+      );
+    }
+    return InputDecorator(
+      decoration: const InputDecoration(
+        border: OutlineInputBorder(),
+        isDense: true,
+        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String?>(
+          isExpanded: true,
+          value: _dropdownPlantValue,
+          items: [
+            const DropdownMenuItem<String?>(
+              value: null,
+              child: Text('Svi pogoni (cijela tvrtka)'),
+            ),
+            ..._plantChoices.map(
+              (e) => DropdownMenuItem<String?>(
+                value: e.plantKey,
+                child: Text(e.label),
+              ),
+            ),
+          ],
+          onChanged: _loading
+              ? null
+              : (v) => unawaited(_onAssistantScopeChanged(v)),
+        ),
       ),
     );
   }
