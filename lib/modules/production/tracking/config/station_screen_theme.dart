@@ -153,6 +153,14 @@ Brightness _brightnessForSurface(Color background) {
   return ThemeData.estimateBrightnessForColor(background);
 }
 
+/// Lokalni izgled stanice ostaje nezavisan od VisualStyle (Classic / Premium).
+///
+/// VISUAL-EXPERIENCE-M1: Industrijska noć i dalje koristi ovu SCADA paletu.
+/// Dijeljeni Premium Midnight tokeni su u OperonixVisualTokens i namjerno
+/// ne prepisuju spremljeni izgled Praćenja. Konvergencija boja je sljedeći
+/// korak samo ako owner potvrdi da lokalni picker stanice smije naslijediti
+/// app temu bez regresije.
+///
 /// SCADA `ScadaWallTheme.operonix_graphite` — tamna podloga i paneli.
 const Color _kScadaWall = Color(0xFF070A0F);
 const Color _kScadaPanel = Color(0xFF343E52);

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/visual/operonix_empty_state.dart';
+import '../../../../core/visual/operonix_visual_tokens.dart';
 import '../models/production_process_model.dart';
 import '../services/production_process_service.dart';
 import 'production_process_create_screen.dart';
@@ -212,7 +214,7 @@ class _ProductionProcessesListScreenState
                   Text(
                     'Pogon: ${_plantLabel(_selectedPlantKey)}',
                     style: TextStyle(
-                      color: Colors.grey.shade800,
+                      color: OperonixVisualTokens.of(context).metaText,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -361,13 +363,10 @@ class _ProductionProcessesListScreenState
 
                 final filtered = _applyFilters(snap.data!).toList();
                 if (filtered.isEmpty) {
-                  return Center(
-                    child: Text(
-                      snap.data!.isEmpty
-                          ? 'Nema procesa na ovom pogonu. ${_canManage ? 'Dodajte prvi zapis.' : ''}'
-                          : 'Nema zapisa za trenutne filtere.',
-                      textAlign: TextAlign.center,
-                    ),
+                  return OperonixEmptyState(
+                    message: snap.data!.isEmpty
+                        ? 'Nema procesa na ovom pogonu. ${_canManage ? 'Dodajte prvi zapis.' : ''}'
+                        : 'Nema zapisa za trenutne filtere.',
                   );
                 }
 

@@ -13,7 +13,10 @@ import 'package:window_manager/window_manager.dart';
 
 import 'firebase_options.dart';
 import 'package:production_app/core/firebase_firestore_emulator.dart';
-import 'package:production_app/core/theme/operonix_production_brand.dart';
+import 'package:production_app/core/visual/operonix_application_frame.dart';
+import 'package:production_app/core/visual/operonix_visual_theme.dart';
+import 'package:production_app/core/visual/visual_experience_controller.dart';
+import 'package:production_app/core/visual/visual_experience_scope.dart';
 import 'package:production_app/modules/auth/session/screens/auth_wrapper.dart';
 import 'package:production_app/services/fcm_token_service.dart';
 import 'package:production_app/services/mes_push_navigation.dart';
@@ -238,102 +241,52 @@ Future<void> main() async {
 
   await _initProductionPushStack();
 
-  runApp(const MyApp());
+  final visualExperience = VisualExperienceController();
+  await visualExperience.load();
+  runApp(MyApp(visualExperience: visualExperience));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final VisualExperienceController visualExperience;
+
+  const MyApp({super.key, required this.visualExperience});
 
   @override
   Widget build(BuildContext context) {
-    const brand = Color(0xFF164344);
+    return ListenableBuilder(
+      listenable: visualExperience,
+      builder: (context, _) {
+        return VisualExperienceScope(
+          controller: visualExperience,
+          child: MaterialApp(
+            navigatorKey: operonixProductionNavigatorKey,
+            title: 'Operonix Production',
+            debugShowCheckedModeBanner: false,
 
-    final baseTheme = ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: brand),
-      useMaterial3: true,
-      visualDensity: kIsWeb ? VisualDensity.compact : VisualDensity.standard,
-    );
-    final scheme = baseTheme.colorScheme;
-
-    return MaterialApp(
-      navigatorKey: operonixProductionNavigatorKey,
-      title: 'Operonix Production',
-      debugShowCheckedModeBanner: false,
-
-      /// HR kalendari u dijalozima (npr. datum); prikaz punog datuma u tekstu ide preko [BaFormattedDate].
-      /// Nema miješanog EN+BA: fiksna lokacija za tržište; puni engleski UI zahtijeva l10n (ARB) — trenutno nije uključeno.
-      locale: const Locale('hr', 'BA'),
-      supportedLocales: const [
-        Locale('hr', 'BA'),
-        Locale('bs', 'BA'),
-      ],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      theme: baseTheme.copyWith(
-        cardTheme: const CardThemeData(
-          surfaceTintColor: Colors.transparent,
-          elevation: 1,
-          clipBehavior: Clip.antiAlias,
-          shape: kOperonixProductionCardShape,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          /// Na webu je [VisualDensity.compact]; malo veći padding sprječava
-          /// da plutajuća oznaka „presijeca” obrub kod outlined polja.
-          contentPadding: kIsWeb
-              ? const EdgeInsets.fromLTRB(14, 18, 14, 14)
-              : null,
-          border: OutlineInputBorder(
-            borderRadius: const BorderRadius.all(Radius.circular(12)),
-            borderSide: BorderSide(
-              color: kOperonixProductionBrandGreen.withValues(alpha: 0.45),
-            ),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: const BorderRadius.all(Radius.circular(12)),
-            borderSide: BorderSide(
-              color: kOperonixProductionBrandGreen.withValues(alpha: 0.45),
-            ),
-          ),
-          focusedBorder: const OutlineInputBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
-            borderSide: BorderSide(
-              color: kOperonixProductionBrandGreen,
-              width: 2,
-            ),
-          ),
-          disabledBorder: OutlineInputBorder(
-            borderRadius: const BorderRadius.all(Radius.circular(12)),
-            borderSide: BorderSide(
-              color: scheme.onSurface.withValues(alpha: 0.12),
-            ),
-          ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: const BorderRadius.all(Radius.circular(12)),
-            borderSide: BorderSide(color: scheme.error),
-          ),
-          focusedErrorBorder: OutlineInputBorder(
-            borderRadius: const BorderRadius.all(Radius.circular(12)),
-            borderSide: BorderSide(color: scheme.error, width: 2),
-          ),
-        ),
-      ),
-      builder: (context, child) {
-        if (child == null) return const SizedBox.shrink();
-        if (!kIsWeb) return child;
-        return ColoredBox(
-          color: Theme.of(context).colorScheme.surfaceContainerLowest,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1280),
-              child: child,
-            ),
+            /// HR kalendari u dijalozima (npr. datum); prikaz punog datuma u tekstu ide preko [BaFormattedDate].
+            /// Nema miješanog EN+BA: fiksna lokacija za tržište; puni engleski UI zahtijeva l10n (ARB) — trenutno nije uključeno.
+            locale: const Locale('hr', 'BA'),
+            supportedLocales: const [
+              Locale('hr', 'BA'),
+              Locale('bs', 'BA'),
+            ],
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            theme: OperonixVisualTheme.forStyle(visualExperience.style),
+            builder: (context, child) {
+              if (child == null) return const SizedBox.shrink();
+              return OperonixApplicationFrame(
+                useWebShell: kIsWeb,
+                child: child,
+              );
+            },
+            home: const AuthWrapper(),
           ),
         );
       },
-      home: const AuthWrapper(),
     );
   }
 }

@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/access/production_access_helper.dart';
-import '../../../../core/theme/operonix_production_brand.dart';
+import '../../../../core/visual/operonix_empty_state.dart';
+import '../../../../core/visual/operonix_visual_tokens.dart';
 import '../../../../core/date/date_range_utils.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/ui/date_range_filter_controls.dart';
@@ -512,6 +513,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
       required ValueChanged<T?> onChanged,
     }) {
       final cs = Theme.of(context).colorScheme;
+      final tokens = OperonixVisualTokens.of(context);
       return DropdownButtonFormField<T?>(
         isExpanded: true,
         borderRadius: BorderRadius.circular(12),
@@ -521,22 +523,15 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
           fillColor: cs.surface,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(
-              color: kOperonixProductionBrandGreen.withValues(alpha: 0.45),
-            ),
+            borderSide: BorderSide(color: tokens.fieldOutline),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(
-              color: kOperonixProductionBrandGreen.withValues(alpha: 0.45),
-            ),
+            borderSide: BorderSide(color: tokens.fieldOutline),
           ),
-          focusedBorder: const OutlineInputBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
-            borderSide: BorderSide(
-              color: kOperonixProductionBrandGreen,
-              width: 2,
-            ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: const BorderRadius.all(Radius.circular(12)),
+            borderSide: BorderSide(color: tokens.fieldFocus, width: 2),
           ),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 12,
@@ -1026,31 +1021,32 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     final done = _orders
         .where((o) => o.status == 'completed' || o.status == 'closed')
         .length;
+    final tokens = OperonixVisualTokens.of(context);
 
     return StandardKpiGrid(
       metrics: [
         KpiMetric(
           label: 'Ukupno',
           value: total,
-          color: Colors.blue,
+          color: tokens.info,
           icon: Icons.assignment_outlined,
         ),
         KpiMetric(
           label: 'Otvoreni',
           value: open,
-          color: Colors.orange,
+          color: tokens.warning,
           icon: Icons.pending_actions_outlined,
         ),
         KpiMetric(
           label: 'U toku',
           value: inProgress,
-          color: Colors.deepOrange,
+          color: tokens.kpiActive,
           icon: Icons.play_circle_outline,
         ),
         KpiMetric(
           label: 'Završeni',
           value: done,
-          color: Colors.green,
+          color: tokens.success,
           icon: Icons.task_alt_rounded,
         ),
       ],
@@ -1753,7 +1749,10 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
       child: Text(
         '${_companyDisplayName()}  ·  Pogon: ${_plantLineForDisplay()}'
         '  ·  Datum ispisa: ${_formatDate(now)}$op',
-        style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+        style: TextStyle(
+          fontSize: 12,
+          color: OperonixVisualTokens.of(context).metaText,
+        ),
       ),
     );
   }
@@ -1774,15 +1773,13 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
       child: Center(child: Text(_error!, textAlign: TextAlign.center)),
     );
 
-    Widget emptyBody() => const Center(
-      child: Padding(
-        padding: EdgeInsets.symmetric(vertical: 48),
-        child: Text('Nema proizvodnih naloga za trenutne filtere.'),
-      ),
+    Widget emptyBody() => const OperonixEmptyState(
+      message: 'Nema proizvodnih naloga za trenutne filtere.',
+      padding: EdgeInsets.symmetric(vertical: 48, horizontal: 24),
     );
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
+      backgroundColor: OperonixVisualTokens.of(context).pageBackground,
       body: SafeArea(
         child: _isLoading
             ? loadingBody()

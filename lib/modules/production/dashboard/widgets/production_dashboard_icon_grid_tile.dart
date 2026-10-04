@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/operonix_production_brand.dart';
+import '../../../../core/visual/operonix_visual_tokens.dart';
 
 /// Kompaktna ikona + naslov (ikonski prikaz početnog zaslona).
 class ProductionDashboardIconGridTile extends StatelessWidget {
@@ -19,16 +20,21 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = OperonixVisualTokens.of(context);
+    final accent = tokens.moduleAccent;
+    final shape = tokens.isPremium
+        ? tokens.cardShape
+        : RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: kOperonixProductionBrandGreen.withValues(alpha: 0.55),
+              width: 1.2,
+            ),
+          );
     return Card(
       clipBehavior: Clip.antiAlias,
-      elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: kOperonixProductionBrandGreen.withValues(alpha: 0.55),
-          width: 1.2,
-        ),
-      ),
+      elevation: tokens.isPremium ? 0 : 1,
+      shape: shape,
       child: InkWell(
         onTap: onTap,
         child: Padding(
@@ -44,20 +50,16 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
                     height: 52,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: kOperonixProductionBrandGreen.withValues(
-                        alpha: 0.10,
-                      ),
+                      color: accent.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: kOperonixProductionBrandGreen.withValues(
-                          alpha: 0.45,
-                        ),
+                        color: accent.withValues(alpha: 0.45),
                       ),
                     ),
                     child: Icon(
                       icon,
                       size: 28,
-                      color: kOperonixProductionBrandGreen,
+                      color: accent,
                     ),
                   ),
                   if (badgeText != null && badgeText!.trim().isNotEmpty)
@@ -67,14 +69,14 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: kOperonixProductionBrandGreen,
+                          color: accent,
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 1.5),
+                          border: Border.all(color: tokens.surface, width: 1.5),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.notifications,
                           size: 10,
-                          color: Colors.white,
+                          color: tokens.onAccent,
                         ),
                       ),
                     ),

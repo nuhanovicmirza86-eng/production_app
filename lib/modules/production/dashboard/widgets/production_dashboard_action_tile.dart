@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/operonix_production_brand.dart';
+import '../../../../core/visual/operonix_visual_tokens.dart';
 
 /// Kartica prečice na početnom zaslonu (standardni prikaz).
 class ProductionDashboardActionTile extends StatelessWidget {
@@ -21,18 +21,14 @@ class ProductionDashboardActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = OperonixVisualTokens.of(context);
+    final accent = tokens.moduleAccent;
     return Card(
       clipBehavior: Clip.antiAlias,
-      elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(
-          color: kOperonixProductionBrandGreen,
-          width: 1.5,
-        ),
-      ),
+      elevation: tokens.isPremium ? 0 : 1,
+      shape: tokens.cardShape,
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(tokens.cardRadius),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -43,15 +39,13 @@ class ProductionDashboardActionTile extends StatelessWidget {
                 height: 46,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: kOperonixProductionBrandGreen.withValues(alpha: 0.10),
+                  color: accent.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: kOperonixProductionBrandGreen.withValues(
-                      alpha: 0.45,
-                    ),
+                    color: accent.withValues(alpha: 0.45),
                   ),
                 ),
-                child: Icon(icon, color: kOperonixProductionBrandGreen),
+                child: Icon(icon, color: accent),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -68,7 +62,7 @@ class ProductionDashboardActionTile extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: const TextStyle(color: Colors.black54),
+                      style: TextStyle(color: tokens.secondaryText),
                     ),
                     if (noticeText != null && noticeText!.trim().isNotEmpty) ...[
                       const SizedBox(height: 8),
@@ -79,14 +73,10 @@ class ProductionDashboardActionTile extends StatelessWidget {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: kOperonixProductionBrandGreen.withValues(
-                            alpha: 0.12,
-                          ),
+                          color: accent.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: kOperonixProductionBrandGreen.withValues(
-                              alpha: 0.35,
-                            ),
+                            color: accent.withValues(alpha: 0.35),
                           ),
                         ),
                         child: Row(
@@ -94,15 +84,14 @@ class ProductionDashboardActionTile extends StatelessWidget {
                             Icon(
                               Icons.notifications_active_outlined,
                               size: 18,
-                              color: kOperonixProductionBrandGreen,
+                              color: accent,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 noticeText!,
                                 style: TextStyle(
-                                  color: kOperonixProductionBrandGreen
-                                      .withValues(alpha: 0.95),
+                                  color: accent.withValues(alpha: 0.95),
                                   fontWeight: FontWeight.w700,
                                   fontSize: 13,
                                 ),
@@ -117,7 +106,7 @@ class ProductionDashboardActionTile extends StatelessWidget {
               ),
               Icon(
                 Icons.chevron_right,
-                color: kOperonixProductionBrandGreen.withValues(alpha: 0.55),
+                color: accent.withValues(alpha: 0.55),
               ),
             ],
           ),

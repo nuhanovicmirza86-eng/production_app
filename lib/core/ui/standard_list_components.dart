@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:production_app/core/theme/operonix_production_brand.dart';
+
+import '../visual/operonix_visual_tokens.dart';
 
 class KpiMetric {
   final String label;
@@ -49,7 +50,7 @@ class StandardScreenHeader extends StatelessWidget {
             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
           ),
         ),
-        if (beforeInfoAction != null) beforeInfoAction!,
+        ?beforeInfoAction,
         if (onInfo != null)
           IconButton(
             icon: const Icon(Icons.info_outline_rounded),
@@ -66,13 +67,14 @@ class StandardKpiGrid extends StatelessWidget {
 
   const StandardKpiGrid({super.key, required this.metrics});
 
-  Widget _buildKpiCard(KpiMetric metric) {
+  Widget _buildKpiCard(BuildContext context, KpiMetric metric) {
+    final tokens = OperonixVisualTokens.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade200),
+        color: tokens.kpiSurface,
+        borderRadius: BorderRadius.circular(tokens.kpiRadius),
+        border: Border.all(color: tokens.kpiBorder),
       ),
       child: Row(
         children: [
@@ -102,7 +104,7 @@ class StandardKpiGrid extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   metric.label,
-                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  style: TextStyle(fontSize: 12, color: tokens.secondaryText),
                 ),
               ],
             ),
@@ -121,7 +123,7 @@ class StandardKpiGrid extends StatelessWidget {
         children: [
           for (int i = 0; i < m.length; i++) ...[
             if (i > 0) const SizedBox(width: 10),
-            Expanded(child: _buildKpiCard(m[i])),
+            Expanded(child: _buildKpiCard(context, m[i])),
           ],
         ],
       );
@@ -131,17 +133,17 @@ class StandardKpiGrid extends StatelessWidget {
       children: [
         Row(
           children: [
-            Expanded(child: _buildKpiCard(m[0])),
+            Expanded(child: _buildKpiCard(context, m[0])),
             const SizedBox(width: 10),
-            Expanded(child: _buildKpiCard(m[1])),
+            Expanded(child: _buildKpiCard(context, m[1])),
           ],
         ),
         const SizedBox(height: 10),
         Row(
           children: [
-            Expanded(child: _buildKpiCard(m[2])),
+            Expanded(child: _buildKpiCard(context, m[2])),
             const SizedBox(width: 10),
-            Expanded(child: _buildKpiCard(m[3])),
+            Expanded(child: _buildKpiCard(context, m[3])),
           ],
         ),
       ],
@@ -168,7 +170,8 @@ class StandardSearchField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final outline = kOperonixProductionBrandGreen.withValues(alpha: 0.45);
+    final tokens = OperonixVisualTokens.of(context);
+    final outline = tokens.fieldOutline;
     final pad = compact
         ? const EdgeInsets.symmetric(horizontal: 12, vertical: 10)
         : const EdgeInsets.symmetric(horizontal: 14, vertical: 14);
@@ -193,8 +196,8 @@ class StandardSearchField extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(compact ? 12 : 14),
-          borderSide: const BorderSide(
-            color: kOperonixProductionBrandGreen,
+          borderSide: BorderSide(
+            color: tokens.fieldFocus,
             width: 2,
           ),
         ),

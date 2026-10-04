@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/visual/operonix_empty_state.dart';
+import '../../../../core/visual/operonix_visual_tokens.dart';
+
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/company_plant_display_name.dart';
 import '../../../../features/catalog_evidence_runtime/utils/catalog_evidence_help_texts.dart';
@@ -193,15 +196,11 @@ class _ProductionEvidenceOperatorHubScreenState
       );
     }
     if (_entries.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
+      return const OperonixEmptyState(
+        padding: EdgeInsets.all(24),
+        message:
             'Nema aktivnih evidencija za vašu ulogu i pogon.\n'
             'Administrator može aktivirati obrasce u Evidencije kompanije.',
-            textAlign: TextAlign.center,
-          ),
-        ),
       );
     }
 
@@ -213,32 +212,19 @@ class _ProductionEvidenceOperatorHubScreenState
         final entry = _entries[index];
         final config = entry.config;
         final profile = entry.profile;
-        return Card(
-          child: ListTile(
-            leading: CircleAvatar(
-              child: Icon(_iconForProfile(profile.profileKey)),
-            ),
-            title: Text(config.displayName),
-            subtitle: Text(
+        return ProductionEvidenceListCard(
+          title: config.displayName,
+          subtitle:
               '${profile.displayName}\n'
               'Pogon: ${_plantLabel(config.plantKey)} · '
               'Proces: ${config.processKey} · Faza: ${config.phaseKey}',
-            ),
-            isThreeLine: true,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // M1-I5-C3 — svaka operativna evidencija mora imati info ikonicu.
-                CatalogEvidenceHelpTexts.infoIconForProfile(
-                  profileKey: profile.profileKey,
-                  displayName: profile.displayName,
-                  description: profile.description,
-                ),
-                const Icon(Icons.chevron_right),
-              ],
-            ),
-            onTap: () => _openEvidence(config, profile),
+          icon: _iconForProfile(profile.profileKey),
+          infoAction: CatalogEvidenceHelpTexts.infoIconForProfile(
+            profileKey: profile.profileKey,
+            displayName: profile.displayName,
+            description: profile.description,
           ),
+          onTap: () => _openEvidence(config, profile),
         );
       },
     );
@@ -271,5 +257,54 @@ class _ProductionEvidenceOperatorHubScreenState
       default:
         return Icons.assignment_outlined;
     }
+  }
+}
+
+/// Kartica evidencije u hubu. Isti sadržaj u Classic i Premium; izgled ide iz teme.
+class ProductionEvidenceListCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Widget infoAction;
+  final VoidCallback? onTap;
+
+  const ProductionEvidenceListCard({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.infoAction,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = OperonixVisualTokens.of(context);
+    return Card(
+      child: ListTile(
+        minVerticalPadding: 12,
+        leading: CircleAvatar(
+          backgroundColor: tokens.isPremium
+              ? tokens.primaryAccent.withValues(alpha: 0.18)
+              : null,
+          foregroundColor: tokens.isPremium ? tokens.primaryAccent : null,
+          child: Icon(icon),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        subtitle: Text(subtitle),
+        isThreeLine: true,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            infoAction,
+            const Icon(Icons.chevron_right),
+          ],
+        ),
+        onTap: onTap,
+      ),
+    );
   }
 }

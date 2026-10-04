@@ -7,7 +7,10 @@ import 'package:flutter/foundation.dart'
 import 'package:flutter/material.dart';
 import 'package:production_app/services/mes_push_navigation.dart';
 import 'package:production_app/core/branding/operonix_ai_branding.dart';
-import 'package:production_app/core/theme/operonix_production_brand.dart';
+import 'package:production_app/core/visual/app_appearance_selector.dart';
+import 'package:production_app/core/visual/operonix_desktop_shell.dart';
+import 'package:production_app/core/visual/operonix_shell_metrics.dart';
+import 'package:production_app/core/visual/operonix_visual_tokens.dart';
 import 'package:production_app/screens/about_screen.dart';
 
 import '../../../../core/access/production_access_helper.dart';
@@ -380,7 +383,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
   bool _isWideLayout(BuildContext context) {
     final w = MediaQuery.sizeOf(context).width;
     final isWin = !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
-    return isWin || w >= 900;
+    return OperonixShellMetrics.isWide(width: w, windowsNative: isWin);
   }
 
   List<_ProdNavItem> _buildFullNav(BuildContext context) {
@@ -1075,32 +1078,21 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       return _withInAppArrivalBanner(Scaffold(
         key: _shellScaffoldKey,
         drawer: kIsWeb ? _webProductionDrawer(context) : null,
-        body: SafeArea(
-          child: Row(
-            children: [
-              NavigationRail(
-                leading: kIsWeb
-                    ? IconButton(
-                        tooltip: 'Web meni',
-                        icon: const Icon(Icons.menu),
-                        onPressed: () =>
-                            _shellScaffoldKey.currentState?.openDrawer(),
-                      )
-                    : null,
-                selectedIndex: safeIndex,
-                onDestinationSelected: _selectShellIndex,
-                labelType: NavigationRailLabelType.all,
-                destinations: _toRailDestinations(nav),
-                scrollable: true,
-              ),
-              const VerticalDivider(width: 1, thickness: 1),
-              Expanded(
-                child: KeyedSubtree(
-                  key: ValueKey<String>('prod_rail_$safeIndex'),
-                  child: current,
-                ),
-              ),
-            ],
+        body: OperonixDesktopShell(
+          leading: kIsWeb
+              ? IconButton(
+                  tooltip: 'Web meni',
+                  icon: const Icon(Icons.menu),
+                  onPressed: () =>
+                      _shellScaffoldKey.currentState?.openDrawer(),
+                )
+              : null,
+          selectedIndex: safeIndex,
+          onDestinationSelected: _selectShellIndex,
+          destinations: _toRailDestinations(nav),
+          child: KeyedSubtree(
+            key: ValueKey<String>('prod_rail_$safeIndex'),
+            child: current,
           ),
         ),
       ));
@@ -1166,8 +1158,8 @@ class _ProductionHomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gap = kIsWeb ? 12.0 : 16.0;
-    final pad = kIsWeb ? 12.0 : 16.0;
+    final gap = OperonixShellMetrics.pagePaddingFor(web: kIsWeb);
+    final pad = OperonixShellMetrics.pagePaddingFor(web: kIsWeb);
 
     return Scaffold(
       appBar: AppBar(
@@ -1216,6 +1208,8 @@ class _ProductionHomePage extends StatelessWidget {
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
+          SizedBox(height: gap * 0.75),
+          const AppAppearanceSelector(),
           SizedBox(height: gap * 0.75),
           ProductionDashboardLayoutSelector(
             value: dashboardLayout,
@@ -1331,17 +1325,17 @@ class _SessionHeaderCard extends StatelessWidget {
     required this.companyLine,
   });
 
-  Widget _plantLine() {
+  Widget _plantLine(Color color) {
     if (plantKey.trim().isEmpty) {
-      return const Text(
+      return Text(
         'Pogon: nije vezan na korisniku (globalni admin — biraj kontekst u modulima)',
-        style: TextStyle(color: Colors.black87, fontSize: 13),
+        style: TextStyle(color: color, fontSize: 13),
       );
     }
     if (companyId.trim().isEmpty) {
       return Text(
         'Pogon: $plantKey',
-        style: const TextStyle(color: Colors.black87),
+        style: TextStyle(color: color),
       );
     }
     return FutureBuilder<String>(
@@ -1356,7 +1350,7 @@ class _SessionHeaderCard extends StatelessWidget {
             : (snap.data ?? plantKey);
         return Text(
           'Pogon: $label',
-          style: const TextStyle(color: Colors.black87),
+          style: TextStyle(color: color),
         );
       },
     );
@@ -1364,16 +1358,11 @@ class _SessionHeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = OperonixVisualTokens.of(context);
     return Card(
       clipBehavior: Clip.antiAlias,
-      elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(
-          color: kOperonixProductionBrandGreen,
-          width: 1.5,
-        ),
-      ),
+      elevation: tokens.isPremium ? 0 : 1,
+      shape: tokens.cardShape,
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
@@ -1387,17 +1376,17 @@ class _SessionHeaderCard extends StatelessWidget {
                 children: [
                   Text(
                     'Uloga: $roleLabel',
-                    style: const TextStyle(
-                      color: Colors.black87,
+                    style: TextStyle(
+                      color: tokens.primaryText,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 4),
-                  _plantLine(),
+                  _plantLine(tokens.primaryText),
                   const SizedBox(height: 2),
                   Text(
                     'Kompanija: $companyLine',
-                    style: const TextStyle(color: Colors.black54),
+                    style: TextStyle(color: tokens.secondaryText),
                   ),
                 ],
               ),
@@ -1440,9 +1429,10 @@ class _CompanyHeaderLogoState extends State<_CompanyHeaderLogo> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final tokens = OperonixVisualTokens.of(context);
     final border = Border.all(
-      color: kOperonixProductionBrandGreen.withValues(alpha: 0.5),
-      width: 1.5,
+      color: tokens.moduleAccent.withValues(alpha: 0.5),
+      width: tokens.cardBorderWidth,
     );
     final radius = BorderRadius.circular(12);
 
@@ -1453,7 +1443,7 @@ class _CompanyHeaderLogoState extends State<_CompanyHeaderLogo> {
           child: Icon(
             Icons.apartment_outlined,
             size: 30,
-            color: kOperonixProductionBrandGreen.withValues(alpha: 0.75),
+            color: tokens.moduleAccent.withValues(alpha: 0.75),
           ),
         ),
       );
