@@ -36,18 +36,31 @@ Border is used for selection, focus or status. Ordinary grouping uses surface co
 
 Spacing follows 4 / 8 / 12 / 16 / 24 / 32. Radius is not the same on every surface.
 
-## Palette
+## Three layers
 
-Station appearance stays the existing local preference (`StationScreenThemeStore`).
+Global visual style and the two local tracking preferences stay separate.
 
-In Premium that choice maps to a dark palette:
+| Layer | Store | What it may change |
+| --- | --- | --- |
+| Global visual style | `operonix_production_visual_style_v1` | Classic or Premium component system for the whole app |
+| Tema radnog prostora | `station_screen_appearance_v1` (`StationScreenThemeStore`) | Tracking canvas, AppBar, surfaces, dividers, navigation accent, icon shift |
+| Boja operativnih akcija | `prep_station_accent_v1` (`PreparationStationUiPrefs`) | Skeniraj QR, Potvrdi unos, and the same primary station actions. Not the canvas or navigation |
 
-- Operonix (brend) → Midnight, teal accent, canvas `#0A1020`
-- Industrijska noć → cobalt canvas and blue accent
-- Svijetla proizvodnja → dark violet canvas, never a light page
-- custom colors → accent is kept, a light background is pulled down to a dark canvas
+Precedence on Praćenje proizvodnje:
 
-The palette changes the page canvas, selected navigation, primary action, selected segmented control and relevant icon badges. It does not change component structure or switch Premium back to Classic.
+```text
+Premium base
+→ station workspace palette
+→ action accent override
+```
+
+Operonix (brend) on Premium is Midnight, canvas `#0A1020`, teal accent.
+
+Industrijska noć is a near-black industrial canvas with a cyan accent.
+
+Svijetla proizvodnja is a real light Premium workspace on the tracking screen only. It does not switch the app back to Classic.
+
+The action colors stay Zelena, Plava, Narančasta and Ljubičasta. They recolor the primary action and its foreground is chosen for contrast. They do not recolor the page.
 
 ## Pilot screens
 

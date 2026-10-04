@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/visual/operonix_visual_tokens.dart';
 import '../../../../core/visual/premium/premium_icon_accent.dart';
+import '../../../../core/visual/premium/premium_station_palette.dart';
 import '../../../../core/visual/premium/premium_type.dart';
 import '../../../../core/visual/premium/premium_widgets.dart';
 import '../config/preparation_station_ui_prefs.dart';
@@ -91,14 +92,26 @@ class TrackingScanActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = OperonixVisualTokens.of(context);
     final premium = tokens.isPremium;
-    assert(!premium || accent.a >= 0);
+    final onAction = premiumActionForeground(accent);
     final scan = premium
         ? FilledButton.icon(
             onPressed: onScan,
             style: FilledButton.styleFrom(
-              backgroundColor: tokens.primaryAccent,
-              foregroundColor: tokens.onAccent,
+              backgroundColor: accent,
+              foregroundColor: onAction,
+              iconColor: onAction,
               minimumSize: const Size(48, 48),
+            ).copyWith(
+              overlayColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.pressed)) {
+                  return onAction.withValues(alpha: 0.16);
+                }
+                if (states.contains(WidgetState.focused) ||
+                    states.contains(WidgetState.hovered)) {
+                  return onAction.withValues(alpha: 0.10);
+                }
+                return null;
+              }),
             ),
             icon: const Icon(Icons.qr_code_scanner_outlined),
             label: const Text('Skeniraj QR'),
@@ -150,12 +163,16 @@ class TrackingButtonAccentChoices extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelected;
   final bool inline;
+  final bool showHeading;
+  final bool showSwatch;
 
   const TrackingButtonAccentChoices({
     super.key,
     required this.selectedIndex,
     required this.onSelected,
     this.inline = true,
+    this.showHeading = true,
+    this.showSwatch = false,
   });
 
   @override
@@ -169,14 +186,21 @@ class TrackingButtonAccentChoices extends StatelessWidget {
       runSpacing: 6,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Text(
-          'Tema gumba',
-          style: theme.textTheme.labelMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+        if (showHeading)
+          Text(
+            'Tema gumba',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
-        ),
         for (var i = 0; i < PreparationStationUiPrefs.accentColors.length; i++)
           ChoiceChip(
+            avatar: showSwatch
+                ? CircleAvatar(
+                    backgroundColor: PreparationStationUiPrefs.accentColors[i],
+                    radius: 8,
+                  )
+                : null,
             label: Text(PreparationStationUiPrefs.accentLabels[i]),
             selected: selectedIndex == i,
             onSelected: (selected) {

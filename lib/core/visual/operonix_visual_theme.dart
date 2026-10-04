@@ -81,9 +81,13 @@ class OperonixVisualTheme {
       premiumWith(OperonixVisualTokens.midnight());
 
   /// Premium struktura ostaje ista. Paleta mijenja platno, površine i akcent.
+  ///
+  /// Svijetlo platno (Svijetla proizvodnja) ostaje Premium: brightness prati
+  /// platno, ne globalni VisualStyle.
   static ThemeData premiumWith(OperonixVisualTokens tokens) {
+    final lightCanvas = tokens.background.computeLuminance() > 0.45;
     final scheme = ColorScheme(
-      brightness: Brightness.dark,
+      brightness: lightCanvas ? Brightness.light : Brightness.dark,
       primary: tokens.primaryAccent,
       onPrimary: tokens.onAccent,
       secondary: tokens.info,
@@ -104,8 +108,12 @@ class OperonixVisualTheme {
       onPrimaryContainer: tokens.primaryText,
       secondaryContainer: tokens.primaryAccent.withValues(alpha: 0.22),
       onSecondaryContainer: tokens.primaryAccent,
-      errorContainer: const Color(0xFF4A1C1C),
-      onErrorContainer: const Color(0xFFFFD6D6),
+      errorContainer: lightCanvas
+          ? const Color(0xFFFDECEC)
+          : const Color(0xFF4A1C1C),
+      onErrorContainer: lightCanvas
+          ? const Color(0xFF6B1212)
+          : const Color(0xFFFFD6D6),
     );
 
     final radius = BorderRadius.circular(tokens.cardRadius);
@@ -127,7 +135,7 @@ class OperonixVisualTheme {
 
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.dark,
+      brightness: lightCanvas ? Brightness.light : Brightness.dark,
       colorScheme: scheme,
       scaffoldBackgroundColor: tokens.background,
       visualDensity: kIsWeb ? VisualDensity.compact : VisualDensity.standard,

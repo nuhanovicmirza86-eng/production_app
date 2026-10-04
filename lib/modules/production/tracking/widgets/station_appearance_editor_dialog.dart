@@ -207,14 +207,16 @@ class _StationAppearanceEditorBodyState extends State<_StationAppearanceEditorBo
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Predlošci prate Operonix brend i SCADA paletu (tamna noć = „Operonix grafit“).',
+              widget.showButtonAccent
+                  ? 'Tema radnog prostora mijenja platno, površine i navigaciju ovog ekrana. Boja akcija mijenja samo glavne radnje.'
+                  : 'Predlošci prate Operonix brend i SCADA paletu (tamna noć = „Operonix grafit“).',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 12),
             Text(
-              'Predlošci',
+              widget.showButtonAccent ? 'Tema radnog prostora' : 'Predlošci',
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
@@ -226,7 +228,9 @@ class _StationAppearanceEditorBodyState extends State<_StationAppearanceEditorBo
               children: [
                 for (final t in StationScreenThemeId.values)
                   ChoiceChip(
-                    avatar: Icon(t.menuIcon, size: 18),
+                    avatar: widget.showButtonAccent
+                        ? _WorkspaceSwatch(themeId: t)
+                        : Icon(t.menuIcon, size: 18),
                     label: Text(t.label),
                     selected: !_useCustomColors &&
                         (!widget.seed.usesCustom || _presetPicked) &&
@@ -339,10 +343,17 @@ class _StationAppearanceEditorBodyState extends State<_StationAppearanceEditorBo
             ],
             if (widget.showButtonAccent) ...[
               const Divider(height: 24),
+              Text(
+                'Boja operativnih akcija',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
               const _ButtonAccentSection(),
               const SizedBox(height: 8),
               Text(
-                'Paleta stanice mijenja tamnu Premium podlogu i akcent. Tema gumba ostaje za Classic i ne vraća svijetli ekran.',
+                'Mijenja Skeniraj QR i potvrdu unosa. Ne mijenja platno ni navigaciju.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -463,11 +474,40 @@ class _ButtonAccentSectionState extends State<_ButtonAccentSection> {
   Widget build(BuildContext context) {
     return TrackingButtonAccentChoices(
       inline: false,
+      showHeading: false,
+      showSwatch: true,
       selectedIndex: _index,
       onSelected: (index) {
         setState(() => _index = index);
         PreparationStationUiPrefs.saveAccentIndex(index);
       },
+    );
+  }
+}
+
+class _WorkspaceSwatch extends StatelessWidget {
+  final StationScreenThemeId themeId;
+
+  const _WorkspaceSwatch({required this.themeId});
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = PremiumStationPalette.tokensFor(
+      StationScreenAppearance(preset: themeId),
+    );
+    return SizedBox(
+      width: 28,
+      height: 14,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(3),
+        child: Row(
+          children: [
+            Expanded(child: ColoredBox(color: tokens.background)),
+            Expanded(child: ColoredBox(color: tokens.surfaceElevated)),
+            Expanded(child: ColoredBox(color: tokens.primaryAccent)),
+          ],
+        ),
+      ),
     );
   }
 }

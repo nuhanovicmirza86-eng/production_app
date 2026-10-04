@@ -6,6 +6,7 @@ import 'package:production_app/core/visual/premium/premium_icon_accent.dart';
 import 'package:production_app/core/visual/premium/premium_station_palette.dart';
 import 'package:production_app/core/visual/premium/premium_widgets.dart';
 import 'package:production_app/core/visual/visual_style.dart';
+import 'package:production_app/modules/production/tracking/config/preparation_station_ui_prefs.dart';
 import 'package:production_app/modules/production/tracking/config/station_screen_theme.dart';
 import 'package:production_app/modules/production/tracking/config/station_screen_theme_store.dart';
 import 'package:production_app/modules/quality/quality_premium_sections.dart';
@@ -18,50 +19,53 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Praćenje Premium presentation', () {
-    test('Premium palette changes the dark canvas and never turns light', () {
+    test('each station theme drives a distinct Premium workspace palette', () {
       final midnight = OperonixVisualTheme.premiumMidnight();
-      final operonix = trackingPageTheme(
-        parent: midnight,
-        appearance: const StationScreenAppearance(
-          preset: StationScreenThemeId.operonix,
-        ),
-        premium: true,
-      );
+      final themes = <StationScreenThemeId, ThemeData>{
+        for (final id in StationScreenThemeId.values)
+          id: trackingPageTheme(
+            parent: midnight,
+            appearance: StationScreenAppearance(preset: id),
+            premium: true,
+          ),
+      };
+      final operonix = themes[StationScreenThemeId.operonix]!;
+      final night = themes[StationScreenThemeId.industrialDark]!;
+      final light = themes[StationScreenThemeId.cleanLight]!;
+
       expect(operonix.scaffoldBackgroundColor, const Color(0xFF0A1020));
       expect(operonix.brightness, Brightness.dark);
+      expect(operonix.extension<OperonixVisualTokens>()!.style, VisualStyle.premium);
 
-      final cobalt = trackingPageTheme(
-        parent: midnight,
-        appearance: const StationScreenAppearance(
-          preset: StationScreenThemeId.industrialDark,
-        ),
-        premium: true,
-      );
-      final violet = trackingPageTheme(
-        parent: midnight,
-        appearance: const StationScreenAppearance(
-          preset: StationScreenThemeId.cleanLight,
-        ),
-        premium: true,
-      );
-      expect(cobalt.scaffoldBackgroundColor, isNot(const Color(0xFF0A1020)));
-      expect(violet.scaffoldBackgroundColor, isNot(const Color(0xFF0A1020)));
+      expect(night.scaffoldBackgroundColor, const Color(0xFF05080C));
+      expect(night.brightness, Brightness.dark);
+      expect(night.appBarTheme.backgroundColor, const Color(0xFF0C1218));
+      expect(night.colorScheme.primary, const Color(0xFF3EC6D6));
+
+      expect(light.scaffoldBackgroundColor, const Color(0xFFF2F4F7));
+      expect(light.brightness, Brightness.light);
+      expect(light.appBarTheme.backgroundColor, Colors.white);
       expect(
-        cobalt.scaffoldBackgroundColor,
-        isNot(violet.scaffoldBackgroundColor),
+        light.extension<OperonixVisualTokens>()!.primaryText,
+        const Color(0xFF1B2430),
       );
-      expect(cobalt.colorScheme.primary, isNot(violet.colorScheme.primary));
-      expect(cobalt.colorScheme.primary, isNot(operonix.colorScheme.primary));
-      for (final theme in [cobalt, violet]) {
-        expect(theme.brightness, Brightness.dark);
-        expect(theme.scaffoldBackgroundColor.computeLuminance(), lessThan(0.2));
-        expect(theme.scaffoldBackgroundColor, isNot(Colors.white));
-        expect(theme.scaffoldBackgroundColor, isNot(const Color(0xFFF5F8FB)));
-        expect(theme.scaffoldBackgroundColor, isNot(const Color(0xFFFAFAFA)));
-      }
+      expect(light.extension<OperonixVisualTokens>()!.style, VisualStyle.premium);
 
+      final canvases = themes.values.map((t) => t.scaffoldBackgroundColor).toSet();
+      final surfaces = themes.values.map((t) => t.appBarTheme.backgroundColor).toSet();
+      final accents = themes.values.map((t) => t.tabBarTheme.labelColor).toSet();
+      expect(canvases, hasLength(3));
+      expect(surfaces, hasLength(3));
+      expect(accents, hasLength(3));
+      for (final theme in themes.values) {
+        expect(theme.tabBarTheme.labelColor, theme.colorScheme.primary);
+        expect(theme.tabBarTheme.indicatorColor, theme.colorScheme.primary);
+      }
+    });
+
+    test('custom light workspace stays light and Premium', () {
       final custom = trackingPageTheme(
-        parent: midnight,
+        parent: OperonixVisualTheme.premiumMidnight(),
         appearance: StationScreenAppearance(
           custom: StationScreenCustomColors(
             background: Colors.white,
@@ -71,11 +75,14 @@ void main() {
         ),
         premium: true,
       );
-      expect(custom.brightness, Brightness.dark);
-      expect(custom.scaffoldBackgroundColor, isNot(Colors.white));
-      expect(custom.scaffoldBackgroundColor, isNot(const Color(0xFF0A1020)));
-      expect(custom.scaffoldBackgroundColor.computeLuminance(), lessThan(0.2));
+      expect(custom.brightness, Brightness.light);
+      expect(custom.scaffoldBackgroundColor.computeLuminance(), greaterThan(0.7));
       expect(custom.colorScheme.primary, Colors.purple);
+      expect(
+        custom.extension<OperonixVisualTokens>()!.primaryText.computeLuminance(),
+        lessThan(0.2),
+      );
+      expect(custom.extension<OperonixVisualTokens>()!.style, VisualStyle.premium);
     });
 
     test('palette tokens apply immediately from the station appearance', () {
@@ -106,8 +113,12 @@ void main() {
         appearance: loaded,
         premium: true,
       );
-      expect(theme.scaffoldBackgroundColor, const Color(0xFF140C1C));
-      expect(theme.brightness, Brightness.dark);
+      expect(theme.scaffoldBackgroundColor, const Color(0xFFF2F4F7));
+      expect(theme.brightness, Brightness.light);
+      expect(
+        OperonixVisualTheme.premiumMidnight().scaffoldBackgroundColor,
+        const Color(0xFF0A1020),
+      );
     });
 
     test('Classic still receives the full station theme', () {
@@ -183,7 +194,9 @@ void main() {
       await tester.tap(find.text('Otvori paletu'));
       await tester.pumpAndSettle();
       expect(find.text('Operonix (brend)'), findsOneWidget);
-      expect(find.text('Tema gumba'), findsOneWidget);
+      expect(find.text('Tema radnog prostora'), findsOneWidget);
+      expect(find.text('Boja operativnih akcija'), findsOneWidget);
+      expect(find.text('Tema gumba'), findsNothing);
       expect(find.text('Zelena'), findsOneWidget);
       expect(find.text('Ljubičasta'), findsOneWidget);
     });
@@ -414,12 +427,98 @@ void main() {
       }
 
       expect(previewOf().color, const Color(0xFF0A1020));
+      await tester.tap(find.text('Industrijska noć'));
+      await tester.pumpAndSettle();
+      expect(previewOf().color, const Color(0xFF05080C));
       await tester.tap(find.text('Svijetla proizvodnja'));
       await tester.pumpAndSettle();
-      final next = previewOf().color!;
-      expect(next, isNot(const Color(0xFF0A1020)));
-      expect(next, isNot(Colors.white));
-      expect(next.computeLuminance(), lessThan(0.2));
+      final next = previewOf().color;
+      expect(next, const Color(0xFFF2F4F7));
+      expect(next!.computeLuminance(), greaterThan(0.7));
+    });
+
+    test('action color overrides buttons and leaves the canvas', () {
+      final workspace = trackingPageTheme(
+        parent: OperonixVisualTheme.premiumMidnight(),
+        appearance: const StationScreenAppearance(
+          preset: StationScreenThemeId.industrialDark,
+        ),
+        premium: true,
+      );
+      for (final action in PreparationStationUiPrefs.accentColors) {
+        final themed = premiumTrackingActionTheme(workspace, action);
+        expect(themed.scaffoldBackgroundColor, workspace.scaffoldBackgroundColor);
+        expect(themed.appBarTheme.backgroundColor, workspace.appBarTheme.backgroundColor);
+        expect(themed.tabBarTheme.labelColor, workspace.tabBarTheme.labelColor);
+        final bg = themed.filledButtonTheme.style!.backgroundColor!.resolve(
+          const <WidgetState>{},
+        );
+        final fg = themed.filledButtonTheme.style!.foregroundColor!.resolve(
+          const <WidgetState>{},
+        );
+        expect(bg, action);
+        expect(premiumContrast(bg!, fg!), greaterThanOrEqualTo(3));
+      }
+    });
+
+    testWidgets('every saved action color recolors Skeniraj QR', (tester) async {
+      for (final action in PreparationStationUiPrefs.accentColors) {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: OperonixVisualTheme.premiumMidnight(),
+            home: Scaffold(
+              body: TrackingScanActions(
+                accent: action,
+                onScan: () {},
+                onSecondary: () {},
+                showSecondary: true,
+                secondaryLabel: 'Zatvori kutiju',
+                secondaryIcon: Icons.inventory_2_outlined,
+              ),
+            ),
+          ),
+        );
+        final button = tester.widget<FilledButton>(
+          find.widgetWithText(FilledButton, 'Skeniraj QR'),
+        );
+        final bg = button.style!.backgroundColor!.resolve(const <WidgetState>{});
+        final fg = button.style!.foregroundColor!.resolve(const <WidgetState>{});
+        expect(bg, action);
+        expect(premiumContrast(bg!, fg!), greaterThanOrEqualTo(3));
+      }
+    });
+
+    test('saved action color and workspace theme reload together', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      await StationScreenThemeStore.save(
+        const StationScreenAppearance(preset: StationScreenThemeId.cleanLight),
+      );
+      await PreparationStationUiPrefs.saveAccentIndex(2);
+      final appearance = await StationScreenThemeStore.load();
+      final accent = await PreparationStationUiPrefs.loadAccentIndex();
+      expect(appearance.preset, StationScreenThemeId.cleanLight);
+      expect(accent, 2);
+      expect(
+        PreparationStationUiPrefs.accentColors[accent],
+        const Color(0xFFEF6C00),
+      );
+      final theme = trackingPageTheme(
+        parent: OperonixVisualTheme.premiumMidnight(),
+        appearance: appearance,
+        premium: true,
+      );
+      expect(theme.scaffoldBackgroundColor, const Color(0xFFF2F4F7));
+      final actions = premiumTrackingActionTheme(
+        theme,
+        PreparationStationUiPrefs.accentColors[accent],
+      );
+      expect(
+        actions.filledButtonTheme.style!.backgroundColor!.resolve(
+          const <WidgetState>{},
+        ),
+        const Color(0xFFEF6C00),
+      );
+      expect(actions.scaffoldBackgroundColor, const Color(0xFFF2F4F7));
     });
   });
 }

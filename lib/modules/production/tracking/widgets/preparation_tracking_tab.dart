@@ -12,6 +12,7 @@ import '../../../workforce/employee_profiles/workforce_employee_qr_navigation.da
 import '../../../../core/theme/operonix_production_brand.dart';
 import '../../../../core/format/ba_formatted_date.dart';
 import '../../../../core/visual/operonix_visual_tokens.dart';
+import '../../../../core/visual/premium/premium_station_palette.dart';
 import '../../../../core/visual/premium/premium_type.dart';
 import '../../../../core/visual/premium/premium_widgets.dart';
 import '../../../../core/ui/station_input.dart';
@@ -2968,7 +2969,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
     final workKey = _workDateKey(_workDay);
     final scrapDefs = _scrapTiles();
     final premium = OperonixVisualTokens.of(context).isPremium;
-    final themed = premium ? theme : _themedForAccents(theme);
+    final themed = premium
+        ? premiumTrackingActionTheme(theme, _buttonAccent)
+        : _themedForAccents(theme);
 
     return Theme(
       data: themed,
