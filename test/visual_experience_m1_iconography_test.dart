@@ -364,10 +364,106 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.byType(OperonixPremiumIcon), findsNothing);
       expect(find.byIcon(Icons.display_settings_outlined), findsWidgets);
+      final card = tester.widget<Card>(find.byType(Card).first);
+      final side = (card.shape! as RoundedRectangleBorder).side;
+      expect(side.width, greaterThan(1));
       expect(
         ProductionDashboardHomeModulesView.classicIconGridColumnCount(400),
         3,
       );
+    });
+
+    test('home business concepts map to distinct pictograms', () {
+      final glyphs = [
+        for (final title in _homePictogramTitles)
+          OperonixPremiumIconography.forTitle(title),
+      ];
+      expect(glyphs, everyElement(isNotNull));
+      expect(glyphs.toSet().length, _homePictogramTitles.length);
+      expect(glyphs, isNot(contains(OperonixPremiumGlyph.station)));
+    });
+
+    testWidgets('premium icon spot has no outline', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: OperonixVisualTheme.premiumMidnight(),
+          home: const Scaffold(
+            body: PremiumIconBadge(
+              glyph: OperonixPremiumGlyph.products,
+              role: PremiumIconRole.success,
+              variant: PremiumBadgeVariant.large,
+            ),
+          ),
+        ),
+      );
+      final badge = tester.widget<PremiumIconBadge>(find.byType(PremiumIconBadge));
+      expect(badge.extent, inInclusiveRange(48, 64));
+      final spot = tester.widget<Container>(
+        find.descendant(
+          of: find.byType(PremiumIconBadge),
+          matching: find.byType(Container),
+        ),
+      );
+      final decoration = spot.decoration! as BoxDecoration;
+      expect(decoration.border, isNull);
+      final mark = tester.widget<OperonixPremiumIcon>(find.byType(OperonixPremiumIcon));
+      expect(mark.size, greaterThanOrEqualTo(46));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('premium home tile drops the double box', (tester) async {
+      await _pumpIconHome(tester, width: 360, premium: true);
+      final card = tester.widget<Card>(find.byType(Card).first);
+      expect((card.shape! as RoundedRectangleBorder).side, BorderSide.none);
+      final spot = tester.widget<Container>(
+        find.descendant(
+          of: find.byType(PremiumIconBadge).first,
+          matching: find.byType(Container),
+        ).first,
+      );
+      expect((spot.decoration! as BoxDecoration).border, isNull);
+      final text = tester.widget<Text>(find.text('Način rada na ovom uređaju'));
+      expect(text.textAlign, TextAlign.start);
+    });
+
+    testWidgets('home pictograms differ by shape in one color', (tester) async {
+      final glyphs = [
+        for (final title in _homePictogramTitles)
+          OperonixPremiumIconography.forTitle(title)!,
+      ];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Wrap(
+            children: [
+              for (final glyph in glyphs)
+                RepaintBoundary(
+                  key: ValueKey(glyph),
+                  child: OperonixPremiumIcon(
+                    glyph: glyph,
+                    size: 48,
+                    color: const Color(0xFF222222),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+      final signatures = <int>{};
+      await tester.runAsync(() async {
+        for (final glyph in glyphs) {
+          final boundary = tester.renderObject<RenderRepaintBoundary>(
+            find.byKey(ValueKey(glyph)),
+          );
+          final image = await boundary.toImage();
+          final bytes = (await image.toByteData())!.buffer.asUint8List();
+          var hash = 0;
+          for (final byte in bytes) {
+            hash = (hash * 31 + byte) & 0x7fffffff;
+          }
+          signatures.add(hash);
+        }
+      });
+      expect(signatures.length, glyphs.length);
     });
 
     testWidgets('Standardno stays a list when Premium is on', (tester) async {
@@ -383,6 +479,21 @@ void main() {
     });
   });
 }
+
+const _homePictogramTitles = [
+  'Način rada na ovom uređaju',
+  'Proizvodi',
+  'Proizvodni nalozi',
+  'Planiranje proizvodnje',
+  'Praćenje proizvodnje (tabovi)',
+  'Stanica: pripremna',
+  'Stanica: prva kontrola',
+  'Stanica: završna kontrola',
+  'Operativne stanice (profil)',
+  'Operativne evidencije',
+  'Moje otvorene akcije',
+  'Evidencije procesa',
+];
 
 const _longHomeLabels = [
   'Način rada na ovom uređaju',

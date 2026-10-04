@@ -31,7 +31,9 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
         ? PremiumIconAccent.of(OperonixPremiumIconography.roleFor(glyph), tokens)
         : tokens.moduleAccent;
     final shape = tokens.isPremium
-        ? tokens.cardShape
+        ? RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(tokens.cardRadius),
+          )
         : RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
             side: BorderSide(
@@ -40,16 +42,22 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
             ),
           );
     return Card(
+      margin: tokens.isPremium ? EdgeInsets.zero : null,
       clipBehavior: Clip.antiAlias,
-      elevation: tokens.isPremium ? 0 : 1,
+      elevation: 1,
+      shadowColor: tokens.isPremium ? const Color(0x33000000) : null,
+      color: tokens.isPremium ? tokens.surfaceElevated : null,
       shape: shape,
       child: InkWell(
         onTap: onTap,
         child: Padding(
           padding: tokens.isPremium
-              ? const EdgeInsets.fromLTRB(12, 14, 12, 12)
+              ? const EdgeInsets.fromLTRB(12, 10, 12, 10)
               : const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
           child: Column(
+            crossAxisAlignment: tokens.isPremium
+                ? CrossAxisAlignment.start
+                : CrossAxisAlignment.center,
             mainAxisAlignment: tokens.isPremium
                 ? MainAxisAlignment.start
                 : MainAxisAlignment.center,
@@ -101,16 +109,17 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
                     ),
                 ],
               ),
-              SizedBox(height: tokens.isPremium ? 10 : 8),
+              const SizedBox(height: 8),
               Text(
                 title,
-                textAlign: TextAlign.center,
+                textAlign: tokens.isPremium ? TextAlign.start : TextAlign.center,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: tokens.isPremium ? 14 : 12,
-                  height: tokens.isPremium ? 1.25 : 1.2,
+                  height: 1.2,
+                  color: tokens.isPremium ? tokens.primaryText : null,
                 ),
               ),
             ],

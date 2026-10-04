@@ -6,7 +6,7 @@ import 'operonix_premium_iconography.dart';
 import 'premium_icon_accent.dart';
 import 'premium_type.dart';
 
-/// Veličina i radijus bedža. Oblik se mijenja samo kroz ove varijante.
+/// Veličina meke mrlje. Piktogram puni većinu površine, bez obruba.
 enum PremiumBadgeVariant { small, medium, large }
 
 const double _kBadge = 40;
@@ -85,7 +85,7 @@ class PremiumIconBadge extends StatelessWidget {
     return switch (variant) {
       PremiumBadgeVariant.small => 28,
       PremiumBadgeVariant.medium => _kBadge,
-      PremiumBadgeVariant.large => 56,
+      PremiumBadgeVariant.large => 60,
     };
   }
 
@@ -111,32 +111,32 @@ class PremiumIconBadge extends StatelessWidget {
         ? tokens.disabledText
         : PremiumIconAccent.of(role, tokens);
     final box = extent;
-    final fill = disabled
-        ? tokens.disabledText.withValues(alpha: 0.10)
-        : accent.withValues(alpha: selected ? 0.30 : 0.16);
-    final border = accent.withValues(
-      alpha: disabled ? 0.28 : (selected ? 0.95 : 0.50),
-    );
+    final spot = disabled
+        ? tokens.disabledText.withValues(alpha: 0.14)
+        : accent.withValues(alpha: selected ? 0.30 : 0.20);
+    final spotDeep = disabled
+        ? tokens.disabledText.withValues(alpha: 0.06)
+        : accent.withValues(alpha: selected ? 0.12 : 0.07);
     final mark = glyph;
     return Container(
       width: box,
       height: box,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: fill,
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(
-          color: border,
-          width: selected ? 1.6 : 1,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [spot, spotDeep],
         ),
       ),
       child: mark != null
           ? OperonixPremiumIcon(
               glyph: mark,
               color: accent,
-              size: box * 0.56,
+              size: box * 0.82,
             )
-          : Icon(icon ?? Icons.circle_outlined, size: box * 0.52, color: accent),
+          : Icon(icon ?? Icons.circle_outlined, size: box * 0.62, color: accent),
     );
   }
 }

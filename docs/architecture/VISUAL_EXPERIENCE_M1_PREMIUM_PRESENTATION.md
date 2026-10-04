@@ -64,15 +64,15 @@ The action colors stay Zelena, Plava, Narančasta and Ljubičasta. They recolor 
 
 ## Premium iconography
 
-Premium business icons are local vector glyphs (`OperonixPremiumIcon`), not a Material pack and not image assets. Classic keeps its existing Material icons.
+Premium business icons are local duotone pictograms (`OperonixPremiumIcon`), not a Material pack and not image assets. Each mark is a filled object plus one secondary detail. Classic keeps its existing Material icons.
 
-Badge size and radius come only from `PremiumBadgeVariant`: small (28 / 8), medium (40 / 12), large home card (56 / 18). Selected and disabled states change fill, border and foreground. Disabled uses `disabledText`.
+The icon sits on a borderless soft spot. There is no stroked rounded square around the pictogram. Spot size and radius come from `PremiumBadgeVariant`: small (28 / 8), medium (40 / 12), large home illustration (60 / 18). The drawing fills most of that spot. Selected state deepens the tint. Disabled uses `disabledText`. Utility actions (back, close, search, refresh, more) stay Material icons.
 
-Color families stay semantic: production green, quality cyan, material amber, maintenance/operation orange, lab teal, information blue, critical red, analytics violet, administration teal. On a light tracking canvas the accent is darkened so the stroke stays readable. The glyph shape stays recognizable without color.
+Color families stay semantic: production green, quality cyan, material amber, maintenance/operation orange, lab teal, information blue, critical red, analytics violet, administration teal. Recognition comes from the silhouette. On a light tracking canvas the accent is darkened so the pictogram stays readable.
 
-`OperonixPremiumIconography` maps home titles, evidence profile keys, quality titles and the four production-order KPI labels. Utility actions (back, close, search, refresh, more) stay Material icons. Station workspace theme does not leave Praćenje proizvodnje.
+`OperonixPremiumIconography` maps home titles, evidence profile keys, quality titles and the four production-order KPI labels. Home concepts use separate objects: terminal, pallet parts, order sheet, Gantt, live cell, feed bin, caliper, final shield, linked cells, logbook, task tray and process sheet. Station workspace theme does not leave Praćenje proizvodnje.
 
-Premium Ikone on Početna chooses the column count from the content width and a minimum tile width of 150. A phone-width list stays at 2 columns. Classic Ikone keeps its previous column steps. Standardno stays a separate layout. Device mode, preparation, first control, final control and the operational station network each have their own glyph.
+Premium Ikone on Početna chooses the column count from the content width and a minimum tile width of 150. A phone-width list stays at 2 columns. The tile is a compact surface: pictogram at the top left, title underneath, elevation instead of a competing outline. Classic Ikone keeps its previous column steps and green card border. Standardno stays a separate layout.
 
 ## Pilot screens
 

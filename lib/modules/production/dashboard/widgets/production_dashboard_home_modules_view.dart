@@ -20,8 +20,8 @@ class PremiumHomeIconGridMetrics {
   static const double minTileWidth = 150;
   static const double gap = ProductionDashboardHomeModulesView.tileGap;
 
-  /// Bedž 56 + razmak + tri reda naslova + unutrašnji padding.
-  static const double tileExtent = 180;
+  /// Piktogram 60, kratak razmak i do tri reda naslova. Bez prazne visine.
+  static const double tileExtent = 152;
 
   static int columnCount(double contentWidth) {
     if (!contentWidth.isFinite || contentWidth <= 0) return 1;
