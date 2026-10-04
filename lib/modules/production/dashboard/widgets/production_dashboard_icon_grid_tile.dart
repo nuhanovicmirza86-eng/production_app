@@ -46,9 +46,13 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          padding: tokens.isPremium
+              ? const EdgeInsets.fromLTRB(12, 14, 12, 12)
+              : const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: tokens.isPremium
+                ? MainAxisAlignment.start
+                : MainAxisAlignment.center,
             children: [
               Stack(
                 clipBehavior: Clip.none,
@@ -97,16 +101,16 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
                     ),
                 ],
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: tokens.isPremium ? 10 : 8),
               Text(
                 title,
                 textAlign: TextAlign.center,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w800,
-                  fontSize: 12,
-                  height: 1.2,
+                  fontSize: tokens.isPremium ? 14 : 12,
+                  height: tokens.isPremium ? 1.25 : 1.2,
                 ),
               ),
             ],

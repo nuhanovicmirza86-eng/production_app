@@ -10,10 +10,44 @@ import 'production_dashboard_action_tile.dart';
 import 'production_dashboard_icon_grid_tile.dart';
 import 'production_dashboard_module_group_header.dart';
 
+/// Broj kolona ikonske mreže bira se iz širine sadržaja, ne iz imena uređaja.
+///
+/// Kartica ne smije biti uža od [minTileWidth]. Telefon s uobičajenim
+/// paddingom (oko 328 px) ostaje na 2 kolone.
+class PremiumHomeIconGridMetrics {
+  const PremiumHomeIconGridMetrics._();
+
+  static const double minTileWidth = 150;
+  static const double gap = ProductionDashboardHomeModulesView.tileGap;
+
+  /// Bedž 56 + razmak + tri reda naslova + unutrašnji padding.
+  static const double tileExtent = 180;
+
+  static int columnCount(double contentWidth) {
+    if (!contentWidth.isFinite || contentWidth <= 0) return 1;
+    final columns =
+        ((contentWidth + gap) / (minTileWidth + gap)).floor();
+    return columns < 1 ? 1 : columns;
+  }
+
+  static double tileWidth(double contentWidth) {
+    final columns = columnCount(contentWidth);
+    return (contentWidth - gap * (columns - 1)) / columns;
+  }
+}
+
 class ProductionDashboardHomeModulesView extends StatelessWidget {
   static const double tileGap = 10;
   static const double sectionGap = 18;
   static const double afterHeader = 8;
+
+  /// Classic ikonska mreža. Premium koristi [PremiumHomeIconGridMetrics].
+  static int classicIconGridColumnCount(double screenWidth) {
+    if (screenWidth >= 1200) return 6;
+    if (screenWidth >= 900) return 5;
+    if (screenWidth >= 600) return 4;
+    return 3;
+  }
 
   final ProductionDashboardLayout layout;
   final List<ProductionDashboardModuleSection> sections;
@@ -107,17 +141,32 @@ class _IconGridView extends StatelessWidget {
     required this.access,
   });
 
-  int _crossAxisCount(double width) {
-    if (width >= 1200) return 6;
-    if (width >= 900) return 5;
-    if (width >= 600) return 4;
-    return 3;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final crossAxisCount = _crossAxisCount(width);
+    final premium = OperonixVisualTokens.of(context).isPremium;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final contentWidth = constraints.maxWidth;
+        final crossAxisCount = premium
+            ? PremiumHomeIconGridMetrics.columnCount(contentWidth)
+            : ProductionDashboardHomeModulesView.classicIconGridColumnCount(
+                screenWidth,
+              );
+        return _buildColumn(
+          context,
+          crossAxisCount: crossAxisCount,
+          mainAxisExtent: premium ? PremiumHomeIconGridMetrics.tileExtent : null,
+        );
+      },
+    );
+  }
+
+  Widget _buildColumn(
+    BuildContext context, {
+    required int crossAxisCount,
+    required double? mainAxisExtent,
+  }) {
     final out = <Widget>[];
 
     for (var i = 0; i < sections.length; i++) {
@@ -141,7 +190,8 @@ class _IconGridView extends StatelessWidget {
             crossAxisCount: crossAxisCount,
             mainAxisSpacing: ProductionDashboardHomeModulesView.tileGap,
             crossAxisSpacing: ProductionDashboardHomeModulesView.tileGap,
-            childAspectRatio: 0.82,
+            mainAxisExtent: mainAxisExtent,
+            childAspectRatio: mainAxisExtent == null ? 0.82 : 1,
           ),
           itemCount: section.entries.length,
           itemBuilder: (context, index) {

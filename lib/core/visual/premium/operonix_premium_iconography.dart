@@ -33,15 +33,18 @@ class OperonixPremiumIconography {
     'Prijava problema': OperonixPremiumGlyph.maintenance,
     'Izvršenje proizvodnje': OperonixPremiumGlyph.productionCell,
     'Izvještaji': OperonixPremiumGlyph.reports,
-    'Način rada na ovom uređaju': OperonixPremiumGlyph.station,
-    'Operativne stanice (profil)': OperonixPremiumGlyph.station,
+    'Način rada na ovom uređaju': OperonixPremiumGlyph.deviceWorkMode,
+    'Operativne stanice (profil)': OperonixPremiumGlyph.stationNetwork,
+    'Stanica: pripremna': OperonixPremiumGlyph.stationPreparation,
+    'Stanica: prva kontrola': OperonixPremiumGlyph.stationFirstControl,
+    'Stanica: završna kontrola': OperonixPremiumGlyph.stationFinalControl,
     'Operativne evidencije': OperonixPremiumGlyph.evidence,
     'Kontrolne evidencije': OperonixPremiumGlyph.inspectionRoute,
     'Moje otvorene akcije': OperonixPremiumGlyph.openActions,
     'Evidencije procesa': OperonixPremiumGlyph.processCheck,
     'Analitika evidencija procesa': OperonixPremiumGlyph.analytics,
     'Evidencije kompanije': OperonixPremiumGlyph.evidence,
-    'Stanice proizvodnje': OperonixPremiumGlyph.station,
+    'Stanice proizvodnje': OperonixPremiumGlyph.productionStations,
     'Kvalitet': OperonixPremiumGlyph.qualityShield,
     'Kvalitet — središnji izbornik': OperonixPremiumGlyph.qualityShield,
     'Metodologija · IATF': OperonixPremiumGlyph.methodology,
@@ -104,7 +107,6 @@ class OperonixPremiumIconography {
     if (key == kOperonixAiAssistantTitle || key == kOperonixAiShortLabel) {
       return OperonixPremiumGlyph.aiInsight;
     }
-    if (key.startsWith('Stanica')) return OperonixPremiumGlyph.station;
     if (key.startsWith('Praćenje')) return OperonixPremiumGlyph.liveTracking;
     if (key.startsWith('OOE')) return OperonixPremiumGlyph.analytics;
     return null;
@@ -275,14 +277,11 @@ class OperonixPremiumIconography {
         icon == Icons.local_shipping_outlined) {
       return OperonixPremiumGlyph.ncr;
     }
-    if (icon == Icons.fullscreen_outlined || icon == Icons.fullscreen) {
-      return OperonixPremiumGlyph.station;
-    }
     if (icon == Icons.access_time_outlined || icon == Icons.access_time_filled) {
       return OperonixPremiumGlyph.workDay;
     }
     if (icon == Icons.display_settings_outlined) {
-      return OperonixPremiumGlyph.station;
+      return OperonixPremiumGlyph.deviceWorkMode;
     }
     return null;
   }
@@ -316,6 +315,7 @@ class OperonixPremiumIconography {
       case OperonixPremiumGlyph.kpiDone:
       case OperonixPremiumGlyph.workspace5s:
       case OperonixPremiumGlyph.readyStatus:
+      case OperonixPremiumGlyph.stationNetwork:
         return PremiumIconRole.success;
       case OperonixPremiumGlyph.qualityShield:
       case OperonixPremiumGlyph.processCheck:
@@ -326,16 +326,20 @@ class OperonixPremiumIconography {
       case OperonixPremiumGlyph.inspectionRoute:
       case OperonixPremiumGlyph.controlPlan:
       case OperonixPremiumGlyph.audit:
+      case OperonixPremiumGlyph.stationFirstControl:
+      case OperonixPremiumGlyph.stationFinalControl:
         return PremiumIconRole.quality;
       case OperonixPremiumGlyph.planningFlow:
       case OperonixPremiumGlyph.materialPrep:
       case OperonixPremiumGlyph.entryDate:
       case OperonixPremiumGlyph.quantity:
+      case OperonixPremiumGlyph.stationPreparation:
         return PremiumIconRole.material;
       case OperonixPremiumGlyph.machineClean:
       case OperonixPremiumGlyph.maintenance:
       case OperonixPremiumGlyph.kpiRunning:
       case OperonixPremiumGlyph.workCenter:
+      case OperonixPremiumGlyph.productionStations:
         return PremiumIconRole.active;
       case OperonixPremiumGlyph.chemicalDose:
       case OperonixPremiumGlyph.wastewater:
@@ -344,6 +348,7 @@ class OperonixPremiumIconography {
       case OperonixPremiumGlyph.plant:
       case OperonixPremiumGlyph.workforce:
       case OperonixPremiumGlyph.partners:
+      case OperonixPremiumGlyph.deviceWorkMode:
         return PremiumIconRole.people;
       case OperonixPremiumGlyph.aiInsight:
       case OperonixPremiumGlyph.analytics:

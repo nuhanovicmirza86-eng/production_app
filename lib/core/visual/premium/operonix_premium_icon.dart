@@ -56,6 +56,12 @@ enum OperonixPremiumGlyph {
   carbon,
   maintenance,
   station,
+  deviceWorkMode,
+  stationPreparation,
+  stationFirstControl,
+  stationFinalControl,
+  stationNetwork,
+  productionStations,
   analytics,
   attention,
   ncr,
@@ -695,6 +701,61 @@ void _drawGlyph(_Pen pen, OperonixPremiumGlyph glyph) {
       pen.line(12, 15.6, 12, 19.2);
       pen.line(8, 19.2, 16, 19.2);
       pen.circle(7, 9.2, 1.3, alt: true);
+    case OperonixPremiumGlyph.deviceWorkMode:
+      pen.rrect(const Rect.fromLTWH(5.2, 2.4, 9.2, 17.2), 2);
+      pen.line(7.4, 5.6, 12.2, 5.6, alt: true);
+      pen.rrect(const Rect.fromLTWH(7.2, 14.2, 5.2, 2.4), 1.2, alt: true);
+      pen.circle(11.2, 15.4, 1.15, fill: true);
+      pen.line(16.2, 8.2, 20.2, 6.2, alt: true);
+      pen.line(16.2, 12.2, 20.2, 14.2, alt: true);
+    case OperonixPremiumGlyph.stationPreparation:
+      pen.path(
+        Path()
+          ..moveTo(2.4, 4.2)
+          ..lineTo(8.4, 4.2)
+          ..lineTo(7.2, 8.4)
+          ..lineTo(3.6, 8.4)
+          ..close(),
+      );
+      pen.line(7.6, 6.4, 10.2, 8.6, alt: true);
+      pen.rrect(const Rect.fromLTWH(9.2, 7.2, 11.2, 10.6), 1.4);
+      pen.check(11.4, 10.6, 5);
+      pen.line(10.4, 17.8, 19.2, 17.8);
+    case OperonixPremiumGlyph.stationFirstControl:
+      pen.path(
+        Path()
+          ..moveTo(3.4, 15.6)
+          ..quadraticBezierTo(12, 3.2, 20.6, 15.6),
+      );
+      pen.line(12, 15.2, 15.6, 9.4);
+      pen.dot(12, 15.2);
+      pen.line(4.2, 18.4, 19.8, 18.4, alt: true);
+      pen.line(5.2, 6.2, 5.2, 11.2, alt: true);
+      pen.line(3.8, 8, 5.2, 6.2, alt: true);
+    case OperonixPremiumGlyph.stationFinalControl:
+      pen.path(
+        Path()
+          ..moveTo(3.2, 19)
+          ..lineTo(3.2, 9.2)
+          ..quadraticBezierTo(12, 2.2, 20.8, 9.2)
+          ..lineTo(20.8, 19),
+      );
+      pen.line(7.2, 19, 16.8, 19, alt: true);
+      pen.check(8.6, 11.2, 6.2);
+    case OperonixPremiumGlyph.stationNetwork:
+      pen.rrect(const Rect.fromLTWH(2.2, 9.2, 5.6, 5.2), 1.1);
+      pen.rrect(const Rect.fromLTWH(9.2, 3.2, 5.6, 5.2), 1.1, alt: true);
+      pen.rrect(const Rect.fromLTWH(16.2, 12.2, 5.6, 5.2), 1.1);
+      pen.line(7.6, 11.2, 9.4, 7.2, alt: true);
+      pen.line(14.6, 7.6, 16.4, 12.6, alt: true);
+      pen.line(7.8, 12.4, 16.2, 14.2, alt: true);
+    case OperonixPremiumGlyph.productionStations:
+      pen.rrect(const Rect.fromLTWH(2.2, 6.2, 5.4, 11.6), 1);
+      pen.rrect(const Rect.fromLTWH(9.3, 6.2, 5.4, 11.6), 1, alt: true);
+      pen.rrect(const Rect.fromLTWH(16.4, 6.2, 5.4, 11.6), 1);
+      pen.line(3.4, 9.2, 6.2, 9.2, alt: true);
+      pen.line(10.5, 9.2, 13.3, 9.2, alt: true);
+      pen.line(17.6, 9.2, 20.4, 9.2, alt: true);
     case OperonixPremiumGlyph.analytics:
       pen.path(
         Path()

@@ -72,6 +72,8 @@ Color families stay semantic: production green, quality cyan, material amber, ma
 
 `OperonixPremiumIconography` maps home titles, evidence profile keys, quality titles and the four production-order KPI labels. Utility actions (back, close, search, refresh, more) stay Material icons. Station workspace theme does not leave Praćenje proizvodnje.
 
+Premium Ikone on Početna chooses the column count from the content width and a minimum tile width of 150. A phone-width list stays at 2 columns. Classic Ikone keeps its previous column steps. Standardno stays a separate layout. Device mode, preparation, first control, final control and the operational station network each have their own glyph.
+
 ## Pilot screens
 
 Početna, Proizvodni nalozi, Procesi, Operativne evidencije, Praćenje proizvodnje → Proizvodnja, and Kvalitet each have a Premium composition that is separate from the Classic layout.
