@@ -12,6 +12,7 @@ import 'package:production_app/modules/production/dashboard/models/production_da
 import 'package:production_app/modules/production/dashboard/models/production_dashboard_module.dart';
 import 'package:production_app/modules/production/dashboard/production_dashboard_access.dart';
 import 'package:production_app/modules/production/dashboard/widgets/production_dashboard_action_tile.dart';
+import 'package:production_app/modules/production/dashboard/widgets/premium_home_icon_grid_metrics.dart';
 import 'package:production_app/modules/production/dashboard/widgets/production_dashboard_home_modules_view.dart';
 import 'package:production_app/modules/production/dashboard/widgets/production_dashboard_icon_grid_tile.dart';
 import 'package:production_app/modules/production/station_pages/screens/production_evidence_operator_hub_screen.dart';
@@ -304,6 +305,19 @@ void main() {
       expect(PremiumHomeIconGridMetrics.columnCount(568), greaterThanOrEqualTo(3));
       expect(PremiumHomeIconGridMetrics.columnCount(1100), greaterThanOrEqualTo(4));
       expect(
+        PremiumHomeIconGridMetrics.gap,
+        ProductionDashboardHomeModulesView.tileGap,
+      );
+      expect(PremiumHomeIconGridMetrics.iconSlot, 60);
+      expect(PremiumHomeIconGridMetrics.tileExtentFor(phoneContent), lessThan(152));
+      expect(PremiumHomeIconGridMetrics.titleMaxLines(phoneContent), 3);
+      expect(PremiumHomeIconGridMetrics.titleMaxLines(411 - 32), 2);
+      expect(
+        PremiumHomeIconGridMetrics.tileExtentFor(411 - 32),
+        lessThan(PremiumHomeIconGridMetrics.tileExtentFor(phoneContent)),
+      );
+      expect(PremiumHomeIconGridMetrics.tileExtentFor(1100), lessThanOrEqualTo(140));
+      expect(
         ProductionDashboardHomeModulesView.classicIconGridColumnCount(360),
         3,
       );
@@ -322,12 +336,22 @@ void main() {
       expect(tester.takeException(), isNull);
       final tile = tester.getSize(find.byType(ProductionDashboardIconGridTile).first);
       expect(tile.width, greaterThanOrEqualTo(150));
-      expect(tile.height, PremiumHomeIconGridMetrics.tileExtent);
+      expect(
+        tile.height,
+        PremiumHomeIconGridMetrics.tileExtentFor(360 - 32),
+      );
       expect(find.byType(GridView), findsOneWidget);
+      final badge = tester.widget<PremiumIconBadge>(
+        find.descendant(
+          of: find.byType(ProductionDashboardIconGridTile).first,
+          matching: find.byType(PremiumIconBadge),
+        ),
+      );
+      expect(badge.extent, PremiumHomeIconGridMetrics.iconSlot);
       for (final label in _longHomeLabels) {
         final text = tester.widget<Text>(find.text(label));
         final paragraph = tester.renderObject<RenderParagraph>(find.text(label));
-        expect(text.maxLines, 3);
+        expect(text.maxLines, PremiumHomeIconGridMetrics.titleMaxLines(360 - 32));
         expect(text.style?.fontSize, 14);
         expect(paragraph.size.height, lessThan(tile.height * 0.55));
       }
@@ -352,8 +376,20 @@ void main() {
         expect(tester.takeException(), isNull, reason: 'width $width');
         final tile = tester.getSize(find.byType(ProductionDashboardIconGridTile).first);
         expect(tile.width, greaterThanOrEqualTo(150), reason: 'width $width');
+        expect(
+          tile.height,
+          PremiumHomeIconGridMetrics.tileExtentFor(width - 32),
+          reason: 'width $width',
+        );
+        expect(tile.height, lessThan(152), reason: 'width $width');
         for (final label in _longHomeLabels) {
+          final text = tester.widget<Text>(find.text(label));
           final paragraph = tester.renderObject<RenderParagraph>(find.text(label));
+          expect(
+            text.maxLines,
+            PremiumHomeIconGridMetrics.titleMaxLines(width - 32),
+            reason: 'width $width',
+          );
           expect(paragraph.size.height, lessThan(tile.height * 0.55));
         }
       }
@@ -464,6 +500,84 @@ void main() {
         }
       });
       expect(signatures.length, glyphs.length);
+    });
+
+    testWidgets('Registracije uses the same compact Premium card', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(411, 1400);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      ProductionDashboardModuleEntry entry(String id, String title) {
+        return ProductionDashboardModuleEntry(
+          id: id,
+          icon: Icons.person_add_alt_1,
+          title: title,
+          subtitle: 'Opis',
+          onTap: () {},
+        );
+      }
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: OperonixVisualTheme.premiumMidnight(),
+          home: Scaffold(
+            body: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                ProductionDashboardHomeModulesView(
+                  layout: ProductionDashboardLayout.iconGrid,
+                  access: ProductionDashboardAccess(
+                    companyData: const {},
+                    role: 'admin',
+                    companyId: 'c',
+                    plantKey: 'p',
+                    enabledModules: const ['production'],
+                  ),
+                  sections: [
+                    ProductionDashboardModuleSection(
+                      id: 'users',
+                      title: 'Korisnici',
+                      subtitle: 'Računi',
+                      icon: Icons.manage_accounts_outlined,
+                      entries: [entry('users.registrations', 'Registracije')],
+                    ),
+                    ProductionDashboardModuleSection(
+                      id: 'production',
+                      title: 'Proizvodnja',
+                      subtitle: 'Moduli',
+                      icon: Icons.precision_manufacturing_outlined,
+                      entries: [
+                        entry('production.orders', 'Proizvodni nalozi'),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      final tiles = tester
+          .getSize(find.byType(ProductionDashboardIconGridTile).at(0));
+      final orders = tester
+          .getSize(find.byType(ProductionDashboardIconGridTile).at(1));
+      expect(tiles, orders);
+      expect(tiles.height, PremiumHomeIconGridMetrics.tileExtentFor(411 - 32));
+      expect(tiles.height, lessThan(140));
+      expect(find.text('Registracije'), findsOneWidget);
+      expect(
+        tester
+            .widget<PremiumIconBadge>(
+              find.descendant(
+                of: find.byType(ProductionDashboardIconGridTile).first,
+                matching: find.byType(PremiumIconBadge),
+              ),
+            )
+            .extent,
+        60,
+      );
     });
 
     testWidgets('Standardno stays a list when Premium is on', (tester) async {

@@ -5,6 +5,7 @@ import '../../../../core/visual/operonix_visual_tokens.dart';
 import '../../../../core/visual/premium/operonix_premium_iconography.dart';
 import '../../../../core/visual/premium/premium_icon_accent.dart';
 import '../../../../core/visual/premium/premium_widgets.dart';
+import 'premium_home_icon_grid_metrics.dart';
 
 /// Kompaktna ikona + naslov (ikonski prikaz početnog zaslona).
 class ProductionDashboardIconGridTile extends StatelessWidget {
@@ -50,9 +51,21 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
       shape: shape,
       child: InkWell(
         onTap: onTap,
-        child: Padding(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final lines = tokens.isPremium
+                ? PremiumHomeIconGridMetrics.titleMaxLinesForTileWidth(
+                    constraints.maxWidth,
+                  )
+                : 3;
+            return Padding(
           padding: tokens.isPremium
-              ? const EdgeInsets.fromLTRB(12, 10, 12, 10)
+              ? const EdgeInsets.fromLTRB(
+                  PremiumHomeIconGridMetrics.tilePaddingH,
+                  PremiumHomeIconGridMetrics.padTop,
+                  PremiumHomeIconGridMetrics.tilePaddingH,
+                  PremiumHomeIconGridMetrics.padBottom,
+                )
               : const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
           child: Column(
             crossAxisAlignment: tokens.isPremium
@@ -109,21 +122,29 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
                     ),
                 ],
               ),
-              const SizedBox(height: 8),
+              SizedBox(
+                height: tokens.isPremium ? PremiumHomeIconGridMetrics.titleGap : 8,
+              ),
               Text(
                 title,
                 textAlign: tokens.isPremium ? TextAlign.start : TextAlign.center,
-                maxLines: 3,
+                maxLines: lines,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
-                  fontSize: tokens.isPremium ? 14 : 12,
-                  height: 1.2,
+                  fontSize: tokens.isPremium
+                      ? PremiumHomeIconGridMetrics.titleFontSize
+                      : 12,
+                  height: tokens.isPremium
+                      ? PremiumHomeIconGridMetrics.titleLineHeight
+                      : 1.2,
                   color: tokens.isPremium ? tokens.primaryText : null,
                 ),
               ),
             ],
           ),
+        );
+          },
         ),
       ),
     );

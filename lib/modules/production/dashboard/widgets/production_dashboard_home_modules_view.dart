@@ -6,35 +6,10 @@ import '../../packing/services/packing_box_service.dart';
 import '../models/production_dashboard_layout.dart';
 import '../models/production_dashboard_module.dart';
 import '../production_dashboard_access.dart';
+import 'premium_home_icon_grid_metrics.dart';
 import 'production_dashboard_action_tile.dart';
 import 'production_dashboard_icon_grid_tile.dart';
 import 'production_dashboard_module_group_header.dart';
-
-/// Broj kolona ikonske mreže bira se iz širine sadržaja, ne iz imena uređaja.
-///
-/// Kartica ne smije biti uža od [minTileWidth]. Telefon s uobičajenim
-/// paddingom (oko 328 px) ostaje na 2 kolone.
-class PremiumHomeIconGridMetrics {
-  const PremiumHomeIconGridMetrics._();
-
-  static const double minTileWidth = 150;
-  static const double gap = ProductionDashboardHomeModulesView.tileGap;
-
-  /// Piktogram 60, kratak razmak i do tri reda naslova. Bez prazne visine.
-  static const double tileExtent = 152;
-
-  static int columnCount(double contentWidth) {
-    if (!contentWidth.isFinite || contentWidth <= 0) return 1;
-    final columns =
-        ((contentWidth + gap) / (minTileWidth + gap)).floor();
-    return columns < 1 ? 1 : columns;
-  }
-
-  static double tileWidth(double contentWidth) {
-    final columns = columnCount(contentWidth);
-    return (contentWidth - gap * (columns - 1)) / columns;
-  }
-}
 
 class ProductionDashboardHomeModulesView extends StatelessWidget {
   static const double tileGap = 10;
@@ -156,7 +131,9 @@ class _IconGridView extends StatelessWidget {
         return _buildColumn(
           context,
           crossAxisCount: crossAxisCount,
-          mainAxisExtent: premium ? PremiumHomeIconGridMetrics.tileExtent : null,
+          mainAxisExtent: premium
+              ? PremiumHomeIconGridMetrics.tileExtentFor(contentWidth)
+              : null,
         );
       },
     );

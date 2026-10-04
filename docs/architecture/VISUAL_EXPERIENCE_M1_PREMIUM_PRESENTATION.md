@@ -72,7 +72,7 @@ Color families stay semantic: production green, quality cyan, material amber, ma
 
 `OperonixPremiumIconography` maps home titles, evidence profile keys, quality titles and the four production-order KPI labels. Home concepts use separate objects: terminal, pallet parts, order sheet, Gantt, live cell, feed bin, caliper, final shield, linked cells, logbook, task tray and process sheet. Station workspace theme does not leave Praćenje proizvodnje.
 
-Premium Ikone on Početna chooses the column count from the content width and a minimum tile width of 150. A phone-width list stays at 2 columns. The tile is a compact surface: pictogram at the top left, title underneath, elevation instead of a competing outline. Classic Ikone keeps its previous column steps and green card border. Standardno stays a separate layout.
+Premium Ikone on Početna chooses the column count from the content width and a minimum tile width of 150. A phone-width list stays at 2 columns. Tile height follows the 60 px pictogram plus the title: two lines once the title column is wide enough, three lines only on a narrower phone tile. Wider tablet and web tiles stay in that same short band and do not become tall panels. Registracije uses that same card. Classic Ikone keeps its previous column steps and green card border. Standardno stays a separate layout.
 
 ## Pilot screens
 
