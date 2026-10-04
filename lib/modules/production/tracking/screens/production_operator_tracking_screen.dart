@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/format/ba_formatted_date.dart';
 import '../../../../core/visual/operonix_visual_tokens.dart';
-import '../../../../core/visual/premium/premium_icon_accent.dart';
-import '../../../../core/visual/premium/premium_type.dart';
-import '../../../../core/visual/premium/premium_widgets.dart';
+import '../../../../core/visual/premium/premium_station_palette.dart';
 import '../../../../core/access/production_access_helper.dart'
     show ProductionAccessHelper, ProductionDashboardCard;
 import '../../../../core/saas/production_module_keys.dart';
@@ -241,6 +239,8 @@ class _ProductionOperatorTrackingScreenState
                   tooltip: 'Izgled ekrana (boje i predlošci)',
                   icon: const Icon(Icons.palette_outlined),
                   onPressed: () async {
+                    final saved = _appearance;
+                    final premiumNow = tokens.isPremium;
                     final next = await showStationAppearanceEditorDialog(
                       context: context,
                       current: _appearance,
@@ -248,9 +248,19 @@ class _ProductionOperatorTrackingScreenState
                           ProductionAccessHelper.canEditStationScreenCustomColors(
                         (widget.companyData['role'] ?? '').toString(),
                       ),
-                      showButtonAccent: tokens.isPremium,
+                      showButtonAccent: premiumNow,
+                      onPreview: premiumNow
+                          ? (draft) {
+                              if (!mounted) return;
+                              setState(() => _appearance = draft);
+                            }
+                          : null,
                     );
-                    if (next == null || !mounted) return;
+                    if (!mounted) return;
+                    if (next == null) {
+                      if (premiumNow) setState(() => _appearance = saved);
+                      return;
+                    }
                     setState(() => _appearance = next);
                     await StationScreenThemeStore.save(next);
                   },
@@ -332,44 +342,8 @@ class _ProductionOperatorTrackingScreenState
                   onSelectPlaceholder: (label) =>
                       _openHubDestination(context, label),
                 ),
-                if (_tabController.index > 0)
-                  tokens.isPremium
-                      ? Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                          child: PremiumSurfaceCard(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            child: Row(
-                              children: [
-                                const PremiumIconBadge(
-                                  icon: Icons.calendar_today_outlined,
-                                  role: PremiumIconRole.info,
-                                  size: 32,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Radni dan',
-                                        style: PremiumType.meta(tokens),
-                                      ),
-                                      Text(
-                                        _todayLine(),
-                                        style: PremiumType.cardTitle(tokens),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      : Material(
+                if (_tabController.index > 0 && !tokens.isPremium)
+                  Material(
                           color: theme.colorScheme.surfaceContainerHighest
                               .withValues(alpha: 0.35),
                           child: Padding(

@@ -320,16 +320,14 @@ class _ProductionProcessesListScreenState
   Widget _premiumProcessCard(ProductionProcess p) {
     final meta =
         '${p.processCode} · ${ProductionProcess.labelForType(p.processType)} · ${ProductionProcess.labelForStatus(p.status)}';
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: PremiumListCard(
-        icon: Icons.account_tree_outlined,
-        role: _processRole(p),
-        title: p.name.trim().isEmpty ? p.processCode : p.name,
-        subtitle: meta,
-        trailing: _canManage ? _processMenu(p) : null,
-        onTap: () => _openProcess(p),
-      ),
+    return PremiumListCard(
+      flush: true,
+      icon: Icons.account_tree_outlined,
+      role: _processRole(p),
+      title: p.name.trim().isEmpty ? p.processCode : p.name,
+      subtitle: meta,
+      trailing: _canManage ? _processMenu(p) : null,
+      onTap: () => _openProcess(p),
     );
   }
 
@@ -353,7 +351,7 @@ class _ProductionProcessesListScreenState
               PremiumContextCard(
                 icon: Icons.factory_outlined,
                 role: PremiumIconRole.info,
-                label: 'Pogon (filter)',
+                label: 'Pogon',
                 value: _plantLabel(_selectedPlantKey),
                 trailing: Icon(
                   Icons.keyboard_arrow_down_rounded,
@@ -393,18 +391,35 @@ class _ProductionProcessesListScreenState
                   actionLabel: noRecords && _canManage ? 'Dodaj' : null,
                   onAction: noRecords && _canManage ? _openCreate : null,
                 )
-              else ...[
-                if (_canManage)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: PremiumPrimaryAction(
-                      label: 'Dodaj',
-                      onPressed: _openCreate,
-                    ),
+              else
+                PremiumSurfaceCard(
+                  level: 1,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_canManage)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: PremiumPrimaryAction(
+                              label: 'Dodaj',
+                              onPressed: _openCreate,
+                            ),
+                          ),
+                        ),
+                      for (var i = 0; i < filtered.length; i++) ...[
+                        if (i > 0)
+                          Divider(
+                            height: 1,
+                            color: OperonixVisualTokens.of(context).divider,
+                          ),
+                        _premiumProcessCard(filtered[i]),
+                      ],
+                    ],
                   ),
-                if (_canManage) const SizedBox(height: 10),
-                for (final process in filtered) _premiumProcessCard(process),
-              ],
+                ),
             ],
           );
         },

@@ -155,9 +155,8 @@ Brightness _brightnessForSurface(Color background) {
 
 /// Lokalni izgled stanice u Classicu i dalje boji cijeli ekran.
 ///
-/// VISUAL-EXPERIENCE-M1-UI-CORRECTION-02: kad je VisualStyle Premium,
-/// [trackingPageTheme] ostavlja Midnight pozadinu. Spremljena tema stanice
-/// tada ne smije obojiti tijelo u svijetlu Classic podlogu.
+/// U Premiumu ista spremljena paleta mijenja tamno platno i akcent.
+/// Nikad ne vraća svijetlu Classic podlogu.
 ///
 /// SCADA `ScadaWallTheme.operonix_graphite` — tamna podloga i paneli.
 const Color _kScadaWall = Color(0xFF070A0F);
@@ -315,15 +314,6 @@ ColorScheme _colorSchemeCleanLight() {
 
 /// Tema stranice Praćenja. Premium zadržava roditeljski Midnight.
 /// Classic i dalje dobija punu temu stanice.
-ThemeData trackingPageTheme({
-  required ThemeData parent,
-  required StationScreenAppearance appearance,
-  required bool premium,
-}) {
-  if (!premium) return buildStationScreenTheme(parent, appearance);
-  return parent;
-}
-
 /// Gradi temu stanice iz roditeljske [ThemeData] (tipografija ostaje).
 ThemeData buildStationScreenTheme(
   ThemeData parent,

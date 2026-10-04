@@ -218,30 +218,54 @@ class _ProductionEvidenceOperatorHubScreenState
       );
     }
 
+    if (OperonixVisualTokens.of(context).isPremium) {
+      final tokens = OperonixVisualTokens.of(context);
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        children: [
+          PremiumSurfaceCard(
+            level: 1,
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              children: [
+                for (var index = 0; index < _entries.length; index++) ...[
+                  if (index > 0)
+                    Divider(height: 1, color: tokens.divider),
+                  _evidenceCardAt(index),
+                ],
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: _entries.length,
       separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final entry = _entries[index];
-        final config = entry.config;
-        final profile = entry.profile;
-        return ProductionEvidenceListCard(
-          title: config.displayName,
-          subtitle:
-              '${profile.displayName}\n'
-              'Pogon: ${_plantLabel(config.plantKey)} · '
-              'Proces: ${config.processKey} · Faza: ${config.phaseKey}',
-          icon: _iconForProfile(profile.profileKey),
-          profileKey: profile.profileKey,
-          infoAction: CatalogEvidenceHelpTexts.infoIconForProfile(
-            profileKey: profile.profileKey,
-            displayName: profile.displayName,
-            description: profile.description,
-          ),
-          onTap: () => _openEvidence(config, profile),
-        );
-      },
+      itemBuilder: (context, index) => _evidenceCardAt(index),
+    );
+  }
+
+  Widget _evidenceCardAt(int index) {
+    final entry = _entries[index];
+    final config = entry.config;
+    final profile = entry.profile;
+    return ProductionEvidenceListCard(
+      title: config.displayName,
+      subtitle:
+          '${profile.displayName}\n'
+          'Pogon: ${_plantLabel(config.plantKey)} · '
+          'Proces: ${config.processKey} · Faza: ${config.phaseKey}',
+      icon: _iconForProfile(profile.profileKey),
+      profileKey: profile.profileKey,
+      infoAction: CatalogEvidenceHelpTexts.infoIconForProfile(
+        profileKey: profile.profileKey,
+        displayName: profile.displayName,
+        description: profile.description,
+      ),
+      onTap: () => _openEvidence(config, profile),
     );
   }
 
@@ -308,6 +332,7 @@ class ProductionEvidenceListCard extends StatelessWidget {
   Widget build(BuildContext context) {
     if (OperonixVisualTokens.of(context).isPremium) {
       return PremiumListCard(
+        flush: true,
         icon: icon,
         role: PremiumIconAccent.forProfile(profileKey),
         title: title,

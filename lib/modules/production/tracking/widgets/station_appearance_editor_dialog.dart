@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
 import '../../../../core/theme/operonix_production_brand.dart';
+import '../../../../core/visual/operonix_visual_theme.dart';
+import '../../../../core/visual/premium/premium_station_palette.dart';
 import '../config/preparation_station_ui_prefs.dart';
 import '../config/station_screen_theme.dart';
 import 'tracking_workflow_chrome.dart';
@@ -16,6 +18,7 @@ Future<StationScreenAppearance?> showStationAppearanceEditorDialog({
   required StationScreenAppearance current,
   bool allowCustomColors = false,
   bool showButtonAccent = false,
+  ValueChanged<StationScreenAppearance>? onPreview,
 }) {
   return showDialog<StationScreenAppearance>(
       barrierDismissible: false,
@@ -24,6 +27,7 @@ Future<StationScreenAppearance?> showStationAppearanceEditorDialog({
       seed: current,
       allowCustomColors: allowCustomColors,
       showButtonAccent: showButtonAccent,
+      onPreview: onPreview,
     ),
   );
 }
@@ -33,11 +37,13 @@ class _StationAppearanceEditorBody extends StatefulWidget {
     required this.seed,
     required this.allowCustomColors,
     required this.showButtonAccent,
+    this.onPreview,
   });
 
   final StationScreenAppearance seed;
   final bool allowCustomColors;
   final bool showButtonAccent;
+  final ValueChanged<StationScreenAppearance>? onPreview;
 
   @override
   State<_StationAppearanceEditorBody> createState() =>
@@ -79,6 +85,26 @@ class _StationAppearanceEditorBodyState extends State<_StationAppearanceEditorBo
       primaryAccent: _accentColor,
       fieldOutline: _outlineColor,
     );
+  }
+
+  StationScreenAppearance _draftAppearance() {
+    final adminCustom = widget.allowCustomColors;
+    if (!adminCustom && widget.seed.usesCustom) return widget.seed;
+    if (adminCustom && _useCustomColors) {
+      return StationScreenAppearance(
+        preset: _preset,
+        custom: StationScreenCustomColors(
+          background: _bgColor,
+          primaryAccent: _accentColor,
+          fieldOutline: _outlineColor,
+        ),
+      );
+    }
+    return StationScreenAppearance(preset: _preset);
+  }
+
+  void _emitPreview() {
+    widget.onPreview?.call(_draftAppearance());
   }
 
   Future<void> _pickColor({
@@ -152,6 +178,7 @@ class _StationAppearanceEditorBodyState extends State<_StationAppearanceEditorBo
                 onChanged(c);
                 _syncCustomFromColors();
               });
+              _emitPreview();
             },
           ),
           borderRadius: BorderRadius.circular(8),
@@ -165,23 +192,12 @@ class _StationAppearanceEditorBodyState extends State<_StationAppearanceEditorBo
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final adminCustom = widget.allowCustomColors;
-    final StationScreenAppearance previewAppearance;
-    if (!adminCustom && widget.seed.usesCustom) {
-      previewAppearance = widget.seed;
-    } else if (adminCustom && _useCustomColors) {
-      previewAppearance = StationScreenAppearance(
-        preset: _preset,
-        custom: StationScreenCustomColors(
-          background: _bgColor,
-          primaryAccent: _accentColor,
-          fieldOutline: _outlineColor,
-        ),
-      );
-    } else {
-      previewAppearance = StationScreenAppearance(preset: _preset);
-    }
-    final previewStationTheme =
-        buildStationScreenTheme(theme, previewAppearance);
+    final previewAppearance = _draftAppearance();
+    final previewStationTheme = widget.showButtonAccent
+        ? OperonixVisualTheme.premiumWith(
+            PremiumStationPalette.tokensFor(previewAppearance),
+          )
+        : buildStationScreenTheme(theme, previewAppearance);
 
     return AlertDialog(
       title: const Text('Izgled ekrana stanice'),
@@ -222,6 +238,7 @@ class _StationAppearanceEditorBodyState extends State<_StationAppearanceEditorBo
                         _useCustomColors = false;
                         _presetPicked = true;
                       });
+                      _emitPreview();
                     },
                   ),
               ],
@@ -283,14 +300,17 @@ class _StationAppearanceEditorBodyState extends State<_StationAppearanceEditorBo
                   'Podloga, akcent gumba i obrub polja — sprema se na ovom uređaju.',
                 ),
                 value: _useCustomColors,
-                onChanged: (v) => setState(() {
-                  _useCustomColors = v;
-                  if (v) {
-                    _syncCustomFromColors();
-                  } else {
-                    _custom = null;
-                  }
-                }),
+                onChanged: (v) {
+                  setState(() {
+                    _useCustomColors = v;
+                    if (v) {
+                      _syncCustomFromColors();
+                    } else {
+                      _custom = null;
+                    }
+                  });
+                  _emitPreview();
+                },
               ),
               if (_useCustomColors) ...[
                 Text(
@@ -322,7 +342,7 @@ class _StationAppearanceEditorBodyState extends State<_StationAppearanceEditorBo
               const _ButtonAccentSection(),
               const SizedBox(height: 8),
               Text(
-                'U Premiumu ovo boji glavnu radnju. Pozadina ekrana ostaje Midnight.',
+                'Paleta stanice mijenja tamnu Premium podlogu i akcent. Tema gumba ostaje za Classic i ne vraća svijetli ekran.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),

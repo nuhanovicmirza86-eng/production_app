@@ -1426,27 +1426,27 @@ class _SessionHeaderCard extends StatelessWidget {
     final tokens = OperonixVisualTokens.of(context);
     if (tokens.isPremium) {
       return PremiumSurfaceCard(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        level: 1,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _CompanyHeaderLogo(candidates: logoCandidates, size: 44),
+            _CompanyHeaderLogo(candidates: logoCandidates, size: 52),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Uloga', style: PremiumType.meta(tokens)),
-                  Text(roleLabel, style: PremiumType.cardTitle(tokens)),
-                  const SizedBox(height: 6),
-                  Text('Pogon', style: PremiumType.meta(tokens)),
-                  _plantValue(PremiumType.cardTitle(tokens)),
-                  const SizedBox(height: 6),
-                  Text('Kompanija', style: PremiumType.meta(tokens)),
                   Text(
                     companyLine,
-                    style: PremiumType.cardTitle(tokens),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: PremiumType.pageTitle(tokens),
                   ),
+                  const SizedBox(height: 4),
+                  Text(roleLabel, style: PremiumType.cardTitle(tokens)),
+                  const SizedBox(height: 2),
+                  _plantValue(PremiumType.meta(tokens)),
                 ],
               ),
             ),

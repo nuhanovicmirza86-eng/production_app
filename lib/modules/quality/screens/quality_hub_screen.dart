@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/access/production_access_helper.dart';
+import '../../../core/visual/operonix_visual_tokens.dart';
+import '../../../core/visual/premium/premium_icon_accent.dart';
+import '../../../core/visual/premium/premium_type.dart';
+import '../../../core/visual/premium/premium_widgets.dart';
+import '../quality_premium_sections.dart';
 import '../../production/station_pages/screens/production_evidence_operator_hub_screen.dart';
 import '../widgets/qms_iatf_help.dart';
 import 'capa_tracking_screen.dart';
@@ -258,6 +263,7 @@ class QualityHubScreen extends StatelessWidget {
       ),
     ];
 
+    final premium = OperonixVisualTokens.of(context).isPremium;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Kvalitet'),
@@ -268,7 +274,9 @@ class QualityHubScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: ListView.builder(
+      body: premium
+          ? _PremiumQualityBody(items: items)
+          : ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: items.length + 1,
         itemBuilder: (context, index) {
@@ -295,6 +303,92 @@ class QualityHubScreen extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+class _PremiumQualityBody extends StatelessWidget {
+  final List<
+      ({
+        IconData icon,
+        String title,
+        String subtitle,
+        String? iatfTitle,
+        String? iatfMessage,
+        Future<void> Function() onTap,
+      })> items;
+
+  const _PremiumQualityBody({required this.items});
+
+  PremiumIconRole _role(String section, IconData icon) {
+    switch (section) {
+      case 'Prioritet':
+        return PremiumIconRole.warning;
+      case 'Sistem':
+        return PremiumIconRole.quality;
+      case 'Planiranje':
+        return PremiumIconRole.material;
+      case 'Izvještavanje':
+        return PremiumIconRole.analytics;
+      default:
+        return PremiumIconAccent.forIcon(icon);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final grouped = <String, List<int>>{};
+    for (var i = 0; i < items.length; i++) {
+      final section = qualityPremiumSectionForTitle(items[i].title);
+      grouped.putIfAbsent(section, () => []).add(i);
+    }
+    final sections = [
+      for (final name in qualityPremiumSectionOrder)
+        if (grouped[name] != null) name,
+    ];
+
+    final tokens = OperonixVisualTokens.of(context);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+      children: [
+        Text(
+          'IATF zatvoreni krug: NCR, uzrok, CAPA, verifikacija i zatvaranje.',
+          style: PremiumType.support(tokens),
+        ),
+        const SizedBox(height: 16),
+        for (final section in sections) ...[
+          PremiumSectionHeader(
+            title: section,
+            subtitle: section == 'Prioritet'
+                ? 'Otvoreni zadaci koji čekaju odluku'
+                : null,
+          ),
+          const SizedBox(height: 8),
+          PremiumResponsiveGrid(
+            children: [
+              for (final index in grouped[section]!)
+                PremiumListCard(
+                  icon: items[index].icon,
+                  role: _role(section, items[index].icon),
+                  title: items[index].title,
+                  subtitle: items[index].subtitle,
+                  onTap: () => items[index].onTap(),
+                  trailing: items[index].iatfTitle != null &&
+                          items[index].iatfMessage != null &&
+                          items[index].iatfTitle!.isNotEmpty &&
+                          items[index].iatfMessage!.isNotEmpty
+                      ? QmsIatfInfoIcon(
+                          title: items[index].iatfTitle!,
+                          message: items[index].iatfMessage!,
+                          size: 20,
+                        )
+                      : null,
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+        ],
+      ],
     );
   }
 }

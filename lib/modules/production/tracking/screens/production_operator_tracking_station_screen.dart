@@ -6,6 +6,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../../../core/format/ba_formatted_date.dart';
 import '../../../../core/visual/operonix_visual_tokens.dart';
+import '../../../../core/visual/premium/premium_station_palette.dart';
 import '../../../../core/access/production_access_helper.dart'
     show ProductionAccessHelper, ProductionDashboardCard;
 import '../../station/screens/station_tracking_setup_screen.dart';
@@ -265,6 +266,7 @@ class _ProductionOperatorTrackingStationScreenState
             tooltip: 'Izgled stanice (boje i predlošci)',
             icon: const Icon(Icons.palette_outlined),
             onPressed: () async {
+              final saved = _appearance;
               final next = await showStationAppearanceEditorDialog(
                 context: context,
                 current: _appearance,
@@ -273,8 +275,18 @@ class _ProductionOperatorTrackingStationScreenState
                   (widget.companyData['role'] ?? '').toString(),
                 ),
                 showButtonAccent: premium,
+                onPreview: premium
+                    ? (draft) {
+                        if (!mounted) return;
+                        setState(() => _appearance = draft);
+                      }
+                    : null,
               );
-              if (next == null || !mounted) return;
+              if (!mounted) return;
+              if (next == null) {
+                if (premium) setState(() => _appearance = saved);
+                return;
+              }
               setState(() => _appearance = next);
               await StationScreenThemeStore.save(next);
             },

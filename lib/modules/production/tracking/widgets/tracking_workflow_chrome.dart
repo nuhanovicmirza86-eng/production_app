@@ -19,13 +19,32 @@ class TrackingEntryModeControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final premium = OperonixVisualTokens.of(context).isPremium;
+    final tokens = OperonixVisualTokens.of(context);
+    final premium = tokens.isPremium;
     return SegmentedButton<bool>(
       style: premium
-          ? const ButtonStyle(
+          ? ButtonStyle(
               visualDensity: VisualDensity.standard,
-              minimumSize: WidgetStatePropertyAll(Size(48, 44)),
+              minimumSize: const WidgetStatePropertyAll(Size(48, 44)),
               tapTargetSize: MaterialTapTargetSize.padded,
+              backgroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return tokens.primaryAccent.withValues(alpha: 0.22);
+                }
+                return tokens.surface;
+              }),
+              foregroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return tokens.primaryText;
+                }
+                return tokens.secondaryText;
+              }),
+              side: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return BorderSide(color: tokens.primaryAccent);
+                }
+                return BorderSide.none;
+              }),
             )
           : null,
       segments: const [
@@ -70,13 +89,15 @@ class TrackingScanActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final premium = OperonixVisualTokens.of(context).isPremium;
+    final tokens = OperonixVisualTokens.of(context);
+    final premium = tokens.isPremium;
+    assert(!premium || accent.a >= 0);
     final scan = premium
         ? FilledButton.icon(
             onPressed: onScan,
             style: FilledButton.styleFrom(
-              backgroundColor: accent,
-              foregroundColor: Colors.white,
+              backgroundColor: tokens.primaryAccent,
+              foregroundColor: tokens.onAccent,
               minimumSize: const Size(48, 48),
             ),
             icon: const Icon(Icons.qr_code_scanner_outlined),
@@ -165,6 +186,138 @@ class TrackingButtonAccentChoices extends StatelessWidget {
           ),
       ],
     );
+  }
+}
+
+/// Jedna radna traka: dan, datum unosa i pogon. Nisu tri odvojene kartice.
+class TrackingContextBand extends StatelessWidget {
+  final String workDay;
+  final String entryDate;
+  final String plant;
+  final VoidCallback? onPlant;
+  final List<Widget> actions;
+
+  const TrackingContextBand({
+    super.key,
+    required this.workDay,
+    required this.entryDate,
+    required this.plant,
+    this.onPlant,
+    this.actions = const [],
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = OperonixVisualTokens.of(context);
+    return PremiumSurfaceCard(
+      level: 1,
+      padding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final cells = [
+                _ContextCell(
+                  icon: Icons.calendar_today_outlined,
+                  role: PremiumIconRole.info,
+                  label: 'Radni dan',
+                  value: workDay,
+                ),
+                _ContextCell(
+                  icon: Icons.edit_calendar_outlined,
+                  role: PremiumIconRole.material,
+                  label: 'Datum unosa',
+                  value: entryDate,
+                ),
+                _ContextCell(
+                  icon: Icons.factory_outlined,
+                  role: PremiumIconRole.people,
+                  label: 'Pogon',
+                  value: plant,
+                  onTap: onPlant,
+                ),
+              ];
+              if (constraints.maxWidth < 560) {
+                return Column(
+                  children: [
+                    for (var i = 0; i < cells.length; i++) ...[
+                      if (i > 0)
+                        Divider(height: 12, color: tokens.divider),
+                      cells[i],
+                    ],
+                  ],
+                );
+              }
+              return IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < cells.length; i++) ...[
+                      if (i > 0)
+                        Container(width: 1, color: tokens.divider),
+                      Expanded(child: cells[i]),
+                    ],
+                  ],
+                ),
+              );
+            },
+          ),
+          if (actions.isNotEmpty)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Row(mainAxisSize: MainAxisSize.min, children: actions),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContextCell extends StatelessWidget {
+  final IconData icon;
+  final PremiumIconRole role;
+  final String label;
+  final String value;
+  final VoidCallback? onTap;
+
+  const _ContextCell({
+    required this.icon,
+    required this.role,
+    required this.label,
+    required this.value,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = OperonixVisualTokens.of(context);
+    final body = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        children: [
+          PremiumIconBadge(icon: icon, role: role, size: 32),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(label, style: PremiumType.meta(tokens)),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: PremiumType.cardTitle(tokens),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    if (onTap == null) return body;
+    return InkWell(onTap: onTap, child: body);
   }
 }
 

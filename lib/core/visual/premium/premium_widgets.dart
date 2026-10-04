@@ -4,7 +4,6 @@ import '../operonix_visual_tokens.dart';
 import 'premium_icon_accent.dart';
 import 'premium_type.dart';
 
-const double _kRadius = 16;
 const double _kBadge = 40;
 
 class PremiumSurfaceCard extends StatelessWidget {
@@ -12,24 +11,41 @@ class PremiumSurfaceCard extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   final VoidCallback? onTap;
 
+  /// 1 = sekcija, 2 = radna površina, 3 = odabrano / prioritet.
+  final int level;
+  final bool outlined;
+
   const PremiumSurfaceCard({
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(12),
     this.onTap,
+    this.level = 2,
+    this.outlined = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final tokens = OperonixVisualTokens.of(context);
-    final radius = BorderRadius.circular(_kRadius);
+    final radius = BorderRadius.circular(switch (level) {
+      1 => 20,
+      3 => 12,
+      _ => 14,
+    });
+    final color = switch (level) {
+      1 => tokens.surface,
+      3 => tokens.surfaceInteractive,
+      _ => tokens.surfaceElevated,
+    };
     final body = Padding(padding: padding, child: child);
     return Material(
-      color: tokens.surfaceElevated,
+      color: color,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: radius,
-        side: BorderSide(color: tokens.border.withValues(alpha: 0.85)),
+        side: outlined
+            ? BorderSide(color: tokens.border.withValues(alpha: 0.7))
+            : BorderSide.none,
       ),
       clipBehavior: Clip.antiAlias,
       child: onTap == null
@@ -53,7 +69,8 @@ class PremiumIconBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = PremiumIconAccent.of(role);
+    final tokens = OperonixVisualTokens.of(context);
+    final accent = PremiumIconAccent.of(role, tokens);
     return Container(
       width: size,
       height: size,
@@ -115,7 +132,8 @@ class PremiumContextCard extends StatelessWidget {
     final tokens = OperonixVisualTokens.of(context);
     return PremiumSurfaceCard(
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      level: 1,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         children: [
           leading ??
@@ -158,6 +176,9 @@ class PremiumListCard extends StatelessWidget {
   final Widget? trailing;
   final VoidCallback? onTap;
 
+  /// Red unutar zajedničke površine, bez vlastite kartice.
+  final bool flush;
+
   const PremiumListCard({
     super.key,
     required this.icon,
@@ -166,49 +187,78 @@ class PremiumListCard extends StatelessWidget {
     this.subtitle,
     this.trailing,
     this.onTap,
+    this.flush = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final tokens = OperonixVisualTokens.of(context);
+    final accent = PremiumIconAccent.of(role, tokens);
     final meta = (subtitle ?? '').trim();
+    final row = Row(
+      children: [
+        Container(
+          width: 3,
+          height: 36,
+          decoration: BoxDecoration(
+            color: accent,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 10),
+        PremiumIconBadge(icon: icon, role: role),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                PremiumIconAccent.familyLabel(role),
+                style: PremiumType.meta(tokens).copyWith(
+                  color: accent,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: PremiumType.cardTitle(tokens),
+              ),
+              if (meta.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  meta,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: PremiumType.meta(tokens),
+                ),
+              ],
+            ],
+          ),
+        ),
+        ?trailing,
+        Icon(
+          Icons.chevron_right,
+          color: tokens.secondaryText,
+          size: 22,
+        ),
+      ],
+    );
+    if (flush) {
+      final padded = Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+        child: row,
+      );
+      if (onTap == null) return padded;
+      return InkWell(onTap: onTap, child: padded);
+    }
     return PremiumSurfaceCard(
       onTap: onTap,
+      level: 2,
       padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
-      child: Row(
-        children: [
-          PremiumIconBadge(icon: icon, role: role),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: PremiumType.cardTitle(tokens),
-                ),
-                if (meta.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    meta,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: PremiumType.meta(tokens),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          ?trailing,
-          Icon(
-            Icons.chevron_right,
-            color: tokens.secondaryText,
-            size: 22,
-          ),
-        ],
-      ),
+      child: row,
     );
   }
 }
@@ -230,8 +280,8 @@ class PremiumKpiCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = OperonixVisualTokens.of(context);
-    final accent = PremiumIconAccent.of(role);
-    return PremiumSurfaceCard(
+    final accent = PremiumIconAccent.of(role, tokens);
+    return Padding(
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
@@ -265,28 +315,84 @@ class PremiumKpiGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = OperonixVisualTokens.of(context);
     final items = cards.take(4).toList();
     if (items.isEmpty) return const SizedBox.shrink();
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(child: items[0]),
-            const SizedBox(width: 10),
-            Expanded(child: items.length > 1 ? items[1] : const SizedBox()),
-          ],
-        ),
-        if (items.length > 2) ...[
-          const SizedBox(height: 10),
-          Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 720;
+        final rows = wide
+            ? [items]
+            : [
+                items.take(2).toList(),
+                if (items.length > 2) items.skip(2).take(2).toList(),
+              ];
+        return PremiumSurfaceCard(
+          level: 1,
+          padding: EdgeInsets.zero,
+          child: Column(
             children: [
-              Expanded(child: items[2]),
-              const SizedBox(width: 10),
-              Expanded(child: items.length > 3 ? items[3] : const SizedBox()),
+              for (var r = 0; r < rows.length; r++) ...[
+                if (r > 0)
+                  Container(height: 1, color: tokens.divider),
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var c = 0; c < rows[r].length; c++) ...[
+                        if (c > 0)
+                          Container(width: 1, color: tokens.divider),
+                        Expanded(child: rows[r][c]),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
-        ],
-      ],
+        );
+      },
+    );
+  }
+}
+
+class PremiumResponsiveGrid extends StatelessWidget {
+  final List<Widget> children;
+  final double breakpoint;
+
+  const PremiumResponsiveGrid({
+    super.key,
+    required this.children,
+    this.breakpoint = 720,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= breakpoint;
+        if (!wide) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < children.length; i++) ...[
+                if (i > 0) const SizedBox(height: 8),
+                children[i],
+              ],
+            ],
+          );
+        }
+        final cols = constraints.maxWidth >= 1100 ? 3 : 2;
+        final width =
+            (constraints.maxWidth - 12 * (cols - 1)) / cols;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            for (final child in children) SizedBox(width: width, child: child),
+          ],
+        );
+      },
     );
   }
 }
@@ -313,6 +419,7 @@ class PremiumFilterCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = OperonixVisualTokens.of(context);
     return PremiumSurfaceCard(
+      level: 2,
       padding: EdgeInsets.zero,
       child: Column(
         children: [
@@ -429,6 +536,7 @@ class PremiumEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = OperonixVisualTokens.of(context);
     return PremiumSurfaceCard(
+      level: 1,
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -467,7 +575,7 @@ class PremiumNavigationSelection {
       backgroundColor: tokens.surfaceElevated,
       elevation: 0,
       height: 72,
-      indicatorColor: tokens.surfaceInteractive,
+      indicatorColor: tokens.primaryAccent.withValues(alpha: 0.22),
       indicatorShape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -475,7 +583,7 @@ class PremiumNavigationSelection {
         final selected = states.contains(WidgetState.selected);
         return IconThemeData(
           size: 24,
-          color: selected ? tokens.primaryText : tokens.disabledText,
+          color: selected ? tokens.primaryAccent : tokens.disabledText,
         );
       }),
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
@@ -483,7 +591,7 @@ class PremiumNavigationSelection {
         return TextStyle(
           fontSize: 12,
           fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-          color: selected ? tokens.primaryText : tokens.disabledText,
+          color: selected ? tokens.primaryAccent : tokens.disabledText,
         );
       }),
     );

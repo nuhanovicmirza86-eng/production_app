@@ -119,10 +119,12 @@ class _HubChip extends StatelessWidget {
     final tokens = OperonixVisualTokens.of(context);
     final premium = tokens.isPremium;
     final fg = premium
-        ? (item.selected ? tokens.primaryText : tokens.secondaryText)
+        ? (item.selected ? tokens.primaryAccent : tokens.secondaryText)
         : (item.selected ? Colors.white : const Color(0xFF9CA3AF));
     final bg = premium
-        ? (item.selected ? tokens.surfaceInteractive : Colors.transparent)
+        ? (item.selected
+              ? tokens.primaryAccent.withValues(alpha: 0.18)
+              : Colors.transparent)
         : (item.selected
               ? Colors.white.withValues(alpha: 0.12)
               : Colors.transparent);

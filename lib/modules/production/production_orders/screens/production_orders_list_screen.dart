@@ -982,15 +982,18 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
                 onBack: () => Navigator.of(context).pop(),
                 beforeInfoAction: _exportMenuButton(),
                 onInfo: infoAction,
+                action: !compact && _canCreateOrder
+                    ? PremiumPrimaryAction(
+                        label: 'Novi nalog',
+                        onPressed: _openCreateScreen,
+                      )
+                    : null,
               ),
-              if (_canCreateOrder) ...[
+              if (compact && _canCreateOrder) ...[
                 const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: PremiumPrimaryAction(
-                    label: 'Novi nalog',
-                    onPressed: _openCreateScreen,
-                  ),
+                PremiumPrimaryAction(
+                  label: 'Novi nalog',
+                  onPressed: _openCreateScreen,
                 ),
               ],
             ],

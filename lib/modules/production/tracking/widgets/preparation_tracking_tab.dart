@@ -10,8 +10,9 @@ import 'package:flutter/services.dart';
 import '../../../../core/access/production_access_helper.dart';
 import '../../../workforce/employee_profiles/workforce_employee_qr_navigation.dart';
 import '../../../../core/theme/operonix_production_brand.dart';
+import '../../../../core/format/ba_formatted_date.dart';
 import '../../../../core/visual/operonix_visual_tokens.dart';
-import '../../../../core/visual/premium/premium_icon_accent.dart';
+import '../../../../core/visual/premium/premium_type.dart';
 import '../../../../core/visual/premium/premium_widgets.dart';
 import '../../../../core/ui/station_input.dart';
 import '../../production_orders/models/production_order_model.dart';
@@ -2557,12 +2558,15 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
       ),
     );
 
-    return Material(
+    final premiumTable = OperonixVisualTokens.of(context).isPremium;
+    final table = Material(
       color: Colors.transparent,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: frameLine, width: 1),
+        borderRadius: BorderRadius.circular(premiumTable ? 0 : 12),
+        side: premiumTable
+            ? BorderSide.none
+            : BorderSide(color: frameLine, width: 1),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -2590,6 +2594,12 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
           if (includeMjBar) mjBar,
         ],
       ),
+    );
+    if (!premiumTable) return table;
+    return PremiumSurfaceCard(
+      level: 1,
+      padding: EdgeInsets.zero,
+      child: table,
     );
   }
 
@@ -2874,6 +2884,84 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
     );
   }
 
+  String _contextPlantLabel() {
+    if (_stationBoundPlantKey.isNotEmpty) {
+      return _plantLabelByKey[_stationBoundPlantKey] ?? _stationBoundPlantKey;
+    }
+    if (_plantKeys.length > 1) {
+      if (_isAdminRole) {
+        if (_selectedStationPlantKey == null) return 'Odaberi pogon';
+        return _plantLabelByKey[_selectedStationPlantKey] ??
+            _selectedStationPlantKey!;
+      }
+      return _plantLabelByKey[_plantKeyEffective] ?? _plantKeyEffective;
+    }
+    if (_plantKeys.length == 1) {
+      return _plantLabelByKey[_plantKeys.first] ?? _plantKeys.first;
+    }
+    return '—';
+  }
+
+  VoidCallback? _contextPlantTap() {
+    if (_stationBoundPlantKey.isNotEmpty) return null;
+    if (_plantKeys.length > 1 &&
+        _isAdminRole &&
+        !_saving &&
+        !_plantsLoading) {
+      return _pickStationPlant;
+    }
+    return null;
+  }
+
+  Widget _compactReadyStatus(ThemeData theme) {
+    final tokens = OperonixVisualTokens.of(context);
+    final queued = _offlineQueueCount > 0;
+    final color = queued ? tokens.warning : tokens.success;
+    final text = _statusLine.isEmpty
+        ? (_plantsLoading ? 'Učitavanje…' : 'Spremno za unos')
+        : _statusLine;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: PremiumType.meta(tokens).copyWith(
+                color: tokens.primaryText,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          if (queued)
+            TextButton(
+              onPressed: _saving
+                  ? null
+                  : () => unawaited(_tryFlushOfflineQueue(silent: false)),
+              child: const Text('Pošalji sada'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _scannerWorkspace({required List<Widget> children}) {
+    final column = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: children,
+    );
+    if (!OperonixVisualTokens.of(context).isPremium) return column;
+    return PremiumSurfaceCard(level: 1, child: column);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -2893,8 +2981,11 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (premium)
-                  TrackingWorkContextCard(
+                  TrackingContextBand(
+                    workDay: BaFormattedDate.formatFullDate(DateTime.now()),
                     entryDate: workKey,
+                    plant: _contextPlantLabel(),
+                    onPlant: _contextPlantTap(),
                     actions: [
                       IconButton(
                         tooltip: 'Fokus na pločice količina (Alt+Shift+P)',
@@ -2960,19 +3051,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                     ),
                   ),
                 ],
-                if (_stationBoundPlantKey.isNotEmpty) ...[
+                if (!premium && _stationBoundPlantKey.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  if (premium)
-                    PremiumContextCard(
-                      icon: Icons.factory_outlined,
-                      role: PremiumIconRole.info,
-                      label: 'Pogon',
-                      value:
-                          _plantLabelByKey[_stationBoundPlantKey] ??
-                          _stationBoundPlantKey,
-                    )
-                  else
-                    Align(
+                  Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
                         'Pogon stanice: ${_plantLabelByKey[_stationBoundPlantKey] ?? _stationBoundPlantKey}',
@@ -2981,24 +3062,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                         ),
                       ),
                     ),
-                ] else if (_plantKeys.length > 1) ...[
+                ] else if (!premium && _plantKeys.length > 1) ...[
                   const SizedBox(height: 10),
-                  if (premium && _isAdminRole)
-                    PremiumContextCard(
-                      icon: Icons.factory_outlined,
-                      role: PremiumIconRole.info,
-                      label: 'Pogon (obavezno za ovu stanicu)',
-                      value: _selectedStationPlantKey == null
-                          ? 'Odaberi pogon'
-                          : (_plantLabelByKey[_selectedStationPlantKey] ??
-                                _selectedStationPlantKey!),
-                      trailing: Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        color: OperonixVisualTokens.of(context).secondaryText,
-                      ),
-                      onTap: _saving || _plantsLoading ? null : _pickStationPlant,
-                    )
-                  else if (_isAdminRole)
+                  if (_isAdminRole)
                     DropdownButtonFormField<String>(
                       key: ValueKey<String?>(_selectedStationPlantKey),
                       initialValue:
@@ -3027,15 +3093,6 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                               await _commitStationPlant(v);
                             },
                     )
-                  else if (premium)
-                    PremiumContextCard(
-                      icon: Icons.factory_outlined,
-                      role: PremiumIconRole.info,
-                      label: 'Pogon',
-                      value:
-                          _plantLabelByKey[_plantKeyEffective] ??
-                          _plantKeyEffective,
-                    )
                   else
                     Align(
                       alignment: Alignment.centerLeft,
@@ -3046,19 +3103,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                         ),
                       ),
                     ),
-                ] else if (_plantKeys.length == 1) ...[
+                ] else if (!premium && _plantKeys.length == 1) ...[
                   const SizedBox(height: 8),
-                  if (premium)
-                    PremiumContextCard(
-                      icon: Icons.factory_outlined,
-                      role: PremiumIconRole.info,
-                      label: 'Pogon',
-                      value:
-                          _plantLabelByKey[_plantKeys.first] ??
-                          _plantKeys.first,
-                    )
-                  else
-                    Align(
+                  Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
                         'Pogon: ${_plantLabelByKey[_plantKeys.first] ?? _plantKeys.first}',
@@ -3068,11 +3115,13 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                       ),
                     ),
                 ],
+                if (premium) ...[
+                  const SizedBox(height: 8),
+                  _compactReadyStatus(theme),
+                ] else ...[
                 const SizedBox(height: 8),
                 Material(
-                  color: premium
-                      ? OperonixVisualTokens.of(context).surfaceElevated
-                      : _offlineQueueCount > 0
+                  color: _offlineQueueCount > 0
                       ? theme.colorScheme.tertiaryContainer.withValues(
                           alpha: 0.45,
                         )
@@ -3080,34 +3129,16 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                           alpha: 0.65,
                         ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(premium ? 16 : 10),
-                    side: premium
-                        ? BorderSide(
-                            color: OperonixVisualTokens.of(context).border,
-                          )
-                        : BorderSide.none,
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Padding(
-                    padding: EdgeInsets.symmetric(
+                    padding: const EdgeInsets.symmetric(
                       horizontal: 12,
-                      vertical: premium ? 8 : 10,
+                      vertical: 10,
                     ),
                     child: Row(
-                      crossAxisAlignment: premium
-                          ? CrossAxisAlignment.center
-                          : CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (premium)
-                          PremiumIconBadge(
-                            icon: _offlineQueueCount > 0
-                                ? Icons.cloud_queue_outlined
-                                : Icons.info_outline,
-                            role: _offlineQueueCount > 0
-                                ? PremiumIconRole.warning
-                                : PremiumIconRole.info,
-                            size: 32,
-                          )
-                        else
                           Icon(
                             _offlineQueueCount > 0
                                 ? Icons.cloud_queue_outlined
@@ -3139,6 +3170,7 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                     ),
                   ),
                 ),
+              ],
               ],
             ),
           ),
@@ -3187,7 +3219,12 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                           : const <ProductionOperatorTrackingEntry>[];
 
                       return ListView(
-                        padding: EdgeInsets.all(premium ? 12 : 16),
+                        padding: EdgeInsets.fromLTRB(
+                          16,
+                          premium ? 12 : 16,
+                          16,
+                          premium ? 32 : 16,
+                        ),
                         children: [
                           TrackingEntryModeControl(
                             quickMode: _quickEntryMode,
@@ -3210,24 +3247,28 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                               ),
                             ),
                           if (_quickEntryMode) ...[
-                            ScrollIntoViewOnFocus(
-                              focusNode: _wedgeFocus,
-                              child: TextField(
-                                controller: _wedgeCtrl,
-                                focusNode: _wedgeFocus,
-                                decoration: trackingScannerDecoration(
-                                  premium: premium,
+                            _scannerWorkspace(
+                              children: [
+                                ScrollIntoViewOnFocus(
+                                  focusNode: _wedgeFocus,
+                                  child: TextField(
+                                    controller: _wedgeCtrl,
+                                    focusNode: _wedgeFocus,
+                                    decoration: trackingScannerDecoration(
+                                      premium: premium,
+                                    ),
+                                    onSubmitted: (s) =>
+                                        unawaited(_onScannerWedgeSubmitted(s)),
+                                  ),
                                 ),
-                                onSubmitted: (s) =>
-                                    unawaited(_onScannerWedgeSubmitted(s)),
-                              ),
+                                const SizedBox(height: 12),
+                                _scanActions(
+                                  closeBox: _isPrepPhase,
+                                  printLabel: _stationLabelPrintingEnabled,
+                                ),
+                              ],
                             ),
-                            SizedBox(height: premium ? 10 : 12),
-                            _scanActions(
-                              closeBox: _isPrepPhase,
-                              printLabel: _stationLabelPrintingEnabled,
-                            ),
-                            SizedBox(height: premium ? 10 : 12),
+                            SizedBox(height: premium ? 12 : 12),
                             Row(
                               children: [
                                 if (premium)
@@ -3380,22 +3421,26 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                                 ),
                               ),
                             const SizedBox(height: 8),
-                            _scanActions(
-                              closeBox: _isPrepPhase,
-                              printLabel: _stationLabelPrintingEnabled,
-                            ),
-                            const SizedBox(height: 8),
-                            ScrollIntoViewOnFocus(
-                              focusNode: _wedgeFocus,
-                              child: TextField(
-                                controller: _wedgeCtrl,
-                                focusNode: _wedgeFocus,
-                                decoration: trackingScannerDecoration(
-                                  premium: premium,
+                            _scannerWorkspace(
+                              children: [
+                                _scanActions(
+                                  closeBox: _isPrepPhase,
+                                  printLabel: _stationLabelPrintingEnabled,
                                 ),
-                                onSubmitted: (s) =>
-                                    unawaited(_onScannerWedgeSubmitted(s)),
-                              ),
+                                const SizedBox(height: 12),
+                                ScrollIntoViewOnFocus(
+                                  focusNode: _wedgeFocus,
+                                  child: TextField(
+                                    controller: _wedgeCtrl,
+                                    focusNode: _wedgeFocus,
+                                    decoration: trackingScannerDecoration(
+                                      premium: premium,
+                                    ),
+                                    onSubmitted: (s) =>
+                                        unawaited(_onScannerWedgeSubmitted(s)),
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 12),
                             Row(

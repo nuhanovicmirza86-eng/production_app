@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/visual/operonix_visual_tokens.dart';
+import '../../../../core/visual/premium/premium_widgets.dart';
 import '../../packing/services/packing_box_service.dart';
 import '../models/production_dashboard_layout.dart';
 import '../models/production_dashboard_module.dart';
@@ -56,11 +58,20 @@ class _StandardView extends StatelessWidget {
         ),
       );
       out.add(const SizedBox(height: ProductionDashboardHomeModulesView.afterHeader));
-      for (var j = 0; j < section.entries.length; j++) {
-        if (j > 0) {
-          out.add(const SizedBox(height: ProductionDashboardHomeModulesView.tileGap));
+      final entries = [
+        for (final entry in section.entries) _buildStandardEntry(context, entry),
+      ];
+      if (OperonixVisualTokens.of(context).isPremium && entries.length > 1) {
+        out.add(PremiumResponsiveGrid(children: entries));
+      } else {
+        for (var j = 0; j < entries.length; j++) {
+          if (j > 0) {
+            out.add(
+              const SizedBox(height: ProductionDashboardHomeModulesView.tileGap),
+            );
+          }
+          out.add(entries[j]);
         }
-        out.add(_buildStandardEntry(context, section.entries[j]));
       }
     }
 

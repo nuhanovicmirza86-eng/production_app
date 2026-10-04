@@ -77,8 +77,11 @@ class OperonixVisualTheme {
     );
   }
 
-  static ThemeData premiumMidnight() {
-    final tokens = OperonixVisualTokens.midnight();
+  static ThemeData premiumMidnight() =>
+      premiumWith(OperonixVisualTokens.midnight());
+
+  /// Premium struktura ostaje ista. Paleta mijenja platno, površine i akcent.
+  static ThemeData premiumWith(OperonixVisualTokens tokens) {
     final scheme = ColorScheme(
       brightness: Brightness.dark,
       primary: tokens.primaryAccent,

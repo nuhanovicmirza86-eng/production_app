@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../operonix_visual_tokens.dart';
+
 /// Semantička porodica Premium ikona. Boja nije jedini nosilac značenja.
 enum PremiumIconRole {
   info,
@@ -10,6 +12,7 @@ enum PremiumIconRole {
   lab,
   material,
   people,
+  analytics,
 }
 
 class PremiumIconAccent {
@@ -23,25 +26,56 @@ class PremiumIconAccent {
   static const Color lab = Color(0xFF2BB8C8);
   static const Color material = Color(0xFFE0A106);
   static const Color people = Color(0xFF3D9A94);
+  static const Color analytics = Color(0xFF9B8CFF);
 
-  static Color of(PremiumIconRole role) {
+  static const Color _midnightAccent = Color(0xFF3D9A94);
+
+  static Color of(PremiumIconRole role, [OperonixVisualTokens? tokens]) {
+    final base = switch (role) {
+      PremiumIconRole.info => info,
+      PremiumIconRole.success => success,
+      PremiumIconRole.warning => warning,
+      PremiumIconRole.active => active,
+      PremiumIconRole.quality => quality,
+      PremiumIconRole.lab => lab,
+      PremiumIconRole.material => material,
+      PremiumIconRole.people => people,
+      PremiumIconRole.analytics => analytics,
+    };
+    final accent = tokens?.primaryAccent;
+    if (accent == null || accent == _midnightAccent) {
+      return base;
+    }
+    final mix = switch (role) {
+      PremiumIconRole.warning ||
+      PremiumIconRole.active ||
+      PremiumIconRole.success =>
+        0.18,
+      _ => 0.45,
+    };
+    return Color.lerp(base, accent, mix)!;
+  }
+
+  static String familyLabel(PremiumIconRole role) {
     switch (role) {
       case PremiumIconRole.info:
-        return info;
+        return 'Kontekst';
       case PremiumIconRole.success:
-        return success;
+        return 'Proizvodnja';
       case PremiumIconRole.warning:
-        return warning;
+        return 'Pažnja';
       case PremiumIconRole.active:
-        return active;
+        return 'Operacija';
       case PremiumIconRole.quality:
-        return quality;
+        return 'Kvalitet';
       case PremiumIconRole.lab:
-        return lab;
+        return 'Laboratorija';
       case PremiumIconRole.material:
-        return material;
+        return 'Materijal';
       case PremiumIconRole.people:
-        return people;
+        return 'Administracija';
+      case PremiumIconRole.analytics:
+        return 'Analitika';
     }
   }
 
@@ -102,6 +136,12 @@ class PremiumIconAccent {
         icon == Icons.play_circle ||
         icon == Icons.account_tree_outlined) {
       return PremiumIconRole.active;
+    }
+    if (icon == Icons.insights_outlined ||
+        icon == Icons.query_stats_outlined ||
+        icon == Icons.picture_as_pdf_outlined ||
+        icon == Icons.analytics_outlined) {
+      return PremiumIconRole.analytics;
     }
     return PremiumIconRole.info;
   }

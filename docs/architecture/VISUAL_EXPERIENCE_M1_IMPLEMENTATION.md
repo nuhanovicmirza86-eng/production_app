@@ -1,7 +1,7 @@
 # VISUAL-EXPERIENCE-M1 — Production pilot checkpoint
 
 **Status:** OPEN na grani `ui/visual-experience-m1-production-pilot`  
-**Owner smoke:** FAIL na prvom Premiumu (tamni Classic). UI-CORRECTION-01 uvodi zaseban prezentacioni sloj. PASS tek nakon novog owner smokea.  
+**Owner smoke:** FAIL. PREMIUM-RESET-01: Premium nije tamni Classic. Prihvatni opis: `VISUAL_EXPERIENCE_M1_PREMIUM_PRESENTATION.md`. PASS tek nakon owner re-smokea.  
 **Kanonska arhitektura (ne dirana iz ove grane):**  
 `maintenance_app/docs/architecture/OPERONIX_VISUAL_EXPERIENCE_ARCHITECTURE.md`  
 `maintenance_app/docs/architecture/OPERONIX_UNIFIED_WEB_SHELL_RESPONSIVE_STANDARD.md`

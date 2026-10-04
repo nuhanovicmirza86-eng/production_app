@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:production_app/core/theme/operonix_production_brand.dart';
+import 'package:production_app/core/visual/operonix_visual_tokens.dart';
+import 'package:production_app/core/visual/premium/premium_icon_accent.dart';
+import 'package:production_app/core/visual/premium/premium_type.dart';
+import 'package:production_app/core/visual/premium/premium_widgets.dart';
 
 import 'mes_inbox_attention.dart';
 
@@ -17,6 +21,53 @@ class MesAttentionHomeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!counts.hasAttention) return const SizedBox.shrink();
+    final tokens = OperonixVisualTokens.of(context);
+    if (tokens.isPremium) {
+      final chips = MesInboxAttention.homeCardChipLabels(counts);
+      return PremiumSurfaceCard(
+        level: 3,
+        onTap: onOpenInbox,
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        child: Row(
+          children: [
+            const PremiumIconBadge(
+              icon: Icons.notifications_active_outlined,
+              role: PremiumIconRole.warning,
+              size: 40,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    MesInboxAttention.homeCardTitle(),
+                    style: PremiumType.cardTitle(tokens),
+                  ),
+                  if (chips.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      chips.join(' · '),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: PremiumType.value(tokens, color: tokens.warning),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              MesInboxAttention.homeCardOpenActionLabel(),
+              style: PremiumType.meta(tokens).copyWith(
+                color: tokens.primaryAccent,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     final theme = Theme.of(context);
     final chips = MesInboxAttention.homeCardChipLabels(counts);
     return Card(
