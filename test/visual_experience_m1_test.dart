@@ -8,6 +8,7 @@ import 'package:production_app/core/visual/operonix_empty_state.dart';
 import 'package:production_app/core/visual/operonix_shell_metrics.dart';
 import 'package:production_app/core/visual/operonix_visual_theme.dart';
 import 'package:production_app/core/visual/operonix_visual_tokens.dart';
+import 'package:production_app/core/visual/premium/operonix_premium_icon.dart';
 import 'package:production_app/core/visual/premium/premium_icon_accent.dart';
 import 'package:production_app/core/visual/premium/premium_widgets.dart';
 import 'package:production_app/core/visual/visual_experience_controller.dart';
@@ -368,10 +369,11 @@ void main() {
       expect(find.text('Doziranje'), findsNothing);
       expect(find.byType(PremiumListCard), findsOneWidget);
       expect(find.byType(ListTile), findsNothing);
-      expect(
-        tester.widget<Icon>(find.byIcon(Icons.science_outlined)).color,
-        PremiumIconAccent.of(PremiumIconRole.lab),
+      final mark = tester.widget<OperonixPremiumIcon>(
+        find.byType(OperonixPremiumIcon),
       );
+      expect(mark.glyph, OperonixPremiumGlyph.chemicalDose);
+      expect(mark.color, PremiumIconAccent.of(PremiumIconRole.lab));
     });
 
     testWidgets('classic evidence card stays a list tile', (tester) async {
@@ -452,18 +454,18 @@ void main() {
       );
       expect(find.text('Ukupno'), findsOneWidget);
       expect(find.text('4'), findsOneWidget);
-      expect(
-        tester.widget<Icon>(find.byIcon(Icons.assignment_outlined)).color,
-        PremiumIconAccent.info,
-      );
-      expect(
-        tester.widget<Icon>(find.byIcon(Icons.play_circle_outline)).color,
-        PremiumIconAccent.active,
-      );
-      expect(
-        tester.widget<Icon>(find.byIcon(Icons.task_alt_rounded)).color,
-        PremiumIconAccent.success,
-      );
+      final marks = tester
+          .widgetList<OperonixPremiumIcon>(find.byType(OperonixPremiumIcon))
+          .toList();
+      expect(marks.map((mark) => mark.glyph).toList(), [
+        OperonixPremiumGlyph.kpiTotal,
+        OperonixPremiumGlyph.kpiOpen,
+        OperonixPremiumGlyph.kpiRunning,
+        OperonixPremiumGlyph.kpiDone,
+      ]);
+      expect(marks[0].color, PremiumIconAccent.info);
+      expect(marks[2].color, PremiumIconAccent.active);
+      expect(marks[3].color, PremiumIconAccent.success);
     });
   });
 }

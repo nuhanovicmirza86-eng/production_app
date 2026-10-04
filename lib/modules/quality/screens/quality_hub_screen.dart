@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/access/production_access_helper.dart';
 import '../../../core/visual/operonix_visual_tokens.dart';
+import '../../../core/visual/premium/operonix_premium_iconography.dart';
 import '../../../core/visual/premium/premium_icon_accent.dart';
 import '../../../core/visual/premium/premium_type.dart';
 import '../../../core/visual/premium/premium_widgets.dart';
@@ -320,6 +321,12 @@ class _PremiumQualityBody extends StatelessWidget {
 
   const _PremiumQualityBody({required this.items});
 
+  PremiumIconRole _premiumRole(String section, IconData icon, String title) {
+    final glyph = OperonixPremiumIconography.forTitle(title);
+    if (glyph != null) return OperonixPremiumIconography.roleFor(glyph);
+    return _role(section, icon);
+  }
+
   PremiumIconRole _role(String section, IconData icon) {
     switch (section) {
       case 'Prioritet':
@@ -369,7 +376,8 @@ class _PremiumQualityBody extends StatelessWidget {
               for (final index in grouped[section]!)
                 PremiumListCard(
                   icon: items[index].icon,
-                  role: _role(section, items[index].icon),
+                  glyph: OperonixPremiumIconography.forTitle(items[index].title),
+                  role: _premiumRole(section, items[index].icon, items[index].title),
                   title: items[index].title,
                   subtitle: items[index].subtitle,
                   onTap: () => items[index].onTap(),

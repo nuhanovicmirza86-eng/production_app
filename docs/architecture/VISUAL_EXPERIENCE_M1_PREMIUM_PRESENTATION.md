@@ -26,7 +26,7 @@ Shared families live under `lib/core/visual/premium/`:
 
 - page canvas and surfaces at three levels (section, working surface, selected/priority)
 - context, action and KPI treatments
-- icon badge with a semantic family, not one teal for every icon
+- icon badge with a semantic family and a domain glyph, not one teal Material icon
 - list row with a family rail
 - empty state, filter toolbar, segmented control
 - primary and secondary actions
@@ -61,6 +61,16 @@ Industrijska noć is a near-black industrial canvas with a cyan accent.
 Svijetla proizvodnja is a real light Premium workspace on the tracking screen only. It does not switch the app back to Classic.
 
 The action colors stay Zelena, Plava, Narančasta and Ljubičasta. They recolor the primary action and its foreground is chosen for contrast. They do not recolor the page.
+
+## Premium iconography
+
+Premium business icons are local vector glyphs (`OperonixPremiumIcon`), not a Material pack and not image assets. Classic keeps its existing Material icons.
+
+Badge size and radius come only from `PremiumBadgeVariant`: small (28 / 8), medium (40 / 12), large home card (56 / 18). Selected and disabled states change fill, border and foreground. Disabled uses `disabledText`.
+
+Color families stay semantic: production green, quality cyan, material amber, maintenance/operation orange, lab teal, information blue, critical red, analytics violet, administration teal. On a light tracking canvas the accent is darkened so the stroke stays readable. The glyph shape stays recognizable without color.
+
+`OperonixPremiumIconography` maps home titles, evidence profile keys, quality titles and the four production-order KPI labels. Utility actions (back, close, search, refresh, more) stay Material icons. Station workspace theme does not leave Praćenje proizvodnje.
 
 ## Pilot screens
 

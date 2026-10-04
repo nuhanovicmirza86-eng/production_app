@@ -13,6 +13,7 @@ enum PremiumIconRole {
   material,
   people,
   analytics,
+  critical,
 }
 
 class PremiumIconAccent {
@@ -27,6 +28,7 @@ class PremiumIconAccent {
   static const Color material = Color(0xFFE0A106);
   static const Color people = Color(0xFF3D9A94);
   static const Color analytics = Color(0xFF9B8CFF);
+  static const Color critical = Color(0xFFE5484D);
 
   static const Color _midnightAccent = Color(0xFF3D9A94);
 
@@ -41,19 +43,26 @@ class PremiumIconAccent {
       PremiumIconRole.material => material,
       PremiumIconRole.people => people,
       PremiumIconRole.analytics => analytics,
+      PremiumIconRole.critical => critical,
     };
     final accent = tokens?.primaryAccent;
     if (accent == null || accent == _midnightAccent) {
       return base;
     }
+    var tone = base;
+    final background = tokens?.background;
+    if (background != null && background.computeLuminance() > 0.45) {
+      tone = Color.lerp(base, const Color(0xFF102030), 0.42)!;
+    }
     final mix = switch (role) {
       PremiumIconRole.warning ||
       PremiumIconRole.active ||
-      PremiumIconRole.success =>
+      PremiumIconRole.success ||
+      PremiumIconRole.critical =>
         0.18,
       _ => 0.45,
     };
-    return Color.lerp(base, accent, mix)!;
+    return Color.lerp(tone, accent, mix)!;
   }
 
   static String familyLabel(PremiumIconRole role) {
@@ -76,6 +85,8 @@ class PremiumIconAccent {
         return 'Administracija';
       case PremiumIconRole.analytics:
         return 'Analitika';
+      case PremiumIconRole.critical:
+        return 'Kritično';
     }
   }
 
@@ -95,6 +106,7 @@ class PremiumIconAccent {
       case 'operation_material_preparation':
         return PremiumIconRole.material;
       case 'line_clearance':
+        return PremiumIconRole.active;
       case 'workspace_5s_cleaning':
         return PremiumIconRole.success;
       default:

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/operonix_production_brand.dart';
 import '../../../../core/visual/operonix_visual_tokens.dart';
+import '../../../../core/visual/premium/operonix_premium_iconography.dart';
 import '../../../../core/visual/premium/premium_icon_accent.dart';
 import '../../../../core/visual/premium/premium_widgets.dart';
 
@@ -23,8 +24,11 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = OperonixVisualTokens.of(context);
+    final glyph = tokens.isPremium
+        ? OperonixPremiumIconography.resolve(title: title, icon: icon)
+        : null;
     final accent = tokens.isPremium
-        ? PremiumIconAccent.of(PremiumIconAccent.forIcon(icon))
+        ? PremiumIconAccent.of(OperonixPremiumIconography.roleFor(glyph), tokens)
         : tokens.moduleAccent;
     final shape = tokens.isPremium
         ? tokens.cardShape
@@ -52,8 +56,9 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
                   tokens.isPremium
                       ? PremiumIconBadge(
                           icon: icon,
-                          role: PremiumIconAccent.forIcon(icon),
-                          size: 48,
+                          glyph: glyph,
+                          role: OperonixPremiumIconography.roleFor(glyph),
+                          variant: PremiumBadgeVariant.large,
                         )
                       : Container(
                           width: 52,

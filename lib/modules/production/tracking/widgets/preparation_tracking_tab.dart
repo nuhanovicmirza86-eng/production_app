@@ -12,6 +12,7 @@ import '../../../workforce/employee_profiles/workforce_employee_qr_navigation.da
 import '../../../../core/theme/operonix_production_brand.dart';
 import '../../../../core/format/ba_formatted_date.dart';
 import '../../../../core/visual/operonix_visual_tokens.dart';
+import '../../../../core/visual/premium/operonix_premium_icon.dart';
 import '../../../../core/visual/premium/premium_station_palette.dart';
 import '../../../../core/visual/premium/premium_type.dart';
 import '../../../../core/visual/premium/premium_widgets.dart';
@@ -2925,10 +2926,12 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          OperonixPremiumIcon(
+            glyph: queued
+                ? OperonixPremiumGlyph.attention
+                : OperonixPremiumGlyph.readyStatus,
+            color: color,
+            size: 18,
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -3290,10 +3293,15 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                                 const Spacer(),
                                 TextButton.icon(
                                   onPressed: _openTableColumnVisibility,
-                                  icon: const Icon(
-                                    Icons.view_column_outlined,
-                                    size: 18,
-                                  ),
+                                  icon: premium
+                                      ? const OperonixPremiumIcon(
+                                          glyph: OperonixPremiumGlyph.tableColumns,
+                                          size: 18,
+                                        )
+                                      : const Icon(
+                                          Icons.view_column_outlined,
+                                          size: 18,
+                                        ),
                                   label: const Text('Kolone'),
                                 ),
                               ],
@@ -3458,10 +3466,15 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                                 ),
                                 TextButton.icon(
                                   onPressed: _openTableColumnVisibility,
-                                  icon: const Icon(
-                                    Icons.view_column_outlined,
-                                    size: 18,
-                                  ),
+                                  icon: premium
+                                      ? const OperonixPremiumIcon(
+                                          glyph: OperonixPremiumGlyph.tableColumns,
+                                          size: 18,
+                                        )
+                                      : const Icon(
+                                          Icons.view_column_outlined,
+                                          size: 18,
+                                        ),
                                   label: const Text('Kolone'),
                                 ),
                               ],
@@ -3977,13 +3990,19 @@ class _QuantityTile extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Icon(
-                      isKeyboardFocused
-                          ? Icons.keyboard_outlined
-                          : Icons.touch_app_outlined,
-                      size: 20,
-                      color: accent.withValues(alpha: 0.7),
-                    ),
+                    OperonixVisualTokens.of(context).isPremium
+                        ? OperonixPremiumIcon(
+                            glyph: OperonixPremiumGlyph.quantity,
+                            size: 20,
+                            color: accent.withValues(alpha: 0.9),
+                          )
+                        : Icon(
+                            isKeyboardFocused
+                                ? Icons.keyboard_outlined
+                                : Icons.touch_app_outlined,
+                            size: 20,
+                            color: accent.withValues(alpha: 0.7),
+                          ),
                   ],
                 ),
               ],

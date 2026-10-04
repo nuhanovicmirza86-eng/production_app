@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/visual/operonix_visual_tokens.dart';
+import '../../../../core/visual/premium/operonix_premium_icon.dart';
 import '../../../../core/visual/premium/premium_icon_accent.dart';
 import '../../../../core/visual/premium/premium_station_palette.dart';
 import '../../../../core/visual/premium/premium_type.dart';
@@ -48,16 +49,26 @@ class TrackingEntryModeControl extends StatelessWidget {
               }),
             )
           : null,
-      segments: const [
+      segments: [
         ButtonSegment<bool>(
           value: true,
-          label: Text('Brzi unos'),
-          icon: Icon(Icons.bolt_outlined),
+          label: const Text('Brzi unos'),
+          icon: premium
+              ? const OperonixPremiumIcon(
+                  glyph: OperonixPremiumGlyph.quickEntry,
+                  size: 18,
+                )
+              : const Icon(Icons.bolt_outlined),
         ),
         ButtonSegment<bool>(
           value: false,
-          label: Text('Ručni unos'),
-          icon: Icon(Icons.edit_note_outlined),
+          label: const Text('Ručni unos'),
+          icon: premium
+              ? const OperonixPremiumIcon(
+                  glyph: OperonixPremiumGlyph.manualEntry,
+                  size: 18,
+                )
+              : const Icon(Icons.edit_note_outlined),
         ),
       ],
       selected: {quickMode},
@@ -113,7 +124,10 @@ class TrackingScanActions extends StatelessWidget {
                 return null;
               }),
             ),
-            icon: const Icon(Icons.qr_code_scanner_outlined),
+            icon: const OperonixPremiumIcon(
+              glyph: OperonixPremiumGlyph.qrScan,
+              size: 20,
+            ),
             label: const Text('Skeniraj QR'),
           )
         : FilledButton.icon(
@@ -127,7 +141,12 @@ class TrackingScanActions extends StatelessWidget {
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(48, 48),
             ),
-            icon: Icon(secondaryIcon),
+            icon: OperonixPremiumIcon(
+              glyph: secondaryIcon == Icons.inventory_2_outlined
+                  ? OperonixPremiumGlyph.closeBox
+                  : OperonixPremiumGlyph.labelPrint,
+              size: 20,
+            ),
             label: Text(secondaryLabel),
           )
         : FilledButton.tonalIcon(
@@ -153,7 +172,10 @@ InputDecoration trackingScannerDecoration({required bool premium}) {
     hintText: 'Fokus ovdje, zatim skeniraj',
     isDense: premium,
     prefixIcon: premium
-        ? const Icon(Icons.qr_code_scanner_outlined)
+        ? const OperonixPremiumIcon(
+            glyph: OperonixPremiumGlyph.qrScan,
+            size: 22,
+          )
         : null,
   );
 }
@@ -244,18 +266,21 @@ class TrackingContextBand extends StatelessWidget {
               final cells = [
                 _ContextCell(
                   icon: Icons.calendar_today_outlined,
+                  glyph: OperonixPremiumGlyph.workDay,
                   role: PremiumIconRole.info,
                   label: 'Radni dan',
                   value: workDay,
                 ),
                 _ContextCell(
                   icon: Icons.edit_calendar_outlined,
+                  glyph: OperonixPremiumGlyph.entryDate,
                   role: PremiumIconRole.material,
                   label: 'Datum unosa',
                   value: entryDate,
                 ),
                 _ContextCell(
                   icon: Icons.factory_outlined,
+                  glyph: OperonixPremiumGlyph.plant,
                   role: PremiumIconRole.people,
                   label: 'Pogon',
                   value: plant,
@@ -300,6 +325,7 @@ class TrackingContextBand extends StatelessWidget {
 
 class _ContextCell extends StatelessWidget {
   final IconData icon;
+  final OperonixPremiumGlyph glyph;
   final PremiumIconRole role;
   final String label;
   final String value;
@@ -307,6 +333,7 @@ class _ContextCell extends StatelessWidget {
 
   const _ContextCell({
     required this.icon,
+    required this.glyph,
     required this.role,
     required this.label,
     required this.value,
@@ -320,7 +347,12 @@ class _ContextCell extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
         children: [
-          PremiumIconBadge(icon: icon, role: role, size: 32),
+          PremiumIconBadge(
+            icon: icon,
+            glyph: glyph,
+            role: role,
+            variant: PremiumBadgeVariant.small,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -364,7 +396,8 @@ class TrackingWorkContextCard extends StatelessWidget {
         children: [
           const PremiumIconBadge(
             icon: Icons.calendar_today_outlined,
-            role: PremiumIconRole.info,
+            glyph: OperonixPremiumGlyph.entryDate,
+            role: PremiumIconRole.material,
             size: 36,
           ),
           const SizedBox(width: 10),

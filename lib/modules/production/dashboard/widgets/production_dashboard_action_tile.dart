@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/visual/operonix_visual_tokens.dart';
-import '../../../../core/visual/premium/premium_icon_accent.dart';
+import '../../../../core/visual/premium/operonix_premium_iconography.dart';
 import '../../../../core/visual/premium/premium_widgets.dart';
 
 /// Kartica prečice na početnom zaslonu (standardni prikaz).
@@ -26,9 +26,12 @@ class ProductionDashboardActionTile extends StatelessWidget {
     final tokens = OperonixVisualTokens.of(context);
     if (tokens.isPremium) {
       final notice = (noticeText ?? '').trim();
+      final glyph = OperonixPremiumIconography.resolve(title: title, icon: icon);
       return PremiumListCard(
         icon: icon,
-        role: PremiumIconAccent.forIcon(icon),
+        glyph: glyph,
+        role: OperonixPremiumIconography.roleFor(glyph),
+        badgeVariant: PremiumBadgeVariant.large,
         title: title,
         subtitle: notice.isEmpty ? subtitle : '$subtitle · $notice',
         onTap: onTap,

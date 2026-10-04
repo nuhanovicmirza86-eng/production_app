@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:production_app/core/theme/operonix_production_brand.dart';
 import 'package:production_app/core/visual/operonix_visual_tokens.dart';
+import 'package:production_app/core/visual/premium/operonix_premium_icon.dart';
 import 'package:production_app/core/visual/premium/premium_icon_accent.dart';
 import 'package:production_app/core/visual/premium/premium_type.dart';
 import 'package:production_app/core/visual/premium/premium_widgets.dart';
@@ -32,6 +33,7 @@ class MesAttentionHomeCard extends StatelessWidget {
           children: [
             const PremiumIconBadge(
               icon: Icons.notifications_active_outlined,
+              glyph: OperonixPremiumGlyph.attention,
               role: PremiumIconRole.warning,
               size: 40,
             ),

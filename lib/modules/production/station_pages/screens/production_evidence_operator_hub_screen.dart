@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/visual/operonix_empty_state.dart';
 import '../../../../core/visual/operonix_visual_tokens.dart';
+import '../../../../core/visual/premium/operonix_premium_iconography.dart';
 import '../../../../core/visual/premium/premium_icon_accent.dart';
 import '../../../../core/visual/premium/premium_widgets.dart';
 
@@ -334,6 +335,7 @@ class ProductionEvidenceListCard extends StatelessWidget {
       return PremiumListCard(
         flush: true,
         icon: icon,
+        glyph: OperonixPremiumIconography.forProfile(profileKey),
         role: PremiumIconAccent.forProfile(profileKey),
         title: title,
         subtitle: _premiumMeta,

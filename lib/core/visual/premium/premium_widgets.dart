@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../operonix_visual_tokens.dart';
+import 'operonix_premium_icon.dart';
+import 'operonix_premium_iconography.dart';
 import 'premium_icon_accent.dart';
 import 'premium_type.dart';
+
+/// Veličina i radijus bedža. Oblik se mijenja samo kroz ove varijante.
+enum PremiumBadgeVariant { small, medium, large }
 
 const double _kBadge = 40;
 
@@ -56,31 +61,82 @@ class PremiumSurfaceCard extends StatelessWidget {
 }
 
 class PremiumIconBadge extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final OperonixPremiumGlyph? glyph;
   final PremiumIconRole role;
-  final double size;
+  final PremiumBadgeVariant variant;
+  final double? size;
+  final bool selected;
+  final bool disabled;
 
   const PremiumIconBadge({
     super.key,
-    required this.icon,
+    this.icon,
+    this.glyph,
     required this.role,
-    this.size = _kBadge,
+    this.variant = PremiumBadgeVariant.medium,
+    this.size,
+    this.selected = false,
+    this.disabled = false,
   });
+
+  double get extent {
+    if (size != null) return size!;
+    return switch (variant) {
+      PremiumBadgeVariant.small => 28,
+      PremiumBadgeVariant.medium => _kBadge,
+      PremiumBadgeVariant.large => 56,
+    };
+  }
+
+  double get radius {
+    final resolved = size == null
+        ? variant
+        : size! <= 32
+        ? PremiumBadgeVariant.small
+        : size! >= 48
+        ? PremiumBadgeVariant.large
+        : PremiumBadgeVariant.medium;
+    return switch (resolved) {
+      PremiumBadgeVariant.small => 8,
+      PremiumBadgeVariant.medium => 12,
+      PremiumBadgeVariant.large => 18,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
     final tokens = OperonixVisualTokens.of(context);
-    final accent = PremiumIconAccent.of(role, tokens);
+    final accent = disabled
+        ? tokens.disabledText
+        : PremiumIconAccent.of(role, tokens);
+    final box = extent;
+    final fill = disabled
+        ? tokens.disabledText.withValues(alpha: 0.10)
+        : accent.withValues(alpha: selected ? 0.30 : 0.16);
+    final border = accent.withValues(
+      alpha: disabled ? 0.28 : (selected ? 0.95 : 0.50),
+    );
+    final mark = glyph;
     return Container(
-      width: size,
-      height: size,
+      width: box,
+      height: box,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accent.withValues(alpha: 0.45)),
+        color: fill,
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(
+          color: border,
+          width: selected ? 1.6 : 1,
+        ),
       ),
-      child: Icon(icon, size: size * 0.52, color: accent),
+      child: mark != null
+          ? OperonixPremiumIcon(
+              glyph: mark,
+              color: accent,
+              size: box * 0.56,
+            )
+          : Icon(icon ?? Icons.circle_outlined, size: box * 0.52, color: accent),
     );
   }
 }
@@ -170,11 +226,13 @@ class PremiumContextCard extends StatelessWidget {
 
 class PremiumListCard extends StatelessWidget {
   final IconData icon;
+  final OperonixPremiumGlyph? glyph;
   final PremiumIconRole role;
   final String title;
   final String? subtitle;
   final Widget? trailing;
   final VoidCallback? onTap;
+  final PremiumBadgeVariant badgeVariant;
 
   /// Red unutar zajedničke površine, bez vlastite kartice.
   final bool flush;
@@ -182,17 +240,21 @@ class PremiumListCard extends StatelessWidget {
   const PremiumListCard({
     super.key,
     required this.icon,
+    this.glyph,
     required this.role,
     required this.title,
     this.subtitle,
     this.trailing,
     this.onTap,
     this.flush = false,
+    this.badgeVariant = PremiumBadgeVariant.medium,
   });
 
   @override
   Widget build(BuildContext context) {
     final tokens = OperonixVisualTokens.of(context);
+    final resolved =
+        glyph ?? OperonixPremiumIconography.resolve(title: title, icon: icon);
     final accent = PremiumIconAccent.of(role, tokens);
     final meta = (subtitle ?? '').trim();
     final row = Row(
@@ -206,7 +268,12 @@ class PremiumListCard extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        PremiumIconBadge(icon: icon, role: role),
+        PremiumIconBadge(
+          icon: icon,
+          glyph: resolved,
+          role: role,
+          variant: badgeVariant,
+        ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -268,6 +335,7 @@ class PremiumKpiCard extends StatelessWidget {
   final String value;
   final IconData icon;
   final PremiumIconRole role;
+  final OperonixPremiumGlyph? glyph;
 
   const PremiumKpiCard({
     super.key,
@@ -275,17 +343,22 @@ class PremiumKpiCard extends StatelessWidget {
     required this.value,
     required this.icon,
     required this.role,
+    this.glyph,
   });
 
   @override
   Widget build(BuildContext context) {
     final tokens = OperonixVisualTokens.of(context);
     final accent = PremiumIconAccent.of(role, tokens);
+    final resolved =
+        glyph ??
+        OperonixPremiumIconography.forKpi(label) ??
+        OperonixPremiumIconography.resolve(title: label, icon: icon);
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
-          PremiumIconBadge(icon: icon, role: role, size: 36),
+          PremiumIconBadge(icon: icon, glyph: resolved, role: role, size: 36),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -516,6 +589,7 @@ class PremiumPrimaryAction extends StatelessWidget {
 
 class PremiumEmptyState extends StatelessWidget {
   final IconData icon;
+  final OperonixPremiumGlyph? glyph;
   final PremiumIconRole role;
   final String title;
   final String? support;
@@ -525,6 +599,7 @@ class PremiumEmptyState extends StatelessWidget {
   const PremiumEmptyState({
     super.key,
     required this.icon,
+    this.glyph,
     required this.role,
     required this.title,
     this.support,
@@ -535,13 +610,22 @@ class PremiumEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = OperonixVisualTokens.of(context);
+    final resolved =
+        glyph ??
+        OperonixPremiumIconography.resolve(title: title, icon: icon) ??
+        OperonixPremiumGlyph.evidence;
     return PremiumSurfaceCard(
       level: 1,
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          PremiumIconBadge(icon: icon, role: role, size: 52),
+          PremiumIconBadge(
+            icon: icon,
+            glyph: resolved,
+            role: role,
+            size: 52,
+          ),
           const SizedBox(height: 14),
           Text(
             title,
