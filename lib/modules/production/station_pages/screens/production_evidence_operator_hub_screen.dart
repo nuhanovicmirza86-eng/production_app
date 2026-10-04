@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/visual/operonix_empty_state.dart';
 import '../../../../core/visual/operonix_visual_tokens.dart';
+import '../../../../core/visual/premium/premium_icon_accent.dart';
+import '../../../../core/visual/premium/premium_widgets.dart';
 
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/company_plant_display_name.dart';
@@ -196,6 +198,18 @@ class _ProductionEvidenceOperatorHubScreenState
       );
     }
     if (_entries.isEmpty) {
+      if (OperonixVisualTokens.of(context).isPremium) {
+        return const Padding(
+          padding: EdgeInsets.all(16),
+          child: PremiumEmptyState(
+            icon: Icons.fact_check_outlined,
+            role: PremiumIconRole.quality,
+            title: 'Nema aktivnih evidencija za vašu ulogu i pogon.',
+            support:
+                'Administrator može aktivirati obrasce u Evidencije kompanije.',
+          ),
+        );
+      }
       return const OperonixEmptyState(
         padding: EdgeInsets.all(24),
         message:
@@ -219,6 +233,7 @@ class _ProductionEvidenceOperatorHubScreenState
               'Pogon: ${_plantLabel(config.plantKey)} · '
               'Proces: ${config.processKey} · Faza: ${config.phaseKey}',
           icon: _iconForProfile(profile.profileKey),
+          profileKey: profile.profileKey,
           infoAction: CatalogEvidenceHelpTexts.infoIconForProfile(
             profileKey: profile.profileKey,
             displayName: profile.displayName,
@@ -260,13 +275,14 @@ class _ProductionEvidenceOperatorHubScreenState
   }
 }
 
-/// Kartica evidencije u hubu. Isti sadržaj u Classic i Premium; izgled ide iz teme.
+/// Kartica evidencije u hubu. Isti podaci; Premium ima zaseban kompaktan raspored.
 class ProductionEvidenceListCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
   final Widget infoAction;
   final VoidCallback? onTap;
+  final String profileKey;
 
   const ProductionEvidenceListCard({
     super.key,
@@ -275,21 +291,35 @@ class ProductionEvidenceListCard extends StatelessWidget {
     required this.icon,
     required this.infoAction,
     this.onTap,
+    this.profileKey = '',
   });
+
+  String get _premiumMeta {
+    final lines = subtitle
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
+    if (lines.length >= 2) return lines.sublist(1).join(' · ');
+    return lines.join(' · ');
+  }
 
   @override
   Widget build(BuildContext context) {
-    final tokens = OperonixVisualTokens.of(context);
+    if (OperonixVisualTokens.of(context).isPremium) {
+      return PremiumListCard(
+        icon: icon,
+        role: PremiumIconAccent.forProfile(profileKey),
+        title: title,
+        subtitle: _premiumMeta,
+        trailing: infoAction,
+        onTap: onTap,
+      );
+    }
     return Card(
       child: ListTile(
         minVerticalPadding: 12,
-        leading: CircleAvatar(
-          backgroundColor: tokens.isPremium
-              ? tokens.primaryAccent.withValues(alpha: 0.18)
-              : null,
-          foregroundColor: tokens.isPremium ? tokens.primaryAccent : null,
-          child: Icon(icon),
-        ),
+        leading: CircleAvatar(child: Icon(icon)),
         title: Text(
           title,
           style: const TextStyle(fontWeight: FontWeight.w700),

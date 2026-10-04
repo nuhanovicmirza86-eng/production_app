@@ -8,6 +8,8 @@ import 'package:production_app/core/visual/operonix_empty_state.dart';
 import 'package:production_app/core/visual/operonix_shell_metrics.dart';
 import 'package:production_app/core/visual/operonix_visual_theme.dart';
 import 'package:production_app/core/visual/operonix_visual_tokens.dart';
+import 'package:production_app/core/visual/premium/premium_icon_accent.dart';
+import 'package:production_app/core/visual/premium/premium_widgets.dart';
 import 'package:production_app/core/visual/visual_experience_controller.dart';
 import 'package:production_app/core/visual/visual_experience_scope.dart';
 import 'package:production_app/core/visual/visual_experience_store.dart';
@@ -74,9 +76,11 @@ void main() {
     test('midnight palette resolves semantic colors', () {
       final tokens = OperonixVisualTokens.midnight();
       expect(tokens.style, VisualStyle.premium);
-      expect(tokens.background, const Color(0xFF070A0F));
-      expect(tokens.surface, const Color(0xFF12151C));
-      expect(tokens.surfaceElevated, const Color(0xFF1C232E));
+      expect(tokens.background, const Color(0xFF0A1020));
+      expect(tokens.surface, const Color(0xFF121A2B));
+      expect(tokens.surfaceElevated, const Color(0xFF182338));
+      expect(tokens.surfaceInteractive, const Color(0xFF223049));
+      expect(tokens.kpiActive, const Color(0xFFFF7043));
       expect(tokens.primaryText, const Color(0xFFE6EDF3));
       expect(tokens.secondaryText, const Color(0xFF8B949E));
       expect(tokens.primaryAccent, const Color(0xFF3D9A94));
@@ -108,9 +112,9 @@ void main() {
       expect(premium.brightness, Brightness.dark);
       expect(
         premium.extension<OperonixVisualTokens>()!.background,
-        const Color(0xFF070A0F),
+        const Color(0xFF0A1020),
       );
-      expect(premium.scaffoldBackgroundColor, const Color(0xFF070A0F));
+      expect(premium.scaffoldBackgroundColor, const Color(0xFF0A1020));
       expect(
         premium.navigationRailTheme.minWidth,
         isNull,
@@ -288,7 +292,7 @@ void main() {
         OperonixVisualTokens.of(
           tester.element(find.text('Tema: Midnight')),
         ).background,
-        const Color(0xFF070A0F),
+        const Color(0xFF0A1020),
       );
       expect(find.text('Kontrola pakovanja'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -305,6 +309,161 @@ void main() {
       expect(layout, ProductionDashboardLayout.iconGrid);
       expect(find.text('Procesi (master-data)'), findsOneWidget);
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('Premium presentation', () {
+    test('semantic accents stay distinct', () {
+      expect(
+        PremiumIconAccent.forProfile('chemical_dosing'),
+        PremiumIconRole.lab,
+      );
+      expect(
+        PremiumIconAccent.forProfile('production_counting'),
+        PremiumIconRole.success,
+      );
+      expect(
+        PremiumIconAccent.forProfile('in_process_quality_check'),
+        PremiumIconRole.quality,
+      );
+      expect(
+        PremiumIconAccent.forProfile('operation_material_preparation'),
+        PremiumIconRole.material,
+      );
+      final colors = {
+        PremiumIconAccent.of(PremiumIconRole.info),
+        PremiumIconAccent.of(PremiumIconRole.success),
+        PremiumIconAccent.of(PremiumIconRole.warning),
+        PremiumIconAccent.of(PremiumIconRole.active),
+        PremiumIconAccent.of(PremiumIconRole.quality),
+        PremiumIconAccent.of(PremiumIconRole.lab),
+      };
+      expect(colors.length, greaterThan(3));
+      expect(
+        PremiumIconAccent.of(PremiumIconRole.lab),
+        isNot(PremiumIconAccent.of(PremiumIconRole.info)),
+      );
+    });
+
+    testWidgets('premium evidence card keeps title and drops the extra line', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: OperonixVisualTheme.premiumMidnight(),
+          home: Scaffold(
+            body: ProductionEvidenceListCard(
+              title: 'Doziranje hemikalija',
+              subtitle: 'Doziranje\nPogon: BR · Proces: MIX · Faza: 1',
+              icon: Icons.science_outlined,
+              profileKey: 'chemical_dosing',
+              infoAction: const Icon(Icons.info_outline),
+              onTap: () {},
+            ),
+          ),
+        ),
+      );
+      expect(find.text('Doziranje hemikalija'), findsOneWidget);
+      expect(find.text('Pogon: BR · Proces: MIX · Faza: 1'), findsOneWidget);
+      expect(find.text('Doziranje'), findsNothing);
+      expect(find.byType(PremiumListCard), findsOneWidget);
+      expect(find.byType(ListTile), findsNothing);
+      expect(
+        tester.widget<Icon>(find.byIcon(Icons.science_outlined)).color,
+        PremiumIconAccent.of(PremiumIconRole.lab),
+      );
+    });
+
+    testWidgets('classic evidence card stays a list tile', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: OperonixVisualTheme.classic(),
+          home: const Scaffold(
+            body: ProductionEvidenceListCard(
+              title: 'Kontrola pakovanja',
+              subtitle: 'Profil\nPogon: BR',
+              icon: Icons.inventory_2_outlined,
+              infoAction: Icon(Icons.info_outline),
+            ),
+          ),
+        ),
+      );
+      expect(find.byType(ListTile), findsOneWidget);
+      expect(find.byType(PremiumListCard), findsNothing);
+    });
+
+    testWidgets('premium empty panel contains the add action', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: OperonixVisualTheme.premiumMidnight(),
+          home: Scaffold(
+            body: PremiumEmptyState(
+              icon: Icons.account_tree_outlined,
+              role: PremiumIconRole.active,
+              title: 'Nema procesa na ovom pogonu.',
+              support: 'Dodajte prvi zapis za početak.',
+              actionLabel: 'Dodaj',
+              onAction: () {},
+            ),
+          ),
+        ),
+      );
+      expect(find.text('Nema procesa na ovom pogonu.'), findsOneWidget);
+      expect(find.text('Dodajte prvi zapis za početak.'), findsOneWidget);
+      expect(find.text('Dodaj'), findsOneWidget);
+      expect(find.byType(FloatingActionButton), findsNothing);
+    });
+
+    testWidgets('premium kpi cards keep semantic icons', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: OperonixVisualTheme.premiumMidnight(),
+          home: const Scaffold(
+            body: PremiumKpiGrid(
+              cards: [
+                PremiumKpiCard(
+                  label: 'Ukupno',
+                  value: '4',
+                  icon: Icons.assignment_outlined,
+                  role: PremiumIconRole.info,
+                ),
+                PremiumKpiCard(
+                  label: 'Otvoreni',
+                  value: '1',
+                  icon: Icons.pending_actions_outlined,
+                  role: PremiumIconRole.warning,
+                ),
+                PremiumKpiCard(
+                  label: 'U toku',
+                  value: '2',
+                  icon: Icons.play_circle_outline,
+                  role: PremiumIconRole.active,
+                ),
+                PremiumKpiCard(
+                  label: 'Završeni',
+                  value: '3',
+                  icon: Icons.task_alt_rounded,
+                  role: PremiumIconRole.success,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      expect(find.text('Ukupno'), findsOneWidget);
+      expect(find.text('4'), findsOneWidget);
+      expect(
+        tester.widget<Icon>(find.byIcon(Icons.assignment_outlined)).color,
+        PremiumIconAccent.info,
+      );
+      expect(
+        tester.widget<Icon>(find.byIcon(Icons.play_circle_outline)).color,
+        PremiumIconAccent.active,
+      );
+      expect(
+        tester.widget<Icon>(find.byIcon(Icons.task_alt_rounded)).color,
+        PremiumIconAccent.success,
+      );
     });
   });
 }

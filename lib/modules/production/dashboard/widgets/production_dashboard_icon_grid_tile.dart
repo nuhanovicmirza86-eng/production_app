@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/operonix_production_brand.dart';
 import '../../../../core/visual/operonix_visual_tokens.dart';
+import '../../../../core/visual/premium/premium_icon_accent.dart';
+import '../../../../core/visual/premium/premium_widgets.dart';
 
 /// Kompaktna ikona + naslov (ikonski prikaz početnog zaslona).
 class ProductionDashboardIconGridTile extends StatelessWidget {
@@ -21,7 +23,9 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = OperonixVisualTokens.of(context);
-    final accent = tokens.moduleAccent;
+    final accent = tokens.isPremium
+        ? PremiumIconAccent.of(PremiumIconAccent.forIcon(icon))
+        : tokens.moduleAccent;
     final shape = tokens.isPremium
         ? tokens.cardShape
         : RoundedRectangleBorder(
@@ -45,23 +49,29 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
               Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: accent.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: accent.withValues(alpha: 0.45),
-                      ),
-                    ),
-                    child: Icon(
-                      icon,
-                      size: 28,
-                      color: accent,
-                    ),
-                  ),
+                  tokens.isPremium
+                      ? PremiumIconBadge(
+                          icon: icon,
+                          role: PremiumIconAccent.forIcon(icon),
+                          size: 48,
+                        )
+                      : Container(
+                          width: 52,
+                          height: 52,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: accent.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: accent.withValues(alpha: 0.45),
+                            ),
+                          ),
+                          child: Icon(
+                            icon,
+                            size: 28,
+                            color: accent,
+                          ),
+                        ),
                   if (badgeText != null && badgeText!.trim().isNotEmpty)
                     Positioned(
                       right: -4,

@@ -1,7 +1,7 @@
 # VISUAL-EXPERIENCE-M1 — Production pilot checkpoint
 
-**Status:** implementirano na grani `ui/visual-experience-m1-production-pilot`  
-**Owner smoke:** pending  
+**Status:** OPEN na grani `ui/visual-experience-m1-production-pilot`  
+**Owner smoke:** FAIL na prvom Premiumu (tamni Classic). UI-CORRECTION-01 uvodi zaseban prezentacioni sloj. PASS tek nakon novog owner smokea.  
 **Kanonska arhitektura (ne dirana iz ove grane):**  
 `maintenance_app/docs/architecture/OPERONIX_VISUAL_EXPERIENCE_ARCHITECTURE.md`  
 `maintenance_app/docs/architecture/OPERONIX_UNIFIED_WEB_SHELL_RESPONSIVE_STANDARD.md`
@@ -37,11 +37,15 @@ Geometrija je ista za Classic i Premium i prati Maintenance read-only:
 
 ## Pilot
 
-- Početna: izgled aplikacije + postojeće kartice/akcije preko tokena
-- Proizvodni nalozi: KPI, filteri, prazno stanje, puna širina stranice
-- Procesi: postojeći CRUD, tokenizirana labela pogona, prazno stanje
-- Operativne evidencije: `ProductionEvidenceListCard` bez jakog zelenog obruba u Premiumu
-- Praćenje proizvodnje: lokalni station theme store nije prepisivan
+Isti ekran, isti podaci i iste akcije. Classic zadržava dosadašnji raspored. Premium koristi `lib/core/visual/premium/`:
+
+- Početna: kompaktna kartica sesije s logom, semantičke kartice modula, Standardno/Ikone na sadržaju. Izgled aplikacije je na Više, u web izborniku i preko tune akcije.
+- Proizvodni nalozi: 2×2 KPI s posebnim akcentima, filter kartica, prazan panel, Novi nalog nije puna širina.
+- Procesi: kartica pogona, filter kartica, prazan panel s Dodaj. Nema odvojenog FAB-a u Premiumu.
+- Operativne evidencije: kompaktna kartica, naslov pa jedna meta linija, semantička značka po profilu.
+- Praćenje proizvodnje: lokalni station theme store nije prepisivan.
+
+Midnight dubina: background `0xFF0A1020`, surface `0xFF121A2B`, elevated `0xFF182338`, interactive `0xFF223049`.
 
 ## Namjerno odgođeno
 

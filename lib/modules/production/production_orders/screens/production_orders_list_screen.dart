@@ -6,6 +6,8 @@ import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/visual/operonix_empty_state.dart';
 import '../../../../core/visual/operonix_visual_tokens.dart';
+import '../../../../core/visual/premium/premium_icon_accent.dart';
+import '../../../../core/visual/premium/premium_widgets.dart';
 import '../../../../core/date/date_range_utils.dart';
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/ui/date_range_filter_controls.dart';
@@ -939,6 +941,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
   }
 
   Widget _buildHeader() {
+    final tokens = OperonixVisualTokens.of(context);
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 700;
@@ -967,6 +970,30 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
                 ),
               ],
             ),
+          );
+        }
+
+        if (tokens.isPremium) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              StandardScreenHeader(
+                title: 'Proizvodni nalozi',
+                onBack: () => Navigator.of(context).pop(),
+                beforeInfoAction: _exportMenuButton(),
+                onInfo: infoAction,
+              ),
+              if (_canCreateOrder) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: PremiumPrimaryAction(
+                    label: 'Novi nalog',
+                    onPressed: _openCreateScreen,
+                  ),
+                ),
+              ],
+            ],
           );
         }
 
@@ -1022,6 +1049,37 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
         .where((o) => o.status == 'completed' || o.status == 'closed')
         .length;
     final tokens = OperonixVisualTokens.of(context);
+
+    if (tokens.isPremium) {
+      return PremiumKpiGrid(
+        cards: [
+          PremiumKpiCard(
+            label: 'Ukupno',
+            value: '$total',
+            icon: Icons.assignment_outlined,
+            role: PremiumIconRole.info,
+          ),
+          PremiumKpiCard(
+            label: 'Otvoreni',
+            value: '$open',
+            icon: Icons.pending_actions_outlined,
+            role: PremiumIconRole.warning,
+          ),
+          PremiumKpiCard(
+            label: 'U toku',
+            value: '$inProgress',
+            icon: Icons.play_circle_outline,
+            role: PremiumIconRole.active,
+          ),
+          PremiumKpiCard(
+            label: 'Završeni',
+            value: '$done',
+            icon: Icons.task_alt_rounded,
+            role: PremiumIconRole.success,
+          ),
+        ],
+      );
+    }
 
     return StandardKpiGrid(
       metrics: [
@@ -1114,22 +1172,34 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
   }
 
   Widget _buildSearchAndFiltersStrip() {
+    final filters = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildSearch(compact: true),
+        const SizedBox(height: 10),
+        _buildPnAxisFilters(),
+        const SizedBox(height: 10),
+        _buildStatusDateFilters(),
+      ],
+    );
+    if (OperonixVisualTokens.of(context).isPremium) {
+      return PremiumFilterCard(
+        title: 'Pretraga i filteri',
+        summary: 'Status, datum, proces',
+        expanded: _searchStripExpanded,
+        activeCount: _searchStripActiveCount,
+        onToggle: () =>
+            setState(() => _searchStripExpanded = !_searchStripExpanded),
+        child: filters,
+      );
+    }
     return StandardFilterPanel(
       title: 'Pretraga i filteri',
       expanded: _searchStripExpanded,
       activeCount: _searchStripActiveCount,
       onToggle: () =>
           setState(() => _searchStripExpanded = !_searchStripExpanded),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildSearch(compact: true),
-          const SizedBox(height: 10),
-          _buildPnAxisFilters(),
-          const SizedBox(height: 10),
-          _buildStatusDateFilters(),
-        ],
-      ),
+      child: filters,
     );
   }
 
@@ -1773,13 +1843,21 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
       child: Center(child: Text(_error!, textAlign: TextAlign.center)),
     );
 
-    Widget emptyBody() => const OperonixEmptyState(
-      message: 'Nema proizvodnih naloga za trenutne filtere.',
-      padding: EdgeInsets.symmetric(vertical: 48, horizontal: 24),
-    );
+    final tokens = OperonixVisualTokens.of(context);
+    Widget emptyBody() => tokens.isPremium
+        ? const PremiumEmptyState(
+            icon: Icons.assignment_outlined,
+            role: PremiumIconRole.info,
+            title: 'Nema proizvodnih naloga za trenutne filtere.',
+            support: 'Promijenite filter ili otvorite novi nalog.',
+          )
+        : const OperonixEmptyState(
+            message: 'Nema proizvodnih naloga za trenutne filtere.',
+            padding: EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+          );
 
     return Scaffold(
-      backgroundColor: OperonixVisualTokens.of(context).pageBackground,
+      backgroundColor: tokens.pageBackground,
       body: SafeArea(
         child: _isLoading
             ? loadingBody()
@@ -1802,7 +1880,22 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
                     ),
                   ),
                   if (list.isEmpty)
-                    Expanded(child: emptyBody())
+                    Expanded(
+                      child: tokens.isPremium
+                          ? Align(
+                              alignment: Alignment.topCenter,
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  12,
+                                  16,
+                                  24,
+                                ),
+                                child: emptyBody(),
+                              ),
+                            )
+                          : emptyBody(),
+                    )
                   else ...[
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/operonix_production_brand.dart';
 import 'operonix_visual_tokens.dart';
+import 'premium/premium_widgets.dart';
 import 'visual_style.dart';
 
 /// Gradi [ThemeData] za Classic (postojeći Production) ili Premium Midnight.
@@ -142,21 +143,35 @@ class OperonixVisualTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
-        iconTheme: IconThemeData(color: tokens.primaryText),
+        iconTheme: IconThemeData(color: tokens.primaryText, size: 22),
+        actionsIconTheme: IconThemeData(color: tokens.primaryText, size: 22),
         titleTextStyle: TextStyle(
           color: tokens.primaryText,
           fontSize: 20,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
+          height: 1.15,
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          foregroundColor: tokens.primaryText,
+          minimumSize: const Size(48, 48),
+          iconSize: 22,
         ),
       ),
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: tokens.surface,
-        indicatorColor: tokens.primaryAccent.withValues(alpha: 0.22),
+        indicatorColor: tokens.surfaceInteractive,
       ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: tokens.surface,
-        indicatorColor: tokens.primaryAccent.withValues(alpha: 0.22),
-        elevation: 0,
+      navigationBarTheme: PremiumNavigationSelection.barTheme(tokens),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: tokens.surfaceElevated,
+        surfaceTintColor: Colors.transparent,
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: tokens.surfaceElevated,
+        surfaceTintColor: Colors.transparent,
+        textStyle: TextStyle(color: tokens.primaryText, fontSize: 14),
       ),
       tabBarTheme: TabBarThemeData(
         labelColor: tokens.primaryAccent,

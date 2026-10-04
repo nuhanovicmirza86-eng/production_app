@@ -4,6 +4,22 @@ import 'operonix_visual_tokens.dart';
 import 'visual_experience_scope.dart';
 import 'visual_style.dart';
 
+/// Ekran iz Više / izbornika. Isti lokalni izbor kao [AppAppearanceSelector].
+class AppAppearanceScreen extends StatelessWidget {
+  const AppAppearanceScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Izgled aplikacije')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: const [AppAppearanceSelector()],
+      ),
+    );
+  }
+}
+
 /// Izgled aplikacije. Nezamjenjuje prikaz Standardno / Ikone.
 class AppAppearanceSelector extends StatelessWidget {
   const AppAppearanceSelector({super.key});

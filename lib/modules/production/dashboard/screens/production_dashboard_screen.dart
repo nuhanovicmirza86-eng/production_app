@@ -11,6 +11,8 @@ import 'package:production_app/core/visual/app_appearance_selector.dart';
 import 'package:production_app/core/visual/operonix_desktop_shell.dart';
 import 'package:production_app/core/visual/operonix_shell_metrics.dart';
 import 'package:production_app/core/visual/operonix_visual_tokens.dart';
+import 'package:production_app/core/visual/premium/premium_type.dart';
+import 'package:production_app/core/visual/premium/premium_widgets.dart';
 import 'package:production_app/screens/about_screen.dart';
 
 import '../../../../core/access/production_access_helper.dart';
@@ -1010,6 +1012,21 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                   ],
                   const SizedBox(height: 10),
                   ProductionDashboardActionTile(
+                    icon: Icons.tune,
+                    title: 'Izgled aplikacije',
+                    subtitle: 'Classic ili Premium Midnight',
+                    onTap: () {
+                      _shellScaffoldKey.currentState?.closeDrawer();
+                      Navigator.push<void>(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => const AppAppearanceScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  ProductionDashboardActionTile(
                     icon: Icons.article_outlined,
                     title: 'O aplikaciji',
                     subtitle: 'Verzija, autor, informacije',
@@ -1160,11 +1177,24 @@ class _ProductionHomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final gap = OperonixShellMetrics.pagePaddingFor(web: kIsWeb);
     final pad = OperonixShellMetrics.pagePaddingFor(web: kIsWeb);
+    final tokens = OperonixVisualTokens.of(context);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Početna'),
         actions: [
+          IconButton(
+            tooltip: 'Izgled aplikacije',
+            icon: const Icon(Icons.tune),
+            onPressed: () {
+              Navigator.push<void>(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => const AppAppearanceScreen(),
+                ),
+              );
+            },
+          ),
           if (showQrScanAction && onOpenQrScan != null)
             IconButton(
               tooltip: 'Skeniraj QR — nalog ili naljepnica s proizvodnog poda',
@@ -1198,18 +1228,24 @@ class _ProductionHomePage extends StatelessWidget {
             ),
           ],
           SizedBox(height: gap),
-          const _SectionTitle(title: 'Brze akcije'),
-          SizedBox(height: gap * 0.35),
-          Text(
-            'Grupirano po modulima pretplate i funkciji. Pojedina kartica ovisi o ulozi.',
-            style: TextStyle(
-              fontSize: 12,
-              height: 1.35,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+          if (tokens.isPremium)
+            const PremiumSectionHeader(
+              title: 'Brze akcije',
+              subtitle:
+                  'Grupirano po modulima pretplate i funkciji. Pojedina kartica ovisi o ulozi.',
+            )
+          else ...[
+            const _SectionTitle(title: 'Brze akcije'),
+            SizedBox(height: gap * 0.35),
+            Text(
+              'Grupirano po modulima pretplate i funkciji. Pojedina kartica ovisi o ulozi.',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
-          ),
-          SizedBox(height: gap * 0.75),
-          const AppAppearanceSelector(),
+          ],
           SizedBox(height: gap * 0.75),
           ProductionDashboardLayoutSelector(
             value: dashboardLayout,
@@ -1264,8 +1300,12 @@ class _ProductionMoreMenuScreenState extends State<_ProductionMoreMenuScreen> {
       ),
       body: Column(
         children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(12, 12, 12, 4),
+            child: AppAppearanceSelector(),
+          ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
             child: TextField(
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.search),
@@ -1325,6 +1365,31 @@ class _SessionHeaderCard extends StatelessWidget {
     required this.companyLine,
   });
 
+  Widget _plantValue(TextStyle style) {
+    if (plantKey.trim().isEmpty) {
+      return Text(
+        'nije vezan na korisniku (globalni admin — biraj kontekst u modulima)',
+        style: style,
+      );
+    }
+    if (companyId.trim().isEmpty) {
+      return Text(plantKey, style: style);
+    }
+    return FutureBuilder<String>(
+      key: ValueKey('plant-value|$companyId|$plantKey'),
+      future: CompanyPlantDisplayName.resolve(
+        companyId: companyId,
+        plantKey: plantKey,
+      ),
+      builder: (context, snap) {
+        final label = snap.connectionState == ConnectionState.waiting
+            ? '…'
+            : (snap.data ?? plantKey);
+        return Text(label, style: style);
+      },
+    );
+  }
+
   Widget _plantLine(Color color) {
     if (plantKey.trim().isEmpty) {
       return Text(
@@ -1359,6 +1424,36 @@ class _SessionHeaderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = OperonixVisualTokens.of(context);
+    if (tokens.isPremium) {
+      return PremiumSurfaceCard(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            _CompanyHeaderLogo(candidates: logoCandidates, size: 44),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Uloga', style: PremiumType.meta(tokens)),
+                  Text(roleLabel, style: PremiumType.cardTitle(tokens)),
+                  const SizedBox(height: 6),
+                  Text('Pogon', style: PremiumType.meta(tokens)),
+                  _plantValue(PremiumType.cardTitle(tokens)),
+                  const SizedBox(height: 6),
+                  Text('Kompanija', style: PremiumType.meta(tokens)),
+                  Text(
+                    companyLine,
+                    style: PremiumType.cardTitle(tokens),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     return Card(
       clipBehavior: Clip.antiAlias,
       elevation: tokens.isPremium ? 0 : 1,
@@ -1400,9 +1495,9 @@ class _SessionHeaderCard extends StatelessWidget {
 
 class _CompanyHeaderLogo extends StatefulWidget {
   final List<String> candidates;
-  static const double size = 56;
+  final double size;
 
-  const _CompanyHeaderLogo({required this.candidates});
+  const _CompanyHeaderLogo({required this.candidates, this.size = 56});
 
   @override
   State<_CompanyHeaderLogo> createState() => _CompanyHeaderLogoState();
@@ -1452,8 +1547,8 @@ class _CompanyHeaderLogoState extends State<_CompanyHeaderLogo> {
     final urls = widget.candidates;
     if (urls.isEmpty) {
       return SizedBox(
-        width: _CompanyHeaderLogo.size,
-        height: _CompanyHeaderLogo.size,
+        width: widget.size,
+        height: widget.size,
         child: DecoratedBox(
           decoration: BoxDecoration(borderRadius: radius, border: border),
           child: ClipRRect(borderRadius: radius, child: placeholder()),
@@ -1466,12 +1561,12 @@ class _CompanyHeaderLogoState extends State<_CompanyHeaderLogo> {
     final isWordmark = CompanyLogoResolver.isWordmarkLogoUrl(u);
     final imageFit = isWordmark ? BoxFit.contain : BoxFit.cover;
     final imagePadding = isWordmark
-        ? const EdgeInsets.all(_CompanyHeaderLogo.size * 0.12)
+        ? EdgeInsets.all(widget.size * 0.12)
         : EdgeInsets.zero;
 
     return SizedBox(
-      width: _CompanyHeaderLogo.size,
-      height: _CompanyHeaderLogo.size,
+      width: widget.size,
+      height: widget.size,
       child: DecoratedBox(
         decoration: BoxDecoration(borderRadius: radius, border: border),
         child: ClipRRect(

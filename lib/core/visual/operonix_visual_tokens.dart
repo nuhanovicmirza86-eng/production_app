@@ -24,7 +24,7 @@ class OperonixVisualTokens extends ThemeExtension<OperonixVisualTokens> {
   final Color danger;
   final Color info;
 
-  /// Classic KPI „U toku” ostaje deep orange. Premium koristi primarni akcent.
+  /// Classic KPI „U toku” ostaje deep orange. Premium koristi aktivni narančasto-crveni akcent.
   final Color kpiActive;
 
   /// Obrub standardne kartice. Classic = brend zelena 1.5. Premium = suzdržani border.
@@ -128,21 +128,24 @@ class OperonixVisualTokens extends ThemeExtension<OperonixVisualTokens> {
     );
   }
 
-  /// Premium Midnight. Ista paleta smjera kao odobreno Praćenje (navy / grafit),
-  /// bez neon efekta. Geometrija nije ovdje.
+  /// Premium Midnight. Duboki navy / grafit, bez neon efekta i bez ravnog crnog polja.
+  ///
+  /// Hijerarhija: background → surface → surfaceElevated → surfaceInteractive.
+  /// [border] je suzdržan, [cardBorder] jači.
   factory OperonixVisualTokens.midnight() {
     const primaryText = Color(0xFFE6EDF3);
     const secondaryText = Color(0xFF8B949E);
     const accent = Color(0xFF3D9A94);
-    const border = Color(0xFF3A4658);
+    const borderSubtle = Color(0xFF2C3A52);
+    const borderStrong = Color(0xFF3E5270);
     return OperonixVisualTokens(
       style: VisualStyle.premium,
-      background: const Color(0xFF070A0F),
-      surface: const Color(0xFF12151C),
-      surfaceElevated: const Color(0xFF1C232E),
-      surfaceInteractive: const Color(0xFF262F3D),
-      border: border,
-      divider: const Color(0xFF2A3344),
+      background: const Color(0xFF0A1020),
+      surface: const Color(0xFF121A2B),
+      surfaceElevated: const Color(0xFF182338),
+      surfaceInteractive: const Color(0xFF223049),
+      border: borderSubtle,
+      divider: const Color(0xFF243044),
       primaryText: primaryText,
       secondaryText: secondaryText,
       disabledText: const Color(0xFF6E7681),
@@ -151,16 +154,16 @@ class OperonixVisualTokens extends ThemeExtension<OperonixVisualTokens> {
       warning: const Color(0xFFE0A106),
       danger: const Color(0xFFE35D5D),
       info: const Color(0xFF58A6FF),
-      kpiActive: accent,
-      cardBorder: border,
+      kpiActive: const Color(0xFFFF7043),
+      cardBorder: borderStrong,
       cardBorderWidth: 1,
-      kpiSurface: const Color(0xFF1C232E),
-      kpiBorder: border,
-      pageBackground: const Color(0xFF070A0F),
+      kpiSurface: const Color(0xFF182338),
+      kpiBorder: borderStrong,
+      pageBackground: const Color(0xFF0A1020),
       metaText: secondaryText,
       moduleAccent: accent,
       onAccent: const Color(0xFF041614),
-      fieldOutline: border,
+      fieldOutline: borderSubtle,
       fieldFocus: accent,
       cardRadius: 12,
       kpiRadius: 14,
