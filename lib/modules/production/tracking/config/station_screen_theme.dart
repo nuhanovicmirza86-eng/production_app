@@ -153,13 +153,11 @@ Brightness _brightnessForSurface(Color background) {
   return ThemeData.estimateBrightnessForColor(background);
 }
 
-/// Lokalni izgled stanice ostaje nezavisan od VisualStyle (Classic / Premium).
+/// Lokalni izgled stanice u Classicu i dalje boji cijeli ekran.
 ///
-/// VISUAL-EXPERIENCE-M1: Industrijska noć i dalje koristi ovu SCADA paletu.
-/// Dijeljeni Premium Midnight tokeni su u OperonixVisualTokens i namjerno
-/// ne prepisuju spremljeni izgled Praćenja. Konvergencija boja je sljedeći
-/// korak samo ako owner potvrdi da lokalni picker stanice smije naslijediti
-/// app temu bez regresije.
+/// VISUAL-EXPERIENCE-M1-UI-CORRECTION-02: kad je VisualStyle Premium,
+/// [trackingPageTheme] ostavlja Midnight pozadinu. Spremljena tema stanice
+/// tada ne smije obojiti tijelo u svijetlu Classic podlogu.
 ///
 /// SCADA `ScadaWallTheme.operonix_graphite` — tamna podloga i paneli.
 const Color _kScadaWall = Color(0xFF070A0F);
@@ -313,6 +311,17 @@ ColorScheme _colorSchemeCleanLight() {
     outline: const Color(0xFFB0BEC5),
     outlineVariant: const Color(0xFFCFD8DC),
   );
+}
+
+/// Tema stranice Praćenja. Premium zadržava roditeljski Midnight.
+/// Classic i dalje dobija punu temu stanice.
+ThemeData trackingPageTheme({
+  required ThemeData parent,
+  required StationScreenAppearance appearance,
+  required bool premium,
+}) {
+  if (!premium) return buildStationScreenTheme(parent, appearance);
+  return parent;
 }
 
 /// Gradi temu stanice iz roditeljske [ThemeData] (tipografija ostaje).

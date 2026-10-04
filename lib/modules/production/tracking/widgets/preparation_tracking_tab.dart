@@ -10,6 +10,9 @@ import 'package:flutter/services.dart';
 import '../../../../core/access/production_access_helper.dart';
 import '../../../workforce/employee_profiles/workforce_employee_qr_navigation.dart';
 import '../../../../core/theme/operonix_production_brand.dart';
+import '../../../../core/visual/operonix_visual_tokens.dart';
+import '../../../../core/visual/premium/premium_icon_accent.dart';
+import '../../../../core/visual/premium/premium_widgets.dart';
 import '../../../../core/ui/station_input.dart';
 import '../../production_orders/models/production_order_model.dart';
 import '../../production_orders/printing/classification_label_print_qr.dart';
@@ -34,6 +37,7 @@ import '../services/production_operator_tracking_service.dart';
 import '../../station_pages/models/production_station_page.dart';
 import '../../packing/screens/station1_close_box_screen.dart';
 import 'tracking_quantity_editor_sheet.dart';
+import 'tracking_workflow_chrome.dart';
 import 'tracking_entry_correction_sheet.dart';
 
 /// Operativni unos po fazi: brzi unos (QR + malo polja) ili ručni unos u tablici,
@@ -170,6 +174,7 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
       c.addListener(_touchDraftEdited);
     }
     _goodQtyCtrl.addListener(_touchDraftEdited);
+    PreparationStationUiPrefs.accentTick.addListener(_onAccentTick);
     unawaited(_loadColumnVisibility());
     unawaited(_loadStationUiPrefs());
     unawaited(_loadPlants());
@@ -215,6 +220,16 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
       unawaited(_loadPlants());
       unawaited(_tryFlushOfflineQueue(silent: true));
     }
+  }
+
+  void _onAccentTick() {
+    unawaited(_reloadAccentIndex());
+  }
+
+  Future<void> _reloadAccentIndex() async {
+    final a = await PreparationStationUiPrefs.loadAccentIndex();
+    if (!mounted) return;
+    setState(() => _accentIndex = a);
   }
 
   Future<void> _loadStationUiPrefs() async {
@@ -1371,6 +1386,7 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
 
   @override
   void dispose() {
+    PreparationStationUiPrefs.accentTick.removeListener(_onAccentTick);
     WidgetsBinding.instance.removeObserver(this);
     _offlineFlushTimer?.cancel();
     _catalogDebounce?.cancel();
@@ -2739,23 +2755,9 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
     );
   }
 
-  static const List<Color> _kAccentColors = [
-    Color(0xFF2E7D32),
-    Color(0xFF1565C0),
-    Color(0xFFEF6C00),
-    Color(0xFF6A1B9A),
-  ];
-
-  static const List<String> _kAccentLabels = [
-    'Zelena',
-    'Plava',
-    'Narančasta',
-    'Ljubičasta',
-  ];
-
   ThemeData _themedForAccents(ThemeData base) {
-    final accent =
-        _kAccentColors[_accentIndex.clamp(0, _kAccentColors.length - 1)];
+    final colors = PreparationStationUiPrefs.accentColors;
+    final accent = colors[_accentIndex.clamp(0, colors.length - 1)];
     final cs = base.colorScheme;
     return base.copyWith(
       colorScheme: cs.copyWith(
@@ -2819,12 +2821,66 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
     );
   }
 
+  Color get _buttonAccent {
+    final colors = PreparationStationUiPrefs.accentColors;
+    return colors[_accentIndex.clamp(0, colors.length - 1)];
+  }
+
+  Future<void> _commitStationPlant(String plantKey) async {
+    setState(() => _selectedStationPlantKey = plantKey);
+    await TrackingStationPlantStore.save(_companyId, plantKey);
+    _setDefaultStatusLine();
+  }
+
+  Future<void> _pickStationPlant() async {
+    final chosen = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final pk in _plantKeys)
+                ListTile(
+                  title: Text(_plantLabelByKey[pk] ?? pk),
+                  onTap: () => Navigator.pop(ctx, pk),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+    if (!mounted || chosen == null) return;
+    await _commitStationPlant(chosen);
+  }
+
+  Widget _scanActions({required bool closeBox, required bool printLabel}) {
+    final showSecondary = closeBox || printLabel;
+    return TrackingScanActions(
+      accent: _buttonAccent,
+      onScan: _saving ? null : _scanRawPieceLabelQr,
+      showSecondary: showSecondary,
+      secondaryLabel: closeBox ? 'Zatvori kutiju' : 'Ispiši etiketu',
+      secondaryIcon: closeBox
+          ? Icons.inventory_2_outlined
+          : Icons.label_outline,
+      onSecondary: _saving
+          ? null
+          : closeBox
+          ? _openStation1CloseBox
+          : printLabel
+          ? _printDraftLabel
+          : null,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final workKey = _workDateKey(_workDay);
     final scrapDefs = _scrapTiles();
-    final themed = _themedForAccents(theme);
+    final premium = OperonixVisualTokens.of(context).isPremium;
+    final themed = premium ? theme : _themedForAccents(theme);
 
     return Theme(
       data: themed,
@@ -2836,59 +2892,65 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Datum unosa: $workKey',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
+                if (premium)
+                  TrackingWorkContextCard(
+                    entryDate: workKey,
+                    actions: [
+                      IconButton(
+                        tooltip: 'Fokus na pločice količina (Alt+Shift+P)',
+                        icon: const Icon(Icons.keyboard_alt_outlined),
+                        onPressed: _saving ? null : _focusQtyTilesFromShortcut,
+                      ),
+                      IconButton(
+                        tooltip: 'Kako radi ovaj ekran',
+                        icon: const Icon(Icons.info_outline),
+                        onPressed: _showPrepScreenHelpDialog,
+                      ),
+                      IconButton(
+                        tooltip: 'Promijeni datum',
+                        icon: const Icon(Icons.edit_calendar_outlined),
+                        onPressed: _pickWorkDay,
+                      ),
+                    ],
+                  )
+                else
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Datum unosa: $workKey',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      tooltip: 'Fokus na pločice količina (Alt+Shift+P)',
-                      icon: const Icon(Icons.keyboard_alt_outlined),
-                      onPressed: _saving ? null : _focusQtyTilesFromShortcut,
-                    ),
-                    IconButton(
-                      tooltip: 'Kako radi ovaj ekran',
-                      icon: const Icon(Icons.info_outline),
-                      onPressed: _showPrepScreenHelpDialog,
-                    ),
-                    IconButton(
-                      tooltip: 'Promijeni datum',
-                      icon: const Icon(Icons.edit_calendar_outlined),
-                      onPressed: _pickWorkDay,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      'Tema gumba',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                      IconButton(
+                        tooltip: 'Fokus na pločice količina (Alt+Shift+P)',
+                        icon: const Icon(Icons.keyboard_alt_outlined),
+                        onPressed: _saving ? null : _focusQtyTilesFromShortcut,
                       ),
-                    ),
-                    for (var i = 0; i < _kAccentColors.length; i++)
-                      ChoiceChip(
-                        label: Text(_kAccentLabels[i]),
-                        selected: _accentIndex == i,
-                        onSelected: (v) {
-                          if (!v) return;
-                          setState(() => _accentIndex = i);
-                          unawaited(
-                            PreparationStationUiPrefs.saveAccentIndex(i),
-                          );
-                        },
+                      IconButton(
+                        tooltip: 'Kako radi ovaj ekran',
+                        icon: const Icon(Icons.info_outline),
+                        onPressed: _showPrepScreenHelpDialog,
                       ),
-                  ],
-                ),
+                      IconButton(
+                        tooltip: 'Promijeni datum',
+                        icon: const Icon(Icons.edit_calendar_outlined),
+                        onPressed: _pickWorkDay,
+                      ),
+                    ],
+                  ),
+                if (!premium) ...[
+                  const SizedBox(height: 8),
+                  TrackingButtonAccentChoices(
+                    selectedIndex: _accentIndex,
+                    onSelected: (i) {
+                      setState(() => _accentIndex = i);
+                      unawaited(PreparationStationUiPrefs.saveAccentIndex(i));
+                    },
+                  ),
+                ],
                 if (_plantsLoadError != null) ...[
                   const SizedBox(height: 8),
                   Text(
@@ -2900,18 +2962,43 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                 ],
                 if (_stationBoundPlantKey.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Pogon stanice: ${_plantLabelByKey[_stationBoundPlantKey] ?? _stationBoundPlantKey}',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+                  if (premium)
+                    PremiumContextCard(
+                      icon: Icons.factory_outlined,
+                      role: PremiumIconRole.info,
+                      label: 'Pogon',
+                      value:
+                          _plantLabelByKey[_stationBoundPlantKey] ??
+                          _stationBoundPlantKey,
+                    )
+                  else
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Pogon stanice: ${_plantLabelByKey[_stationBoundPlantKey] ?? _stationBoundPlantKey}',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
                 ] else if (_plantKeys.length > 1) ...[
                   const SizedBox(height: 10),
-                  if (_isAdminRole)
+                  if (premium && _isAdminRole)
+                    PremiumContextCard(
+                      icon: Icons.factory_outlined,
+                      role: PremiumIconRole.info,
+                      label: 'Pogon (obavezno za ovu stanicu)',
+                      value: _selectedStationPlantKey == null
+                          ? 'Odaberi pogon'
+                          : (_plantLabelByKey[_selectedStationPlantKey] ??
+                                _selectedStationPlantKey!),
+                      trailing: Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: OperonixVisualTokens.of(context).secondaryText,
+                      ),
+                      onTap: _saving || _plantsLoading ? null : _pickStationPlant,
+                    )
+                  else if (_isAdminRole)
                     DropdownButtonFormField<String>(
                       key: ValueKey<String?>(_selectedStationPlantKey),
                       initialValue:
@@ -2937,13 +3024,17 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                           ? null
                           : (v) async {
                               if (v == null) return;
-                              setState(() => _selectedStationPlantKey = v);
-                              await TrackingStationPlantStore.save(
-                                _companyId,
-                                v,
-                              );
-                              _setDefaultStatusLine();
+                              await _commitStationPlant(v);
                             },
+                    )
+                  else if (premium)
+                    PremiumContextCard(
+                      icon: Icons.factory_outlined,
+                      role: PremiumIconRole.info,
+                      label: 'Pogon',
+                      value:
+                          _plantLabelByKey[_plantKeyEffective] ??
+                          _plantKeyEffective,
                     )
                   else
                     Align(
@@ -2957,41 +3048,73 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                     ),
                 ] else if (_plantKeys.length == 1) ...[
                   const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Pogon: ${_plantLabelByKey[_plantKeys.first] ?? _plantKeys.first}',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+                  if (premium)
+                    PremiumContextCard(
+                      icon: Icons.factory_outlined,
+                      role: PremiumIconRole.info,
+                      label: 'Pogon',
+                      value:
+                          _plantLabelByKey[_plantKeys.first] ??
+                          _plantKeys.first,
+                    )
+                  else
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Pogon: ${_plantLabelByKey[_plantKeys.first] ?? _plantKeys.first}',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
                 ],
                 const SizedBox(height: 8),
                 Material(
-                  color: _offlineQueueCount > 0
+                  color: premium
+                      ? OperonixVisualTokens.of(context).surfaceElevated
+                      : _offlineQueueCount > 0
                       ? theme.colorScheme.tertiaryContainer.withValues(
                           alpha: 0.45,
                         )
                       : theme.colorScheme.surfaceContainerHighest.withValues(
                           alpha: 0.65,
                         ),
-                  borderRadius: BorderRadius.circular(10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(premium ? 16 : 10),
+                    side: premium
+                        ? BorderSide(
+                            color: OperonixVisualTokens.of(context).border,
+                          )
+                        : BorderSide.none,
+                  ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
+                    padding: EdgeInsets.symmetric(
                       horizontal: 12,
-                      vertical: 10,
+                      vertical: premium ? 8 : 10,
                     ),
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: premium
+                          ? CrossAxisAlignment.center
+                          : CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          _offlineQueueCount > 0
-                              ? Icons.cloud_queue_outlined
-                              : Icons.info_outline,
-                          size: 22,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                        if (premium)
+                          PremiumIconBadge(
+                            icon: _offlineQueueCount > 0
+                                ? Icons.cloud_queue_outlined
+                                : Icons.info_outline,
+                            role: _offlineQueueCount > 0
+                                ? PremiumIconRole.warning
+                                : PremiumIconRole.info,
+                            size: 32,
+                          )
+                        else
+                          Icon(
+                            _offlineQueueCount > 0
+                                ? Icons.cloud_queue_outlined
+                                : Icons.info_outline,
+                            size: 22,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
@@ -3064,31 +3187,18 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                           : const <ProductionOperatorTrackingEntry>[];
 
                       return ListView(
-                        padding: const EdgeInsets.all(16),
+                        padding: EdgeInsets.all(premium ? 12 : 16),
                         children: [
-                          SegmentedButton<bool>(
-                            segments: const [
-                              ButtonSegment<bool>(
-                                value: true,
-                                label: Text('Brzi unos'),
-                                icon: Icon(Icons.bolt_outlined),
-                              ),
-                              ButtonSegment<bool>(
-                                value: false,
-                                label: Text('Ručni unos'),
-                                icon: Icon(Icons.edit_note_outlined),
-                              ),
-                            ],
-                            selected: {_quickEntryMode},
-                            onSelectionChanged: (Set<bool> s) {
-                              final v = s.first;
+                          TrackingEntryModeControl(
+                            quickMode: _quickEntryMode,
+                            onChanged: (v) {
                               setState(() => _quickEntryMode = v);
                               unawaited(
                                 PreparationStationUiPrefs.saveQuickMode(v),
                               );
                             },
                           ),
-                          const SizedBox(height: 16),
+                          SizedBox(height: premium ? 10 : 16),
                           if (snap.hasError)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 12),
@@ -3105,64 +3215,34 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                               child: TextField(
                                 controller: _wedgeCtrl,
                                 focusNode: _wedgeFocus,
-                                decoration: const InputDecoration(
-                                  labelText: 'Vanjski QR skener',
-                                  hintText: 'Fokus ovdje, zatim skeniraj',
+                                decoration: trackingScannerDecoration(
+                                  premium: premium,
                                 ),
                                 onSubmitted: (s) =>
                                     unawaited(_onScannerWedgeSubmitted(s)),
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: FilledButton.icon(
-                                    onPressed: _saving
-                                        ? null
-                                        : _scanRawPieceLabelQr,
-                                    icon: const Icon(
-                                      Icons.qr_code_scanner_outlined,
-                                    ),
-                                    label: const Text('Skeniraj QR'),
-                                  ),
-                                ),
-                                if (_isPrepPhase) ...[
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: FilledButton.tonalIcon(
-                                      onPressed: _saving
-                                          ? null
-                                          : _openStation1CloseBox,
-                                      icon: const Icon(
-                                        Icons.inventory_2_outlined,
-                                      ),
-                                      label: const Text('Zatvori kutiju'),
-                                    ),
-                                  ),
-                                ] else if (_stationLabelPrintingEnabled) ...[
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: FilledButton.tonalIcon(
-                                      onPressed: _saving
-                                          ? null
-                                          : _printDraftLabel,
-                                      icon: const Icon(Icons.label_outline),
-                                      label: const Text('Ispiši etiketu'),
-                                    ),
-                                  ),
-                                ],
-                              ],
+                            SizedBox(height: premium ? 10 : 12),
+                            _scanActions(
+                              closeBox: _isPrepPhase,
+                              printLabel: _stationLabelPrintingEnabled,
                             ),
-                            const SizedBox(height: 12),
+                            SizedBox(height: premium ? 10 : 12),
                             Row(
                               children: [
-                                Text(
-                                  'Trenutni unos',
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w600,
+                                if (premium)
+                                  const Expanded(
+                                    child: PremiumSectionHeader(
+                                      title: 'Trenutni unos',
+                                    ),
+                                  )
+                                else
+                                  Text(
+                                    'Trenutni unos',
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
-                                ),
                                 const Spacer(),
                                 TextButton.icon(
                                   onPressed: _openTableColumnVisibility,
@@ -3290,52 +3370,19 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                             const SizedBox(height: 12),
                             _qtyTiles(context, scrapDefs),
                             const SizedBox(height: 20),
-                            Text(
-                              'Unos u tablicu',
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: FilledButton.icon(
-                                    onPressed: _saving
-                                        ? null
-                                        : _scanRawPieceLabelQr,
-                                    icon: const Icon(
-                                      Icons.qr_code_scanner_outlined,
-                                    ),
-                                    label: const Text('Skeniraj QR'),
-                                  ),
+                            if (premium)
+                              const PremiumSectionHeader(title: 'Unos u tablicu')
+                            else
+                              Text(
+                                'Unos u tablicu',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
                                 ),
-                                if (_isPrepPhase) ...[
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: FilledButton.tonalIcon(
-                                      onPressed: _saving
-                                          ? null
-                                          : _openStation1CloseBox,
-                                      icon: const Icon(
-                                        Icons.inventory_2_outlined,
-                                      ),
-                                      label: const Text('Zatvori kutiju'),
-                                    ),
-                                  ),
-                                ] else if (_stationLabelPrintingEnabled) ...[
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: FilledButton.tonalIcon(
-                                      onPressed: _saving
-                                          ? null
-                                          : _printDraftLabel,
-                                      icon: const Icon(Icons.label_outline),
-                                      label: const Text('Ispiši etiketu'),
-                                    ),
-                                  ),
-                                ],
-                              ],
+                              ),
+                            const SizedBox(height: 8),
+                            _scanActions(
+                              closeBox: _isPrepPhase,
+                              printLabel: _stationLabelPrintingEnabled,
                             ),
                             const SizedBox(height: 8),
                             ScrollIntoViewOnFocus(
@@ -3343,9 +3390,8 @@ class _PreparationTrackingTabState extends State<PreparationTrackingTab>
                               child: TextField(
                                 controller: _wedgeCtrl,
                                 focusNode: _wedgeFocus,
-                                decoration: const InputDecoration(
-                                  labelText: 'Vanjski QR skener',
-                                  hintText: 'Fokus ovdje, zatim skeniraj',
+                                decoration: trackingScannerDecoration(
+                                  premium: premium,
                                 ),
                                 onSubmitted: (s) =>
                                     unawaited(_onScannerWedgeSubmitted(s)),

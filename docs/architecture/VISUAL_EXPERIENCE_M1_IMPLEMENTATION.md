@@ -43,7 +43,7 @@ Isti ekran, isti podaci i iste akcije. Classic zadržava dosadašnji raspored. P
 - Proizvodni nalozi: 2×2 KPI s posebnim akcentima, filter kartica, prazan panel, Novi nalog nije puna širina.
 - Procesi: kartica pogona, filter kartica, prazan panel s Dodaj. Nema odvojenog FAB-a u Premiumu.
 - Operativne evidencije: kompaktna kartica, naslov pa jedna meta linija, semantička značka po profilu.
-- Praćenje proizvodnje: lokalni station theme store nije prepisivan.
+- Praćenje proizvodnje: u Premiumu Midnight drži cijelu stranicu. Spremljena tema stanice ne boji tijelo. Tema gumba je u paleti, ne u toku unosa. Classic i dalje koristi punu temu stanice.
 
 Midnight dubina: background `0xFF0A1020`, surface `0xFF121A2B`, elevated `0xFF182338`, interactive `0xFF223049`.
 

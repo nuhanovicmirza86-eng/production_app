@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../../../core/format/ba_formatted_date.dart';
+import '../../../../core/visual/operonix_visual_tokens.dart';
 import '../../../../core/access/production_access_helper.dart'
     show ProductionAccessHelper, ProductionDashboardCard;
 import '../../station/screens/station_tracking_setup_screen.dart';
@@ -199,12 +200,17 @@ class _ProductionOperatorTrackingStationScreenState
   @override
   Widget build(BuildContext context) {
     final parentTheme = Theme.of(context);
-    final stationTheme = buildStationScreenTheme(parentTheme, _appearance);
+    final premium = OperonixVisualTokens.of(context).isPremium;
+    final pageTheme = trackingPageTheme(
+      parent: parentTheme,
+      appearance: _appearance,
+      premium: premium,
+    );
 
     return AnimatedTheme(
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeOutCubic,
-      data: stationTheme,
+      data: pageTheme,
       child: Builder(
         builder: (context) {
           final theme = Theme.of(context);
@@ -266,6 +272,7 @@ class _ProductionOperatorTrackingStationScreenState
                     ProductionAccessHelper.canEditStationScreenCustomColors(
                   (widget.companyData['role'] ?? '').toString(),
                 ),
+                showButtonAccent: premium,
               );
               if (next == null || !mounted) return;
               setState(() => _appearance = next);

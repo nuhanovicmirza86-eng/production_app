@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/visual/operonix_visual_tokens.dart';
+
 /// Gornja traka modula (kao na referentnom dashboardu): Pregled / Proizvodnja / …
 /// [productionTabIndex] je indeks taba praćenja (0 = Pregled, 1+ = faze).
 class ProductionTrackingHubNavStrip extends StatelessWidget {
@@ -60,13 +62,23 @@ class ProductionTrackingHubNavStrip extends StatelessWidget {
       ),
     ];
 
+    final tokens = OperonixVisualTokens.of(context);
+    final premium = tokens.isPremium;
     return Material(
-      color: _barBg,
+      color: premium ? tokens.surface : _barBg,
       child: Container(
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: _border, width: 1)),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: premium ? tokens.border : _border,
+              width: 1,
+            ),
+          ),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: EdgeInsets.symmetric(
+          horizontal: 8,
+          vertical: premium ? 4 : 6,
+        ),
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
@@ -104,8 +116,16 @@ class _HubChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = item.selected ? Colors.white : const Color(0xFF9CA3AF);
-    final bg = item.selected ? Colors.white.withValues(alpha: 0.12) : Colors.transparent;
+    final tokens = OperonixVisualTokens.of(context);
+    final premium = tokens.isPremium;
+    final fg = premium
+        ? (item.selected ? tokens.primaryText : tokens.secondaryText)
+        : (item.selected ? Colors.white : const Color(0xFF9CA3AF));
+    final bg = premium
+        ? (item.selected ? tokens.surfaceInteractive : Colors.transparent)
+        : (item.selected
+              ? Colors.white.withValues(alpha: 0.12)
+              : Colors.transparent);
 
     return Material(
       color: bg,
@@ -114,7 +134,10 @@ class _HubChip extends StatelessWidget {
         onTap: item.onTap,
         borderRadius: BorderRadius.circular(20),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: premium ? 8 : 10,
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [

@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/format/ba_formatted_date.dart';
+import '../../../../core/visual/operonix_visual_tokens.dart';
+import '../../../../core/visual/premium/premium_icon_accent.dart';
+import '../../../../core/visual/premium/premium_type.dart';
+import '../../../../core/visual/premium/premium_widgets.dart';
 import '../../../../core/access/production_access_helper.dart'
     show ProductionAccessHelper, ProductionDashboardCard;
 import '../../../../core/saas/production_module_keys.dart';
@@ -174,20 +178,33 @@ class _ProductionOperatorTrackingScreenState
   @override
   Widget build(BuildContext context) {
     final parentTheme = Theme.of(context);
-    final stationTheme = buildStationScreenTheme(parentTheme, _appearance);
+    final premium = OperonixVisualTokens.of(context).isPremium;
+    final pageTheme = trackingPageTheme(
+      parent: parentTheme,
+      appearance: _appearance,
+      premium: premium,
+    );
 
     return AnimatedTheme(
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeOutCubic,
-      data: stationTheme,
+      data: pageTheme,
       child: Builder(
         builder: (context) {
           final theme = Theme.of(context);
+          final tokens = OperonixVisualTokens.of(context);
+          final narrow = MediaQuery.sizeOf(context).width < 720;
           return Scaffold(
+            backgroundColor: tokens.isPremium ? tokens.background : null,
             appBar: AppBar(
-              title: const Text('Praćenje proizvodnje'),
+              toolbarHeight: tokens.isPremium ? 64 : null,
+              title: Text(
+                'Praćenje proizvodnje',
+                maxLines: tokens.isPremium ? 2 : 1,
+                overflow: TextOverflow.ellipsis,
+              ),
               actions: [
-                if (_showStationPagesButton)
+                if (!(tokens.isPremium && narrow) && _showStationPagesButton)
                   IconButton(
                     tooltip: 'Ekrani stanica za ovaj pogon',
                     icon: const Icon(Icons.settings_applications_outlined),
@@ -201,7 +218,7 @@ class _ProductionOperatorTrackingScreenState
                       );
                     },
                   ),
-                if (_showBrowserStationSetup)
+                if (!(tokens.isPremium && narrow) && _showBrowserStationSetup)
                   IconButton(
                     tooltip:
                         'Postavke ovog preglednika (pogon, klasifikacija, ispis etikete)',
@@ -231,16 +248,64 @@ class _ProductionOperatorTrackingScreenState
                           ProductionAccessHelper.canEditStationScreenCustomColors(
                         (widget.companyData['role'] ?? '').toString(),
                       ),
+                      showButtonAccent: tokens.isPremium,
                     );
                     if (next == null || !mounted) return;
                     setState(() => _appearance = next);
                     await StationScreenThemeStore.save(next);
                   },
                 ),
+                if (tokens.isPremium &&
+                    narrow &&
+                    (_showStationPagesButton || _showBrowserStationSetup))
+                  PopupMenuButton<String>(
+                    tooltip: 'Postavke',
+                    icon: const Icon(Icons.more_vert),
+                    onSelected: (value) async {
+                      if (value == 'pages') {
+                        Navigator.of(context).push<void>(
+                          MaterialPageRoute<void>(
+                            builder: (_) => ProductionStationPagesAdminScreen(
+                              companyData: widget.companyData,
+                            ),
+                          ),
+                        );
+                      } else if (value == 'setup') {
+                        await Navigator.of(context).push<void>(
+                          MaterialPageRoute<void>(
+                            builder: (ctx) => StationTrackingSetupScreen(
+                              companyData: _effectiveCompanyData,
+                              onSaved: () {
+                                Navigator.of(ctx).pop();
+                                _loadThemeAndStationPrefs();
+                              },
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      if (_showStationPagesButton)
+                        const PopupMenuItem(
+                          value: 'pages',
+                          child: Text('Ekrani stanica za ovaj pogon'),
+                        ),
+                      if (_showBrowserStationSetup)
+                        const PopupMenuItem(
+                          value: 'setup',
+                          child: Text('Postavke ovog preglednika'),
+                        ),
+                    ],
+                  ),
               ],
               bottom: TabBar(
                 controller: _tabController,
                 isScrollable: true,
+                tabAlignment: tokens.isPremium ? TabAlignment.start : null,
+                dividerColor: tokens.isPremium ? tokens.border : null,
+                indicatorSize: tokens.isPremium
+                    ? TabBarIndicatorSize.label
+                    : TabBarIndicatorSize.tab,
                 tabs: const [
                   Tab(text: 'Pregled'),
                   Tab(text: 'Pripremna'),
@@ -268,32 +333,67 @@ class _ProductionOperatorTrackingScreenState
                       _openHubDestination(context, label),
                 ),
                 if (_tabController.index > 0)
-                  Material(
-                    color: theme.colorScheme.surfaceContainerHighest.withValues(
-                      alpha: 0.35,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.calendar_today_outlined,
-                            size: 20,
-                            color: theme.colorScheme.primary,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'Radni dan: ${_todayLine()}',
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
+                  tokens.isPremium
+                      ? Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                          child: PremiumSurfaceCard(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              children: [
+                                const PremiumIconBadge(
+                                  icon: Icons.calendar_today_outlined,
+                                  role: PremiumIconRole.info,
+                                  size: 32,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Radni dan',
+                                        style: PremiumType.meta(tokens),
+                                      ),
+                                      Text(
+                                        _todayLine(),
+                                        style: PremiumType.cardTitle(tokens),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
+                        )
+                      : Material(
+                          color: theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.35),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.calendar_today_outlined,
+                                  size: 20,
+                                  color: theme.colorScheme.primary,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Radni dan: ${_todayLine()}',
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                 Expanded(
                   child: TabBarView(
                     controller: _tabController,

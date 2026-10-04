@@ -2,14 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
 import '../../../../core/theme/operonix_production_brand.dart';
+import '../config/preparation_station_ui_prefs.dart';
 import '../config/station_screen_theme.dart';
+import 'tracking_workflow_chrome.dart';
 
 /// Dijalog: ugrađene teme ili tri boje (podloga, akcent, obrub polja).
 /// Vlastite boje mogu mijenjati samo Admin (`allowCustomColors: true`).
+///
+/// [showButtonAccent] otvara i lokalnu temu gumba. Koristi se u Premiumu,
+/// da izbor ne stoji u operativnom toku.
 Future<StationScreenAppearance?> showStationAppearanceEditorDialog({
   required BuildContext context,
   required StationScreenAppearance current,
   bool allowCustomColors = false,
+  bool showButtonAccent = false,
 }) {
   return showDialog<StationScreenAppearance>(
       barrierDismissible: false,
@@ -17,6 +23,7 @@ Future<StationScreenAppearance?> showStationAppearanceEditorDialog({
     builder: (ctx) => _StationAppearanceEditorBody(
       seed: current,
       allowCustomColors: allowCustomColors,
+      showButtonAccent: showButtonAccent,
     ),
   );
 }
@@ -25,10 +32,12 @@ class _StationAppearanceEditorBody extends StatefulWidget {
   const _StationAppearanceEditorBody({
     required this.seed,
     required this.allowCustomColors,
+    required this.showButtonAccent,
   });
 
   final StationScreenAppearance seed;
   final bool allowCustomColors;
+  final bool showButtonAccent;
 
   @override
   State<_StationAppearanceEditorBody> createState() =>
@@ -308,6 +317,17 @@ class _StationAppearanceEditorBodyState extends State<_StationAppearanceEditorBo
                 ),
               ],
             ],
+            if (widget.showButtonAccent) ...[
+              const Divider(height: 24),
+              const _ButtonAccentSection(),
+              const SizedBox(height: 8),
+              Text(
+                'U Premiumu ovo boji glavnu radnju. Pozadina ekrana ostaje Midnight.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             Text('Pregled', style: theme.textTheme.labelLarge),
             const SizedBox(height: 6),
@@ -397,6 +417,37 @@ class _StationAppearanceEditorBodyState extends State<_StationAppearanceEditorBo
           child: const Text('Spremi'),
         ),
       ],
+    );
+  }
+}
+
+class _ButtonAccentSection extends StatefulWidget {
+  const _ButtonAccentSection();
+
+  @override
+  State<_ButtonAccentSection> createState() => _ButtonAccentSectionState();
+}
+
+class _ButtonAccentSectionState extends State<_ButtonAccentSection> {
+  int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    PreparationStationUiPrefs.loadAccentIndex().then((value) {
+      if (mounted) setState(() => _index = value);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TrackingButtonAccentChoices(
+      inline: false,
+      selectedIndex: _index,
+      onSelected: (index) {
+        setState(() => _index = index);
+        PreparationStationUiPrefs.saveAccentIndex(index);
+      },
     );
   }
 }
