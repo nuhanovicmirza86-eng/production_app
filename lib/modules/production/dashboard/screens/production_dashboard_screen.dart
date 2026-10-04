@@ -65,8 +65,6 @@ import '../production_dashboard_module_catalog.dart';
 import '../services/production_dashboard_layout_preference.dart';
 import '../widgets/production_dashboard_action_tile.dart';
 import '../widgets/production_dashboard_home_modules_view.dart';
-import '../widgets/production_dashboard_layout_selector.dart';
-
 class _ProdNavItem {
   final WidgetBuilder builder;
   final NavigationDestination destination;
@@ -400,7 +398,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             companyData: cd,
             debugUnlockFinanceModule: kDebugMode,
           ).buildSections(ctx);
-          return _ProductionHomePage(
+          return ProductionHomePage(
             companyData: cd,
             roleLabel: ProductionAccessHelper.displayRoleLabel(
               companyData['role'],
@@ -414,7 +412,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                     _canAccessCentralWarehouse()),
             onOpenQrScan: _openProductionQrScan,
             dashboardLayout: _dashboardLayout,
-            onDashboardLayoutChanged: _setDashboardLayout,
+            onHomeLayoutChanged: _setDashboardLayout,
             moduleSections: sections,
             dashboardAccess: access,
             attentionCounts: _inboxAttention,
@@ -802,7 +800,11 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     return [
       ...primary,
       _ProdNavItem(
-        builder: (_) => _ProductionMoreMenuScreen(items: extras),
+        builder: (_) => _ProductionMoreMenuScreen(
+          items: extras,
+          homeLayout: _dashboardLayout,
+          onHomeLayoutChanged: _setDashboardLayout,
+        ),
         destination: const NavigationDestination(
           icon: Icon(Icons.more_horiz),
           selectedIcon: Icon(Icons.more_horiz),
@@ -1014,13 +1016,16 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                   ProductionDashboardActionTile(
                     icon: Icons.tune,
                     title: 'Izgled aplikacije',
-                    subtitle: 'Classic ili Premium Midnight',
+                    subtitle: 'Classic, Premium i raspored početne',
                     onTap: () {
                       _shellScaffoldKey.currentState?.closeDrawer();
                       Navigator.push<void>(
                         context,
                         MaterialPageRoute<void>(
-                          builder: (_) => const AppAppearanceScreen(),
+                          builder: (_) => AppAppearanceScreen(
+                            homeLayout: _dashboardLayout,
+                            onHomeLayoutChanged: _setDashboardLayout,
+                          ),
                         ),
                       );
                     },
@@ -1140,7 +1145,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
 }
 
 /// Početna s karticom sesije i listom „Brze akcije“ (isti obrazac kao maintenance).
-class _ProductionHomePage extends StatelessWidget {
+class ProductionHomePage extends StatelessWidget {
   final Map<String, dynamic> companyData;
   final String roleLabel;
   final String companyId;
@@ -1151,13 +1156,14 @@ class _ProductionHomePage extends StatelessWidget {
   final bool showQrScanAction;
   final Future<void> Function(BuildContext context)? onOpenQrScan;
   final ProductionDashboardLayout dashboardLayout;
-  final ValueChanged<ProductionDashboardLayout> onDashboardLayoutChanged;
+  final ValueChanged<ProductionDashboardLayout> onHomeLayoutChanged;
   final List<ProductionDashboardModuleSection> moduleSections;
   final ProductionDashboardAccess dashboardAccess;
   final MesInboxAttentionCounts attentionCounts;
   final VoidCallback onOpenInbox;
 
-  const _ProductionHomePage({
+  const ProductionHomePage({
+    super.key,
     required this.companyData,
     required this.roleLabel,
     required this.companyId,
@@ -1166,7 +1172,7 @@ class _ProductionHomePage extends StatelessWidget {
     this.showQrScanAction = false,
     this.onOpenQrScan,
     required this.dashboardLayout,
-    required this.onDashboardLayoutChanged,
+    required this.onHomeLayoutChanged,
     required this.moduleSections,
     required this.dashboardAccess,
     required this.attentionCounts,
@@ -1190,7 +1196,10 @@ class _ProductionHomePage extends StatelessWidget {
               Navigator.push<void>(
                 context,
                 MaterialPageRoute<void>(
-                  builder: (_) => const AppAppearanceScreen(),
+                  builder: (_) => AppAppearanceScreen(
+                    homeLayout: dashboardLayout,
+                    onHomeLayoutChanged: onHomeLayoutChanged,
+                  ),
                 ),
               );
             },
@@ -1247,11 +1256,6 @@ class _ProductionHomePage extends StatelessWidget {
             ),
           ],
           SizedBox(height: gap * 0.75),
-          ProductionDashboardLayoutSelector(
-            value: dashboardLayout,
-            onChanged: onDashboardLayoutChanged,
-          ),
-          SizedBox(height: gap * 0.75),
           ProductionDashboardHomeModulesView(
             layout: dashboardLayout,
             sections: moduleSections,
@@ -1266,8 +1270,14 @@ class _ProductionHomePage extends StatelessWidget {
 /// Mobilni „Više“ meni kad je više od pet stavki u donjoj navigaciji.
 class _ProductionMoreMenuScreen extends StatefulWidget {
   final List<_ProdNavItem> items;
+  final ProductionDashboardLayout homeLayout;
+  final ValueChanged<ProductionDashboardLayout> onHomeLayoutChanged;
 
-  const _ProductionMoreMenuScreen({required this.items});
+  const _ProductionMoreMenuScreen({
+    required this.items,
+    required this.homeLayout,
+    required this.onHomeLayoutChanged,
+  });
 
   @override
   State<_ProductionMoreMenuScreen> createState() =>
@@ -1300,9 +1310,12 @@ class _ProductionMoreMenuScreenState extends State<_ProductionMoreMenuScreen> {
       ),
       body: Column(
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(12, 12, 12, 4),
-            child: AppAppearanceSelector(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+            child: AppAppearanceSelector(
+              homeLayout: widget.homeLayout,
+              onHomeLayoutChanged: widget.onHomeLayoutChanged,
+            ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),

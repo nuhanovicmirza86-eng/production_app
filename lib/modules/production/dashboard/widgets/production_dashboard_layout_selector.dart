@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/production_dashboard_layout.dart';
 
-/// Odabir izgleda početnog zaslona: standardni ili ikonski prikaz.
+/// Raspored početne. Nije vizuelni stil (Classic / Premium).
 class ProductionDashboardLayoutSelector extends StatelessWidget {
   final ProductionDashboardLayout value;
   final ValueChanged<ProductionDashboardLayout> onChanged;
@@ -18,7 +18,7 @@ class ProductionDashboardLayoutSelector extends StatelessWidget {
     return Row(
       children: [
         Text(
-          'Prikaz:',
+          'Raspored:',
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w700,

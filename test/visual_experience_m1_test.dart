@@ -16,7 +16,12 @@ import 'package:production_app/core/visual/visual_experience_scope.dart';
 import 'package:production_app/core/visual/visual_experience_store.dart';
 import 'package:production_app/core/visual/visual_style.dart';
 import 'package:production_app/modules/production/dashboard/models/production_dashboard_layout.dart';
-import 'package:production_app/modules/production/dashboard/widgets/production_dashboard_layout_selector.dart';
+import 'package:production_app/modules/production/dashboard/models/production_dashboard_module.dart';
+import 'package:production_app/modules/production/dashboard/production_dashboard_access.dart';
+import 'package:production_app/modules/production/dashboard/screens/production_dashboard_screen.dart';
+import 'package:production_app/modules/production/dashboard/widgets/production_dashboard_action_tile.dart';
+import 'package:production_app/modules/production/dashboard/widgets/production_dashboard_icon_grid_tile.dart';
+import 'package:production_app/modules/production/notifications/mes_inbox_attention.dart';
 import 'package:production_app/modules/production/station_pages/screens/production_evidence_operator_hub_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -275,6 +280,8 @@ void main() {
       );
 
       expect(find.text('Izgled aplikacije'), findsOneWidget);
+      expect(find.text('Prikaz:'), findsOneWidget);
+      expect(find.text('Raspored:'), findsOneWidget);
       expect(find.text('Tema: Midnight'), findsNothing);
       expect(find.text('Standardno'), findsOneWidget);
       expect(find.text('Proizvodni nalozi'), findsOneWidget);
@@ -309,6 +316,292 @@ void main() {
       expect(find.text('Tema: Midnight'), findsNothing);
       expect(layout, ProductionDashboardLayout.iconGrid);
       expect(find.text('Procesi (master-data)'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('appearance settings', () {
+    test('home layout persistence contract is unchanged', () {
+      expect(
+        ProductionDashboardLayout.preferenceKey,
+        'productionDashboardLayout',
+      );
+      expect(ProductionDashboardLayout.standard.storageValue, 'standard');
+      expect(ProductionDashboardLayout.iconGrid.storageValue, 'icon_grid');
+      expect(
+        SharedPreferencesVisualExperienceStore.storageKey,
+        isNot('productionDashboardLayout'),
+      );
+    });
+
+    testWidgets('settings show style, Midnight and home layout', (tester) async {
+      final controller = VisualExperienceController(
+        store: MemoryVisualExperienceStore(),
+      );
+      var layout = ProductionDashboardLayout.standard;
+
+      Future<void> pump() {
+        return tester.pumpWidget(
+          VisualExperienceScope(
+            controller: controller,
+            child: MaterialApp(
+              theme: OperonixVisualTheme.forStyle(controller.style),
+              home: AppAppearanceScreen(
+                homeLayout: layout,
+                onHomeLayoutChanged: (next) => layout = next,
+              ),
+            ),
+          ),
+        );
+      }
+
+      await pump();
+      expect(find.text('Prikaz:'), findsOneWidget);
+      expect(find.text('Classic'), findsWidgets);
+      expect(find.text('Premium'), findsWidgets);
+      expect(find.text('Raspored:'), findsOneWidget);
+      expect(find.text('Standardno'), findsOneWidget);
+      expect(find.text('Ikone'), findsOneWidget);
+      expect(find.text('Tema: Midnight'), findsNothing);
+
+      await tester.tap(find.text('Premium'));
+      await tester.pump();
+      await pump();
+      expect(controller.style, VisualStyle.premium);
+      expect(layout, ProductionDashboardLayout.standard);
+      expect(find.text('Tema: Midnight'), findsOneWidget);
+
+      await tester.tap(find.text('Ikone'));
+      await tester.pump();
+      expect(layout, ProductionDashboardLayout.iconGrid);
+      expect(controller.style, VisualStyle.premium);
+
+      await tester.tap(find.text('Classic'));
+      await tester.pump();
+      await pump();
+      expect(controller.style, VisualStyle.classic);
+      expect(layout, ProductionDashboardLayout.iconGrid);
+      expect(find.text('Tema: Midnight'), findsNothing);
+    });
+
+    testWidgets('Classic and Premium Home have no layout selector', (
+      tester,
+    ) async {
+      for (final style in VisualStyle.values) {
+        final controller = VisualExperienceController(
+          store: MemoryVisualExperienceStore(initial: style),
+        );
+        await controller.load();
+        await tester.pumpWidget(
+          VisualExperienceScope(
+            key: ValueKey(style),
+            controller: controller,
+            child: MaterialApp(
+              key: ValueKey(style),
+              theme: OperonixVisualTheme.forStyle(style),
+              home: ProductionHomePage(
+                companyData: const {},
+                roleLabel: 'Administrator',
+                companyId: '',
+                plantKey: '',
+                companyLine: 'Operonix',
+                dashboardLayout: ProductionDashboardLayout.iconGrid,
+                onHomeLayoutChanged: (_) {},
+                moduleSections: const <ProductionDashboardModuleSection>[],
+                dashboardAccess: _appearanceAccess(),
+                attentionCounts: const MesInboxAttentionCounts(
+                  newCount: 0,
+                  waitingActionCount: 0,
+                ),
+                onOpenInbox: () {},
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(find.text('Brze akcije'), findsOneWidget);
+        expect(find.text('Početna'), findsOneWidget);
+        expect(find.text('Raspored:'), findsNothing);
+        expect(find.text('Standardno'), findsNothing);
+        expect(find.text('Ikone'), findsNothing);
+        expect(find.text('Prikaz:'), findsNothing);
+        expect(tester.takeException(), isNull);
+      }
+    });
+
+    testWidgets('tune opens appearance settings without touching layout', (
+      tester,
+    ) async {
+      for (final style in VisualStyle.values) {
+        final controller = VisualExperienceController(
+          store: MemoryVisualExperienceStore(initial: style),
+        );
+        await controller.load();
+        var layout = ProductionDashboardLayout.iconGrid;
+        await tester.pumpWidget(
+          VisualExperienceScope(
+            key: ValueKey(style),
+            controller: controller,
+            child: MaterialApp(
+              key: ValueKey(style),
+              theme: OperonixVisualTheme.forStyle(style),
+              home: ProductionHomePage(
+                companyData: const {},
+                roleLabel: 'Administrator',
+                companyId: '',
+                plantKey: '',
+                companyLine: 'Operonix',
+                dashboardLayout: layout,
+                onHomeLayoutChanged: (next) => layout = next,
+                moduleSections: const <ProductionDashboardModuleSection>[],
+                dashboardAccess: _appearanceAccess(),
+                attentionCounts: const MesInboxAttentionCounts(
+                  newCount: 0,
+                  waitingActionCount: 0,
+                ),
+                onOpenInbox: () {},
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.tap(find.byTooltip('Izgled aplikacije'));
+        await tester.pumpAndSettle();
+        expect(find.text('Prikaz:'), findsOneWidget);
+        expect(find.text('Raspored:'), findsOneWidget);
+        expect(find.text('Standardno'), findsOneWidget);
+        expect(find.text('Ikone'), findsOneWidget);
+        if (style == VisualStyle.premium) {
+          expect(find.text('Tema: Midnight'), findsOneWidget);
+        } else {
+          expect(find.text('Tema: Midnight'), findsNothing);
+        }
+        expect(layout, ProductionDashboardLayout.iconGrid);
+        expect(controller.style, style);
+      }
+    });
+
+    testWidgets('mobile Više shows appearance controls', (tester) async {
+      final controller = VisualExperienceController(
+        store: MemoryVisualExperienceStore(),
+      );
+      var layout = ProductionDashboardLayout.standard;
+      await tester.pumpWidget(
+        VisualExperienceScope(
+          controller: controller,
+          child: MaterialApp(
+            theme: OperonixVisualTheme.forStyle(VisualStyle.classic),
+            home: Scaffold(
+              appBar: AppBar(title: const Text('Više')),
+              body: AppAppearanceSelector(
+                homeLayout: layout,
+                onHomeLayoutChanged: (next) => layout = next,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('Više'), findsOneWidget);
+      expect(find.text('Izgled aplikacije'), findsOneWidget);
+      expect(find.text('Prikaz:'), findsOneWidget);
+      expect(find.text('Raspored:'), findsOneWidget);
+      expect(find.text('Tema: Midnight'), findsNothing);
+
+      await tester.tap(find.text('Premium'));
+      await tester.pumpAndSettle();
+      expect(controller.style, VisualStyle.premium);
+      expect(layout, ProductionDashboardLayout.standard);
+    });
+
+    testWidgets('web menu opens the same appearance settings', (tester) async {
+      final controller = VisualExperienceController(
+        store: MemoryVisualExperienceStore(initial: VisualStyle.premium),
+      );
+      await controller.load();
+      var layout = ProductionDashboardLayout.standard;
+      await tester.pumpWidget(
+        VisualExperienceScope(
+          controller: controller,
+          child: MaterialApp(
+            theme: OperonixVisualTheme.premiumMidnight(),
+            home: Builder(
+              builder: (context) {
+                return Scaffold(
+                  body: ProductionDashboardActionTile(
+                    icon: Icons.tune,
+                    title: 'Izgled aplikacije',
+                    subtitle: 'Classic, Premium i raspored početne',
+                    onTap: () {
+                      Navigator.push<void>(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => AppAppearanceScreen(
+                            homeLayout: layout,
+                            onHomeLayoutChanged: (next) => layout = next,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(
+        find.text('Classic, Premium i raspored početne'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Izgled aplikacije'));
+      await tester.pumpAndSettle();
+      expect(find.text('Prikaz:'), findsOneWidget);
+      expect(find.text('Tema: Midnight'), findsOneWidget);
+      expect(find.text('Raspored:'), findsOneWidget);
+      await tester.tap(find.text('Ikone'));
+      await tester.pump();
+      expect(layout, ProductionDashboardLayout.iconGrid);
+      expect(controller.style, VisualStyle.premium);
+    });
+
+    testWidgets('changing layout from settings updates Home immediately', (
+      tester,
+    ) async {
+      final controller = VisualExperienceController(
+        store: MemoryVisualExperienceStore(initial: VisualStyle.classic),
+      );
+      await controller.load();
+      await tester.pumpWidget(
+        VisualExperienceScope(
+          controller: controller,
+          child: MaterialApp(
+            theme: OperonixVisualTheme.forStyle(VisualStyle.classic),
+            home: const _ImmediateLayoutHost(),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.byType(ProductionDashboardActionTile), findsOneWidget);
+      expect(find.byType(ProductionDashboardIconGridTile), findsNothing);
+      expect(find.text('Raspored:'), findsNothing);
+
+      await tester.tap(find.byTooltip('Izgled aplikacije'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ikone'));
+      await tester.pump();
+      expect(controller.style, VisualStyle.classic);
+      expect(find.text('Tema: Midnight'), findsNothing);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(ProductionDashboardIconGridTile), findsOneWidget);
+      expect(find.byType(ProductionDashboardActionTile), findsNothing);
+      expect(find.text('Brze akcije'), findsOneWidget);
+      expect(find.text('Raspored:'), findsNothing);
+      expect(find.text('Prikaz:'), findsNothing);
+      expect(controller.style, VisualStyle.classic);
       expect(tester.takeException(), isNull);
     });
   });
@@ -483,8 +776,10 @@ Widget _pilotChrome({
 }) {
   return ListView(
     children: [
-      const AppAppearanceSelector(),
-      ProductionDashboardLayoutSelector(value: layout, onChanged: onLayout),
+      AppAppearanceSelector(
+        homeLayout: layout,
+        onHomeLayoutChanged: onLayout,
+      ),
       const StandardScreenHeader(title: 'Proizvodni nalozi'),
       const StandardKpiGrid(
         metrics: [
@@ -537,4 +832,61 @@ Widget _pilotChrome({
       ),
     ],
   );
+}
+
+ProductionDashboardAccess _appearanceAccess() {
+  return ProductionDashboardAccess(
+    companyData: const {},
+    role: 'admin',
+    companyId: 'c',
+    plantKey: 'p',
+    enabledModules: const ['production'],
+  );
+}
+
+class _ImmediateLayoutHost extends StatefulWidget {
+  const _ImmediateLayoutHost();
+
+  @override
+  State<_ImmediateLayoutHost> createState() => _ImmediateLayoutHostState();
+}
+
+class _ImmediateLayoutHostState extends State<_ImmediateLayoutHost> {
+  var _layout = ProductionDashboardLayout.standard;
+
+  @override
+  Widget build(BuildContext context) {
+    return ProductionHomePage(
+      companyData: const {},
+      roleLabel: 'Administrator',
+      companyId: '',
+      plantKey: '',
+      companyLine: 'Operonix',
+      dashboardLayout: _layout,
+      onHomeLayoutChanged: (next) => setState(() => _layout = next),
+      moduleSections: [
+        ProductionDashboardModuleSection(
+          id: 'production',
+          title: 'Proizvodnja',
+          subtitle: 'Moduli',
+          icon: Icons.precision_manufacturing_outlined,
+          entries: [
+            ProductionDashboardModuleEntry(
+              id: 'orders',
+              icon: Icons.assignment_outlined,
+              title: 'Proizvodni nalozi',
+              subtitle: 'Nalozi',
+              onTap: () {},
+            ),
+          ],
+        ),
+      ],
+      dashboardAccess: _appearanceAccess(),
+      attentionCounts: const MesInboxAttentionCounts(
+        newCount: 0,
+        waitingActionCount: 0,
+      ),
+      onOpenInbox: () {},
+    );
+  }
 }
