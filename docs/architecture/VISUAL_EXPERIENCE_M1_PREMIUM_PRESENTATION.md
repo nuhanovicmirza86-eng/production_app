@@ -1,6 +1,6 @@
 # VISUAL-EXPERIENCE-M1 — Premium presentation
 
-Status: OPEN. Owner visual PASS is not claimed.
+Status: OWNER ACCEPTED for the Production pilot. Classic stays permanent. Premium stays optional. One Operonix AI Assistant remains NOT STARTED. Maintenance rollout remains future work.
 
 ## Premium is not dark Classic
 
@@ -86,4 +86,8 @@ Maintenance still shows Standardno / Ikone on its Home. The Maintenance Visual E
 
 ## Pilot screens
 
-Početna, Proizvodni nalozi, Procesi, Operativne evidencije, Praćenje proizvodnje → Proizvodnja, and Kvalitet each have a Premium composition that is separate from the Classic layout.
+Početna, Proizvodni nalozi, Procesi, Operativne evidencije, Praćenje proizvodnje → Proizvodnja, and Kvalitet each have a Premium composition that is separate from the Classic layout. On desktop those compositions use the shared full-width shell. Cards and KPI rows take more columns as the page gets wider. Lists and the tracking context band use the remaining width. Classic keeps its previous content inside that same shell.
+
+## Accepted Production pilot
+
+Owner mobile acceptance is PASS for Premium Home, pictorial iconography, Home density, Midnight palette, appearance settings, the Praćenje proizvodnje direction, and Classic. Web structural acceptance is PASS: no application-level 1280 cap, rail at the left edge, same geometry for Classic and Premium, and the same rail, divider, content origin and page-padding model as Maintenance.

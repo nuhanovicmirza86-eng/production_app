@@ -1,8 +1,9 @@
-# VISUAL-EXPERIENCE-M1 — Production pilot checkpoint
+# VISUAL-EXPERIENCE-M1 — Production pilot
 
-**Status:** OPEN na grani `ui/visual-experience-m1-production-pilot`  
-**Owner smoke:** FAIL. PREMIUM-RESET-01: Premium nije tamni Classic. Prihvatni opis: `VISUAL_EXPERIENCE_M1_PREMIUM_PRESENTATION.md`. PASS tek nakon owner re-smokea.  
-**Kanonska arhitektura (ne dirana iz ove grane):**  
+**Status:** OWNER ACCEPTED · CANONICAL on `production_app` `main`  
+**Owner mobile acceptance:** PASS  
+**Production web shell:** PASS against `OPERONIX_UNIFIED_WEB_SHELL_RESPONSIVE_STANDARD.md`  
+**Kanonska arhitektura (nije prepisivana):**  
 `maintenance_app/docs/architecture/OPERONIX_VISUAL_EXPERIENCE_ARCHITECTURE.md`  
 `maintenance_app/docs/architecture/OPERONIX_UNIFIED_WEB_SHELL_RESPONSIVE_STANDARD.md`
 
@@ -39,13 +40,27 @@ Geometrija je ista za Classic i Premium i prati Maintenance read-only:
 
 Isti ekran, isti podaci i iste akcije. Classic zadržava dosadašnji raspored. Premium koristi `lib/core/visual/premium/`:
 
-- Početna: kompaktna kartica sesije s logom, semantičke kartice modula, Standardno/Ikone na sadržaju. Izgled aplikacije je na Više, u web izborniku i preko tune akcije.
-- Proizvodni nalozi: 2×2 KPI s posebnim akcentima, filter kartica, prazan panel, Novi nalog nije puna širina.
+- Početna: kompaktna kartica sesije s logom i semantičke kartice modula. Standardno/Ikone nije na tijelu početne. Izgled aplikacije je na Više, u web izborniku i preko tune akcije.
+- Proizvodni nalozi: KPI u jednom redu na desktopu i 2×2 na užem ekranu, filter kartica, prazan panel, Novi nalog nije puna širina.
 - Procesi: kartica pogona, filter kartica, prazan panel s Dodaj. Nema odvojenog FAB-a u Premiumu.
 - Operativne evidencije: kompaktna kartica, naslov pa jedna meta linija, semantička značka po profilu.
 - Praćenje proizvodnje: u Premiumu Midnight drži cijelu stranicu. Spremljena tema stanice ne boji tijelo. Tema gumba je u paleti, ne u toku unosa. Classic i dalje koristi punu temu stanice.
 
 Midnight dubina: background `0xFF0A1020`, surface `0xFF121A2B`, elevated `0xFF182338`, interactive `0xFF223049`.
+
+## Zatvoreno stanje
+
+- Classic ostaje trajni izgled. Premium je opcioni.
+- Premium tema u M1 je Midnight.
+- Premium poslovne ikone su piktogrami.
+- Premium Početna je responzivna i gušća od prve mreže.
+- Izgled aplikacije je izvan tijela Početne. Standardno/Ikone ostaje zasebna preferenca.
+- Production web shell je puna širina viewporta, usklađen s Maintenance rail geometrijom.
+- Praćenje zadržava paletu radnog prostora i poseban override boje operativne akcije.
+- Owner mobile acceptance: PASS.
+- Web structural acceptance: PASS.
+- Maintenance Visual Experience rollout ostaje budući paket. Ova isporuka ne mijenja Maintenance.
+- One Operonix AI Assistant: NOT STARTED.
 
 ## Namjerno odgođeno
 
@@ -55,7 +70,3 @@ Midnight dubina: background `0xFF0A1020`, surface `0xFF121A2B`, elevated `0xFF18
 - One Operonix AI Assistant
 - prepisivanje lokalnog izgleda Praćenja na dijeljene tokene (rizik regresije odobrenog ekrana)
 - širi Production rollout van pilota
-
-## Owner smoke
-
-Mobilni i web checklist ostaju ručni. Automatski testovi ne zamjenjuju vizuelni PASS.
