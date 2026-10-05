@@ -24,46 +24,66 @@ class ProductionPlanningScreen extends StatelessWidget {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(flex: 44, child: PlanningOrderPoolTable(session: session)),
-              Expanded(flex: 28, child: _filtersAndParams(context, session)),
-              Expanded(flex: 28, child: _precheck(session)),
+              Expanded(
+                flex: 44,
+                child: PlanningOrderPoolTable(session: session),
+              ),
+              Expanded(
+                flex: 28,
+                child: _filtersAndParams(context, session, fill: true),
+              ),
+              Expanded(flex: 28, child: _precheck(session, fill: true)),
             ],
           );
         }
-        return ListView(
-          padding: const EdgeInsets.all(8),
-          children: [
-            SizedBox(height: 420, child: PlanningOrderPoolTable(session: session)),
-            const Divider(),
-            SizedBox(height: 260, child: _filtersAndParams(context, session)),
-            const Divider(),
-            SizedBox(height: 280, child: _precheck(session)),
-          ],
+        final bottom = MediaQuery.viewPaddingOf(context).bottom;
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(8, 8, 8, 16 + bottom),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              PlanningOrderPoolTable(session: session),
+              const SizedBox(height: 8),
+              _filtersAndParams(context, session, fill: false),
+              const SizedBox(height: 8),
+              _precheck(session, fill: false),
+            ],
+          ),
         );
       },
     );
   }
 
-  Widget _filtersAndParams(BuildContext context, PlanningSessionController session) {
+  Widget _filtersAndParams(
+    BuildContext context,
+    PlanningSessionController session, {
+    required bool fill,
+  }) {
+    final children = <Widget>[
+      PlanningFiltersBar(session: session),
+      const SizedBox(height: 10),
+      PlanningSummaryKpiRow(session: session),
+      const Divider(height: 20),
+      PlanningEngineParamsFields(session: session),
+    ];
     return Card(
       margin: const EdgeInsets.all(4),
-      child: ListView(
-        padding: const EdgeInsets.all(10),
-        children: [
-          PlanningFiltersBar(session: session),
-          const SizedBox(height: 10),
-          PlanningSummaryKpiRow(session: session),
-          const Divider(height: 20),
-          PlanningEngineParamsFields(session: session),
-        ],
-      ),
+      child: fill
+          ? ListView(padding: const EdgeInsets.all(10), children: children)
+          : Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: children,
+              ),
+            ),
     );
   }
 
-  Widget _precheck(PlanningSessionController session) {
+  Widget _precheck(PlanningSessionController session, {required bool fill}) {
     return Card(
       margin: const EdgeInsets.all(4),
-      child: PlanningPrecheckPanel(session: session),
+      child: PlanningPrecheckPanel(session: session, fill: fill),
     );
   }
 }

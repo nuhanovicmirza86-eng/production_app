@@ -2,6 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/visual/operonix_visual_tokens.dart';
+import '../../../../core/visual/premium/operonix_premium_icon.dart';
+import '../../../../core/visual/premium/premium_icon_accent.dart';
+import '../../../../core/visual/premium/premium_widgets.dart';
 import '../../production_orders/models/production_order_model.dart';
 import '../planning_order_pool_view_mode.dart';
 import '../planning_session_controller.dart';
@@ -83,6 +87,10 @@ class _PlanningOrderPoolTableState extends State<PlanningOrderPoolTable> {
                         Text(
                           'Označite naloge za plan. Zatim „Generiši plan” ili „Preračunaj” — raspored je na tabu Raspored. '
                           'Desno su filtri i parametri motora; kontekst i spremanje u bočnoj traci (ikonica ili široki prikaz).',
+                          maxLines: constraints.maxWidth < 560 ? 3 : null,
+                          overflow: constraints.maxWidth < 560
+                              ? TextOverflow.ellipsis
+                              : null,
                           style: t.textTheme.bodySmall?.copyWith(
                             color: t.colorScheme.onSurfaceVariant,
                           ),
@@ -118,8 +126,8 @@ class _PlanningOrderPoolTableState extends State<PlanningOrderPoolTable> {
                         children: [
                           titleBlock,
                           const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerLeft,
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
                             child: viewToggle,
                           ),
                         ],
@@ -180,29 +188,52 @@ class _PlanningOrderPoolTableState extends State<PlanningOrderPoolTable> {
               ),
             ],
           );
-          final body = session.loadingPool
-              ? const Center(child: CircularProgressIndicator())
-              : session.poolError != null
-              ? Center(child: Text(session.poolError!))
-              : session.pool.isEmpty
-              ? const Center(
-                  child: Text(
-                    'Nema naloga u statusima „Pušten” i „U toku” za ovaj pogon.',
-                  ),
-                )
-              : _view == PlanningOrderPoolViewMode.table
-              ? _OrderDataTable(session: session)
-              : _OrderCardList(session: session);
+          Widget body({required bool grow}) {
+            if (session.loadingPool) {
+              const indicator = SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              );
+              if (grow) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: indicator,
+                );
+              }
+              return const Center(child: indicator);
+            }
+            if (session.poolError != null) {
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(session.poolError!, textAlign: TextAlign.center),
+              );
+            }
+            if (session.pool.isEmpty) {
+              return _emptyPool(context);
+            }
+            if (_view == PlanningOrderPoolViewMode.table) {
+              return _OrderDataTable(session: session, growVertically: grow);
+            }
+            return _OrderCardList(session: session, growVertically: grow);
+          }
+
           return LayoutBuilder(
             builder: (context, constraints) {
-              final tight =
-                  constraints.hasBoundedHeight && constraints.maxHeight < 520;
+              if (!constraints.hasBoundedHeight) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [chrome, body(grow: true)],
+                );
+              }
+              final tight = constraints.maxHeight < 520;
               if (!tight) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     chrome,
-                    Expanded(child: body),
+                    Expanded(child: body(grow: false)),
                   ],
                 );
               }
@@ -210,7 +241,7 @@ class _PlanningOrderPoolTableState extends State<PlanningOrderPoolTable> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Flexible(child: SingleChildScrollView(child: chrome)),
-                  Expanded(flex: 2, child: body),
+                  Expanded(flex: 2, child: body(grow: false)),
                 ],
               );
             },
@@ -219,53 +250,75 @@ class _PlanningOrderPoolTableState extends State<PlanningOrderPoolTable> {
       ),
     );
   }
-}
 
-class _OrderDataTable extends StatelessWidget {
-  const _OrderDataTable({required this.session});
-
-  final PlanningSessionController session;
-
-  @override
-  Widget build(BuildContext context) {
-    final list = session.ordersForTable;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SingleChildScrollView(
-        child: DataTable(
-          headingRowHeight: 40,
-          dataRowMinHeight: 40,
-          columns: const [
-            DataColumn(label: Text('')),
-            DataColumn(label: Text('Nalog')),
-            DataColumn(
-              label: Text('Signali'),
-              tooltip: 'Stroj, rok — isto kao lijevi rub (zeleno/žuto/crveno).',
-            ),
-            DataColumn(label: Text('Proizvod')),
-            DataColumn(label: Text('Kol.')),
-            DataColumn(label: Text('Rok')),
-            DataColumn(label: Text('Kupac')),
-            DataColumn(label: Text('Routing')),
-            DataColumn(label: Text('Izv. stroj')),
-            DataColumn(label: Text('Akcije')),
-          ],
-          rows: list.map((o) => _dataRow(context, session, o)).toList(),
-        ),
-      ),
+  Widget _emptyPool(BuildContext context) {
+    const message =
+        'Nema naloga u statusima „Pušten” i „U toku” za ovaj pogon.';
+    if (!OperonixVisualTokens.of(context).isPremium) {
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(12, 8, 12, 16),
+        child: Text(message, textAlign: TextAlign.center),
+      );
+    }
+    return const PremiumEmptyState(
+      icon: Icons.assignment_outlined,
+      glyph: OperonixPremiumGlyph.productionOrder,
+      role: PremiumIconRole.info,
+      title: message,
     );
   }
 }
 
-class _OrderCardList extends StatelessWidget {
-  const _OrderCardList({required this.session});
+class _OrderDataTable extends StatelessWidget {
+  const _OrderDataTable({required this.session, required this.growVertically});
 
   final PlanningSessionController session;
+  final bool growVertically;
+
+  @override
+  Widget build(BuildContext context) {
+    final list = session.ordersForTable;
+    final table = DataTable(
+      headingRowHeight: 40,
+      dataRowMinHeight: 40,
+      columns: const [
+        DataColumn(label: Text('')),
+        DataColumn(label: Text('Nalog')),
+        DataColumn(
+          label: Text('Signali'),
+          tooltip: 'Stroj, rok — isto kao lijevi rub (zeleno/žuto/crveno).',
+        ),
+        DataColumn(label: Text('Proizvod')),
+        DataColumn(label: Text('Kol.')),
+        DataColumn(label: Text('Rok')),
+        DataColumn(label: Text('Kupac')),
+        DataColumn(label: Text('Routing')),
+        DataColumn(label: Text('Izv. stroj')),
+        DataColumn(label: Text('Akcije')),
+      ],
+      rows: list.map((o) => _dataRow(context, session, o)).toList(),
+    );
+    final horizontal = SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: table,
+    );
+    if (growVertically) return horizontal;
+    return SingleChildScrollView(child: horizontal);
+  }
+}
+
+class _OrderCardList extends StatelessWidget {
+  const _OrderCardList({required this.session, required this.growVertically});
+
+  final PlanningSessionController session;
+  final bool growVertically;
 
   @override
   Widget build(BuildContext context) {
     final list = session.ordersForTable;
     return ListView.builder(
+      shrinkWrap: growVertically,
+      physics: growVertically ? const NeverScrollableScrollPhysics() : null,
       padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
       itemCount: list.length,
       itemBuilder: (context, i) {

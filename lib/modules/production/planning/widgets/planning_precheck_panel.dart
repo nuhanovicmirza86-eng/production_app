@@ -9,9 +9,13 @@ class PlanningPrecheckPanel extends StatelessWidget {
   const PlanningPrecheckPanel({
     super.key,
     required this.session,
+    this.fill = true,
   });
 
   final PlanningSessionController session;
+
+  /// Na telefonu sadržaj ide u stranicu. Na širokom prikazu panel sam skrola.
+  final bool fill;
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +27,9 @@ class PlanningPrecheckPanel extends StatelessWidget {
     var noInputLotBom = 0;
     for (final o in pool) {
       if ((o.machineId ?? '').trim().isEmpty) {
-        pre.add('${o.productionOrderCode}: nema stroja (kandidat za plan ili ne).');
+        pre.add(
+          '${o.productionOrderCode}: nema stroja (kandidat za plan ili ne).',
+        );
       }
       final due = o.requestedDeliveryDate;
       if (due != null && due.difference(DateTime.now()).inDays < 2) {
@@ -40,10 +46,14 @@ class PlanningPrecheckPanel extends StatelessWidget {
       }
     }
     if (noRouting > 0) {
-      pre.add('Routings: $noRouting naloga nema routings — motor radi sintetički jedan korak po nalogu.');
+      pre.add(
+        'Routings: $noRouting naloga nema routings — motor radi sintetički jedan korak po nalogu.',
+      );
     }
     if (noInputLotBom > 0) {
-      pre.add('Lota ulaza (SK): $noInputLotBom naloga s BOM-om, bez unesenog lota — IATF sljedivost.');
+      pre.add(
+        'Lota ulaza (SK): $noInputLotBom naloga s BOM-om, bez unesenog lota — IATF sljedivost.',
+      );
     }
     if (result != null) {
       var toolMissing = 0;
@@ -57,19 +67,27 @@ class PlanningPrecheckPanel extends StatelessWidget {
         }
       }
       if (toolMissing > 0) {
-        pre.add('Alat: u $toolMissing zadanih operacija nije naveden alat (routings / ručno).');
+        pre.add(
+          'Alat: u $toolMissing zadanih operacija nije naveden alat (routings / ručno).',
+        );
       }
       if (opMissing > 0) {
-        pre.add('Operater: u $opMissing operacija nema dodijeljenog operatera (kapacitetska priprema).');
+        pre.add(
+          'Operater: u $opMissing operacija nema dodijeljenog operatera (kapacitetska priprema).',
+        );
       }
     }
 
     return ListView(
+      shrinkWrap: !fill,
+      physics: fill ? null : const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.all(8),
       children: [
         Row(
           children: [
-            Text('Pre-check (stalno)', style: t.textTheme.titleSmall),
+            Expanded(
+              child: Text('Pre-check (stalno)', style: t.textTheme.titleSmall),
+            ),
             PlanningHelpIcon(
               title: PlanningHelpTexts.precheckTitle,
               message: PlanningHelpTexts.precheckMessage,
@@ -81,18 +99,30 @@ class PlanningPrecheckPanel extends StatelessWidget {
         if (pre.isEmpty)
           Text(
             'Nema očitih upozorenja (stroj, routing, rok, lot, alat, operater).',
-            style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
+            style: t.textTheme.bodySmall?.copyWith(
+              color: t.colorScheme.onSurfaceVariant,
+            ),
           )
         else
-          ...pre.take(18).map((s) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text('• $s', style: const TextStyle(fontSize: 12)),
-              )),
-        if (pre.length > 18) Text('… +${pre.length - 18}', style: t.textTheme.labelSmall),
+          ...pre
+              .take(18)
+              .map(
+                (s) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text('• $s', style: const TextStyle(fontSize: 12)),
+                ),
+              ),
+        if (pre.length > 18)
+          Text('… +${pre.length - 18}', style: t.textTheme.labelSmall),
         const Divider(height: 20),
         Row(
           children: [
-            Text('Motor (nakon generiranja)', style: t.textTheme.titleSmall),
+            Expanded(
+              child: Text(
+                'Motor (nakon generiranja)',
+                style: t.textTheme.titleSmall,
+              ),
+            ),
             PlanningHelpIcon(
               title: PlanningHelpTexts.engineAfterRunTitle,
               message: PlanningHelpTexts.engineAfterRunMessage,
@@ -104,12 +134,19 @@ class PlanningPrecheckPanel extends StatelessWidget {
         if (result == null)
           Text(
             'Još nema pokretanja plana.',
-            style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
+            style: t.textTheme.bodySmall?.copyWith(
+              color: t.colorScheme.onSurfaceVariant,
+            ),
           )
         else if (result.conflicts.isEmpty)
-          const Text('Nema konflikata u zadnjem rezultatu.', style: TextStyle(fontSize: 12))
+          const Text(
+            'Nema konflikata u zadnjem rezultatu.',
+            style: TextStyle(fontSize: 12),
+          )
         else
-          ...result.conflicts.take(16).map(
+          ...result.conflicts
+              .take(16)
+              .map(
                 (c) => Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Text(

@@ -4,7 +4,12 @@ import 'package:production_app/core/ui/date_range_filter_controls.dart';
 import 'package:production_app/core/visual/operonix_collapsible_section.dart';
 import 'package:production_app/core/visual/operonix_visual_theme.dart';
 import 'package:production_app/core/visual/premium/operonix_premium_icon.dart';
+import 'package:production_app/core/visual/premium/premium_widgets.dart';
+import 'package:production_app/modules/production/planning/planning_session_controller.dart';
+import 'package:production_app/modules/production/planning/planning_workflow_scope.dart';
+import 'package:production_app/modules/production/planning/screens/planning_scenarios_tab.dart';
 import 'package:production_app/modules/production/planning/screens/production_planning_home_screen.dart';
+import 'package:production_app/modules/production/planning/screens/production_planning_screen.dart';
 import 'package:production_app/modules/production/production_orders/screens/production_orders_list_screen.dart';
 import 'package:production_app/modules/production/products/screens/products_list_screen.dart';
 import 'package:production_app/modules/production/tracking/widgets/tracking_workflow_chrome.dart';
@@ -245,5 +250,190 @@ void main() {
     expect(dated, 1);
     expect(focused, 1);
     expect(tester.takeException(), isNull);
+  });
+
+  const emptyOrders =
+      'Nema naloga u statusima „Pušten” i „U toku” za ovaj pogon.';
+
+  Future<PlanningSessionController> emptySession() async {
+    final session = PlanningSessionController('', '');
+    session.loadingPool = false;
+    session.poolError = null;
+    session.pool = [];
+    return session;
+  }
+
+  testWidgets('planning orders empty state stays compact on a phone', (
+    tester,
+  ) async {
+    for (final width in [360.0, 411.0]) {
+      await setPhone(tester, Size(width, 800));
+      final session = await emptySession();
+      addTearDown(session.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: OperonixVisualTheme.premiumMidnight(),
+          home: Scaffold(
+            body: PlanningWorkflowScope(
+              session: session,
+              child: const ProductionPlanningScreen(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull, reason: 'orders $width');
+      expect(find.text(emptyOrders), findsOneWidget);
+      final empty = tester.getSize(find.byType(PremiumEmptyState));
+      expect(empty.height, lessThan(220));
+      expect(empty.width, lessThanOrEqualTo(width));
+
+      expect(find.text('Filtri liste naloga'), findsOneWidget);
+      final emptyRect = tester.getRect(find.text(emptyOrders));
+      final filters = tester.getRect(find.text('Filtri liste naloga'));
+      expect(filters.top, greaterThan(emptyRect.bottom));
+      expect(filters.top - emptyRect.bottom, lessThan(160));
+      expect(find.text('Pre-check (stalno)'), findsOneWidget);
+      expect(tester.takeException(), isNull, reason: 'filters $width');
+    }
+  });
+
+  testWidgets('classic planning empty state keeps classic text', (
+    tester,
+  ) async {
+    await setPhone(tester, const Size(360, 800));
+    final session = await emptySession();
+    addTearDown(session.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: OperonixVisualTheme.classic(),
+        home: Scaffold(
+          body: PlanningWorkflowScope(
+            session: session,
+            child: const ProductionPlanningScreen(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text(emptyOrders), findsOneWidget);
+    expect(find.byType(PremiumEmptyState), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  Future<void> pumpScenarios(
+    WidgetTester tester, {
+    required Size size,
+    required ThemeData theme,
+  }) async {
+    await setPhone(tester, size);
+    final title = TextEditingController();
+    final base = TextEditingController();
+    final notes = TextEditingController();
+    addTearDown(title.dispose);
+    addTearDown(base.dispose);
+    addTearDown(notes.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme,
+        home: Scaffold(
+          body: PlanningScenariosLayout(
+            rows: const [],
+            locked: false,
+            onRefresh: () {},
+            onEdit: (_) {},
+            onDelete: (_) {},
+            form: PlanningScenarioForm(
+              editing: false,
+              locked: false,
+              saving: false,
+              title: title,
+              basePlan: base,
+              notes: notes,
+              type: 'baseline',
+              onType: (_) {},
+              onUseLastPlan: () {},
+              onSave: () {},
+              onClear: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+  }
+
+  testWidgets('planning scenarios are a single column on a phone', (
+    tester,
+  ) async {
+    for (final width in [360.0, 411.0]) {
+      await pumpScenarios(
+        tester,
+        size: Size(width, 800),
+        theme: OperonixVisualTheme.premiumMidnight(),
+      );
+      expect(tester.takeException(), isNull, reason: 'scenarios $width');
+      final intro = tester.getRect(
+        find.text(PlanningScenariosLayout.introText),
+      );
+      expect(intro.width, greaterThan(width - 80));
+      expect(intro.left, lessThan(40));
+
+      await tester.ensureVisible(find.text('Novi scenarij'));
+      final formTitle = tester.getRect(find.text('Novi scenarij'));
+      expect(formTitle.top, greaterThan(intro.bottom));
+      expect(formTitle.left, lessThan(40));
+
+      await tester.ensureVisible(find.text('Naslov'));
+      final field = tester.getSize(find.byType(TextField).first);
+      expect(field.width, greaterThan(width - 80));
+
+      await tester.ensureVisible(find.text('Spremljeni zapis'));
+      final save = tester.getRect(find.text('Spremljeni zapis'));
+      expect(save.right, lessThanOrEqualTo(width));
+      expect(save.left, greaterThanOrEqualTo(0));
+      expect(save.width, greaterThan(48));
+      expect(tester.takeException(), isNull, reason: 'form $width');
+    }
+  });
+
+  testWidgets('planning scenarios stay two columns on a wide screen', (
+    tester,
+  ) async {
+    await pumpScenarios(
+      tester,
+      size: const Size(1440, 900),
+      theme: OperonixVisualTheme.premiumMidnight(),
+    );
+    expect(tester.takeException(), isNull);
+    final intro = tester.getRect(find.text(PlanningScenariosLayout.introText));
+    final formTitle = tester.getRect(find.text('Novi scenarij'));
+    expect(formTitle.left, greaterThan(intro.right - 8));
+    expect((formTitle.top - intro.top).abs(), lessThan(80));
+    final save = tester.getRect(find.text('Spremljeni zapis'));
+    expect(save.right, lessThanOrEqualTo(1440));
+  });
+
+  testWidgets('all planning tabs render on phone widths', (tester) async {
+    const tabs = ['Nalozi', 'Raspored', 'Provedba', 'Kapacitet', 'Scenariji'];
+    for (final width in [360.0, 411.0]) {
+      await setPhone(tester, Size(width, 800));
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: OperonixVisualTheme.premiumMidnight(),
+          home: const ProductionPlanningHomeScreen(companyData: {}),
+        ),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull, reason: 'home $width');
+      for (final label in tabs) {
+        expect(find.text(label), findsWidgets);
+        await tester.ensureVisible(find.text(label).first);
+        await tester.tap(find.text(label).first);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(tester.takeException(), isNull, reason: '$label $width');
+      }
+    }
   });
 }

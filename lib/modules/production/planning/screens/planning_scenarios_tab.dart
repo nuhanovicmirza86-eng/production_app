@@ -21,7 +21,7 @@ class PlanningScenariosTab extends StatefulWidget {
 }
 
 class _PlanningScenariosTabState extends State<PlanningScenariosTab> {
-  final _svc = PlanningScenarioService();
+  late final PlanningScenarioService _svc = PlanningScenarioService();
   final _title = TextEditingController();
   final _basePlan = TextEditingController();
   final _notes = TextEditingController();
@@ -211,7 +211,6 @@ class _PlanningScenariosTabState extends State<PlanningScenariosTab> {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context);
     if (_cid.isEmpty || _pk.isEmpty) {
       return const Center(
         child: Text('Kontekst kompanija/pogon nije učitavan.'),
@@ -228,167 +227,277 @@ class _PlanningScenariosTabState extends State<PlanningScenariosTab> {
         ),
       );
     }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          flex: 5,
-          child: ListView(
-            padding: const EdgeInsets.all(8),
+    return PlanningScenariosLayout(
+      rows: _rows,
+      locked: widget.session.isLocked,
+      onRefresh: widget.session.isLocked ? null : _load,
+      onEdit: _startEdit,
+      onDelete: _delete,
+      form: PlanningScenarioForm(
+        editing: _editingId != null,
+        locked: widget.session.isLocked,
+        saving: _saving,
+        title: _title,
+        basePlan: _basePlan,
+        notes: _notes,
+        type: _type,
+        onType: widget.session.isLocked
+            ? null
+            : (v) => setState(() => _type = v),
+        onUseLastPlan: widget.session.isLocked ? null : _useLastPlanId,
+        onSave: widget.session.isLocked || _saving ? null : _save,
+        onClear: widget.session.isLocked ? null : _clearForm,
+      ),
+    );
+  }
+}
+
+/// Scenariji: jedna kolona na telefonu, dva okna tek kad oba imaju širinu.
+class PlanningScenariosLayout extends StatelessWidget {
+  static const twoColumnMinWidth = 960.0;
+  static const introText =
+      'Baseline / what-if, opcionalno vezan nacrt plana. Pisanje: Callable u pozadini.';
+
+  final List<PlanningScenarioRecord> rows;
+  final bool locked;
+  final VoidCallback? onRefresh;
+  final ValueChanged<PlanningScenarioRecord> onEdit;
+  final ValueChanged<PlanningScenarioRecord> onDelete;
+  final Widget form;
+
+  const PlanningScenariosLayout({
+    super.key,
+    required this.rows,
+    required this.locked,
+    required this.onRefresh,
+    required this.onEdit,
+    required this.onDelete,
+    required this.form,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final intro = _intro(context);
+        final cards = [for (final r in rows) _card(r)];
+        if (constraints.maxWidth < twoColumnMinWidth) {
+          final bottom = MediaQuery.viewPaddingOf(context).bottom;
+          return ListView(
+            padding: EdgeInsets.fromLTRB(12, 8, 12, 16 + bottom),
+            children: [intro, ...cards, const SizedBox(height: 8), form],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              flex: 5,
+              child: ListView(
+                padding: const EdgeInsets.all(8),
+                children: [intro, ...cards],
+              ),
+            ),
+            Expanded(flex: 4, child: SingleChildScrollView(child: form)),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _intro(BuildContext context) {
+    final t = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              ListTile(
-                title: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Scenariji planiranja (F4)',
-                        style: t.textTheme.titleMedium,
-                      ),
-                    ),
-                    PlanningHelpIcon(
-                      title: PlanningHelpTexts.scenariosTabTitle,
-                      message: PlanningHelpTexts.scenariosTabMessage,
-                      size: 18,
-                    ),
-                  ],
-                ),
-                subtitle: const Text(
-                  'Baseline / what-if, opcionalno vezan nacrt plana. Pisanje: Callable u pozadini.',
-                ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: widget.session.isLocked ? null : _load,
+              Expanded(
+                child: Text(
+                  'Scenariji planiranja (F4)',
+                  style: t.textTheme.titleMedium,
                 ),
               ),
-              for (final r in _rows)
-                Card(
-                  child: ListTile(
-                    title: Text(r.title),
-                    subtitle: Text(
-                      'Tip: ${r.scenarioType} · baza: ${r.basePlanId.isEmpty ? "—" : r.basePlanId}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    isThreeLine: (r.notes ?? '').isNotEmpty,
-                    trailing: widget.session.isLocked
-                        ? null
-                        : Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.edit_outlined),
-                                onPressed: () => _startEdit(r),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline),
-                                onPressed: () => _delete(r),
-                              ),
-                            ],
-                          ),
-                    onTap: () => _startEdit(r),
-                  ),
-                ),
+              PlanningHelpIcon(
+                title: PlanningHelpTexts.scenariosTabTitle,
+                message: PlanningHelpTexts.scenariosTabMessage,
+                size: 18,
+              ),
+              IconButton(
+                tooltip: 'Osvježi',
+                icon: const Icon(Icons.refresh),
+                onPressed: onRefresh,
+              ),
             ],
           ),
+          Text(introText, style: t.textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+
+  Widget _card(PlanningScenarioRecord r) {
+    return Card(
+      child: ListTile(
+        title: Text(r.title),
+        subtitle: Text(
+          'Tip: ${r.scenarioType} · baza: ${r.basePlanId.isEmpty ? "—" : r.basePlanId}',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
-        Expanded(
-          flex: 4,
-          child: Card(
-            margin: const EdgeInsets.all(8),
-            child: ListView(
-              padding: const EdgeInsets.all(12),
-              children: [
-                Text(
-                  _editingId == null ? 'Novi scenarij' : 'Uređivanje',
-                  style: t.textTheme.titleSmall,
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _title,
-                  enabled: !widget.session.isLocked,
-                  decoration: const InputDecoration(labelText: 'Naslov'),
-                ),
-                const SizedBox(height: 8),
-                InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: 'Vrsta',
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
+        isThreeLine: (r.notes ?? '').isNotEmpty,
+        trailing: locked
+            ? null
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined),
+                    onPressed: () => onEdit(r),
                   ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _type,
-                      isExpanded: true,
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'baseline',
-                          child: Text('Baseline'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'whatif',
-                          child: Text('What-if'),
-                        ),
-                      ],
-                      onChanged: widget.session.isLocked
-                          ? null
-                          : (v) {
-                              if (v != null) {
-                                setState(() => _type = v);
-                              }
-                            },
-                    ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () => onDelete(r),
                   ),
+                ],
+              ),
+        onTap: () => onEdit(r),
+      ),
+    );
+  }
+}
+
+class PlanningScenarioForm extends StatelessWidget {
+  final bool editing;
+  final bool locked;
+  final bool saving;
+  final TextEditingController title;
+  final TextEditingController basePlan;
+  final TextEditingController notes;
+  final String type;
+  final ValueChanged<String>? onType;
+  final VoidCallback? onUseLastPlan;
+  final VoidCallback? onSave;
+  final VoidCallback? onClear;
+
+  const PlanningScenarioForm({
+    super.key,
+    required this.editing,
+    required this.locked,
+    required this.saving,
+    required this.title,
+    required this.basePlan,
+    required this.notes,
+    required this.type,
+    required this.onType,
+    required this.onUseLastPlan,
+    required this.onSave,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.all(8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              editing ? 'Uređivanje' : 'Novi scenarij',
+              style: t.textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: title,
+              enabled: !locked,
+              decoration: const InputDecoration(labelText: 'Naslov'),
+            ),
+            const SizedBox(height: 8),
+            InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Vrsta',
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
                 ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _basePlan,
-                  enabled: !widget.session.isLocked,
-                  decoration: const InputDecoration(
-                    labelText: 'ID baze (nacrt u production_plans, opcij.)',
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    onPressed: widget.session.isLocked ? null : _useLastPlanId,
-                    child: const Text('Ubaci zadnje spremljeni plan iz sesije'),
-                  ),
-                ),
-                TextField(
-                  controller: _notes,
-                  enabled: !widget.session.isLocked,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Napomena'),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    FilledButton(
-                      onPressed: widget.session.isLocked || _saving
-                          ? null
-                          : _save,
-                      child: _saving
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Spremljeni zapis'),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: type,
+                  isExpanded: true,
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'baseline',
+                      child: Text('Baseline'),
                     ),
-                    const SizedBox(width: 8),
-                    OutlinedButton(
-                      onPressed: widget.session.isLocked ? null : _clearForm,
-                      child: const Text('Očisti formu'),
-                    ),
+                    DropdownMenuItem(value: 'whatif', child: Text('What-if')),
                   ],
+                  onChanged: onType == null
+                      ? null
+                      : (v) {
+                          if (v != null) onType!(v);
+                        },
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: basePlan,
+              enabled: !locked,
+              decoration: const InputDecoration(
+                labelText: 'ID baze (nacrt u production_plans, opcij.)',
+              ),
+            ),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                style: TextButton.styleFrom(
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                ),
+                onPressed: onUseLastPlan,
+                child: const Text(
+                  'Ubaci zadnje spremljeni plan iz sesije',
+                  textAlign: TextAlign.start,
+                ),
+              ),
+            ),
+            TextField(
+              controller: notes,
+              enabled: !locked,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'Napomena'),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton(
+                  onPressed: onSave,
+                  child: saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Spremljeni zapis'),
+                ),
+                OutlinedButton(
+                  onPressed: onClear,
+                  child: const Text('Očisti formu'),
                 ),
               ],
             ),
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
