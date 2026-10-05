@@ -7,6 +7,7 @@ import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/ui/date_range_filter_controls.dart';
 import '../../../../core/ui/export_list_popup_menu.dart';
 import '../../../../core/ui/standard_list_components.dart';
+import '../../../../core/visual/operonix_visual_tokens.dart';
 import '../../../logistics/inventory/services/product_warehouse_stock_service.dart';
 import '../export/orders_list_pdf_export.dart';
 import '../models/order_model.dart';
@@ -26,8 +27,8 @@ class OrdersListScreen extends StatefulWidget {
 }
 
 class _OrdersListScreenState extends State<OrdersListScreen> {
-  final OrdersService _ordersService = OrdersService();
-  final ProductWarehouseStockService _stockService =
+  late final OrdersService _ordersService = OrdersService();
+  late final ProductWarehouseStockService _stockService =
       ProductWarehouseStockService();
 
   bool _isLoading = true;
@@ -481,7 +482,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                     icon: const Icon(Icons.arrow_back_ios_new_rounded),
                   ),
                   const SizedBox(width: 4),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Narudžbe',
                       maxLines: 1,
@@ -489,6 +490,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
+                        color: OperonixVisualTokens.of(context).primaryText,
                       ),
                     ),
                   ),
@@ -559,12 +561,16 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
               icon: const Icon(Icons.arrow_back_ios_new_rounded),
             ),
             const SizedBox(width: 4),
-            const Expanded(
+            Expanded(
               child: Text(
                 'Narudžbe',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: OperonixVisualTokens.of(context).primaryText,
+                ),
               ),
             ),
             _exportMenuButton(),
@@ -1372,9 +1378,10 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
   @override
   Widget build(BuildContext context) {
     final list = _filteredOrders;
+    final tokens = OperonixVisualTokens.of(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
+      backgroundColor: tokens.pageBackground,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadOrders,
@@ -1412,17 +1419,24 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Center(
-                      child: Text(_errorMessage!, textAlign: TextAlign.center),
+                      child: Text(
+                        _errorMessage!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: tokens.primaryText),
+                      ),
                     ),
                   ),
                 )
               else if (list.isEmpty)
-                const SliverFillRemaining(
+                SliverFillRemaining(
                   hasScrollBody: false,
                   child: Center(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 48),
-                      child: Text('Nema narudžbi'),
+                      padding: const EdgeInsets.symmetric(vertical: 48),
+                      child: Text(
+                        'Nema narudžbi',
+                        style: TextStyle(color: tokens.primaryText),
+                      ),
                     ),
                   ),
                 )

@@ -169,13 +169,28 @@ class _ProductionProcessesListScreenState
     final chosen = await showModalBottomSheet<String>(
       context: context,
       builder: (ctx) {
+        final tokens = OperonixVisualTokens.of(ctx);
         return SafeArea(
           child: ListView(
             shrinkWrap: true,
             children: [
               for (final plant in _plants)
                 ListTile(
-                  title: Text(plant.label),
+                  selected: tokens.isPremium &&
+                      plant.plantKey == _selectedPlantKey,
+                  selectedTileColor: tokens.isPremium
+                      ? tokens.surfaceInteractive
+                      : null,
+                  title: Text(
+                    plant.label,
+                    style: tokens.isPremium
+                        ? TextStyle(color: tokens.primaryText)
+                        : null,
+                  ),
+                  trailing: tokens.isPremium &&
+                          plant.plantKey == _selectedPlantKey
+                      ? Icon(Icons.check_rounded, color: tokens.primaryAccent)
+                      : null,
                   onTap: () => Navigator.pop(ctx, plant.plantKey),
                 ),
             ],

@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/ui/company_plant_label_text.dart';
 import '../../../../core/visual/operonix_collapsible_section.dart';
-import '../../../../core/visual/operonix_shell_metrics.dart';
 import '../../../../core/visual/premium/operonix_premium_icon.dart';
 import '../../../../core/visual/premium/premium_icon_accent.dart';
+import '../models/planning_scenario_record.dart';
 import '../planning_session_controller.dart';
+import '../planning_viewport.dart';
 import '../planning_workflow_scope.dart';
 import '../widgets/planning_context_sidebar.dart';
 import '../widgets/planning_help_icon.dart';
@@ -24,9 +25,16 @@ import '../widgets/planning_fcs_reoptimize.dart';
 /// Zajednički **planning workflow**: zaglavlje (pogon, horizont, scenarij, vremenski odsjek, akcije, KPI) i tabovi
 /// Nalozi · Raspored · Provedba · Kapacitet.
 class ProductionPlanningHomeScreen extends StatefulWidget {
-  const ProductionPlanningHomeScreen({super.key, required this.companyData});
+  const ProductionPlanningHomeScreen({
+    super.key,
+    required this.companyData,
+    this.scenarioLoader,
+  });
 
   final Map<String, dynamic> companyData;
+
+  /// Passed through to Scenariji. Production leaves this null.
+  final Future<List<PlanningScenarioRecord>> Function()? scenarioLoader;
 
   @override
   State<ProductionPlanningHomeScreen> createState() =>
@@ -59,8 +67,8 @@ class _ProductionPlanningHomeScreenState
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_planSettingsReady) return;
-    final wide =
-        MediaQuery.sizeOf(context).width >= OperonixShellMetrics.wideBreakpoint;
+    final wide = MediaQuery.sizeOf(context).width >=
+        PlanningViewport.multiColumnMinWidth;
     _planSettingsExpanded = wide;
     _planSettingsReady = true;
   }
@@ -72,17 +80,22 @@ class _ProductionPlanningHomeScreenState
       if (mounted) setState(() => _plantSummary = '—');
       return;
     }
-    final resolved = await CompanyPlantDisplayName.resolve(
-      companyId: cid,
-      plantKey: pk,
-    );
-    if (!mounted) return;
-    setState(() {
-      _plantSummary = CompanyPlantDisplayName.forUi(
-        resolved: resolved,
+    try {
+      final resolved = await CompanyPlantDisplayName.resolve(
+        companyId: cid,
         plantKey: pk,
       );
-    });
+      if (!mounted) return;
+      setState(() {
+        _plantSummary = CompanyPlantDisplayName.forUi(
+          resolved: resolved,
+          plantKey: pk,
+        );
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _plantSummary = pk);
+    }
   }
 
   @override
@@ -194,7 +207,9 @@ class _ProductionPlanningHomeScreenState
           session: _session,
           child: LayoutBuilder(
             builder: (context, c) {
-              final showSidebar = c.maxWidth >= _sidebarMinWidth;
+              final decision = PlanningViewport.decisionWidth(context, c);
+              final showSidebar =
+                  decision >= _sidebarMinWidth;
               return Scaffold(
                 key: _scaffoldKey,
                 endDrawer: showSidebar
@@ -257,7 +272,7 @@ class _ProductionPlanningHomeScreenState
                 ),
                 body: _planningBody(
                   context,
-                  wide: c.maxWidth >= OperonixShellMetrics.wideBreakpoint,
+                  wide: decision >= PlanningViewport.multiColumnMinWidth,
                   showSidebar: showSidebar,
                 ),
               );
@@ -392,6 +407,7 @@ class _ProductionPlanningHomeScreenState
                     PlanningScenariosTab(
                       companyData: widget.companyData,
                       session: _session,
+                      scenarioLoader: widget.scenarioLoader,
                     ),
                   ],
                 ),

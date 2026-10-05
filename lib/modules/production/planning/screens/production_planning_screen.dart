@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../planning_session_controller.dart';
+import '../planning_viewport.dart';
 import '../planning_workflow_scope.dart';
 import '../widgets/planning_engine_params_fields.dart';
 import '../widgets/planning_filters_bar.dart';
@@ -12,14 +13,13 @@ import '../widgets/planning_summary_kpi_row.dart';
 class ProductionPlanningScreen extends StatelessWidget {
   const ProductionPlanningScreen({super.key});
 
-  static const _wide = 1180.0;
-
   @override
   Widget build(BuildContext context) {
     final session = PlanningWorkflowScope.of(context);
     return LayoutBuilder(
       builder: (context, c) {
-        final wide = c.maxWidth >= _wide;
+        final wide = session.pool.isNotEmpty &&
+            PlanningViewport.ordersThreeColumn(context, c);
         if (wide) {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,

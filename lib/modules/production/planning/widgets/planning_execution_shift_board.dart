@@ -23,8 +23,14 @@ class PlanningExecutionShiftBoard extends StatefulWidget {
 }
 
 class _PlanningExecutionShiftBoardState extends State<PlanningExecutionShiftBoard> {
-  static final _orderSvc = ProductionOrderService();
-  static final _execSvc = ProductionExecutionService();
+  static ProductionOrderService? _orderSvcCache;
+  static ProductionExecutionService? _execSvcCache;
+
+  static ProductionOrderService get _orderSvc =>
+      _orderSvcCache ??= ProductionOrderService();
+
+  static ProductionExecutionService get _execSvc =>
+      _execSvcCache ??= ProductionExecutionService();
 
   Future<_BoardData>? _boardFuture;
   String? _loadKey;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/planning_scenario_record.dart';
 import '../planning_session_controller.dart';
+import '../planning_viewport.dart';
 import '../services/planning_scenario_service.dart';
 import '../widgets/planning_help_icon.dart';
 
@@ -11,10 +12,15 @@ class PlanningScenariosTab extends StatefulWidget {
     super.key,
     required this.companyData,
     required this.session,
+    this.scenarioLoader,
   });
 
   final Map<String, dynamic> companyData;
   final PlanningSessionController session;
+
+  /// When set, the tab does not call the scenario Callable.
+  /// Production leaves this null.
+  final Future<List<PlanningScenarioRecord>> Function()? scenarioLoader;
 
   @override
   State<PlanningScenariosTab> createState() => _PlanningScenariosTabState();
@@ -62,7 +68,10 @@ class _PlanningScenariosTabState extends State<PlanningScenariosTab> {
       _err = null;
     });
     try {
-      final list = await _svc.listScenarios(companyId: _cid, plantKey: _pk);
+      final loader = widget.scenarioLoader;
+      final list = loader != null
+          ? await loader()
+          : await _svc.listScenarios(companyId: _cid, plantKey: _pk);
       if (mounted) {
         setState(() {
           _rows = list;
@@ -254,7 +263,7 @@ class _PlanningScenariosTabState extends State<PlanningScenariosTab> {
 
 /// Scenariji: jedna kolona na telefonu, dva okna tek kad oba imaju širinu.
 class PlanningScenariosLayout extends StatelessWidget {
-  static const twoColumnMinWidth = 960.0;
+  static const twoColumnMinWidth = PlanningViewport.multiColumnMinWidth;
   static const introText =
       'Baseline / what-if, opcionalno vezan nacrt plana. Pisanje: Callable u pozadini.';
 
@@ -281,25 +290,34 @@ class PlanningScenariosLayout extends StatelessWidget {
       builder: (context, constraints) {
         final intro = _intro(context);
         final cards = [for (final r in rows) _card(r)];
-        if (constraints.maxWidth < twoColumnMinWidth) {
-          final bottom = MediaQuery.viewPaddingOf(context).bottom;
-          return ListView(
-            padding: EdgeInsets.fromLTRB(12, 8, 12, 16 + bottom),
-            children: [intro, ...cards, const SizedBox(height: 8), form],
-          );
-        }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              flex: 5,
-              child: ListView(
-                padding: const EdgeInsets.all(8),
-                children: [intro, ...cards],
-              ),
-            ),
-            Expanded(flex: 4, child: SingleChildScrollView(child: form)),
-          ],
+        final width = PlanningViewport.decisionWidth(context, constraints);
+        final multi = width >= twoColumnMinWidth;
+        final bottom = MediaQuery.viewPaddingOf(context).bottom;
+        final column = ListView(
+          padding: EdgeInsets.fromLTRB(12, 8, 12, 16 + bottom),
+          children: [intro, ...cards, const SizedBox(height: 8), form],
+        );
+        final body = multi
+            ? Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    flex: 5,
+                    child: ListView(
+                      padding: const EdgeInsets.all(8),
+                      children: [intro, ...cards],
+                    ),
+                  ),
+                  Expanded(
+                    flex: 4,
+                    child: SingleChildScrollView(child: form),
+                  ),
+                ],
+              )
+            : column;
+        return Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(width: width, child: body),
         );
       },
     );

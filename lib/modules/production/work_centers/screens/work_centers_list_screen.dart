@@ -3,6 +3,11 @@ import 'package:flutter/material.dart';
 import '../../../../core/access/production_access_helper.dart';
 import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/errors/app_error_mapper.dart';
+import '../../../../core/visual/operonix_collapsible_section.dart';
+import '../../../../core/visual/operonix_visual_tokens.dart';
+import '../../../../core/visual/premium/operonix_premium_icon.dart';
+import '../../../../core/visual/premium/premium_icon_accent.dart';
+import '../../../../core/visual/premium/premium_widgets.dart';
 import '../models/work_center_model.dart';
 import '../services/work_center_service.dart';
 import '../widgets/work_center_help.dart';
@@ -19,7 +24,7 @@ class WorkCentersListScreen extends StatefulWidget {
 }
 
 class _WorkCentersListScreenState extends State<WorkCentersListScreen> {
-  final WorkCenterService _service = WorkCenterService();
+  late final WorkCenterService _service = WorkCenterService();
 
   bool _filtersExpanded = false;
 
@@ -75,11 +80,35 @@ class _WorkCentersListScreenState extends State<WorkCentersListScreen> {
     _loadPlants();
   }
 
+  Future<void> _openCreate() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => WorkCenterCreateScreen(
+          companyData: widget.companyData,
+          initialPlantKey: _selectedPlantKey,
+        ),
+      ),
+    );
+    await _reloadList();
+  }
+
   Future<void> _loadPlants() async {
     if (_companyId.isEmpty) return;
-    final list = await CompanyPlantDisplayName.listSelectablePlants(
-      companyId: _companyId,
-    );
+    List<({String plantKey, String label})> list;
+    try {
+      list = await CompanyPlantDisplayName.listSelectablePlants(
+        companyId: _companyId,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _listLoading = false;
+        _listError = AppErrorMapper.toMessage(e);
+        _items = const [];
+      });
+      return;
+    }
     if (!mounted) return;
     var allowed = list;
     if (!_canSwitchPlant && _sessionPlantKey.isNotEmpty) {
@@ -192,6 +221,218 @@ class _WorkCentersListScreenState extends State<WorkCentersListScreen> {
     return '$t s';
   }
 
+  Widget _filterControls() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DropdownButtonFormField<String?>(
+          initialValue: _filterStatus,
+          isExpanded: true,
+          decoration: InputDecoration(
+            labelText: 'Status',
+            suffixIcon: WorkCenterInfoIcon(
+              title: WorkCenterHelpTexts.statusTitle,
+              message: WorkCenterHelpTexts.statusBody,
+            ),
+          ),
+          items: [
+            const DropdownMenuItem<String?>(value: null, child: Text('Svi')),
+            ...WorkCenter.selectableStatuses.map(
+              (e) => DropdownMenuItem<String?>(
+                value: e.key,
+                child: Text(e.value),
+              ),
+            ),
+          ],
+          onChanged: (v) => setState(() => _filterStatus = v),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String?>(
+          initialValue: _filterType,
+          isExpanded: true,
+          decoration: InputDecoration(
+            labelText: 'Tip radnog centra',
+            suffixIcon: WorkCenterInfoIcon(
+              title: WorkCenterHelpTexts.typeTitle,
+              message: WorkCenterHelpTexts.typeBody,
+            ),
+          ),
+          items: [
+            const DropdownMenuItem<String?>(value: null, child: Text('Svi')),
+            ...WorkCenter.selectableTypes.map(
+              (e) => DropdownMenuItem<String?>(
+                value: e.key,
+                child: Text(e.value),
+              ),
+            ),
+          ],
+          onChanged: (v) => setState(() => _filterType = v),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String?>(
+          initialValue: _filterOee,
+          isExpanded: true,
+          decoration: InputDecoration(
+            labelText: 'OEE relevantan',
+            suffixIcon: WorkCenterInfoIcon(
+              title: WorkCenterHelpTexts.oeeFlagTitle,
+              message: WorkCenterHelpTexts.oeeFlagBody,
+            ),
+          ),
+          items: const [
+            DropdownMenuItem<String?>(value: null, child: Text('Svi')),
+            DropdownMenuItem<String?>(value: 'yes', child: Text('Da')),
+            DropdownMenuItem<String?>(value: 'no', child: Text('Ne')),
+          ],
+          onChanged: (v) => setState(() => _filterOee = v),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String?>(
+          initialValue: _filterActive,
+          isExpanded: true,
+          decoration: InputDecoration(
+            labelText: 'Aktivno u šifrarniku',
+            suffixIcon: WorkCenterInfoIcon(
+              title: WorkCenterHelpTexts.activeTitle,
+              message: WorkCenterHelpTexts.activeBody,
+            ),
+          ),
+          items: const [
+            DropdownMenuItem<String?>(value: null, child: Text('Svi')),
+            DropdownMenuItem<String?>(value: 'active', child: Text('Aktivni')),
+            DropdownMenuItem<String?>(
+              value: 'inactive',
+              child: Text('Neaktivni'),
+            ),
+          ],
+          onChanged: (v) => setState(() => _filterActive = v),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPremiumScaffold() {
+    final tokens = OperonixVisualTokens.of(context);
+    final filtered = _applyFilters(_items).toList();
+    final emptyCopy = _items.isEmpty
+        ? 'Nema radnih centara na ovom pogonu. ${_canManage ? 'Dodajte prvi zapis.' : ''}'
+        : 'Nema zapisa za trenutne filtere.';
+    return Scaffold(
+      backgroundColor: tokens.pageBackground,
+      appBar: AppBar(
+        title: const Text('Radni centri'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            tooltip: WorkCenterHelpTexts.overviewTitle,
+            onPressed: () => showWorkCenterHelpDialog(
+              context,
+              title: WorkCenterHelpTexts.overviewTitle,
+              message: WorkCenterHelpTexts.overviewBody,
+            ),
+          ),
+        ],
+        bottom: _canManage
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(52),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8, bottom: 4),
+                    child: IconButton(
+                      tooltip: 'Dodaj',
+                      onPressed: _openCreate,
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                      ),
+                      icon: const OperonixPremiumIcon(
+                        glyph: OperonixPremiumGlyph.workCenter,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            : null,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        children: [
+          PremiumContextCard(
+            leading: const PremiumIconBadge(
+              icon: Icons.factory_outlined,
+              glyph: OperonixPremiumGlyph.plant,
+              role: PremiumIconRole.info,
+              size: 36,
+            ),
+            label: 'Pogon',
+            value: _plantLabel(_selectedPlantKey),
+          ),
+          const SizedBox(height: 10),
+          OperonixCollapsibleSection(
+            title: 'Filteri',
+            summary: 'Status, tip, OEE, aktivno',
+            expanded: _filtersExpanded,
+            glyph: OperonixPremiumGlyph.entryDate,
+            role: PremiumIconRole.info,
+            onToggle: () =>
+                setState(() => _filtersExpanded = !_filtersExpanded),
+            child: _filterControls(),
+          ),
+          const SizedBox(height: 12),
+          if (_listLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_listError != null)
+            PremiumEmptyState(
+              icon: Icons.error_outline,
+              glyph: OperonixPremiumGlyph.workCenter,
+              role: PremiumIconRole.warning,
+              title: _listError!,
+            )
+          else if (filtered.isEmpty)
+            PremiumEmptyState(
+              icon: Icons.precision_manufacturing_outlined,
+              glyph: OperonixPremiumGlyph.workCenter,
+              role: PremiumIconRole.active,
+              title: emptyCopy,
+            )
+          else
+            for (final wc in filtered) _workCenterCard(wc),
+        ],
+      ),
+    );
+  }
+
+  Widget _workCenterCard(WorkCenter wc) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: PremiumListCard(
+        icon: Icons.precision_manufacturing_outlined,
+        glyph: OperonixPremiumGlyph.workCenter,
+        role: PremiumIconRole.active,
+        title: '${wc.workCenterCode} | ${wc.name}',
+        subtitle:
+            '${WorkCenter.labelForType(wc.type)} · ${WorkCenter.labelForStatus(wc.status)} · ${_fmtCapacity(wc)}',
+        onTap: () async {
+          await Navigator.push<void>(
+            context,
+            MaterialPageRoute<void>(
+              builder: (_) => WorkCenterDetailsScreen(
+                companyData: widget.companyData,
+                workCenterId: wc.id,
+                plantKey: _selectedPlantKey,
+              ),
+            ),
+          );
+          await _reloadList();
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_companyId.isEmpty || _selectedPlantKey.isEmpty) {
@@ -203,6 +444,10 @@ class _WorkCentersListScreenState extends State<WorkCentersListScreen> {
           ),
         ),
       );
+    }
+
+    if (OperonixVisualTokens.of(context).isPremium) {
+      return _buildPremiumScaffold();
     }
 
     return Scaffold(
@@ -222,18 +467,7 @@ class _WorkCentersListScreenState extends State<WorkCentersListScreen> {
       ),
       floatingActionButton: _canManage
           ? FloatingActionButton.extended(
-              onPressed: () async {
-                await Navigator.push<void>(
-                  context,
-                  MaterialPageRoute<void>(
-                    builder: (_) => WorkCenterCreateScreen(
-                      companyData: widget.companyData,
-                      initialPlantKey: _selectedPlantKey,
-                    ),
-                  ),
-                );
-                await _reloadList();
-              },
+              onPressed: _openCreate,
               icon: const Icon(Icons.add),
               label: const Text('Dodaj'),
             )

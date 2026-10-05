@@ -220,7 +220,10 @@ class _PlanningOrderPoolTableState extends State<PlanningOrderPoolTable> {
 
           return LayoutBuilder(
             builder: (context, constraints) {
-              if (!constraints.hasBoundedHeight) {
+              final empty = !session.loadingPool &&
+                  session.poolError == null &&
+                  session.pool.isEmpty;
+              if (empty || !constraints.hasBoundedHeight) {
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
