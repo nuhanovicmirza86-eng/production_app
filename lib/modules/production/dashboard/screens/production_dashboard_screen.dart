@@ -11,6 +11,7 @@ import 'package:production_app/core/visual/app_appearance_selector.dart';
 import 'package:production_app/core/visual/operonix_desktop_shell.dart';
 import 'package:production_app/core/visual/operonix_shell_metrics.dart';
 import 'package:production_app/core/visual/operonix_visual_tokens.dart';
+import 'package:production_app/core/visual/premium/premium_company_logo_plate.dart';
 import 'package:production_app/core/visual/premium/premium_type.dart';
 import 'package:production_app/core/visual/premium/premium_widgets.dart';
 import 'package:production_app/screens/about_screen.dart';
@@ -1444,7 +1445,7 @@ class _SessionHeaderCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _CompanyHeaderLogo(candidates: logoCandidates, size: 52),
+            ProductionCompanyHeaderLogo(candidates: logoCandidates, size: 52),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -1476,7 +1477,7 @@ class _SessionHeaderCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _CompanyHeaderLogo(candidates: logoCandidates),
+            ProductionCompanyHeaderLogo(candidates: logoCandidates),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -1506,21 +1507,26 @@ class _SessionHeaderCard extends StatelessWidget {
   }
 }
 
-class _CompanyHeaderLogo extends StatefulWidget {
+class ProductionCompanyHeaderLogo extends StatefulWidget {
   final List<String> candidates;
   final double size;
 
-  const _CompanyHeaderLogo({required this.candidates, this.size = 56});
+  const ProductionCompanyHeaderLogo({
+    super.key,
+    required this.candidates,
+    this.size = 56,
+  });
 
   @override
-  State<_CompanyHeaderLogo> createState() => _CompanyHeaderLogoState();
+  State<ProductionCompanyHeaderLogo> createState() =>
+      _CompanyHeaderLogoState();
 }
 
-class _CompanyHeaderLogoState extends State<_CompanyHeaderLogo> {
+class _CompanyHeaderLogoState extends State<ProductionCompanyHeaderLogo> {
   int _candidateIndex = 0;
 
   @override
-  void didUpdateWidget(covariant _CompanyHeaderLogo oldWidget) {
+  void didUpdateWidget(covariant ProductionCompanyHeaderLogo oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.candidates != widget.candidates) {
       _candidateIndex = 0;
@@ -1534,10 +1540,91 @@ class _CompanyHeaderLogoState extends State<_CompanyHeaderLogo> {
     }
   }
 
+  Widget _networkImage({
+    required String url,
+    required BoxFit fit,
+    required EdgeInsets padding,
+    required Widget placeholder,
+    bool expand = false,
+  }) {
+    return Padding(
+      padding: padding,
+      child: Image.network(
+        url,
+        key: ValueKey<String>(url),
+        width: expand ? null : widget.size,
+        height: expand ? null : widget.size,
+        fit: fit,
+        alignment: Alignment.center,
+        webHtmlElementStrategy: kIsWeb
+            ? WebHtmlElementStrategy.prefer
+            : WebHtmlElementStrategy.never,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded /
+                          loadingProgress.expectedTotalBytes!
+                    : null,
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          if (_candidateIndex < widget.candidates.length - 1) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _tryNextCandidate();
+            });
+          }
+          return placeholder;
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final tokens = OperonixVisualTokens.of(context);
+    if (tokens.isPremium) {
+      Widget premiumPlaceholder() {
+        return const ColoredBox(
+          color: PremiumCompanyLogoPlate.plateColor,
+          child: Icon(
+            Icons.apartment_outlined,
+            size: 30,
+            color: Color(0xFF1B2433),
+          ),
+        );
+      }
+
+      final urls = widget.candidates;
+      if (urls.isEmpty) {
+        return PremiumCompanyLogoPlate(
+          size: widget.size,
+          child: premiumPlaceholder(),
+        );
+      }
+      final safeIndex = _candidateIndex.clamp(0, urls.length - 1);
+      final u = urls[safeIndex].trim();
+      return PremiumCompanyLogoPlate(
+        size: widget.size,
+        child: SizedBox.expand(
+          child: _networkImage(
+            url: u,
+            fit: BoxFit.contain,
+            padding: EdgeInsets.zero,
+            placeholder: premiumPlaceholder(),
+            expand: true,
+          ),
+        ),
+      );
+    }
     final border = Border.all(
       color: tokens.moduleAccent.withValues(alpha: 0.5),
       width: tokens.cardBorderWidth,
