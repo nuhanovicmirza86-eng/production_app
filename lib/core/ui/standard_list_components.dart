@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../visual/operonix_visual_tokens.dart';
+import '../visual/visual_style.dart';
 
 class KpiMetric {
   final String label;
@@ -229,14 +230,18 @@ class StandardFilterPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final tokens = OperonixVisualTokens.of(context);
+    final premium = tokens.style == VisualStyle.premium;
     final summaryText = (summary ?? '').trim();
     return Material(
-      color: cs.surface,
+      color: premium ? tokens.surfaceElevated : cs.surface,
       elevation: 0,
       shadowColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: cs.outlineVariant),
+        side: premium
+            ? BorderSide.none
+            : BorderSide(color: cs.outlineVariant),
       ),
       child: Column(
         children: [

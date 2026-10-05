@@ -178,6 +178,9 @@ class OperonixVisualTheme {
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: tokens.surfaceElevated,
         surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
       ),
       popupMenuTheme: PopupMenuThemeData(
         color: tokens.surfaceElevated,
@@ -283,6 +286,30 @@ class OperonixVisualTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: tokens.surfaceElevated,
         surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        titleTextStyle: TextStyle(
+          color: tokens.primaryText,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      dataTableTheme: DataTableThemeData(
+        headingRowColor: WidgetStatePropertyAll(tokens.surfaceInteractive),
+        headingTextStyle: TextStyle(
+          color: tokens.primaryText,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+        ),
+        dataTextStyle: TextStyle(color: tokens.primaryText, fontSize: 13),
+        dividerThickness: 1,
+      ),
+      datePickerTheme: DatePickerThemeData(
+        backgroundColor: tokens.surfaceElevated,
+        headerBackgroundColor: tokens.surface,
+        headerForegroundColor: tokens.primaryText,
+        dayForegroundColor: WidgetStatePropertyAll(tokens.primaryText),
+        todayForegroundColor: WidgetStatePropertyAll(tokens.primaryAccent),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: tokens.surfaceInteractive,
