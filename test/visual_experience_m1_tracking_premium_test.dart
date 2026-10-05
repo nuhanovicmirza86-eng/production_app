@@ -35,7 +35,10 @@ void main() {
 
       expect(operonix.scaffoldBackgroundColor, const Color(0xFF0A1020));
       expect(operonix.brightness, Brightness.dark);
-      expect(operonix.extension<OperonixVisualTokens>()!.style, VisualStyle.premium);
+      expect(
+        operonix.extension<OperonixVisualTokens>()!.style,
+        VisualStyle.premium,
+      );
 
       expect(night.scaffoldBackgroundColor, const Color(0xFF05080C));
       expect(night.brightness, Brightness.dark);
@@ -49,11 +52,20 @@ void main() {
         light.extension<OperonixVisualTokens>()!.primaryText,
         const Color(0xFF1B2430),
       );
-      expect(light.extension<OperonixVisualTokens>()!.style, VisualStyle.premium);
+      expect(
+        light.extension<OperonixVisualTokens>()!.style,
+        VisualStyle.premium,
+      );
 
-      final canvases = themes.values.map((t) => t.scaffoldBackgroundColor).toSet();
-      final surfaces = themes.values.map((t) => t.appBarTheme.backgroundColor).toSet();
-      final accents = themes.values.map((t) => t.tabBarTheme.labelColor).toSet();
+      final canvases = themes.values
+          .map((t) => t.scaffoldBackgroundColor)
+          .toSet();
+      final surfaces = themes.values
+          .map((t) => t.appBarTheme.backgroundColor)
+          .toSet();
+      final accents = themes.values
+          .map((t) => t.tabBarTheme.labelColor)
+          .toSet();
       expect(canvases, hasLength(3));
       expect(surfaces, hasLength(3));
       expect(accents, hasLength(3));
@@ -76,13 +88,22 @@ void main() {
         premium: true,
       );
       expect(custom.brightness, Brightness.light);
-      expect(custom.scaffoldBackgroundColor.computeLuminance(), greaterThan(0.7));
+      expect(
+        custom.scaffoldBackgroundColor.computeLuminance(),
+        greaterThan(0.7),
+      );
       expect(custom.colorScheme.primary, Colors.purple);
       expect(
-        custom.extension<OperonixVisualTokens>()!.primaryText.computeLuminance(),
+        custom
+            .extension<OperonixVisualTokens>()!
+            .primaryText
+            .computeLuminance(),
         lessThan(0.2),
       );
-      expect(custom.extension<OperonixVisualTokens>()!.style, VisualStyle.premium);
+      expect(
+        custom.extension<OperonixVisualTokens>()!.style,
+        VisualStyle.premium,
+      );
     });
 
     test('palette tokens apply immediately from the station appearance', () {
@@ -133,7 +154,9 @@ void main() {
       expect(station.scaffoldBackgroundColor, const Color(0xFFF5F8FB));
     });
 
-    testWidgets('button theme stays out of the Premium workflow', (tester) async {
+    testWidgets('button theme stays out of the Premium workflow', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: OperonixVisualTheme.premiumMidnight(),
@@ -149,7 +172,9 @@ void main() {
       expect(find.text('Zelena'), findsNothing);
     });
 
-    testWidgets('Classic workflow still shows the button theme', (tester) async {
+    testWidgets('Classic workflow still shows the button theme', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: OperonixVisualTheme.classic(),
@@ -166,40 +191,41 @@ void main() {
       expect(find.text('Plava'), findsOneWidget);
     });
 
-    testWidgets('palette dialog still exposes station theme and button colors', (
-      tester,
-    ) async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: OperonixVisualTheme.premiumMidnight(),
-          home: Builder(
-            builder: (context) {
-              return Scaffold(
-                body: TextButton(
-                  onPressed: () {
-                    showStationAppearanceEditorDialog(
-                      context: context,
-                      current: const StationScreenAppearance(),
-                      showButtonAccent: true,
-                    );
-                  },
-                  child: const Text('Otvori paletu'),
-                ),
-              );
-            },
+    testWidgets(
+      'palette dialog still exposes station theme and button colors',
+      (tester) async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: OperonixVisualTheme.premiumMidnight(),
+            home: Builder(
+              builder: (context) {
+                return Scaffold(
+                  body: TextButton(
+                    onPressed: () {
+                      showStationAppearanceEditorDialog(
+                        context: context,
+                        current: const StationScreenAppearance(),
+                        showButtonAccent: true,
+                      );
+                    },
+                    child: const Text('Otvori paletu'),
+                  ),
+                );
+              },
+            ),
           ),
-        ),
-      );
-      await tester.tap(find.text('Otvori paletu'));
-      await tester.pumpAndSettle();
-      expect(find.text('Operonix (brend)'), findsOneWidget);
-      expect(find.text('Tema radnog prostora'), findsOneWidget);
-      expect(find.text('Boja operativnih akcija'), findsOneWidget);
-      expect(find.text('Tema gumba'), findsNothing);
-      expect(find.text('Zelena'), findsOneWidget);
-      expect(find.text('Ljubičasta'), findsOneWidget);
-    });
+        );
+        await tester.tap(find.text('Otvori paletu'));
+        await tester.pumpAndSettle();
+        expect(find.text('Operonix (brend)'), findsOneWidget);
+        expect(find.text('Tema radnog prostora'), findsOneWidget);
+        expect(find.text('Boja operativnih akcija'), findsOneWidget);
+        expect(find.text('Tema gumba'), findsNothing);
+        expect(find.text('Zelena'), findsOneWidget);
+        expect(find.text('Ljubičasta'), findsOneWidget);
+      },
+    );
 
     testWidgets('entry mode and scan actions keep their callbacks', (
       tester,
@@ -252,10 +278,12 @@ void main() {
       expect(find.byType(OutlinedButton), findsOneWidget);
 
       final surface = tester.widget<Material>(
-        find.descendant(
-          of: find.byType(PremiumSurfaceCard),
-          matching: find.byType(Material),
-        ).first,
+        find
+            .descendant(
+              of: find.byType(PremiumSurfaceCard),
+              matching: find.byType(Material),
+            )
+            .first,
       );
       expect(surface.color, const Color(0xFF182338));
       expect(
@@ -264,7 +292,9 @@ void main() {
       );
     });
 
-    testWidgets('Classic scan actions stay filled, not outlined', (tester) async {
+    testWidgets('Classic scan actions stay filled, not outlined', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: OperonixVisualTheme.classic(),
@@ -314,14 +344,8 @@ void main() {
         qualityPremiumSectionForTitle('Moje otvorene akcije'),
         'Prioritet',
       );
-      expect(
-        qualityPremiumSectionForTitle('Metodologija · IATF'),
-        'Sistem',
-      );
-      expect(
-        qualityPremiumSectionForTitle('PFMEA (proces)'),
-        'Planiranje',
-      );
+      expect(qualityPremiumSectionForTitle('Metodologija · IATF'), 'Sistem');
+      expect(qualityPremiumSectionForTitle('PFMEA (proces)'), 'Planiranje');
       expect(
         qualityPremiumSectionForTitle('Izvještaj za vodstvo'),
         'Izvještavanje',
@@ -348,10 +372,17 @@ void main() {
         ),
       );
       expect(tester.takeException(), isNull);
+      expect(find.text('Kontekst unosa'), findsOneWidget);
+      expect(find.textContaining('2026-10-04'), findsWidgets);
+      expect(find.textContaining('Brizganje (BR)'), findsOneWidget);
+      expect(find.text('Radni dan'), findsNothing);
+
+      await tester.tap(find.text('Kontekst unosa'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
       expect(find.text('Radni dan'), findsOneWidget);
       expect(find.text('Datum unosa'), findsOneWidget);
       expect(find.text('Pogon'), findsOneWidget);
-      expect(find.text('Brizganje (BR)'), findsOneWidget);
     });
 
     testWidgets('premium kpi panel is one surface and widens on desktop', (
@@ -447,8 +478,14 @@ void main() {
       );
       for (final action in PreparationStationUiPrefs.accentColors) {
         final themed = premiumTrackingActionTheme(workspace, action);
-        expect(themed.scaffoldBackgroundColor, workspace.scaffoldBackgroundColor);
-        expect(themed.appBarTheme.backgroundColor, workspace.appBarTheme.backgroundColor);
+        expect(
+          themed.scaffoldBackgroundColor,
+          workspace.scaffoldBackgroundColor,
+        );
+        expect(
+          themed.appBarTheme.backgroundColor,
+          workspace.appBarTheme.backgroundColor,
+        );
         expect(themed.tabBarTheme.labelColor, workspace.tabBarTheme.labelColor);
         final bg = themed.filledButtonTheme.style!.backgroundColor!.resolve(
           const <WidgetState>{},
@@ -461,7 +498,9 @@ void main() {
       }
     });
 
-    testWidgets('every saved action color recolors Skeniraj QR', (tester) async {
+    testWidgets('every saved action color recolors Skeniraj QR', (
+      tester,
+    ) async {
       for (final action in PreparationStationUiPrefs.accentColors) {
         await tester.pumpWidget(
           MaterialApp(
@@ -481,8 +520,12 @@ void main() {
         final button = tester.widget<FilledButton>(
           find.widgetWithText(FilledButton, 'Skeniraj QR'),
         );
-        final bg = button.style!.backgroundColor!.resolve(const <WidgetState>{});
-        final fg = button.style!.foregroundColor!.resolve(const <WidgetState>{});
+        final bg = button.style!.backgroundColor!.resolve(
+          const <WidgetState>{},
+        );
+        final fg = button.style!.foregroundColor!.resolve(
+          const <WidgetState>{},
+        );
         expect(bg, action);
         expect(premiumContrast(bg!, fg!), greaterThanOrEqualTo(3));
       }

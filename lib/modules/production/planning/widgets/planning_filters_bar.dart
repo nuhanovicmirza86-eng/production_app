@@ -38,7 +38,8 @@ class PlanningFiltersBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     final s = session;
-    final anyFilter = s.poolFilterHasMachine ||
+    final anyFilter =
+        s.poolFilterHasMachine ||
         s.poolFilterDueWithinDays != null ||
         s.poolFilterNoMachine ||
         s.poolFilterMachineId != null ||
@@ -73,24 +74,29 @@ class PlanningFiltersBar extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           'Rok (tražena isporuka u manje od N dana od sada, uklj. dospjele).',
-          style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
+          style: t.textTheme.bodySmall?.copyWith(
+            color: t.colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 6),
-        SegmentedButton<int>(
-          segments: [0, 3, 7, 14].map((k) {
-            return ButtonSegment<int>(
-              value: k,
-              label: Text(_dueSegments[k]!),
-            );
-          }).toList(),
-          showSelectedIcon: false,
-          selected: {_dueToSegment()},
-          onSelectionChanged: s.isLocked
-              ? null
-              : (Set<int> n) {
-                  final v = n.first;
-                  s.setPoolFilterDueWithinDays(_dueFromSegment(v));
-                },
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SegmentedButton<int>(
+            segments: [0, 3, 7, 14].map((k) {
+              return ButtonSegment<int>(
+                value: k,
+                label: Text(_dueSegments[k]!),
+              );
+            }).toList(),
+            showSelectedIcon: false,
+            selected: {_dueToSegment()},
+            onSelectionChanged: s.isLocked
+                ? null
+                : (Set<int> n) {
+                    final v = n.first;
+                    s.setPoolFilterDueWithinDays(_dueFromSegment(v));
+                  },
+          ),
         ),
         const SizedBox(height: 10),
         Wrap(
@@ -121,7 +127,8 @@ class PlanningFiltersBar extends StatelessWidget {
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String?>(
               isExpanded: true,
-              value: s.poolFilterMachineId != null &&
+              value:
+                  s.poolFilterMachineId != null &&
                       machineOpts.any((e) => e.id == s.poolFilterMachineId)
                   ? s.poolFilterMachineId
                   : null,
@@ -145,7 +152,10 @@ class PlanningFiltersBar extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Text('Segment (naziv operacije na nalogu)', style: t.textTheme.labelLarge),
+        Text(
+          'Segment (naziv operacije na nalogu)',
+          style: t.textTheme.labelLarge,
+        ),
         const SizedBox(height: 4),
         InputDecorator(
           decoration: const InputDecoration(
@@ -156,12 +166,15 @@ class PlanningFiltersBar extends StatelessWidget {
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String?>(
               isExpanded: true,
-              value: s.poolFilterOperationName != null &&
+              value:
+                  s.poolFilterOperationName != null &&
                       opNames.contains(s.poolFilterOperationName)
                   ? s.poolFilterOperationName
                   : null,
               hint: Text(
-                opNames.isEmpty ? 'Nema podataka u učitanoj listi' : 'Svi segmenti',
+                opNames.isEmpty
+                    ? 'Nema podataka u učitanoj listi'
+                    : 'Svi segmenti',
               ),
               items: [
                 const DropdownMenuItem<String?>(
@@ -193,12 +206,19 @@ class PlanningFiltersBar extends StatelessWidget {
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String?>(
               isExpanded: true,
-              value: s.poolFilterLineId != null && lineOpts.any((e) => e.id == s.poolFilterLineId)
+              value:
+                  s.poolFilterLineId != null &&
+                      lineOpts.any((e) => e.id == s.poolFilterLineId)
                   ? s.poolFilterLineId
                   : null,
-              hint: Text(lineOpts.isEmpty ? 'Nema lineId u listi' : 'Sve linije'),
+              hint: Text(
+                lineOpts.isEmpty ? 'Nema lineId u listi' : 'Sve linije',
+              ),
               items: [
-                const DropdownMenuItem<String?>(value: null, child: Text('Sve linije')),
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('Sve linije'),
+                ),
                 ...lineOpts.map(
                   (e) => DropdownMenuItem<String?>(
                     value: e.id,
@@ -206,7 +226,9 @@ class PlanningFiltersBar extends StatelessWidget {
                   ),
                 ),
               ],
-              onChanged: s.isLocked || lineOpts.isEmpty ? null : s.setPoolFilterLineId,
+              onChanged: s.isLocked || lineOpts.isEmpty
+                  ? null
+                  : s.setPoolFilterLineId,
             ),
           ),
         ),
@@ -222,7 +244,8 @@ class PlanningFiltersBar extends StatelessWidget {
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String?>(
               isExpanded: true,
-              value: s.poolFilterCustomerName != null &&
+              value:
+                  s.poolFilterCustomerName != null &&
                       customers.contains(s.poolFilterCustomerName)
                   ? s.poolFilterCustomerName
                   : null,
@@ -230,7 +253,10 @@ class PlanningFiltersBar extends StatelessWidget {
                 customers.isEmpty ? 'Nema kupca u učitanoj listi' : 'Svi kupci',
               ),
               items: [
-                const DropdownMenuItem<String?>(value: null, child: Text('Svi kupci')),
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('Svi kupci'),
+                ),
                 ...customers.map(
                   (name) => DropdownMenuItem<String?>(
                     value: name,
@@ -238,14 +264,18 @@ class PlanningFiltersBar extends StatelessWidget {
                   ),
                 ),
               ],
-              onChanged: s.isLocked || customers.isEmpty ? null : s.setPoolFilterCustomerName,
+              onChanged: s.isLocked || customers.isEmpty
+                  ? null
+                  : s.setPoolFilterCustomerName,
             ),
           ),
         ),
         const SizedBox(height: 8),
         Text(
           'Alat / work-centar: kad budu u modelu naloga (ili routingu), ovdje se mogu proširiti; segment i stroj već slijede podatke s naloga.',
-          style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
+          style: t.textTheme.bodySmall?.copyWith(
+            color: t.colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     );

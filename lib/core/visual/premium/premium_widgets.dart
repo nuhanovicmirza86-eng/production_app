@@ -131,12 +131,12 @@ class PremiumIconBadge extends StatelessWidget {
         ),
       ),
       child: mark != null
-          ? OperonixPremiumIcon(
-              glyph: mark,
+          ? OperonixPremiumIcon(glyph: mark, color: accent, size: box * 0.82)
+          : Icon(
+              icon ?? Icons.circle_outlined,
+              size: box * 0.62,
               color: accent,
-              size: box * 0.82,
-            )
-          : Icon(icon ?? Icons.circle_outlined, size: box * 0.62, color: accent),
+            ),
     );
   }
 }
@@ -214,10 +214,7 @@ class PremiumContextCard extends StatelessWidget {
               ],
             ),
           ),
-          if (trailing != null) ...[
-            const SizedBox(width: 8),
-            trailing!,
-          ],
+          if (trailing != null) ...[const SizedBox(width: 8), trailing!],
         ],
       ),
     );
@@ -306,11 +303,7 @@ class PremiumListCard extends StatelessWidget {
           ),
         ),
         ?trailing,
-        Icon(
-          Icons.chevron_right,
-          color: tokens.secondaryText,
-          size: 22,
-        ),
+        Icon(Icons.chevron_right, color: tokens.secondaryText, size: 22),
       ],
     );
     if (flush) {
@@ -406,15 +399,13 @@ class PremiumKpiGrid extends StatelessWidget {
           child: Column(
             children: [
               for (var r = 0; r < rows.length; r++) ...[
-                if (r > 0)
-                  Container(height: 1, color: tokens.divider),
+                if (r > 0) Container(height: 1, color: tokens.divider),
                 IntrinsicHeight(
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       for (var c = 0; c < rows[r].length; c++) ...[
-                        if (c > 0)
-                          Container(width: 1, color: tokens.divider),
+                        if (c > 0) Container(width: 1, color: tokens.divider),
                         Expanded(child: rows[r][c]),
                       ],
                     ],
@@ -456,8 +447,7 @@ class PremiumResponsiveGrid extends StatelessWidget {
           );
         }
         final cols = constraints.maxWidth >= 1100 ? 3 : 2;
-        final width =
-            (constraints.maxWidth - 12 * (cols - 1)) / cols;
+        final width = (constraints.maxWidth - 12 * (cols - 1)) / cols;
         return Wrap(
           spacing: 12,
           runSpacing: 12,
@@ -477,6 +467,8 @@ class PremiumFilterCard extends StatelessWidget {
   final int activeCount;
   final VoidCallback onToggle;
   final Widget child;
+  final OperonixPremiumGlyph? glyph;
+  final PremiumIconRole role;
 
   const PremiumFilterCard({
     super.key,
@@ -486,6 +478,8 @@ class PremiumFilterCard extends StatelessWidget {
     required this.onToggle,
     required this.child,
     this.activeCount = 0,
+    this.glyph,
+    this.role = PremiumIconRole.info,
   });
 
   @override
@@ -502,9 +496,10 @@ class PremiumFilterCard extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
               child: Row(
                 children: [
-                  const PremiumIconBadge(
+                  PremiumIconBadge(
                     icon: Icons.filter_alt_outlined,
-                    role: PremiumIconRole.info,
+                    glyph: glyph,
+                    role: role,
                     size: 36,
                   ),
                   const SizedBox(width: 12),
@@ -544,11 +539,17 @@ class PremiumFilterCard extends StatelessWidget {
               ),
             ),
           ),
-          if (expanded)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: child,
-            ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: expanded
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    child: child,
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
         ],
       ),
     );
@@ -620,12 +621,7 @@ class PremiumEmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          PremiumIconBadge(
-            icon: icon,
-            glyph: resolved,
-            role: role,
-            size: 52,
-          ),
+          PremiumIconBadge(icon: icon, glyph: resolved, role: role, size: 52),
           const SizedBox(height: 14),
           Text(
             title,

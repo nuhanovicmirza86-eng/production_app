@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/company_plant_display_name.dart';
 import '../../../../core/access/production_access_helper.dart';
+import '../../../../core/visual/operonix_collapsible_section.dart';
 import '../../../../core/visual/operonix_empty_state.dart';
 import '../../../../core/visual/operonix_visual_tokens.dart';
+import '../../../../core/visual/premium/operonix_premium_icon.dart';
 import '../../../../core/visual/premium/premium_icon_accent.dart';
 import '../../../../core/visual/premium/premium_widgets.dart';
 import '../../../../core/date/date_range_utils.dart';
@@ -103,6 +105,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_onOrdersTabChanged);
     if (widget.initialStatusFilter != null) {
       _selectedStatus = widget.initialStatusFilter!;
     }
@@ -117,10 +120,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
 
   /// Povlačenje + nalozi (npr. nakon pull-to-refresh) da se šifrarnik RC uskladi s filterom.
   Future<void> _refreshListData() async {
-    await Future.wait<void>([
-      _loadWorkCenters(),
-      _loadOrders(),
-    ]);
+    await Future.wait<void>([_loadWorkCenters(), _loadOrders()]);
   }
 
   Future<void> _loadWorkCenters() async {
@@ -137,8 +137,14 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
     }
   }
 
+  void _onOrdersTabChanged() {
+    if (_tabController.indexIsChanging || !mounted) return;
+    setState(() {});
+  }
+
   @override
   void dispose() {
+    _tabController.removeListener(_onOrdersTabChanged);
     _tabController.dispose();
     _stockDebounce?.cancel();
     _searchController.dispose();
@@ -491,9 +497,7 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
       );
     }
     final k = _filterWorkCenterKey;
-    if (k != null &&
-        k != '__none__' &&
-        !items.any((e) => e.value == k)) {
+    if (k != null && k != '__none__' && !items.any((e) => e.value == k)) {
       items.add(
         DropdownMenuItem<String?>(
           value: k,
@@ -948,8 +952,8 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
 
         void infoAction() {
           showDialog(
-      barrierDismissible: false,
-      context: context,
+            barrierDismissible: false,
+            context: context,
             builder: (_) => AlertDialog(
               title: const Text('Proizvodni nalozi'),
               content: const Text(
@@ -1185,21 +1189,12 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
         _buildStatusDateFilters(),
       ],
     );
-    if (OperonixVisualTokens.of(context).isPremium) {
-      return PremiumFilterCard(
-        title: 'Pretraga i filteri',
-        summary: 'Status, datum, proces',
-        expanded: _searchStripExpanded,
-        activeCount: _searchStripActiveCount,
-        onToggle: () =>
-            setState(() => _searchStripExpanded = !_searchStripExpanded),
-        child: filters,
-      );
-    }
-    return StandardFilterPanel(
+    return OperonixCollapsibleSection(
       title: 'Pretraga i filteri',
+      summary: 'Status, datum, proces',
       expanded: _searchStripExpanded,
       activeCount: _searchStripActiveCount,
+      glyph: OperonixPremiumGlyph.tableColumns,
       onToggle: () =>
           setState(() => _searchStripExpanded = !_searchStripExpanded),
       child: filters,
@@ -1866,95 +1861,61 @@ class _ProductionOrdersListScreenState extends State<ProductionOrdersListScreen>
             ? loadingBody()
             : _error != null
             ? errorBody()
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildHeader(),
-                        const SizedBox(height: 16),
-                        _buildKpis(),
-                        const SizedBox(height: 12),
-                        _buildSearchAndFiltersStrip(),
-                      ],
-                    ),
-                  ),
-                  if (list.isEmpty)
-                    Expanded(
-                      child: tokens.isPremium
-                          ? Align(
-                              alignment: Alignment.topCenter,
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  16,
-                                  12,
-                                  16,
-                                  24,
-                                ),
-                                child: emptyBody(),
-                              ),
+            : RefreshIndicator(
+                onRefresh: _refreshListData,
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                      sliver: SliverList(
+                        delegate: SliverChildListDelegate([
+                          _buildHeader(),
+                          const SizedBox(height: 16),
+                          _buildKpis(),
+                          const SizedBox(height: 12),
+                          _buildSearchAndFiltersStrip(),
+                          if (list.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: emptyBody(),
                             )
-                          : emptyBody(),
-                    )
-                  else ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _buildReportMetaLine(),
-                          Material(
-                            color: Theme.of(context).colorScheme.surface,
-                            borderRadius: BorderRadius.circular(12),
-                            clipBehavior: Clip.antiAlias,
-                            child: TabBar(
-                              controller: _tabController,
-                              labelColor: Theme.of(context).colorScheme.primary,
-                              unselectedLabelColor: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                              tabs: const [
-                                Tab(text: 'Zalihe i status'),
-                                Tab(text: 'Izvještaj'),
-                              ],
+                          else ...[
+                            _buildReportMetaLine(),
+                            Material(
+                              color: Theme.of(context).colorScheme.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              clipBehavior: Clip.antiAlias,
+                              child: TabBar(
+                                controller: _tabController,
+                                labelColor: Theme.of(
+                                  context,
+                                ).colorScheme.primary,
+                                unselectedLabelColor: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                                tabs: const [
+                                  Tab(text: 'Zalihe i status'),
+                                  Tab(text: 'Izvještaj'),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: RefreshIndicator(
-                        onRefresh: _refreshListData,
-                        child: TabBarView(
-                          controller: _tabController,
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          children: [
-                            ListView(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                              children: [
-                                if (_stockLoading)
-                                  const Padding(
-                                    padding: EdgeInsets.only(bottom: 8),
-                                    child: LinearProgressIndicator(
-                                      minHeight: 3,
-                                    ),
-                                  ),
-                                _buildGroupedPnTables(list),
-                              ],
-                            ),
-                            ListView(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                              children: [_buildReportGroupedTables(list)],
-                            ),
+                            if (_stockLoading && _tabController.index == 0)
+                              const Padding(
+                                padding: EdgeInsets.only(top: 8),
+                                child: LinearProgressIndicator(minHeight: 3),
+                              ),
+                            const SizedBox(height: 8),
+                            if (_tabController.index == 0)
+                              _buildGroupedPnTables(list)
+                            else
+                              _buildReportGroupedTables(list),
                           ],
-                        ),
+                        ]),
                       ),
                     ),
                   ],
-                ],
+                ),
               ),
       ),
     );

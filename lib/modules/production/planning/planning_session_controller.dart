@@ -20,12 +20,7 @@ import 'services/production_plan_persistence_service.dart';
 
 /// Zajedničko stanje planiranja za [ProductionPlanningHomeScreen] i tabove.
 class PlanningSessionController extends ChangeNotifier {
-  PlanningSessionController(this.companyId, this.plantKey)
-      : _engine = PlanningEngineService(),
-        _orderService = ProductionOrderService(),
-        _persistence = ProductionPlanPersistenceService(),
-        _executionService = ProductionExecutionService(),
-        _varianceService = PlanningExecutionVarianceService() {
+  PlanningSessionController(this.companyId, this.plantKey) {
     perfController = TextEditingController(text: '0.65');
     setupController = TextEditingController(text: '30');
     cycleController = TextEditingController(text: '60');
@@ -34,11 +29,14 @@ class PlanningSessionController extends ChangeNotifier {
   final String companyId;
   final String plantKey;
 
-  final PlanningEngineService _engine;
-  final ProductionOrderService _orderService;
-  final ProductionPlanPersistenceService _persistence;
-  final ProductionExecutionService _executionService;
-  final PlanningExecutionVarianceService _varianceService;
+  late final PlanningEngineService _engine = PlanningEngineService();
+  late final ProductionOrderService _orderService = ProductionOrderService();
+  late final ProductionPlanPersistenceService _persistence =
+      ProductionPlanPersistenceService();
+  late final ProductionExecutionService _executionService =
+      ProductionExecutionService();
+  late final PlanningExecutionVarianceService _varianceService =
+      PlanningExecutionVarianceService();
 
   late final TextEditingController perfController;
   late final TextEditingController setupController;
@@ -50,9 +48,12 @@ class PlanningSessionController extends ChangeNotifier {
   String? errorMessage;
   bool saving = false;
   int horizonDays = 14;
+
   /// F4.3 — redoslijed naloga u FCS: EDD (rok) ili SPT (kraći procijenjeni posao prvi).
-  PlanningScheduleStrategy scheduleStrategy = PlanningScheduleStrategy.eddDueDate;
+  PlanningScheduleStrategy scheduleStrategy =
+      PlanningScheduleStrategy.eddDueDate;
   int scenarioIndex = 0;
+
   /// 0=smjena, 1=dan, 2=tjedan (povezat će se s MES/šiftom kasnije).
   int timeScopeIndex = 1;
 
@@ -62,6 +63,7 @@ class PlanningSessionController extends ChangeNotifier {
   bool loadingPool = true;
   String? poolError;
   String searchQuery = '';
+
   /// Povećava se ručno (gumb) da se u Provedbi ponovo učitaju MES očitavanja.
   int mesBoardRefreshToken = 0;
 
@@ -72,22 +74,29 @@ class PlanningSessionController extends ChangeNotifier {
 
   /// Brzi filteri prikaza poola (AND). Povezivanje s master filterima = kasnije.
   bool poolFilterHasMachine = false;
+
   /// `null` = ne filtrirati. Inače: [requestedDeliveryDate] u manje od toliko dana (isti prag kao prijašnji „rizik roka” za 3 d).
   int? poolFilterDueWithinDays;
   bool poolFilterNoMachine = false;
+
   /// `null` = svi strojevi. Inače [ProductionOrderModel.machineId] (točan zapis s naloga).
   String? poolFilterMachineId;
+
   /// `null` = sve. Inače točno podudaranje [ProductionOrderModel.operationName].
   String? poolFilterOperationName;
+
   /// `null` = sve linije. [ProductionOrderModel.lineId].
   String? poolFilterLineId;
+
   /// `null` = svi. Točan kupac s naloga (prikaz imena u poolu).
   String? poolFilterCustomerName;
+
   /// FCS (plave) + MES (narandžaste) u Ganttu.
   bool showMesGanttOverlay = true;
   bool _mesGanttLoading = false;
   PlanningGanttDto? _ganttWithMes;
   final Set<String> _dismissedEngineConflictKeys = {};
+
   /// Faza 3: uzrok po `ScheduledOperation.id` (draft do spremanja; Firestore nakon [saveDraft] + Spremi uzroke).
   final Map<String, String> _varianceRootByClientOpId = {};
   final Map<String, String> _varianceNotesByClientOpId = {};
@@ -96,6 +105,7 @@ class PlanningSessionController extends ChangeNotifier {
   ProductionOrderModel? selectedOrder;
   Map<String, String> ganttMachineLabels = const {};
   String? ganttLabelForResultId;
+
   /// Ime stroja s poola (šifarnik) kada Gantt još nema taj resurs.
   Map<String, String> _poolMachineIdLabels = const {};
 
@@ -117,14 +127,10 @@ class PlanningSessionController extends ChangeNotifier {
     }
     if (poolFilterDueWithinDays != null) {
       final n = poolFilterDueWithinDays!;
-      list = list
-          .where(
-            (o) {
-              final d = o.requestedDeliveryDate;
-              return d != null && d.difference(DateTime.now()).inDays < n;
-            },
-          )
-          .toList();
+      list = list.where((o) {
+        final d = o.requestedDeliveryDate;
+        return d != null && d.difference(DateTime.now()).inDays < n;
+      }).toList();
     }
     if (poolFilterNoMachine) {
       list = list.where((o) => (o.machineId ?? '').trim().isEmpty).toList();
@@ -153,9 +159,7 @@ class PlanningSessionController extends ChangeNotifier {
         list = list
             .where(
               (o) =>
-                  ((o.customerName ?? o.sourceCustomerName) ?? '')
-                      .trim() ==
-                  c,
+                  ((o.customerName ?? o.sourceCustomerName) ?? '').trim() == c,
             )
             .toList();
       }
@@ -362,11 +366,9 @@ class PlanningSessionController extends ChangeNotifier {
         productionOrderIds: ids,
       );
       for (final op in r.scheduledOperations) {
-        final list = mes[op.productionOrderId] ?? const <Map<String, dynamic>>[];
-        final actual = _bestMesStartEndOnMachine(
-          list,
-          op.machineId,
-        );
+        final list =
+            mes[op.productionOrderId] ?? const <Map<String, dynamic>>[];
+        final actual = _bestMesStartEndOnMachine(list, op.machineId);
         final code = getExecutionVarianceRootDraft(op.id) ?? 'unknown';
         final notes = getExecutionVarianceNotesDraft(op.id);
         await _varianceService.upsertForOperation(
@@ -675,7 +677,9 @@ class PlanningSessionController extends ChangeNotifier {
     if (isLocked) return;
     selectedOrderIds
       ..clear()
-      ..addAll(pool.where((o) => !excludedOrderIds.contains(o.id)).map((e) => e.id));
+      ..addAll(
+        pool.where((o) => !excludedOrderIds.contains(o.id)).map((e) => e.id),
+      );
     notifyListeners();
   }
 
@@ -732,7 +736,8 @@ class PlanningSessionController extends ChangeNotifier {
     }
     if (poolFilterOperationName != null) {
       final on = poolFilterOperationName!.trim();
-      if (on.isEmpty || !pool.any((o) => (o.operationName ?? '').trim() == on)) {
+      if (on.isEmpty ||
+          !pool.any((o) => (o.operationName ?? '').trim() == on)) {
         poolFilterOperationName = null;
       }
     }
@@ -747,9 +752,8 @@ class PlanningSessionController extends ChangeNotifier {
       if (c.isEmpty) {
         poolFilterCustomerName = null;
       } else if (!pool.any(
-            (o) =>
-                ((o.customerName ?? o.sourceCustomerName) ?? '').trim() == c,
-          )) {
+        (o) => ((o.customerName ?? o.sourceCustomerName) ?? '').trim() == c,
+      )) {
         poolFilterCustomerName = null;
       }
     }
@@ -833,7 +837,9 @@ class PlanningSessionController extends ChangeNotifier {
       _sanitizePoolFilters();
       selectedOrderIds
         ..clear()
-        ..addAll(list.where((o) => !excludedOrderIds.contains(o.id)).map((e) => e.id));
+        ..addAll(
+          list.where((o) => !excludedOrderIds.contains(o.id)).map((e) => e.id),
+        );
       selectedOrder = list.isNotEmpty ? list.first : null;
       loadingPool = false;
       unawaited(_rebuildPoolMachineLabels());
@@ -961,11 +967,17 @@ class PlanningSessionController extends ChangeNotifier {
         DateTime.now().day,
       );
       final end = start.add(Duration(days: horizonDays));
-      final perf = double.tryParse(perfController.text.replaceAll(',', '.')) ?? 0.65;
-      final setup = double.tryParse(setupController.text.replaceAll(',', '.')) ?? 30;
-      final cyc = double.tryParse(cycleController.text.replaceAll(',', '.')) ?? 60;
-      final eligible = pool.where((o) => !excludedOrderIds.contains(o.id)).toList();
-      final allPoolSelected = eligible.isNotEmpty &&
+      final perf =
+          double.tryParse(perfController.text.replaceAll(',', '.')) ?? 0.65;
+      final setup =
+          double.tryParse(setupController.text.replaceAll(',', '.')) ?? 30;
+      final cyc =
+          double.tryParse(cycleController.text.replaceAll(',', '.')) ?? 60;
+      final eligible = pool
+          .where((o) => !excludedOrderIds.contains(o.id))
+          .toList();
+      final allPoolSelected =
+          eligible.isNotEmpty &&
           eligible.every((o) => selectedOrderIds.contains(o.id)) &&
           selectedOrderIds.length == eligible.length;
       result = await _engine.generateDraftPlan(

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/visual/operonix_collapsible_section.dart';
+import '../../../../core/visual/operonix_shell_metrics.dart';
 import '../../../../core/visual/operonix_visual_tokens.dart';
 import '../../../../core/visual/premium/operonix_premium_icon.dart';
 import '../../../../core/visual/premium/premium_icon_accent.dart';
@@ -107,23 +109,24 @@ class TrackingScanActions extends StatelessWidget {
     final scan = premium
         ? FilledButton.icon(
             onPressed: onScan,
-            style: FilledButton.styleFrom(
-              backgroundColor: accent,
-              foregroundColor: onAction,
-              iconColor: onAction,
-              minimumSize: const Size(48, 48),
-            ).copyWith(
-              overlayColor: WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.pressed)) {
-                  return onAction.withValues(alpha: 0.16);
-                }
-                if (states.contains(WidgetState.focused) ||
-                    states.contains(WidgetState.hovered)) {
-                  return onAction.withValues(alpha: 0.10);
-                }
-                return null;
-              }),
-            ),
+            style:
+                FilledButton.styleFrom(
+                  backgroundColor: accent,
+                  foregroundColor: onAction,
+                  iconColor: onAction,
+                  minimumSize: const Size(48, 48),
+                ).copyWith(
+                  overlayColor: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.pressed)) {
+                      return onAction.withValues(alpha: 0.16);
+                    }
+                    if (states.contains(WidgetState.focused) ||
+                        states.contains(WidgetState.hovered)) {
+                      return onAction.withValues(alpha: 0.10);
+                    }
+                    return null;
+                  }),
+                ),
             icon: const OperonixPremiumIcon(
               glyph: OperonixPremiumGlyph.qrScan,
               size: 20,
@@ -138,9 +141,7 @@ class TrackingScanActions extends StatelessWidget {
     final secondary = premium
         ? OutlinedButton.icon(
             onPressed: onSecondary,
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(48, 48),
-            ),
+            style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
             icon: OperonixPremiumIcon(
               glyph: secondaryIcon == Icons.inventory_2_outlined
                   ? OperonixPremiumGlyph.closeBox
@@ -236,7 +237,9 @@ class TrackingButtonAccentChoices extends StatelessWidget {
 }
 
 /// Jedna radna traka: dan, datum unosa i pogon. Nisu tri odvojene kartice.
-class TrackingContextBand extends StatelessWidget {
+///
+/// Na telefonu je skupljena. Sažetak i dalje pokazuje datum i pogon.
+class TrackingContextBand extends StatefulWidget {
   final String workDay;
   final String entryDate;
   final String plant;
@@ -253,7 +256,33 @@ class TrackingContextBand extends StatelessWidget {
   });
 
   @override
+  State<TrackingContextBand> createState() => _TrackingContextBandState();
+}
+
+class _TrackingContextBandState extends State<TrackingContextBand> {
+  bool? _expanded;
+
+  bool _isExpanded(BuildContext context) {
+    if (_expanded != null) return _expanded!;
+    return MediaQuery.sizeOf(context).width >=
+        OperonixShellMetrics.wideBreakpoint;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final expanded = _isExpanded(context);
+    return OperonixCollapsibleSection(
+      title: 'Kontekst unosa',
+      summary: '${widget.entryDate} · ${widget.plant}',
+      expanded: expanded,
+      glyph: OperonixPremiumGlyph.entryDate,
+      role: PremiumIconRole.material,
+      onToggle: () => setState(() => _expanded = !expanded),
+      child: _details(context),
+    );
+  }
+
+  Widget _details(BuildContext context) {
     final tokens = OperonixVisualTokens.of(context);
     return PremiumSurfaceCard(
       level: 1,
@@ -269,30 +298,29 @@ class TrackingContextBand extends StatelessWidget {
                   glyph: OperonixPremiumGlyph.workDay,
                   role: PremiumIconRole.info,
                   label: 'Radni dan',
-                  value: workDay,
+                  value: widget.workDay,
                 ),
                 _ContextCell(
                   icon: Icons.edit_calendar_outlined,
                   glyph: OperonixPremiumGlyph.entryDate,
                   role: PremiumIconRole.material,
                   label: 'Datum unosa',
-                  value: entryDate,
+                  value: widget.entryDate,
                 ),
                 _ContextCell(
                   icon: Icons.factory_outlined,
                   glyph: OperonixPremiumGlyph.plant,
                   role: PremiumIconRole.people,
                   label: 'Pogon',
-                  value: plant,
-                  onTap: onPlant,
+                  value: widget.plant,
+                  onTap: widget.onPlant,
                 ),
               ];
               if (constraints.maxWidth < 560) {
                 return Column(
                   children: [
                     for (var i = 0; i < cells.length; i++) ...[
-                      if (i > 0)
-                        Divider(height: 12, color: tokens.divider),
+                      if (i > 0) Divider(height: 12, color: tokens.divider),
                       cells[i],
                     ],
                   ],
@@ -303,8 +331,7 @@ class TrackingContextBand extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (var i = 0; i < cells.length; i++) ...[
-                      if (i > 0)
-                        Container(width: 1, color: tokens.divider),
+                      if (i > 0) Container(width: 1, color: tokens.divider),
                       Expanded(child: cells[i]),
                     ],
                   ],
@@ -312,10 +339,13 @@ class TrackingContextBand extends StatelessWidget {
               );
             },
           ),
-          if (actions.isNotEmpty)
+          if (widget.actions.isNotEmpty)
             Align(
               alignment: Alignment.centerRight,
-              child: Row(mainAxisSize: MainAxisSize.min, children: actions),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: widget.actions,
+              ),
             ),
         ],
       ),

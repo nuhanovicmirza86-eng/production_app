@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/errors/app_error_mapper.dart';
 import '../../../../core/ui/standard_list_components.dart';
+import '../../../../core/visual/operonix_visual_tokens.dart';
+import '../../../../core/visual/premium/operonix_premium_icon.dart';
 import '../../../logistics/inventory/services/product_warehouse_stock_service.dart';
 import '../services/product_service.dart';
 import 'product_create_screen.dart';
@@ -260,7 +262,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
     if (_companyId.isEmpty) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Nedostaje podatak o kompaniji. Obrati se administratoru.';
+        _errorMessage =
+            'Nedostaje podatak o kompaniji. Obrati se administratoru.';
         _products = <Map<String, dynamic>>[];
       });
       return;
@@ -422,9 +425,7 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   Future<void> _openProductDetails(Map<String, dynamic> product) async {
     final productId = _s(product['productId']);
     if (productId.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Nedostaje odabir proizvoda. Osvježi ekran.'),
         ),
@@ -751,8 +752,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
 
       if (skippedRows.isNotEmpty) {
         await showDialog<void>(
-      barrierDismissible: false,
-      context: context,
+          barrierDismissible: false,
+          context: context,
           builder: (dialogContext) {
             return AlertDialog(
               title: const Text('Rezultat importa'),
@@ -1432,8 +1433,8 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
             icon: const Icon(Icons.info_outline_rounded),
             onPressed: () {
               showDialog(
-      barrierDismissible: false,
-      context: context,
+                barrierDismissible: false,
+                context: context,
                 builder: (_) => AlertDialog(
                   title: const Text('Proizvodi'),
                   content: const Text(
@@ -1480,32 +1481,23 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
             icon: const Icon(Icons.refresh),
           ),
         ],
+        bottom: _canCreateProduct
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(52),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8, bottom: 4),
+                    child: ProductsPageActions(
+                      enabled: !_isImporting && !_isLoading,
+                      onScan: _openRegisterFromScan,
+                      onCreate: _openCreateProduct,
+                    ),
+                  ),
+                ),
+              )
+            : null,
       ),
-      floatingActionButton: _canCreateProduct
-          ? Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                FloatingActionButton.small(
-                  heroTag: 'product_register_scan',
-                  tooltip: 'Novi proizvod iz postojećeg barkoda / QR',
-                  onPressed: (_isImporting || _isLoading)
-                      ? null
-                      : _openRegisterFromScan,
-                  child: const Icon(Icons.qr_code_scanner_outlined),
-                ),
-                const SizedBox(height: 12),
-                FloatingActionButton.extended(
-                  heroTag: 'product_create',
-                  onPressed: (_isImporting || _isLoading)
-                      ? null
-                      : _openCreateProduct,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Novi proizvod'),
-                ),
-              ],
-            )
-          : null,
       body: _buildBody(),
     );
   }
@@ -1615,5 +1607,54 @@ extension ProductStatusFilterX on ProductStatusFilter {
       case ProductStatusFilter.inactive:
         return s == 'inactive';
     }
+  }
+}
+
+/// Gornje desne akcije ekrana Proizvodi. Nisu plutajuće preko tabele.
+class ProductsPageActions extends StatelessWidget {
+  final bool enabled;
+  final VoidCallback? onScan;
+  final VoidCallback? onCreate;
+
+  const ProductsPageActions({
+    super.key,
+    required this.enabled,
+    required this.onScan,
+    required this.onCreate,
+  });
+
+  static const scanTooltip = 'Novi proizvod iz postojećeg barkoda / QR';
+  static const createTooltip = 'Novi proizvod';
+
+  @override
+  Widget build(BuildContext context) {
+    final premium = OperonixVisualTokens.of(context).isPremium;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          tooltip: scanTooltip,
+          onPressed: enabled ? onScan : null,
+          style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+          icon: premium
+              ? const OperonixPremiumIcon(
+                  glyph: OperonixPremiumGlyph.qrScan,
+                  size: 24,
+                )
+              : const Icon(Icons.qr_code_scanner_outlined),
+        ),
+        IconButton(
+          tooltip: createTooltip,
+          onPressed: enabled ? onCreate : null,
+          style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+          icon: premium
+              ? const OperonixPremiumIcon(
+                  glyph: OperonixPremiumGlyph.products,
+                  size: 24,
+                )
+              : const Icon(Icons.add),
+        ),
+      ],
+    );
   }
 }
