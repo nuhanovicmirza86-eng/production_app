@@ -70,15 +70,10 @@ void main() {
 
     expect(find.text('Pogon'), findsOneWidget);
     expect(find.text('Brizganje (BR)'), findsOneWidget);
-    final card = find.byType(PremiumContextCard);
-    expect(card, findsOneWidget);
-    expect(
-      find.descendant(
-        of: card,
-        matching: find.byIcon(Icons.keyboard_arrow_down_rounded),
-      ),
-      findsOneWidget,
-    );
+    expect(find.byType(DropdownButtonFormField<String>), findsOneWidget);
+    expect(find.byType(PremiumContextCard), findsNothing);
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.byIcon(Icons.arrow_drop_down), findsOneWidget);
     expect(find.byType(FloatingActionButton), findsNothing);
     expect(find.byTooltip('Dodaj'), findsNothing);
 
@@ -93,14 +88,16 @@ void main() {
     final addRight = addBox.localToGlobal(Offset.zero).dx + addBox.size.width;
     expect(addRight, lessThanOrEqualTo(360));
 
-    await tester.tap(card);
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
     await tester.pumpAndSettle();
-    expect(find.text('Montaža (MT)'), findsOneWidget);
-    await tester.tap(find.text('Montaža (MT)'));
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.text('Montaža (MT)'), findsWidgets);
+    await tester.tap(find.text('Montaža (MT)').last);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Montaža (MT)'), findsOneWidget);
     expect(find.text('Brizganje (BR)'), findsNothing);
+    expect(find.byType(BottomSheet), findsNothing);
     expect(tester.takeException(), isNull);
 
     final before = observer.pushed.length;
@@ -122,8 +119,9 @@ void main() {
       plantOptions: plants,
     );
     expect(find.text('Brizganje (BR)'), findsOneWidget);
-    await tester.tap(find.byType(PremiumContextCard));
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
     await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
     expect(find.text('Montaža (MT)'), findsNothing);
     expect(tester.takeException(), isNull);
   });

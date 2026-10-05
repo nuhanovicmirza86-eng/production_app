@@ -374,7 +374,8 @@ void main() {
     expect(find.byType(FloatingActionButton), findsNothing);
     expect(find.byTooltip('Dodaj radni centar'), findsOneWidget);
     expect(find.byIcon(Icons.add), findsOneWidget);
-    expect(find.byType(PremiumContextCard), findsOneWidget);
+    expect(find.text('Pogon'), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
     expect(find.text('Filteri'), findsOneWidget);
     expect(find.text('Status'), findsNothing);
     expect(find.byType(PremiumEmptyState), findsOneWidget);

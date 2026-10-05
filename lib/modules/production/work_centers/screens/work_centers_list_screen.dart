@@ -155,43 +155,10 @@ class _WorkCentersListScreenState extends State<WorkCentersListScreen> {
     }
   }
 
-  Future<void> _pickPlant() async {
-    if (_plants.isEmpty) return;
-    final chosen = await showModalBottomSheet<String>(
-      context: context,
-      builder: (ctx) {
-        final tokens = OperonixVisualTokens.of(ctx);
-        return SafeArea(
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              for (final plant in _plants)
-                ListTile(
-                  selected:
-                      tokens.isPremium && plant.plantKey == _selectedPlantKey,
-                  selectedTileColor: tokens.isPremium
-                      ? tokens.surfaceInteractive
-                      : null,
-                  title: Text(
-                    plant.label,
-                    style: tokens.isPremium
-                        ? TextStyle(color: tokens.primaryText)
-                        : null,
-                  ),
-                  trailing:
-                      tokens.isPremium && plant.plantKey == _selectedPlantKey
-                      ? Icon(Icons.check_rounded, color: tokens.primaryAccent)
-                      : null,
-                  onTap: () => Navigator.pop(ctx, plant.plantKey),
-                ),
-            ],
-          ),
-        );
-      },
-    );
-    if (!mounted || chosen == null || chosen == _selectedPlantKey) return;
-    setState(() => _selectedPlantKey = chosen);
-    await _reloadList();
+  void _selectPlant(String? plantKey) {
+    if (plantKey == null || plantKey == _selectedPlantKey) return;
+    setState(() => _selectedPlantKey = plantKey);
+    _reloadList();
   }
 
   Future<void> _reloadList() async {
@@ -370,6 +337,42 @@ class _WorkCentersListScreenState extends State<WorkCentersListScreen> {
     );
   }
 
+  Widget _premiumPlantField() {
+    const prefix = OperonixPremiumIcon(
+      glyph: OperonixPremiumGlyph.plant,
+      size: 22,
+    );
+    if (_plants.isEmpty) {
+      return InputDecorator(
+        decoration: const InputDecoration(
+          labelText: 'Pogon',
+          prefixIcon: prefix,
+        ),
+        child: Text(
+          _plantLabel(_selectedPlantKey),
+          overflow: TextOverflow.ellipsis,
+        ),
+      );
+    }
+    return DropdownButtonFormField<String>(
+      key: ValueKey<String>('wc-plant-$_selectedPlantKey'),
+      initialValue: _selectedPlantKey,
+      isExpanded: true,
+      decoration: const InputDecoration(
+        labelText: 'Pogon',
+        prefixIcon: prefix,
+      ),
+      items: [
+        for (final plant in _plants)
+          DropdownMenuItem<String>(
+            value: plant.plantKey,
+            child: Text(plant.label, overflow: TextOverflow.ellipsis),
+          ),
+      ],
+      onChanged: _selectPlant,
+    );
+  }
+
   Widget _buildPremiumScaffold() {
     final tokens = OperonixVisualTokens.of(context);
     final filtered = _applyFilters(_items).toList();
@@ -402,23 +405,7 @@ class _WorkCentersListScreenState extends State<WorkCentersListScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
-          PremiumContextCard(
-            leading: const PremiumIconBadge(
-              icon: Icons.factory_outlined,
-              glyph: OperonixPremiumGlyph.plant,
-              role: PremiumIconRole.info,
-              size: 36,
-            ),
-            label: 'Pogon',
-            value: _plantLabel(_selectedPlantKey),
-            trailing: _plants.isEmpty
-                ? null
-                : Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: tokens.secondaryText,
-                  ),
-            onTap: _plants.isEmpty ? null : _pickPlant,
-          ),
+          _premiumPlantField(),
           const SizedBox(height: 10),
           OperonixCollapsibleSection(
             title: 'Filteri',
@@ -549,11 +536,7 @@ class _WorkCentersListScreenState extends State<WorkCentersListScreen> {
                           ),
                         )
                         .toList(),
-                    onChanged: (v) {
-                      if (v == null) return;
-                      setState(() => _selectedPlantKey = v);
-                      _reloadList();
-                    },
+                    onChanged: _selectPlant,
                   ),
                   const SizedBox(height: 10),
                 ] else
