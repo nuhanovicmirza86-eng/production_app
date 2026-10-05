@@ -372,7 +372,8 @@ void main() {
       theme: OperonixVisualTheme.premiumMidnight(),
     );
     expect(find.byType(FloatingActionButton), findsNothing);
-    expect(find.byTooltip('Dodaj'), findsOneWidget);
+    expect(find.byTooltip('Dodaj radni centar'), findsOneWidget);
+    expect(find.byIcon(Icons.add), findsOneWidget);
     expect(find.byType(PremiumContextCard), findsOneWidget);
     expect(find.text('Filteri'), findsOneWidget);
     expect(find.text('Status'), findsNothing);

@@ -17,7 +17,15 @@ import 'work_center_details_screen.dart';
 class WorkCentersListScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
 
-  const WorkCentersListScreen({super.key, required this.companyData});
+  /// When set, skips the plant lookup and uses this allowed-source list.
+  /// Production leaves it null and loads plants the existing way.
+  final List<({String plantKey, String label})>? plantOptions;
+
+  const WorkCentersListScreen({
+    super.key,
+    required this.companyData,
+    this.plantOptions,
+  });
 
   @override
   State<WorkCentersListScreen> createState() => _WorkCentersListScreenState();
@@ -77,7 +85,13 @@ class _WorkCentersListScreenState extends State<WorkCentersListScreen> {
   void initState() {
     super.initState();
     _selectedPlantKey = _sessionPlantKey;
-    _loadPlants();
+    final preset = widget.plantOptions;
+    if (preset != null) {
+      _applyAllowedSelection(_allowedPlants(preset));
+      _reloadList();
+    } else {
+      _loadPlants();
+    }
   }
 
   Future<void> _openCreate() async {
@@ -110,28 +124,73 @@ class _WorkCentersListScreenState extends State<WorkCentersListScreen> {
       return;
     }
     if (!mounted) return;
-    var allowed = list;
+    setState(() => _applyAllowedSelection(_allowedPlants(list)));
+    await _reloadList();
+  }
+
+  List<({String plantKey, String label})> _allowedPlants(
+    List<({String plantKey, String label})> list,
+  ) {
     if (!_canSwitchPlant && _sessionPlantKey.isNotEmpty) {
-      allowed = list
+      final allowed = list
           .where((p) => p.plantKey == _sessionPlantKey)
           .toList();
       if (allowed.isEmpty) {
-        allowed = [
-          (plantKey: _sessionPlantKey, label: _sessionPlantKey),
-        ];
+        return [(plantKey: _sessionPlantKey, label: _sessionPlantKey)];
       }
+      return allowed;
     }
-    setState(() {
-      _plants = allowed;
-      if (!_canSwitchPlant && _sessionPlantKey.isNotEmpty) {
-        _selectedPlantKey = _sessionPlantKey;
-      } else if (_selectedPlantKey.isEmpty && allowed.isNotEmpty) {
-        _selectedPlantKey = allowed.first.plantKey;
-      } else if (allowed.isNotEmpty &&
-          !allowed.any((p) => p.plantKey == _selectedPlantKey)) {
-        _selectedPlantKey = allowed.first.plantKey;
-      }
-    });
+    return list;
+  }
+
+  void _applyAllowedSelection(List<({String plantKey, String label})> allowed) {
+    _plants = allowed;
+    if (!_canSwitchPlant && _sessionPlantKey.isNotEmpty) {
+      _selectedPlantKey = _sessionPlantKey;
+    } else if (_selectedPlantKey.isEmpty && allowed.isNotEmpty) {
+      _selectedPlantKey = allowed.first.plantKey;
+    } else if (allowed.isNotEmpty &&
+        !allowed.any((p) => p.plantKey == _selectedPlantKey)) {
+      _selectedPlantKey = allowed.first.plantKey;
+    }
+  }
+
+  Future<void> _pickPlant() async {
+    if (_plants.isEmpty) return;
+    final chosen = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) {
+        final tokens = OperonixVisualTokens.of(ctx);
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final plant in _plants)
+                ListTile(
+                  selected:
+                      tokens.isPremium && plant.plantKey == _selectedPlantKey,
+                  selectedTileColor: tokens.isPremium
+                      ? tokens.surfaceInteractive
+                      : null,
+                  title: Text(
+                    plant.label,
+                    style: tokens.isPremium
+                        ? TextStyle(color: tokens.primaryText)
+                        : null,
+                  ),
+                  trailing:
+                      tokens.isPremium && plant.plantKey == _selectedPlantKey
+                      ? Icon(Icons.check_rounded, color: tokens.primaryAccent)
+                      : null,
+                  onTap: () => Navigator.pop(ctx, plant.plantKey),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+    if (!mounted || chosen == null || chosen == _selectedPlantKey) return;
+    setState(() => _selectedPlantKey = chosen);
     await _reloadList();
   }
 
@@ -331,29 +390,14 @@ class _WorkCentersListScreenState extends State<WorkCentersListScreen> {
               message: WorkCenterHelpTexts.overviewBody,
             ),
           ),
+          if (_canManage)
+            IconButton(
+              tooltip: 'Dodaj radni centar',
+              onPressed: _openCreate,
+              style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+              icon: const Icon(Icons.add),
+            ),
         ],
-        bottom: _canManage
-            ? PreferredSize(
-                preferredSize: const Size.fromHeight(52),
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 8, bottom: 4),
-                    child: IconButton(
-                      tooltip: 'Dodaj',
-                      onPressed: _openCreate,
-                      style: IconButton.styleFrom(
-                        minimumSize: const Size(48, 48),
-                      ),
-                      icon: const OperonixPremiumIcon(
-                        glyph: OperonixPremiumGlyph.workCenter,
-                        size: 24,
-                      ),
-                    ),
-                  ),
-                ),
-              )
-            : null,
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -367,6 +411,13 @@ class _WorkCentersListScreenState extends State<WorkCentersListScreen> {
             ),
             label: 'Pogon',
             value: _plantLabel(_selectedPlantKey),
+            trailing: _plants.isEmpty
+                ? null
+                : Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: tokens.secondaryText,
+                  ),
+            onTap: _plants.isEmpty ? null : _pickPlant,
           ),
           const SizedBox(height: 10),
           OperonixCollapsibleSection(
