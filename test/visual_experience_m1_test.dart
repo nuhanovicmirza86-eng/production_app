@@ -596,8 +596,12 @@ void main() {
 
       await tester.pageBack();
       await tester.pumpAndSettle();
-      expect(find.byType(ProductionDashboardIconGridTile), findsOneWidget);
-      expect(find.byType(ProductionDashboardActionTile), findsNothing);
+      expect(find.byType(ProductionDashboardActionTile), findsOneWidget);
+      expect(find.byType(ProductionDashboardIconGridTile), findsNothing);
+      expect(
+        tester.getSize(find.byType(ProductionDashboardActionTile)).height,
+        lessThan(110),
+      );
       expect(find.text('Brze akcije'), findsOneWidget);
       expect(find.text('Raspored:'), findsNothing);
       expect(find.text('Prikaz:'), findsNothing);

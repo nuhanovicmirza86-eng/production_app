@@ -4,8 +4,10 @@ import '../../../../core/visual/operonix_visual_tokens.dart';
 import '../../../../core/visual/premium/operonix_premium_iconography.dart';
 import '../../../../core/visual/premium/premium_widgets.dart';
 
-/// Kartica prečice na početnom zaslonu (standardni prikaz).
+/// Compact home shortcut. Same row geometry in Classic and Premium.
 class ProductionDashboardActionTile extends StatelessWidget {
+  static const double iconExtent = 46;
+
   final IconData icon;
   final String title;
   final String subtitle;
@@ -24,54 +26,59 @@ class ProductionDashboardActionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = OperonixVisualTokens.of(context);
-    if (tokens.isPremium) {
-      final notice = (noticeText ?? '').trim();
-      final glyph = OperonixPremiumIconography.resolve(title: title, icon: icon);
-      return PremiumListCard(
-        icon: icon,
-        glyph: glyph,
-        role: OperonixPremiumIconography.roleFor(glyph),
-        badgeVariant: PremiumBadgeVariant.large,
-        title: title,
-        subtitle: notice.isEmpty ? subtitle : '$subtitle · $notice',
-        onTap: onTap,
-      );
-    }
     final accent = tokens.moduleAccent;
+    final glyph = tokens.isPremium
+        ? OperonixPremiumIconography.resolve(title: title, icon: icon)
+        : null;
     return Card(
+      margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       elevation: tokens.isPremium ? 0 : 1,
+      color: tokens.isPremium ? tokens.surfaceElevated : null,
       shape: tokens.cardShape,
       child: InkWell(
         borderRadius: BorderRadius.circular(tokens.cardRadius),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
-              Container(
-                width: 46,
-                height: 46,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: accent.withValues(alpha: 0.45),
-                  ),
-                ),
-                child: Icon(icon, color: accent),
+              SizedBox(
+                width: iconExtent,
+                height: iconExtent,
+                child: tokens.isPremium
+                    ? PremiumIconBadge(
+                        icon: icon,
+                        glyph: glyph,
+                        role: OperonixPremiumIconography.roleFor(glyph),
+                        size: iconExtent,
+                      )
+                    : DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: accent.withValues(alpha: 0.45),
+                          ),
+                        ),
+                        child: Icon(icon, color: accent),
+                      ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 15,
+                        height: 1.2,
+                        color: tokens.primaryText,
                       ),
                     ),
                     const SizedBox(height: 2),

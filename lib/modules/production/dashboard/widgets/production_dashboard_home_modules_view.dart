@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/visual/operonix_visual_tokens.dart';
-import '../../../../core/visual/premium/premium_widgets.dart';
 import '../../packing/services/packing_box_service.dart';
 import '../models/production_dashboard_layout.dart';
 import '../models/production_dashboard_module.dart';
 import '../production_dashboard_access.dart';
-import 'premium_home_icon_grid_metrics.dart';
 import 'production_dashboard_action_tile.dart';
-import 'production_dashboard_icon_grid_tile.dart';
 import 'production_dashboard_module_group_header.dart';
 
 class ProductionDashboardHomeModulesView extends StatelessWidget {
@@ -16,12 +12,14 @@ class ProductionDashboardHomeModulesView extends StatelessWidget {
   static const double sectionGap = 18;
   static const double afterHeader = 8;
 
-  /// Classic ikonska mreža. Premium koristi [PremiumHomeIconGridMetrics].
-  static int classicIconGridColumnCount(double screenWidth) {
-    if (screenWidth >= 1200) return 6;
-    if (screenWidth >= 900) return 5;
-    if (screenWidth >= 600) return 4;
-    return 3;
+  /// Compact action tile. A wider screen adds another tile; it does not
+  /// stretch one card into a large empty rectangle.
+  static const double maxTileWidth = 320;
+
+  static double tileWidthFor(double contentWidth) {
+    if (!contentWidth.isFinite || contentWidth <= 0) return maxTileWidth;
+    if (contentWidth <= maxTileWidth) return contentWidth;
+    return maxTileWidth;
   }
 
   final ProductionDashboardLayout layout;
@@ -67,21 +65,14 @@ class _StandardView extends StatelessWidget {
         ),
       );
       out.add(const SizedBox(height: ProductionDashboardHomeModulesView.afterHeader));
-      final entries = [
-        for (final entry in section.entries) _buildStandardEntry(context, entry),
-      ];
-      if (OperonixVisualTokens.of(context).isPremium && entries.length > 1) {
-        out.add(PremiumResponsiveGrid(children: entries));
-      } else {
-        for (var j = 0; j < entries.length; j++) {
-          if (j > 0) {
-            out.add(
-              const SizedBox(height: ProductionDashboardHomeModulesView.tileGap),
-            );
-          }
-          out.add(entries[j]);
-        }
-      }
+      out.add(
+        _QuickActionWrap(
+          children: [
+            for (final entry in section.entries)
+              _buildStandardEntry(context, entry),
+          ],
+        ),
+      );
     }
 
     return Column(
@@ -118,32 +109,6 @@ class _IconGridView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final premium = OperonixVisualTokens.of(context).isPremium;
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final contentWidth = constraints.maxWidth;
-        final crossAxisCount = premium
-            ? PremiumHomeIconGridMetrics.columnCount(contentWidth)
-            : ProductionDashboardHomeModulesView.classicIconGridColumnCount(
-                screenWidth,
-              );
-        return _buildColumn(
-          context,
-          crossAxisCount: crossAxisCount,
-          mainAxisExtent: premium
-              ? PremiumHomeIconGridMetrics.tileExtentFor(contentWidth)
-              : null,
-        );
-      },
-    );
-  }
-
-  Widget _buildColumn(
-    BuildContext context, {
-    required int crossAxisCount,
-    required double? mainAxisExtent,
-  }) {
     final out = <Widget>[];
 
     for (var i = 0; i < sections.length; i++) {
@@ -160,20 +125,11 @@ class _IconGridView extends StatelessWidget {
       );
       out.add(const SizedBox(height: ProductionDashboardHomeModulesView.afterHeader));
       out.add(
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            mainAxisSpacing: ProductionDashboardHomeModulesView.tileGap,
-            crossAxisSpacing: ProductionDashboardHomeModulesView.tileGap,
-            mainAxisExtent: mainAxisExtent,
-            childAspectRatio: mainAxisExtent == null ? 0.82 : 1,
-          ),
-          itemCount: section.entries.length,
-          itemBuilder: (context, index) {
-            return _buildIconEntry(context, section.entries[index]);
-          },
+        _QuickActionWrap(
+          children: [
+            for (final entry in section.entries)
+              _buildIconEntry(context, entry),
+          ],
         ),
       );
     }
@@ -196,21 +152,51 @@ class _IconGridView extends StatelessWidget {
         ),
         builder: (context, snap) {
           final count = snap.data?.length ?? 0;
-          return ProductionDashboardIconGridTile(
+          return ProductionDashboardActionTile(
             icon: entry.icon,
             title: entry.title,
-            badgeText: count > 0 ? access.packedBoxesPendingNotice(count) : null,
+            subtitle: entry.subtitle,
+            noticeText: count > 0 ? access.packedBoxesPendingNotice(count) : null,
             onTap: entry.onTap,
           );
         },
       );
     }
 
-    return ProductionDashboardIconGridTile(
+    return ProductionDashboardActionTile(
       icon: entry.icon,
       title: entry.title,
-      badgeText: entry.noticeText,
+      subtitle: entry.subtitle,
+      noticeText: entry.noticeText,
       onTap: entry.onTap,
+    );
+  }
+}
+
+class _QuickActionWrap extends StatelessWidget {
+  final List<Widget> children;
+
+  const _QuickActionWrap({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = ProductionDashboardHomeModulesView.tileWidthFor(
+          constraints.maxWidth,
+        );
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: Wrap(
+            spacing: ProductionDashboardHomeModulesView.tileGap,
+            runSpacing: ProductionDashboardHomeModulesView.tileGap,
+            children: [
+              for (final child in children)
+                SizedBox(width: width, child: child),
+            ],
+          ),
+        );
+      },
     );
   }
 }

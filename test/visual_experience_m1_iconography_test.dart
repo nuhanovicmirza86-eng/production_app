@@ -14,7 +14,6 @@ import 'package:production_app/modules/production/dashboard/production_dashboard
 import 'package:production_app/modules/production/dashboard/widgets/production_dashboard_action_tile.dart';
 import 'package:production_app/modules/production/dashboard/widgets/premium_home_icon_grid_metrics.dart';
 import 'package:production_app/modules/production/dashboard/widgets/production_dashboard_home_modules_view.dart';
-import 'package:production_app/modules/production/dashboard/widgets/production_dashboard_icon_grid_tile.dart';
 import 'package:production_app/modules/production/station_pages/screens/production_evidence_operator_hub_screen.dart';
 import 'package:production_app/modules/production/tracking/config/station_screen_theme.dart';
 
@@ -231,7 +230,8 @@ void main() {
         ),
       );
       final badge = tester.widget<PremiumIconBadge>(find.byType(PremiumIconBadge));
-      expect(badge.variant, PremiumBadgeVariant.large);
+      expect(badge.variant, PremiumBadgeVariant.medium);
+      expect(badge.extent, ProductionDashboardActionTile.iconExtent);
       expect(
         tester.widget<OperonixPremiumIcon>(find.byType(OperonixPremiumIcon)).glyph,
         OperonixPremiumGlyph.productionOrder,
@@ -317,43 +317,31 @@ void main() {
         lessThan(PremiumHomeIconGridMetrics.tileExtentFor(phoneContent)),
       );
       expect(PremiumHomeIconGridMetrics.tileExtentFor(1100), lessThanOrEqualTo(140));
-      expect(
-        ProductionDashboardHomeModulesView.classicIconGridColumnCount(360),
-        3,
-      );
-      expect(
-        ProductionDashboardHomeModulesView.classicIconGridColumnCount(400),
-        3,
-      );
-      expect(
-        ProductionDashboardHomeModulesView.classicIconGridColumnCount(900),
-        5,
-      );
+      expect(ProductionDashboardHomeModulesView.tileWidthFor(300), 300);
+      expect(ProductionDashboardHomeModulesView.tileWidthFor(360), 320);
+      expect(ProductionDashboardHomeModulesView.tileWidthFor(1280), 320);
+      expect(ProductionDashboardHomeModulesView.maxTileWidth, 320);
     });
 
     testWidgets('phone Premium icon grid fits long module names', (tester) async {
       await _pumpIconHome(tester, width: 360, premium: true);
       expect(tester.takeException(), isNull);
-      final tile = tester.getSize(find.byType(ProductionDashboardIconGridTile).first);
-      expect(tile.width, greaterThanOrEqualTo(150));
-      expect(
-        tile.height,
-        PremiumHomeIconGridMetrics.tileExtentFor(360 - 32),
-      );
-      expect(find.byType(GridView), findsOneWidget);
+      final tile = tester.getSize(find.byType(ProductionDashboardActionTile).first);
+      expect(tile.width, ProductionDashboardHomeModulesView.tileWidthFor(360 - 32));
+      expect(tile.height, lessThan(110));
+      expect(find.byType(GridView), findsNothing);
       final badge = tester.widget<PremiumIconBadge>(
         find.descendant(
-          of: find.byType(ProductionDashboardIconGridTile).first,
+          of: find.byType(ProductionDashboardActionTile).first,
           matching: find.byType(PremiumIconBadge),
         ),
       );
-      expect(badge.extent, PremiumHomeIconGridMetrics.iconSlot);
+      expect(badge.extent, ProductionDashboardActionTile.iconExtent);
       for (final label in _longHomeLabels) {
         final text = tester.widget<Text>(find.text(label));
-        final paragraph = tester.renderObject<RenderParagraph>(find.text(label));
-        expect(text.maxLines, PremiumHomeIconGridMetrics.titleMaxLines(360 - 32));
-        expect(text.style?.fontSize, 14);
-        expect(paragraph.size.height, lessThan(tile.height * 0.55));
+        expect(text.maxLines, 2);
+        expect(text.style?.fontSize, 15);
+        expect(text.style?.color, OperonixVisualTokens.midnight().primaryText);
       }
       final glyphs = tester
           .widgetList<OperonixPremiumIcon>(find.byType(OperonixPremiumIcon))
@@ -374,23 +362,18 @@ void main() {
       for (final width in [411.0, 800.0]) {
         await _pumpIconHome(tester, width: width, premium: true);
         expect(tester.takeException(), isNull, reason: 'width $width');
-        final tile = tester.getSize(find.byType(ProductionDashboardIconGridTile).first);
-        expect(tile.width, greaterThanOrEqualTo(150), reason: 'width $width');
+        final tile = tester.getSize(find.byType(ProductionDashboardActionTile).first);
         expect(
-          tile.height,
-          PremiumHomeIconGridMetrics.tileExtentFor(width - 32),
+          tile.width,
+          ProductionDashboardHomeModulesView.tileWidthFor(width - 32),
           reason: 'width $width',
         );
-        expect(tile.height, lessThan(152), reason: 'width $width');
+        expect(tile.height, lessThan(110), reason: 'width $width');
+        expect(find.byType(GridView), findsNothing, reason: 'width $width');
         for (final label in _longHomeLabels) {
           final text = tester.widget<Text>(find.text(label));
-          final paragraph = tester.renderObject<RenderParagraph>(find.text(label));
-          expect(
-            text.maxLines,
-            PremiumHomeIconGridMetrics.titleMaxLines(width - 32),
-            reason: 'width $width',
-          );
-          expect(paragraph.size.height, lessThan(tile.height * 0.55));
+          expect(text.maxLines, 2, reason: 'width $width');
+          expect(text.style?.fontSize, 15, reason: 'width $width');
         }
       }
     });
@@ -404,8 +387,12 @@ void main() {
       final side = (card.shape! as RoundedRectangleBorder).side;
       expect(side.width, greaterThan(1));
       expect(
-        ProductionDashboardHomeModulesView.classicIconGridColumnCount(400),
-        3,
+        tester.getSize(find.byType(ProductionDashboardActionTile).first).width,
+        ProductionDashboardHomeModulesView.tileWidthFor(400 - 32),
+      );
+      expect(
+        tester.getSize(find.byType(ProductionDashboardActionTile).first).height,
+        lessThan(110),
       );
     });
 
@@ -450,7 +437,10 @@ void main() {
     testWidgets('premium home tile drops the double box', (tester) async {
       await _pumpIconHome(tester, width: 360, premium: true);
       final card = tester.widget<Card>(find.byType(Card).first);
-      expect((card.shape! as RoundedRectangleBorder).side, BorderSide.none);
+      expect(
+        (card.shape! as RoundedRectangleBorder).side.width,
+        OperonixVisualTokens.midnight().cardBorderWidth,
+      );
       final spot = tester.widget<Container>(
         find.descendant(
           of: find.byType(PremiumIconBadge).first,
@@ -459,7 +449,8 @@ void main() {
       );
       expect((spot.decoration! as BoxDecoration).border, isNull);
       final text = tester.widget<Text>(find.text('Način rada na ovom uređaju'));
-      expect(text.textAlign, TextAlign.start);
+      expect(text.textAlign, anyOf(isNull, TextAlign.start));
+      expect(text.style?.color, OperonixVisualTokens.midnight().primaryText);
     });
 
     testWidgets('home pictograms differ by shape in one color', (tester) async {
@@ -559,24 +550,25 @@ void main() {
       );
       await tester.pump();
       expect(tester.takeException(), isNull);
-      final tiles = tester
-          .getSize(find.byType(ProductionDashboardIconGridTile).at(0));
-      final orders = tester
-          .getSize(find.byType(ProductionDashboardIconGridTile).at(1));
-      expect(tiles, orders);
-      expect(tiles.height, PremiumHomeIconGridMetrics.tileExtentFor(411 - 32));
-      expect(tiles.height, lessThan(140));
+      final tiles = tester.getSize(find.byType(ProductionDashboardActionTile).at(0));
+      final orders = tester.getSize(find.byType(ProductionDashboardActionTile).at(1));
+      expect(tiles.width, orders.width);
+      expect(tiles.height, lessThan(110));
+      expect(orders.height, lessThan(110));
+      expect(tiles.width, ProductionDashboardHomeModulesView.maxTileWidth);
+      expect(tiles.width, lessThan(411 - 32));
+      expect(tiles.height, lessThan(110));
       expect(find.text('Registracije'), findsOneWidget);
       expect(
         tester
             .widget<PremiumIconBadge>(
               find.descendant(
-                of: find.byType(ProductionDashboardIconGridTile).first,
+                of: find.byType(ProductionDashboardActionTile).first,
                 matching: find.byType(PremiumIconBadge),
               ),
             )
             .extent,
-        60,
+        ProductionDashboardActionTile.iconExtent,
       );
     });
 
