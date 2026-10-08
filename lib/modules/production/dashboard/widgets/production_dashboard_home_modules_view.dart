@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/visual/operonix_visual_tokens.dart';
 import '../../packing/services/packing_box_service.dart';
 import '../models/production_dashboard_layout.dart';
 import '../models/production_dashboard_module.dart';
 import '../production_dashboard_access.dart';
+import 'production_classic_action_tile.dart';
 import 'production_dashboard_action_tile.dart';
 import 'production_dashboard_module_group_header.dart';
 
@@ -85,16 +87,7 @@ class _StandardView extends StatelessWidget {
     BuildContext context,
     ProductionDashboardModuleEntry entry,
   ) {
-    if (entry.customTileBuilder != null) {
-      return entry.customTileBuilder!(context);
-    }
-    return ProductionDashboardActionTile(
-      icon: entry.icon,
-      title: entry.title,
-      subtitle: entry.subtitle,
-      noticeText: entry.noticeText,
-      onTap: entry.onTap,
-    );
+    return _actionTile(context, entry, noticeText: entry.noticeText);
   }
 }
 
@@ -152,25 +145,42 @@ class _IconGridView extends StatelessWidget {
         ),
         builder: (context, snap) {
           final count = snap.data?.length ?? 0;
-          return ProductionDashboardActionTile(
-            icon: entry.icon,
-            title: entry.title,
-            subtitle: entry.subtitle,
+          return _actionTile(
+            context,
+            entry,
             noticeText: count > 0 ? access.packedBoxesPendingNotice(count) : null,
-            onTap: entry.onTap,
           );
         },
       );
     }
 
+    return _actionTile(context, entry, noticeText: entry.noticeText);
+  }
+}
+
+Widget _actionTile(
+  BuildContext context,
+  ProductionDashboardModuleEntry entry, {
+  String? noticeText,
+}) {
+  if (entry.customTileBuilder != null) {
+    return entry.customTileBuilder!(context);
+  }
+  if (OperonixVisualTokens.of(context).isPremium) {
     return ProductionDashboardActionTile(
       icon: entry.icon,
       title: entry.title,
       subtitle: entry.subtitle,
-      noticeText: entry.noticeText,
+      noticeText: noticeText,
       onTap: entry.onTap,
     );
   }
+  return ProductionClassicActionTile(
+    icon: entry.icon,
+    title: entry.title,
+    noticeText: noticeText,
+    onTap: entry.onTap,
+  );
 }
 
 class _QuickActionWrap extends StatelessWidget {
@@ -182,9 +192,12 @@ class _QuickActionWrap extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = ProductionDashboardHomeModulesView.tileWidthFor(
-          constraints.maxWidth,
-        );
+        final premium = OperonixVisualTokens.of(context).isPremium;
+        final width = premium
+            ? ProductionDashboardHomeModulesView.tileWidthFor(
+                constraints.maxWidth,
+              )
+            : ProductionClassicActionTile.tileWidthFor(constraints.maxWidth);
         return Align(
           alignment: Alignment.centerLeft,
           child: Wrap(
@@ -192,7 +205,11 @@ class _QuickActionWrap extends StatelessWidget {
             runSpacing: ProductionDashboardHomeModulesView.tileGap,
             children: [
               for (final child in children)
-                SizedBox(width: width, child: child),
+                SizedBox(
+                  width: width,
+                  height: premium ? null : ProductionClassicActionTile.tileHeight,
+                  child: child,
+                ),
             ],
           ),
         );

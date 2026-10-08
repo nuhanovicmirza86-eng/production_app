@@ -11,6 +11,7 @@ import 'package:production_app/core/visual/premium/premium_widgets.dart';
 import 'package:production_app/modules/production/dashboard/models/production_dashboard_layout.dart';
 import 'package:production_app/modules/production/dashboard/models/production_dashboard_module.dart';
 import 'package:production_app/modules/production/dashboard/production_dashboard_access.dart';
+import 'package:production_app/modules/production/dashboard/widgets/production_classic_action_tile.dart';
 import 'package:production_app/modules/production/dashboard/widgets/production_dashboard_action_tile.dart';
 import 'package:production_app/modules/production/dashboard/widgets/premium_home_icon_grid_metrics.dart';
 import 'package:production_app/modules/production/dashboard/widgets/production_dashboard_home_modules_view.dart';
@@ -202,10 +203,9 @@ void main() {
         MaterialApp(
           theme: OperonixVisualTheme.classic(),
           home: Scaffold(
-            body: ProductionDashboardActionTile(
+            body: ProductionClassicActionTile(
               icon: Icons.assignment,
               title: 'Proizvodni nalozi',
-              subtitle: 'Lista naloga',
               onTap: () {},
             ),
           ),
@@ -213,6 +213,14 @@ void main() {
       );
       expect(find.byIcon(Icons.assignment), findsOneWidget);
       expect(find.byType(OperonixPremiumIcon), findsNothing);
+      expect(find.text('Lista naloga'), findsNothing);
+      final title = tester.widget<Text>(find.text('Proizvodni nalozi'));
+      expect(title.textAlign, TextAlign.center);
+      expect(title.maxLines, 2);
+      expect(
+        tester.getRect(find.byIcon(Icons.assignment)).bottom,
+        lessThan(tester.getRect(find.text('Proizvodni nalozi')).top),
+      );
     });
 
     testWidgets('premium home tile uses the domain glyph', (tester) async {
@@ -386,14 +394,12 @@ void main() {
       final card = tester.widget<Card>(find.byType(Card).first);
       final side = (card.shape! as RoundedRectangleBorder).side;
       expect(side.width, greaterThan(1));
-      expect(
-        tester.getSize(find.byType(ProductionDashboardActionTile).first).width,
-        ProductionDashboardHomeModulesView.tileWidthFor(400 - 32),
-      );
-      expect(
-        tester.getSize(find.byType(ProductionDashboardActionTile).first).height,
-        lessThan(110),
-      );
+      expect(find.byType(ProductionDashboardActionTile), findsNothing);
+      expect(find.text('Opis'), findsNothing);
+      final tile = tester.getSize(find.byType(ProductionClassicActionTile).first);
+      expect(tile.width, ProductionClassicActionTile.maxTileWidth);
+      expect(tile.height, ProductionClassicActionTile.tileHeight);
+      expect(tile.width, lessThan(400 - 32));
     });
 
     test('home business concepts map to distinct pictograms', () {

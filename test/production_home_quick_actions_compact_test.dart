@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:production_app/core/visual/operonix_visual_theme.dart';
 import 'package:production_app/core/visual/operonix_visual_tokens.dart';
@@ -7,6 +8,7 @@ import 'package:production_app/core/visual/visual_style.dart';
 import 'package:production_app/modules/production/dashboard/models/production_dashboard_layout.dart';
 import 'package:production_app/modules/production/dashboard/models/production_dashboard_module.dart';
 import 'package:production_app/modules/production/dashboard/production_dashboard_access.dart';
+import 'package:production_app/modules/production/dashboard/widgets/production_classic_action_tile.dart';
 import 'package:production_app/modules/production/dashboard/widgets/production_dashboard_action_tile.dart';
 import 'package:production_app/modules/production/dashboard/widgets/production_dashboard_home_modules_view.dart';
 import 'package:production_app/modules/production/dashboard/widgets/production_dashboard_icon_grid_tile.dart';
@@ -49,10 +51,9 @@ void main() {
       MaterialApp(
         theme: OperonixVisualTheme.forStyle(style),
         home: Scaffold(
-          body: ListView(
+          body: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
-            children: [
-              ProductionDashboardHomeModulesView(
+            child: ProductionDashboardHomeModulesView(
                 layout: layout,
                 access: ProductionDashboardAccess(
                   companyData: const {'role': 'admin'},
@@ -83,7 +84,6 @@ void main() {
                   ),
                 ],
               ),
-            ],
           ),
         ),
       ),
@@ -155,6 +155,67 @@ void main() {
     }
 
     expect(orders.width, lessThan(ordersCard.width));
+    expect(find.text('Otvori'), findsWidgets);
+  }
+
+  void expectClassicTiles(WidgetTester tester, Size size) {
+    expect(find.byType(ProductionDashboardActionTile), findsNothing);
+    expect(find.byIcon(Icons.chevron_right), findsNothing);
+    expect(find.text('Otvori'), findsNothing);
+    final tiles = find.byType(ProductionClassicActionTile);
+    expect(tiles, findsNWidgets(1 + productionTitles.length));
+    final width = ProductionClassicActionTile.tileWidthFor(size.width - 32);
+    for (var i = 0; i < 1 + productionTitles.length; i++) {
+      final rect = tester.getRect(tiles.at(i));
+      expect(rect.width, width);
+      expect(rect.height, ProductionClassicActionTile.tileHeight);
+    }
+    expect(width, lessThanOrEqualTo(ProductionClassicActionTile.maxTileWidth));
+    expect(width, lessThan(size.width - 32));
+
+    final registration = tester.getRect(tiles.first);
+    final orders = tester.getRect(
+      find.ancestor(
+        of: find.text('Proizvodni nalozi'),
+        matching: find.byType(ProductionClassicActionTile),
+      ),
+    );
+    expect(registration.width, orders.width);
+    expect(registration.height, orders.height);
+
+    final icon = tester.getRect(
+      find.descendant(
+        of: tiles.first,
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Container && widget.child is Icon,
+        ),
+      ),
+    );
+    final title = tester.getRect(find.text('Registracije'));
+    expect(icon.center.dx, closeTo(title.center.dx, 1));
+    expect(icon.bottom, lessThan(title.top));
+    expect(icon.width, ProductionClassicActionTile.iconExtent);
+    expect(icon.height, ProductionClassicActionTile.iconExtent);
+
+    final text = tester.widget<Text>(find.text('Registracije'));
+    expect(text.textAlign, TextAlign.center);
+    expect(text.maxLines, 2);
+    expect(text.style?.color, OperonixVisualTokens.classic().primaryText);
+    expect(
+      tester.widget<Icon>(find.byIcon(Icons.precision_manufacturing_outlined).first).color,
+      OperonixVisualTokens.classic().moduleAccent,
+    );
+    for (final label in productionTitles) {
+      final paragraph = tester.renderObject<RenderParagraph>(find.text(label));
+      expect(paragraph.didExceedMaxLines, isFalse, reason: label);
+    }
+    if (size.width >= 1280) {
+      final firstProductionTop = tester.getRect(tiles.at(1)).top;
+      final row = [
+        for (var i = 1; i < tiles.evaluate().length; i++) tester.getRect(tiles.at(i)),
+      ].where((rect) => (rect.top - firstProductionTop).abs() < 1).length;
+      expect(row, greaterThanOrEqualTo(4));
+    }
   }
 
   for (final layout in ProductionDashboardLayout.values) {
@@ -177,7 +238,11 @@ void main() {
               layout: layout,
               taps: taps,
             );
-            expectCompact(tester, size, style);
+            if (style == VisualStyle.classic) {
+              expectClassicTiles(tester, size);
+            } else {
+              expectCompact(tester, size, style);
+            }
 
             await tester.tap(find.text('Registracije'));
             await tester.pump();
