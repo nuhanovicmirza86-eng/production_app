@@ -27,7 +27,7 @@ class ProductionDashboardHomeModulesView extends StatelessWidget {
 
   static const double webPremiumChildAspectRatio = 0.82;
 
-  /// Classic ikonska mreža. Premium koristi [PremiumHomeIconGridMetrics].
+  /// Phone icon grid. Web Classic and Web Premium keep the 132 extent above.
   static int classicIconGridColumnCount(double screenWidth) {
     if (screenWidth >= 1200) return 6;
     if (screenWidth >= 900) return 5;
@@ -148,18 +148,31 @@ class _IconGridView extends StatelessWidget {
     final screenWidth = MediaQuery.sizeOf(context).width;
     return LayoutBuilder(
       builder: (context, constraints) {
+        if (!premium) {
+          return _buildColumn(
+            context,
+            crossAxisCount:
+                ProductionDashboardHomeModulesView.classicIconGridColumnCount(
+              screenWidth,
+            ),
+            mainAxisExtent: null,
+          );
+        }
+        if (screenWidth < 600) {
+          return _buildColumn(
+            context,
+            crossAxisCount:
+                ProductionDashboardHomeModulesView.classicIconGridColumnCount(
+              screenWidth,
+            ),
+            mainAxisExtent: null,
+          );
+        }
         final contentWidth = constraints.maxWidth;
-        final crossAxisCount = premium
-            ? PremiumHomeIconGridMetrics.columnCount(contentWidth)
-            : ProductionDashboardHomeModulesView.classicIconGridColumnCount(
-                screenWidth,
-              );
         return _buildColumn(
           context,
-          crossAxisCount: crossAxisCount,
-          mainAxisExtent: premium
-              ? PremiumHomeIconGridMetrics.tileExtentFor(contentWidth)
-              : null,
+          crossAxisCount: PremiumHomeIconGridMetrics.columnCount(contentWidth),
+          mainAxisExtent: PremiumHomeIconGridMetrics.tileExtentFor(contentWidth),
         );
       },
     );

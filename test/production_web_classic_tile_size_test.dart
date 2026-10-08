@@ -309,7 +309,7 @@ void main() {
       expect(find.byType(PremiumResponsiveGrid), findsNothing);
     });
 
-    testWidgets('android premium $width keeps the baseline premium grid', (
+    testWidgets('android premium $width matches Maintenance phone geometry', (
       tester,
     ) async {
       await pumpHome(
@@ -320,43 +320,54 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       final grid = tester.widget<GridView>(find.byType(GridView));
+      expect(grid.gridDelegate, isA<SliverGridDelegateWithFixedCrossAxisCount>());
       final delegate =
           grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+      expect(delegate.crossAxisCount, 3);
+      expect(delegate.crossAxisSpacing, 10);
+      expect(delegate.mainAxisSpacing, 10);
+      expect(delegate.childAspectRatio, 0.82);
+      expect(delegate.mainAxisExtent, isNull);
       final contentWidth = width - 32;
-      expect(
-        delegate.crossAxisCount,
-        PremiumHomeIconGridMetrics.columnCount(contentWidth),
+      final tileWidth = (contentWidth - 20) / 3;
+      final tileHeight = tileWidth / 0.82;
+      final titleFinder = find.text('Proizvodni nalozi');
+      final tileFinder = find.ancestor(
+        of: titleFinder,
+        matching: find.byType(ProductionDashboardIconGridTile),
       );
-      expect(
-        delegate.mainAxisExtent,
-        PremiumHomeIconGridMetrics.tileExtentFor(contentWidth),
+      final tileSize = tester.getSize(tileFinder);
+      expect(tileSize.width, closeTo(tileWidth, 0.05));
+      expect(tileSize.height, closeTo(tileHeight, 0.05));
+      final badge = tester.widget<PremiumIconBadge>(
+        find.descendant(
+          of: tileFinder,
+          matching: find.byType(PremiumIconBadge),
+        ),
       );
-      expect(
-        tester
-            .widget<PremiumIconBadge>(
-              find.descendant(
-                of: find.byType(ProductionDashboardIconGridTile).first,
-                matching: find.byType(PremiumIconBadge),
-              ),
-            )
-            .variant,
-        PremiumBadgeVariant.large,
-      );
-      final tileFinder = find.byType(ProductionDashboardIconGridTile).first;
+      expect(badge.variant, PremiumBadgeVariant.large);
+      expect(badge.extent, 60);
       final column = tester.widget<Column>(
         find.descendant(of: tileFinder, matching: find.byType(Column)),
       );
-      expect(column.mainAxisAlignment, MainAxisAlignment.start);
-      expect(column.crossAxisAlignment, CrossAxisAlignment.start);
-      expect(
-        tester.widget<Text>(find.text('Proizvodni nalozi')).textAlign,
-        TextAlign.start,
-      );
+      expect(column.mainAxisAlignment, MainAxisAlignment.center);
+      expect(column.crossAxisAlignment, CrossAxisAlignment.center);
+      final title = tester.widget<Text>(titleFinder);
+      expect(title.textAlign, TextAlign.center);
+      expect(title.maxLines, 3);
+      expect(title.overflow, TextOverflow.ellipsis);
+      expect(title.style?.fontSize, 13);
+      expect(title.style?.fontWeight, FontWeight.w700);
+      expect(title.style?.height, 1.15);
       final tileRect = tester.getRect(tileFinder);
       final badgeRect = tester.getRect(
         find.descendant(of: tileFinder, matching: find.byType(PremiumIconBadge)),
       );
-      expect(badgeRect.center.dx, lessThan(tileRect.center.dx - 8));
+      final titleRect = tester.getRect(titleFinder);
+      expect(badgeRect.width, closeTo(60, 0.1));
+      expect(badgeRect.height, closeTo(60, 0.1));
+      expect(badgeRect.center.dx, closeTo(tileRect.center.dx, 1));
+      expect(titleRect.center.dx, closeTo(tileRect.center.dx, 1));
     });
   }
 

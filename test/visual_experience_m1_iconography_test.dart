@@ -335,11 +335,8 @@ void main() {
       await _pumpIconHome(tester, width: 360, premium: true);
       expect(tester.takeException(), isNull);
       final tile = tester.getSize(find.byType(ProductionDashboardIconGridTile).first);
-      expect(tile.width, greaterThanOrEqualTo(150));
-      expect(
-        tile.height,
-        PremiumHomeIconGridMetrics.tileExtentFor(360 - 32),
-      );
+      expect(tile.width, closeTo(102.67, 0.1));
+      expect(tile.height, closeTo(125.20, 0.1));
       expect(find.byType(GridView), findsOneWidget);
       final badge = tester.widget<PremiumIconBadge>(
         find.descendant(
@@ -351,8 +348,8 @@ void main() {
       for (final label in _longHomeLabels) {
         final text = tester.widget<Text>(find.text(label));
         final paragraph = tester.renderObject<RenderParagraph>(find.text(label));
-        expect(text.maxLines, PremiumHomeIconGridMetrics.titleMaxLines(360 - 32));
-        expect(text.style?.fontSize, 14);
+        expect(text.maxLines, 3);
+        expect(text.style?.fontSize, 13);
         expect(paragraph.size.height, lessThan(tile.height * 0.55));
       }
       final glyphs = tester
@@ -375,19 +372,26 @@ void main() {
         await _pumpIconHome(tester, width: width, premium: true);
         expect(tester.takeException(), isNull, reason: 'width $width');
         final tile = tester.getSize(find.byType(ProductionDashboardIconGridTile).first);
-        expect(tile.width, greaterThanOrEqualTo(150), reason: 'width $width');
-        expect(
-          tile.height,
-          PremiumHomeIconGridMetrics.tileExtentFor(width - 32),
-          reason: 'width $width',
-        );
-        expect(tile.height, lessThan(152), reason: 'width $width');
+        if (width < 600) {
+          final contentWidth = width - 32;
+          final tileWidth = (contentWidth - 20) / 3;
+          expect(tile.width, closeTo(tileWidth, 0.1), reason: 'width $width');
+          expect(tile.height, closeTo(tileWidth / 0.82, 0.1), reason: 'width $width');
+        } else {
+          expect(tile.width, greaterThanOrEqualTo(150), reason: 'width $width');
+          expect(
+            tile.height,
+            PremiumHomeIconGridMetrics.tileExtentFor(width - 32),
+            reason: 'width $width',
+          );
+          expect(tile.height, lessThan(152), reason: 'width $width');
+        }
         for (final label in _longHomeLabels) {
           final text = tester.widget<Text>(find.text(label));
           final paragraph = tester.renderObject<RenderParagraph>(find.text(label));
           expect(
             text.maxLines,
-            PremiumHomeIconGridMetrics.titleMaxLines(width - 32),
+            width < 600 ? 3 : PremiumHomeIconGridMetrics.titleMaxLines(width - 32),
             reason: 'width $width',
           );
           expect(paragraph.size.height, lessThan(tile.height * 0.55));
@@ -459,7 +463,7 @@ void main() {
       );
       expect((spot.decoration! as BoxDecoration).border, isNull);
       final text = tester.widget<Text>(find.text('Način rada na ovom uređaju'));
-      expect(text.textAlign, TextAlign.start);
+      expect(text.textAlign, TextAlign.center);
     });
 
     testWidgets('home pictograms differ by shape in one color', (tester) async {
@@ -564,8 +568,8 @@ void main() {
       final orders = tester
           .getSize(find.byType(ProductionDashboardIconGridTile).at(1));
       expect(tiles, orders);
-      expect(tiles.height, PremiumHomeIconGridMetrics.tileExtentFor(411 - 32));
-      expect(tiles.height, lessThan(140));
+      expect(tiles.width, closeTo(119.67, 0.1));
+      expect(tiles.height, closeTo(145.94, 0.1));
       expect(find.text('Registracije'), findsOneWidget);
       expect(
         tester

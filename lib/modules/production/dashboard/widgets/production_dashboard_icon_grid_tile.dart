@@ -31,6 +31,9 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = OperonixVisualTokens.of(context);
     final web = useWebPresentation ?? kIsWeb;
+    final phonePremium = tokens.isPremium &&
+        !web &&
+        MediaQuery.sizeOf(context).width < 600;
     final centerPremium = tokens.isPremium && web;
     final glyph = tokens.isPremium
         ? OperonixPremiumIconography.resolve(title: title, icon: icon)
@@ -60,7 +63,9 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
         onTap: onTap,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final lines = tokens.isPremium
+            final lines = phonePremium
+                ? 3
+                : tokens.isPremium
                 ? PremiumHomeIconGridMetrics.titleMaxLinesForTileWidth(
                     constraints.maxWidth,
                   )
@@ -75,10 +80,10 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
                 )
               : const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
           child: Column(
-            crossAxisAlignment: centerPremium || !tokens.isPremium
+            crossAxisAlignment: centerPremium || phonePremium || !tokens.isPremium
                 ? CrossAxisAlignment.center
                 : CrossAxisAlignment.start,
-            mainAxisAlignment: centerPremium || !tokens.isPremium
+            mainAxisAlignment: centerPremium || phonePremium || !tokens.isPremium
                 ? MainAxisAlignment.center
                 : MainAxisAlignment.start,
             children: [
@@ -130,21 +135,29 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
                 ],
               ),
               SizedBox(
-                height: tokens.isPremium ? PremiumHomeIconGridMetrics.titleGap : 8,
+                height: phonePremium
+                    ? 4
+                    : tokens.isPremium
+                    ? PremiumHomeIconGridMetrics.titleGap
+                    : 8,
               ),
               Text(
                 title,
-                textAlign: centerPremium || !tokens.isPremium
+                textAlign: centerPremium || phonePremium || !tokens.isPremium
                     ? TextAlign.center
                     : TextAlign.start,
                 maxLines: lines,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: tokens.isPremium
+                  fontWeight: phonePremium ? FontWeight.w700 : FontWeight.w800,
+                  fontSize: phonePremium
+                      ? 13
+                      : tokens.isPremium
                       ? PremiumHomeIconGridMetrics.titleFontSize
                       : 12,
-                  height: tokens.isPremium
+                  height: phonePremium
+                      ? 1.15
+                      : tokens.isPremium
                       ? PremiumHomeIconGridMetrics.titleLineHeight
                       : 1.2,
                   color: tokens.isPremium ? tokens.primaryText : null,
