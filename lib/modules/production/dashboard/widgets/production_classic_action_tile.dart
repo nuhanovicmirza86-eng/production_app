@@ -3,29 +3,20 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/operonix_production_brand.dart';
 import '../../../../core/visual/operonix_visual_tokens.dart';
 
-/// Classic home shortcut. Vertical icon tile at the Maintenance Classic scale.
+/// Web Classic home tile. Geometry matches Maintenance web Classic.
 ///
-/// Maintenance reference (`MaintenanceDashboardHomeModulesView` /
-/// `MaintenanceDashboardIconGridTile`):
-/// web cell cap 132, aspect 0.82 (height 161), icon box 52, glyph 28.
-/// Production cards are 180 wide so the longer titles fit on two lines.
+/// [MaintenanceDashboardHomeModulesView.webMaxCrossAxisExtent] = 132
+/// [MaintenanceDashboardHomeModulesView.iconGridChildAspectRatio] = 0.82
+/// [MaintenanceDashboardHomeModulesView.tileGap] = 10
+/// [MaintenanceDashboardIconGridTile] icon box 52, glyph 28,
+/// padding 8×12, title gap 8, font 12 / w800 / height 1.2.
 class ProductionClassicActionTile extends StatelessWidget {
-  /// Maintenance web cell cap is 132. Production titles such as
-  /// "Način rada na ovom uređaju" need 156 px of text at the same 12 px
-  /// weight, so the card is 180 px (padding 8 + 8) and still one compact tile.
-  static const double maxTileWidth = 180;
-
-  /// `MaintenanceDashboardHomeModulesView.iconGridChildAspectRatio`.
+  static const double maxCrossAxisExtent = 132;
   static const double childAspectRatio = 0.82;
-
-  /// Maintenance cell height at its 132 px cap: 132 / 0.82.
-  static const double tileHeight = 132 / childAspectRatio;
-
-  /// `MaintenanceDashboardIconGridTile` icon container.
+  static const double gridSpacing = 10;
   static const double iconExtent = 52;
-
-  /// Glyph inside that container.
   static const double iconSize = 28;
+  static const double titleGap = 8;
 
   final IconData icon;
   final String title;
@@ -40,20 +31,12 @@ class ProductionClassicActionTile extends StatelessWidget {
     required this.onTap,
   });
 
-  /// Same tile on every width. A narrower pane uses the pane; it does not grow.
-  static double tileWidthFor(double contentWidth) {
-    if (!contentWidth.isFinite || contentWidth <= 0) return maxTileWidth;
-    if (contentWidth < maxTileWidth) return contentWidth;
-    return maxTileWidth;
-  }
-
   @override
   Widget build(BuildContext context) {
     final tokens = OperonixVisualTokens.of(context);
     final accent = tokens.moduleAccent;
     final hasNotice = noticeText != null && noticeText!.trim().isNotEmpty;
     return Card(
-      margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       elevation: 1,
       shape: RoundedRectangleBorder(
@@ -106,7 +89,7 @@ class ProductionClassicActionTile extends StatelessWidget {
                     ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: titleGap),
               Text(
                 title,
                 textAlign: TextAlign.center,

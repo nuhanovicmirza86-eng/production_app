@@ -14,7 +14,6 @@ import 'package:production_app/modules/production/dashboard/models/production_da
 import 'package:production_app/modules/production/dashboard/models/production_dashboard_module.dart';
 import 'package:production_app/modules/production/dashboard/production_dashboard_access.dart';
 import 'package:production_app/modules/production/dashboard/screens/production_dashboard_screen.dart';
-import 'package:production_app/modules/production/dashboard/widgets/production_dashboard_action_tile.dart';
 import 'package:production_app/modules/production/dashboard/widgets/production_dashboard_home_modules_view.dart';
 import 'package:production_app/modules/production/notifications/mes_inbox_attention.dart';
 import 'package:production_app/modules/production/station_pages/screens/production_evidence_operator_hub_screen.dart';
@@ -139,19 +138,14 @@ void main() {
       );
       await tester.pump();
       expect(tester.takeException(), isNull);
-      expect(find.byType(GridView), findsNothing);
-      final tiles = find.byType(ProductionDashboardActionTile);
-      expect(tiles, findsNWidgets(8));
-      final rects = [
-        for (var i = 0; i < 8; i++) tester.getRect(tiles.at(i)),
-      ];
-      final firstTop = rects.first.top;
-      final firstRow = rects.where((rect) => (rect.top - firstTop).abs() < 1);
-      expect(firstRow.length, greaterThanOrEqualTo(4));
-      for (final rect in rects) {
-        expect(rect.width, ProductionDashboardHomeModulesView.maxTileWidth);
-        expect(rect.width, lessThan(1920 * 0.4));
-        expect(rect.height, inInclusiveRange(44, 140));
+      final grids = tester.widgetList<GridView>(find.byType(GridView));
+      expect(grids, isNotEmpty);
+      for (final grid in grids) {
+        final delegate =
+            grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+        expect(delegate.crossAxisCount, greaterThanOrEqualTo(6));
+        expect(delegate.mainAxisExtent, isNotNull);
+        expect(delegate.mainAxisExtent!, lessThanOrEqualTo(140));
       }
       expect(
         find.text('Operativne evidencije procesa i kontrola kvaliteta'),

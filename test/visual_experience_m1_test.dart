@@ -19,7 +19,6 @@ import 'package:production_app/modules/production/dashboard/models/production_da
 import 'package:production_app/modules/production/dashboard/models/production_dashboard_module.dart';
 import 'package:production_app/modules/production/dashboard/production_dashboard_access.dart';
 import 'package:production_app/modules/production/dashboard/screens/production_dashboard_screen.dart';
-import 'package:production_app/modules/production/dashboard/widgets/production_classic_action_tile.dart';
 import 'package:production_app/modules/production/dashboard/widgets/production_dashboard_action_tile.dart';
 import 'package:production_app/modules/production/dashboard/widgets/production_dashboard_icon_grid_tile.dart';
 import 'package:production_app/modules/production/notifications/mes_inbox_attention.dart';
@@ -584,8 +583,7 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.byType(ProductionClassicActionTile), findsOneWidget);
-      expect(find.byType(ProductionDashboardActionTile), findsNothing);
+      expect(find.byType(ProductionDashboardActionTile), findsOneWidget);
       expect(find.byType(ProductionDashboardIconGridTile), findsNothing);
       expect(find.text('Raspored:'), findsNothing);
 
@@ -598,17 +596,8 @@ void main() {
 
       await tester.pageBack();
       await tester.pumpAndSettle();
-      expect(find.byType(ProductionClassicActionTile), findsOneWidget);
+      expect(find.byType(ProductionDashboardIconGridTile), findsOneWidget);
       expect(find.byType(ProductionDashboardActionTile), findsNothing);
-      expect(find.byType(ProductionDashboardIconGridTile), findsNothing);
-      expect(
-        tester.getSize(find.byType(ProductionClassicActionTile)).width,
-        ProductionClassicActionTile.maxTileWidth,
-      );
-      expect(
-        tester.getSize(find.byType(ProductionClassicActionTile)).height,
-        ProductionClassicActionTile.tileHeight,
-      );
       expect(find.text('Brze akcije'), findsOneWidget);
       expect(find.text('Raspored:'), findsNothing);
       expect(find.text('Prikaz:'), findsNothing);
