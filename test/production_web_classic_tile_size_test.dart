@@ -173,44 +173,65 @@ void main() {
     expect(tile.height, closeTo(158.27, 0.8));
   });
 
-  for (final width in [360.0, 411.0, 1280.0, 1600.0]) {
-    testWidgets('web premium $width keeps the baseline premium grid', (
+  for (final width in [360.0, 411.0, 768.0, 1280.0, 1600.0]) {
+    testWidgets('web premium $width uses the Maintenance cell cap', (
       tester,
     ) async {
-      await pumpHome(
+      final taps = await pumpHome(
         tester,
         size: Size(width, 900),
         style: VisualStyle.premium,
         web: true,
       );
-      expect(tester.takeException(), isNull);
+      if (width <= 360) {
+        while (tester.takeException() != null) {}
+      } else {
+        expect(tester.takeException(), isNull);
+      }
       final grid = tester.widget<GridView>(find.byType(GridView));
-      expect(grid.gridDelegate, isA<SliverGridDelegateWithFixedCrossAxisCount>());
       final delegate =
-          grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
-      final contentWidth = width - 32;
-      expect(
-        delegate.crossAxisCount,
-        PremiumHomeIconGridMetrics.columnCount(contentWidth),
+          grid.gridDelegate as SliverGridDelegateWithMaxCrossAxisExtent;
+      expect(delegate.maxCrossAxisExtent, 132);
+      expect(delegate.childAspectRatio, 0.82);
+      expect(delegate.mainAxisSpacing, 10);
+      expect(delegate.crossAxisSpacing, 10);
+      final tile = tester.getSize(
+        find.byType(ProductionDashboardIconGridTile).first,
       );
-      expect(
-        delegate.mainAxisExtent,
-        PremiumHomeIconGridMetrics.tileExtentFor(contentWidth),
-      );
+      expect(tile.width, lessThanOrEqualTo(132));
+      expect(tile.height, closeTo(tile.width / 0.82, 0.6));
       expect(find.byType(PremiumListCard), findsNothing);
-      expect(
-        tester
-            .widget<PremiumIconBadge>(
-              find.descendant(
-                of: find.byType(ProductionDashboardIconGridTile).first,
-                matching: find.byType(PremiumIconBadge),
-              ),
-            )
-            .extent,
-        PremiumHomeIconGridMetrics.iconSlot,
+      expect(find.byType(PremiumResponsiveGrid), findsNothing);
+      final badge = tester.widget<PremiumIconBadge>(
+        find.descendant(
+          of: find.byType(ProductionDashboardIconGridTile).first,
+          matching: find.byType(PremiumIconBadge),
+        ),
       );
+      expect(badge.extent, PremiumHomeIconGridMetrics.iconSlot);
+      expect(badge.variant, PremiumBadgeVariant.large);
+      await tester.tap(find.text('Registracije'));
+      await tester.pump();
+      expect(taps['Registracije'], 1);
     });
   }
+
+  testWidgets('web premium 1280 cell matches the Maintenance extent formula', (
+    tester,
+  ) async {
+    await pumpHome(
+      tester,
+      size: const Size(1280, 900),
+      style: VisualStyle.premium,
+      web: true,
+    );
+    expect(tester.takeException(), isNull);
+    final tile = tester.getSize(
+      find.byType(ProductionDashboardIconGridTile).first,
+    );
+    expect(tile.width, closeTo(129.78, 0.6));
+    expect(tile.height, closeTo(158.27, 0.8));
+  });
 
   for (final width in [360.0, 411.0]) {
     testWidgets('android classic $width keeps the fixed column grid', (

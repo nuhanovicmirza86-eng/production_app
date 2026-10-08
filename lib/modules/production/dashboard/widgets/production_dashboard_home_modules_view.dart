@@ -22,6 +22,11 @@ class ProductionDashboardHomeModulesView extends StatelessWidget {
 
   static const double webClassicChildAspectRatio = 0.82;
 
+  /// Web Premium icon grid only. Same cell cap as Maintenance Web Premium.
+  static const double webPremiumMaxCrossAxisExtent = 132;
+
+  static const double webPremiumChildAspectRatio = 0.82;
+
   /// Classic ikonska mreža. Premium koristi [PremiumHomeIconGridMetrics].
   static int classicIconGridColumnCount(double screenWidth) {
     if (screenWidth >= 1200) return 6;
@@ -137,6 +142,9 @@ class _IconGridView extends StatelessWidget {
     if (web && !premium) {
       return _buildWebClassicColumn(context);
     }
+    if (web && premium) {
+      return _buildWebPremiumColumn(context);
+    }
     final screenWidth = MediaQuery.sizeOf(context).width;
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -183,6 +191,46 @@ class _IconGridView extends StatelessWidget {
             crossAxisSpacing: ProductionDashboardHomeModulesView.tileGap,
             childAspectRatio:
                 ProductionDashboardHomeModulesView.webClassicChildAspectRatio,
+          ),
+          itemCount: section.entries.length,
+          itemBuilder: (context, index) {
+            return _buildIconEntry(context, section.entries[index]);
+          },
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: out,
+    );
+  }
+
+  Widget _buildWebPremiumColumn(BuildContext context) {
+    final out = <Widget>[];
+    for (var i = 0; i < sections.length; i++) {
+      final section = sections[i];
+      if (i > 0) {
+        out.add(const SizedBox(height: ProductionDashboardHomeModulesView.sectionGap));
+      }
+      out.add(
+        ProductionDashboardModuleGroupHeader(
+          title: section.title,
+          subtitle: section.subtitle,
+          icon: section.icon,
+        ),
+      );
+      out.add(const SizedBox(height: ProductionDashboardHomeModulesView.afterHeader));
+      out.add(
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent:
+                ProductionDashboardHomeModulesView.webPremiumMaxCrossAxisExtent,
+            mainAxisSpacing: ProductionDashboardHomeModulesView.tileGap,
+            crossAxisSpacing: ProductionDashboardHomeModulesView.tileGap,
+            childAspectRatio:
+                ProductionDashboardHomeModulesView.webPremiumChildAspectRatio,
           ),
           itemCount: section.entries.length,
           itemBuilder: (context, index) {
