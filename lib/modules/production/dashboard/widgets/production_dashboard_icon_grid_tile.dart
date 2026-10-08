@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/operonix_production_brand.dart';
@@ -14,17 +15,23 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
   final String? badgeText;
   final VoidCallback onTap;
 
+  /// Tests set this. Production uses [kIsWeb]. Width never selects the platform.
+  final bool? useWebPresentation;
+
   const ProductionDashboardIconGridTile({
     super.key,
     required this.icon,
     required this.title,
     this.badgeText,
     required this.onTap,
+    this.useWebPresentation,
   });
 
   @override
   Widget build(BuildContext context) {
     final tokens = OperonixVisualTokens.of(context);
+    final web = useWebPresentation ?? kIsWeb;
+    final centerPremium = tokens.isPremium && web;
     final glyph = tokens.isPremium
         ? OperonixPremiumIconography.resolve(title: title, icon: icon)
         : null;
@@ -68,12 +75,12 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
                 )
               : const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
           child: Column(
-            crossAxisAlignment: tokens.isPremium
-                ? CrossAxisAlignment.start
-                : CrossAxisAlignment.center,
-            mainAxisAlignment: tokens.isPremium
-                ? MainAxisAlignment.start
-                : MainAxisAlignment.center,
+            crossAxisAlignment: centerPremium || !tokens.isPremium
+                ? CrossAxisAlignment.center
+                : CrossAxisAlignment.start,
+            mainAxisAlignment: centerPremium || !tokens.isPremium
+                ? MainAxisAlignment.center
+                : MainAxisAlignment.start,
             children: [
               Stack(
                 clipBehavior: Clip.none,
@@ -127,7 +134,9 @@ class ProductionDashboardIconGridTile extends StatelessWidget {
               ),
               Text(
                 title,
-                textAlign: tokens.isPremium ? TextAlign.start : TextAlign.center,
+                textAlign: centerPremium || !tokens.isPremium
+                    ? TextAlign.center
+                    : TextAlign.start,
                 maxLines: lines,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(

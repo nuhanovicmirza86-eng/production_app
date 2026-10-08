@@ -307,6 +307,7 @@ class _IconGridView extends StatelessWidget {
             title: entry.title,
             badgeText: count > 0 ? access.packedBoxesPendingNotice(count) : null,
             onTap: entry.onTap,
+            useWebPresentation: web,
           );
         },
       );
@@ -317,6 +318,7 @@ class _IconGridView extends StatelessWidget {
       title: entry.title,
       badgeText: entry.noticeText,
       onTap: entry.onTap,
+      useWebPresentation: web,
     );
   }
 }

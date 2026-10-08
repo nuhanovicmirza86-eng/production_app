@@ -130,6 +130,26 @@ void main() {
     expect(title.style?.fontSize, 12);
     expect(title.style?.fontWeight, FontWeight.w800);
     expect(title.style?.height, 1.2);
+    expect(title.textAlign, TextAlign.center);
+    final tileFinder = find.byType(ProductionDashboardIconGridTile).first;
+    final column = tester.widget<Column>(
+      find.descendant(of: tileFinder, matching: find.byType(Column)),
+    );
+    expect(column.mainAxisAlignment, MainAxisAlignment.center);
+    expect(column.crossAxisAlignment, CrossAxisAlignment.center);
+    final tileRect = tester.getRect(tileFinder);
+    final iconRect = tester.getRect(
+      find.descendant(
+        of: tileFinder,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Container &&
+              widget.constraints?.maxWidth == 52 &&
+              widget.constraints?.maxHeight == 52,
+        ),
+      ),
+    );
+    expect(iconRect.center.dx, closeTo(tileRect.center.dx, 1));
     expect(find.byType(PremiumListCard), findsNothing);
     expect(find.byType(PremiumResponsiveGrid), findsNothing);
     expect(viewport.width, greaterThan(0));
@@ -210,6 +230,24 @@ void main() {
       );
       expect(badge.extent, PremiumHomeIconGridMetrics.iconSlot);
       expect(badge.variant, PremiumBadgeVariant.large);
+      final tileFinder = find.byType(ProductionDashboardIconGridTile).first;
+      final column = tester.widget<Column>(
+        find.descendant(of: tileFinder, matching: find.byType(Column)),
+      );
+      expect(column.mainAxisAlignment, MainAxisAlignment.center);
+      expect(column.crossAxisAlignment, CrossAxisAlignment.center);
+      final title = tester.widget<Text>(find.text('Proizvodni nalozi'));
+      expect(title.textAlign, TextAlign.center);
+      expect(title.style?.fontSize, 14);
+      expect(title.style?.fontWeight, FontWeight.w800);
+      expect(title.maxLines, isNotNull);
+      final tileRect = tester.getRect(tileFinder);
+      final badgeRect = tester.getRect(
+        find.descendant(of: tileFinder, matching: find.byType(PremiumIconBadge)),
+      );
+      expect(badgeRect.width, closeTo(60, 0.1));
+      expect(badgeRect.height, closeTo(60, 0.1));
+      expect(badgeRect.center.dx, closeTo(tileRect.center.dx, 1));
       await tester.tap(find.text('Registracije'));
       await tester.pump();
       expect(taps['Registracije'], 1);
@@ -258,6 +296,16 @@ void main() {
       );
       expect(delegate.childAspectRatio, 0.82);
       expect(delegate.mainAxisExtent, isNull);
+      final tileFinder = find.byType(ProductionDashboardIconGridTile).first;
+      final column = tester.widget<Column>(
+        find.descendant(of: tileFinder, matching: find.byType(Column)),
+      );
+      expect(column.mainAxisAlignment, MainAxisAlignment.center);
+      expect(column.crossAxisAlignment, CrossAxisAlignment.center);
+      expect(
+        tester.widget<Text>(find.text('Proizvodni nalozi')).textAlign,
+        TextAlign.center,
+      );
       expect(find.byType(PremiumResponsiveGrid), findsNothing);
     });
 
@@ -294,6 +342,21 @@ void main() {
             .variant,
         PremiumBadgeVariant.large,
       );
+      final tileFinder = find.byType(ProductionDashboardIconGridTile).first;
+      final column = tester.widget<Column>(
+        find.descendant(of: tileFinder, matching: find.byType(Column)),
+      );
+      expect(column.mainAxisAlignment, MainAxisAlignment.start);
+      expect(column.crossAxisAlignment, CrossAxisAlignment.start);
+      expect(
+        tester.widget<Text>(find.text('Proizvodni nalozi')).textAlign,
+        TextAlign.start,
+      );
+      final tileRect = tester.getRect(tileFinder);
+      final badgeRect = tester.getRect(
+        find.descendant(of: tileFinder, matching: find.byType(PremiumIconBadge)),
+      );
+      expect(badgeRect.center.dx, lessThan(tileRect.center.dx - 8));
     });
   }
 
