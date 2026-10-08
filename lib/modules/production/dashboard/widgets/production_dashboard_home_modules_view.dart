@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../../../../core/visual/operonix_visual_tokens.dart';
@@ -16,6 +17,11 @@ class ProductionDashboardHomeModulesView extends StatelessWidget {
   static const double sectionGap = 18;
   static const double afterHeader = 8;
 
+  /// Web Classic icon grid only. Same cell cap as Maintenance Web Classic.
+  static const double webClassicMaxCrossAxisExtent = 132;
+
+  static const double webClassicChildAspectRatio = 0.82;
+
   /// Classic ikonska mreža. Premium koristi [PremiumHomeIconGridMetrics].
   static int classicIconGridColumnCount(double screenWidth) {
     if (screenWidth >= 1200) return 6;
@@ -28,12 +34,18 @@ class ProductionDashboardHomeModulesView extends StatelessWidget {
   final List<ProductionDashboardModuleSection> sections;
   final ProductionDashboardAccess access;
 
+  /// Tests set this. Production uses [kIsWeb]. Width never selects the platform.
+  final bool? useWebPresentation;
+
   const ProductionDashboardHomeModulesView({
     super.key,
     required this.layout,
     required this.sections,
     required this.access,
+    this.useWebPresentation,
   });
+
+  bool get _web => useWebPresentation ?? kIsWeb;
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +54,7 @@ class ProductionDashboardHomeModulesView extends StatelessWidget {
       ProductionDashboardLayout.iconGrid => _IconGridView(
         sections: sections,
         access: access,
+        web: _web,
       ),
     };
   }
@@ -110,15 +123,20 @@ class _StandardView extends StatelessWidget {
 class _IconGridView extends StatelessWidget {
   final List<ProductionDashboardModuleSection> sections;
   final ProductionDashboardAccess access;
+  final bool web;
 
   const _IconGridView({
     required this.sections,
     required this.access,
+    required this.web,
   });
 
   @override
   Widget build(BuildContext context) {
     final premium = OperonixVisualTokens.of(context).isPremium;
+    if (web && !premium) {
+      return _buildWebClassicColumn(context);
+    }
     final screenWidth = MediaQuery.sizeOf(context).width;
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -136,6 +154,46 @@ class _IconGridView extends StatelessWidget {
               : null,
         );
       },
+    );
+  }
+
+  Widget _buildWebClassicColumn(BuildContext context) {
+    final out = <Widget>[];
+    for (var i = 0; i < sections.length; i++) {
+      final section = sections[i];
+      if (i > 0) {
+        out.add(const SizedBox(height: ProductionDashboardHomeModulesView.sectionGap));
+      }
+      out.add(
+        ProductionDashboardModuleGroupHeader(
+          title: section.title,
+          subtitle: section.subtitle,
+          icon: section.icon,
+        ),
+      );
+      out.add(const SizedBox(height: ProductionDashboardHomeModulesView.afterHeader));
+      out.add(
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent:
+                ProductionDashboardHomeModulesView.webClassicMaxCrossAxisExtent,
+            mainAxisSpacing: ProductionDashboardHomeModulesView.tileGap,
+            crossAxisSpacing: ProductionDashboardHomeModulesView.tileGap,
+            childAspectRatio:
+                ProductionDashboardHomeModulesView.webClassicChildAspectRatio,
+          ),
+          itemCount: section.entries.length,
+          itemBuilder: (context, index) {
+            return _buildIconEntry(context, section.entries[index]);
+          },
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: out,
     );
   }
 
