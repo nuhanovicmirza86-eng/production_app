@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -98,16 +97,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
 
-      // 🔴 KLJUČNA DODANA LOGIKA
-      await FirebaseFirestore.instance.collection('registration_requests').add({
-        'email': email,
-        'companyCode': companyCode,
-        'companyId': null, // popuni admin kasnije ili backend
-        'plantKey': null,
-        'requestedApp': 'production',
-        'status': 'pending',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      // AuthService already wrote users/{uid} + registration_requests/{uid}.
+      // A second collection.add() uses a random ID and rules deny it.
 
       if (!mounted) return;
 
