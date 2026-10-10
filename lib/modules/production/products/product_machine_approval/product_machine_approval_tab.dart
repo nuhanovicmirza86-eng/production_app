@@ -56,6 +56,9 @@ class _ProductMachineApprovalTabState extends State<ProductMachineApprovalTab> {
   bool get _canCreate =>
       ProductionAccessHelper.canPrepareProductMachineApprovalDraft(_role);
 
+  bool get _canApproveTechnology =>
+      ProductionAccessHelper.canApproveProductMachineTechnology(_role);
+
   bool get _choosePlant =>
       ProductionAccessHelper.isCompanyWideContextRole(_role);
 
@@ -101,6 +104,17 @@ class _ProductMachineApprovalTabState extends State<ProductMachineApprovalTab> {
       ),
     );
     if (created == true) await _load();
+  }
+
+  Future<void> _openTechnologyApproval(PmaApprovalView view) async {
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (context) => _PmaTechnologyApprovalDialog(
+        gateway: _gateway,
+        view: view,
+      ),
+    );
+    if (approved == true) await _load();
   }
 
   @override
@@ -177,7 +191,12 @@ class _ProductMachineApprovalTabState extends State<ProductMachineApprovalTab> {
               ..._approvals.map(
                 (view) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: _ApprovalCard(view: view),
+                  child: _ApprovalCard(
+                    view: view,
+                    canApproveTechnology:
+                        _canApproveTechnology && view.isDraft,
+                    onApproveTechnology: () => _openTechnologyApproval(view),
+                  ),
                 ),
               ),
           ],
@@ -188,15 +207,22 @@ class _ProductMachineApprovalTabState extends State<ProductMachineApprovalTab> {
 }
 
 class _ApprovalCard extends StatelessWidget {
-  const _ApprovalCard({required this.view});
+  const _ApprovalCard({
+    required this.view,
+    required this.canApproveTechnology,
+    required this.onApproveTechnology,
+  });
 
   final PmaApprovalView view;
+  final bool canApproveTechnology;
+  final VoidCallback onApproveTechnology;
 
   @override
   Widget build(BuildContext context) {
     final machines = view.machines.isEmpty
         ? view.machineScopeLabel
         : view.machines.join('\n');
+    final technologyApproved = view.isTechnologyApproved;
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -214,17 +240,118 @@ class _ApprovalCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text('Status: ${view.statusLabel}'),
-            const Text('Priprema odobrenja. Mašina još nije odobrena.'),
+            if (technologyApproved)
+              const Text('Čeka potvrdu Kontrole kvaliteta.')
+            else
+              const Text('Priprema odobrenja. Mašina još nije odobrena.'),
             Text('Pogon: ${view.plantName}'),
             const SizedBox(height: 8),
             Text(view.machineScopeLabel),
             Text(machines),
+            if (technologyApproved && view.technologySignatureLabel.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text('Technology odobrio: ${view.technologySignatureLabel}'),
+            ],
             const SizedBox(height: 8),
             Text('Kreirao: ${view.creatorLabel}'),
             Text('Kreirano: ${view.createdAtLabel}'),
+            if (canApproveTechnology) ...[
+              const SizedBox(height: 12),
+              FilledButton(
+                key: Key('pma_approve_technology_${view.omNumber}_${view.revision}'),
+                onPressed: onApproveTechnology,
+                child: const Text('Odobri tehnologiju'),
+              ),
+            ],
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PmaTechnologyApprovalDialog extends StatefulWidget {
+  const _PmaTechnologyApprovalDialog({
+    required this.gateway,
+    required this.view,
+  });
+
+  final ProductMachineApprovalGateway gateway;
+  final PmaApprovalView view;
+
+  @override
+  State<_PmaTechnologyApprovalDialog> createState() =>
+      _PmaTechnologyApprovalDialogState();
+}
+
+class _PmaTechnologyApprovalDialogState
+    extends State<_PmaTechnologyApprovalDialog> {
+  bool _saving = false;
+  String? _error;
+
+  Future<void> _approve() async {
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await widget.gateway.approveTechnology(
+        omNumber: widget.view.omNumber,
+        revision: widget.view.revision,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = _message(error);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final view = widget.view;
+    final products = view.products.isEmpty ? '—' : view.products.join('\n');
+    final machines = view.machines.isEmpty ? '—' : view.machines.join('\n');
+    return AlertDialog(
+      key: const Key('pma_technology_approval_dialog'),
+      title: const Text('Odobri tehnologiju'),
+      content: SizedBox(
+        width: 520,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(view.title, style: const TextStyle(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 12),
+              Text('Proizvod:\n$products'),
+              const SizedBox(height: 8),
+              Text('Pogon: ${view.plantName}'),
+              const SizedBox(height: 8),
+              Text('Mašine:\n$machines'),
+              const SizedBox(height: 8),
+              Text('Status: ${view.statusLabel}'),
+              if (_error != null) ...[
+                const SizedBox(height: 8),
+                Text(_error!),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Odustani'),
+        ),
+        FilledButton(
+          key: const Key('pma_confirm_technology_approval'),
+          onPressed: _saving ? null : _approve,
+          child: const Text('Odobri tehnologiju'),
+        ),
+      ],
     );
   }
 }

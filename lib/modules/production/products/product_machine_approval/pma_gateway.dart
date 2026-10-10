@@ -10,6 +10,11 @@ abstract class ProductMachineApprovalGateway {
 
   Future<PmaApprovalView> createDraft(PmaDraftRequest request);
 
+  Future<PmaApprovalView> approveTechnology({
+    required String omNumber,
+    required int revision,
+  });
+
   Future<List<PmaPlantOption>> listPlants(String companyId);
 
   Future<List<PmaMachineOption>> listMachines({
@@ -60,6 +65,25 @@ class FirebaseProductMachineApprovalGateway
           'productIds': [request.productId],
           'machineScopeMode': request.machineScopeMode,
           'machineIds': request.machineIds,
+        });
+    final data = result.data;
+    final raw = data is Map ? data['approval'] : null;
+    if (raw is! Map) {
+      throw Exception('Odobrenje nije sačuvano.');
+    }
+    return PmaApprovalView.fromCallable(Map<String, dynamic>.from(raw));
+  }
+
+  @override
+  Future<PmaApprovalView> approveTechnology({
+    required String omNumber,
+    required int revision,
+  }) async {
+    final result = await _functions
+        .httpsCallable('approveProductMachineTechnology')
+        .call(<String, dynamic>{
+          'omNumber': omNumber,
+          'revision': revision,
         });
     final data = result.data;
     final raw = data is Map ? data['approval'] : null;

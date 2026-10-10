@@ -36,6 +36,9 @@ class PmaApprovalView {
     required this.machines,
     required this.createdAtLabel,
     required this.creatorLabel,
+    this.state = '',
+    this.technologyApproverLabel = '',
+    this.technologyApprovedAtLabel = '',
   });
 
   final String omNumber;
@@ -49,6 +52,25 @@ class PmaApprovalView {
   final List<String> machines;
   final String createdAtLabel;
   final String creatorLabel;
+  final String state;
+  final String technologyApproverLabel;
+  final String technologyApprovedAtLabel;
+
+  bool get isDraft =>
+      !isTechnologyApproved &&
+      (state == 'draft' || (state.isEmpty && statusLabel == 'Nacrt'));
+
+  bool get isTechnologyApproved =>
+      state == 'technology_approved' || statusLabel == 'Tehnologija odobrena';
+
+  String get technologySignatureLabel {
+    final when = technologyApprovedAtLabel == '—'
+        ? ''
+        : technologyApprovedAtLabel;
+    if (technologyApproverLabel.isEmpty) return when;
+    if (when.isEmpty) return technologyApproverLabel;
+    return '$technologyApproverLabel · $when';
+  }
 
   factory PmaApprovalView.fromCallable(Map<String, dynamic> raw) {
     String s(dynamic value) => (value ?? '').toString().trim();
@@ -69,6 +91,20 @@ class PmaApprovalView {
     final creator = creatorName.isEmpty
         ? (creatorRole.isEmpty ? '—' : creatorRole)
         : (creatorRole.isEmpty ? creatorName : '$creatorName · $creatorRole');
+    final technology = raw['technologyApproval'];
+    var technologyName = '';
+    var technologyRole = '';
+    var technologyAt = '';
+    if (technology is Map) {
+      technologyName = s(technology['displayName']);
+      technologyRole = s(technology['roleLabel']);
+      technologyAt = _formatCreatedAt(s(technology['approvedAt']));
+    }
+    final technologyApprover = technologyName.isEmpty
+        ? technologyRole
+        : (technologyRole.isEmpty
+              ? technologyName
+              : '$technologyName · $technologyRole');
     return PmaApprovalView(
       omNumber: s(raw['omNumber']),
       revision: raw['revision'] is num ? (raw['revision'] as num).toInt() : 0,
@@ -81,6 +117,9 @@ class PmaApprovalView {
       machines: labels(raw['machines'], 'machineCode', 'machineName'),
       createdAtLabel: _formatCreatedAt(s(raw['createdAt'])),
       creatorLabel: creator,
+      state: s(raw['state']),
+      technologyApproverLabel: technologyApprover,
+      technologyApprovedAtLabel: technologyAt,
     );
   }
 }

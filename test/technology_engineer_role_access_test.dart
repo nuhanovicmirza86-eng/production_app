@@ -147,6 +147,28 @@ void main() {
     }
   });
 
+  test('only technology_engineer can sign PMA technology approval', () {
+    expect(
+      ProductionAccessHelper.canApproveProductMachineTechnology(role),
+      isTrue,
+    );
+    for (final denied in [
+      ProductionAccessHelper.roleAdmin,
+      ProductionAccessHelper.roleProductionManager,
+      ProductionAccessHelper.roleQualityControl,
+      ProductionAccessHelper.roleSuperAdmin,
+      ProductionAccessHelper.roleDevelopmentEngineer,
+      ProductionAccessHelper.roleProductionOperator,
+      ProductionAccessHelper.roleShiftLead,
+    ]) {
+      expect(
+        ProductionAccessHelper.canApproveProductMachineTechnology(denied),
+        isFalse,
+        reason: denied,
+      );
+    }
+  });
+
   test('development_engineer still does not see Products', () {
     expect(
       ProductionAccessHelper.canView(
