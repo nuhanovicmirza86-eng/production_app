@@ -59,6 +59,17 @@ Map<ProductionDashboardCard, ProductionAccessLevel> _accessNpiEngineeringHub(
   };
 }
 
+/// Inženjer tehnologije vidi samo Proizvode. Operativni, QMS, NPI i admin moduli ostaju skriveni.
+Map<ProductionDashboardCard, ProductionAccessLevel>
+_accessTechnologyEngineerProductsOnly() {
+  return {
+    for (final c in ProductionDashboardCard.values)
+      c: c == ProductionDashboardCard.products
+          ? ProductionAccessLevel.view
+          : ProductionAccessLevel.hidden,
+  };
+}
+
 /// Quality manager (`quality_control`): uvid u proizvodnju, analitiku/energiju (održavanje), Razvoj, Finance i pun QMS hub.
 Map<ProductionDashboardCard, ProductionAccessLevel> _accessQualityManagerHub() {
   return {
@@ -110,6 +121,9 @@ class ProductionAccessHelper {
 
   /// Razvoj / inženjering u NPI toku (operativni sloj bez kreiranja projekta na portfelju).
   static const String roleDevelopmentEngineer = 'development_engineer';
+
+  /// Inženjer tehnologije. Company-wide Production uloga, nije NPI i nije zamjena za [roleDevelopmentEngineer].
+  static const String roleTechnologyEngineer = 'technology_engineer';
 
   /// Read-only menadžmentski pregled (KPI / AI u Razvoju, bez operativnih mutacija u UI).
   static const String roleManagementViewer = 'management_viewer';
@@ -228,6 +242,8 @@ class ProductionAccessHelper {
         return 'Voditelj projekta';
       case roleDevelopmentEngineer:
         return 'Inženjer razvoja';
+      case roleTechnologyEngineer:
+        return 'Inženjer tehnologije';
       case roleManagementViewer:
         return 'Menadžment (pregled)';
       case roleAccountingManager:
@@ -377,6 +393,7 @@ class ProductionAccessHelper {
         _accessNpiEngineeringHub(ProductionAccessLevel.manage),
     roleDevelopmentEngineer:
         _accessNpiEngineeringHub(ProductionAccessLevel.view),
+    roleTechnologyEngineer: _accessTechnologyEngineerProductsOnly(),
     roleManagementViewer: {
       ProductionDashboardCard.products: ProductionAccessLevel.hidden,
       ProductionDashboardCard.productionOrders: ProductionAccessLevel.hidden,
@@ -621,6 +638,7 @@ class ProductionAccessHelper {
       roleAccountingClerk,
       roleProjectManager,
       roleDevelopmentEngineer,
+      roleTechnologyEngineer,
       roleManagementViewer,
       roleProductionManager,
       roleShiftLead,
@@ -664,7 +682,7 @@ class ProductionAccessHelper {
   ///
   /// Kanonski kodovi: [roleAdmin] (uključujući legacy `company_admin` → normalizacija), [roleSuperAdmin],
   /// [roleAccountingManager], [roleAccountingClerk], [roleProjectManager], [roleDevelopmentEngineer],
-  /// [roleQualityControl].
+  /// [roleTechnologyEngineer], [roleQualityControl].
   ///
   /// Usklađeno s backend [isCompanyWideContextRole] (`production_callable_helpers.js`).
   static bool isCompanyWideContextRole(dynamic roleRaw) {
@@ -675,6 +693,7 @@ class ProductionAccessHelper {
         r == roleAccountingClerk ||
         r == roleProjectManager ||
         r == roleDevelopmentEngineer ||
+        r == roleTechnologyEngineer ||
         r == roleQualityControl;
   }
 
@@ -684,6 +703,7 @@ class ProductionAccessHelper {
   /// samo osnovni AI razgovor (kad je pretplata dopušta).
   static bool canUseOperationalProductionAssistant(dynamic roleRaw) {
     final r = normalizeRole(roleRaw);
+    if (r == roleTechnologyEngineer) return false;
     return isCompanyWideContextRole(r) ||
         r == roleProductionManager ||
         r == 'supervisor' ||

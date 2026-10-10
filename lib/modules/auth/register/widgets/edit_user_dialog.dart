@@ -38,6 +38,7 @@ class _EditUserDialogState extends State<EditUserDialog> {
     ProductionAccessHelper.roleLaboratoryTechnician,
     ProductionAccessHelper.roleProjectManager,
     ProductionAccessHelper.roleDevelopmentEngineer,
+    ProductionAccessHelper.roleTechnologyEngineer,
     ProductionAccessHelper.roleManagementViewer,
     ProductionAccessHelper.roleQualityControl,
     ProductionAccessHelper.roleAccountingManager,
