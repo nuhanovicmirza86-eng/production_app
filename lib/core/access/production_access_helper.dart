@@ -711,6 +711,11 @@ class ProductionAccessHelper {
     return normalizeRole(roleRaw) == roleTechnologyEngineer;
   }
 
+  /// Formalna QC potvrda ili povrat PMA revizije. Samo menadžer kvaliteta.
+  static bool canConfirmProductMachineQuality(dynamic roleRaw) {
+    return normalizeRole(roleRaw) == roleQualityControl;
+  }
+
   /// Usklađeno s backend [canUseProductionAssistant] (`production_callable_helpers.js`).
   ///
   /// Vođa smjene nema Callable operativnog asistenta nad podacima praćenja; u hubu ostaje

@@ -237,6 +237,22 @@ class _FakeGateway implements ProductMachineApprovalGateway {
   }
 
   @override
+  Future<PmaApprovalView> confirmQuality({
+    required String omNumber,
+    required int revision,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<PmaApprovalView> returnToTechnology({
+    required String omNumber,
+    required int revision,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<List<PmaApprovalView>> listForProduct({required String productId}) async {
     return List<PmaApprovalView>.from(_approvals);
   }

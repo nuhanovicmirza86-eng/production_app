@@ -39,6 +39,8 @@ class PmaApprovalView {
     this.state = '',
     this.technologyApproverLabel = '',
     this.technologyApprovedAtLabel = '',
+    this.qualityApproverLabel = '',
+    this.qualityApprovedAtLabel = '',
   });
 
   final String omNumber;
@@ -55,21 +57,39 @@ class PmaApprovalView {
   final String state;
   final String technologyApproverLabel;
   final String technologyApprovedAtLabel;
+  final String qualityApproverLabel;
+  final String qualityApprovedAtLabel;
 
   bool get isDraft =>
       !isTechnologyApproved &&
+      !isQualityConfirmed &&
+      !isQualityReturned &&
       (state == 'draft' || (state.isEmpty && statusLabel == 'Nacrt'));
 
   bool get isTechnologyApproved =>
       state == 'technology_approved' || statusLabel == 'Tehnologija odobrena';
 
-  String get technologySignatureLabel {
-    final when = technologyApprovedAtLabel == '—'
-        ? ''
-        : technologyApprovedAtLabel;
-    if (technologyApproverLabel.isEmpty) return when;
-    if (when.isEmpty) return technologyApproverLabel;
-    return '$technologyApproverLabel · $when';
+  bool get isQualityConfirmed =>
+      state == 'quality_confirmed' || statusLabel == 'Kvalitet potvrdio';
+
+  bool get isQualityReturned =>
+      state == 'cancelled' || statusLabel == 'Otkazano';
+
+  String get technologySignatureLabel => _signatureLabel(
+        technologyApproverLabel,
+        technologyApprovedAtLabel,
+      );
+
+  String get qualitySignatureLabel => _signatureLabel(
+        qualityApproverLabel,
+        qualityApprovedAtLabel,
+      );
+
+  String _signatureLabel(String person, String whenLabel) {
+    final when = whenLabel == '—' ? '' : whenLabel;
+    if (person.isEmpty) return when;
+    if (when.isEmpty) return person;
+    return '$person · $when';
   }
 
   factory PmaApprovalView.fromCallable(Map<String, dynamic> raw) {
@@ -105,6 +125,18 @@ class PmaApprovalView {
         : (technologyRole.isEmpty
               ? technologyName
               : '$technologyName · $technologyRole');
+    final quality = raw['qualityApproval'];
+    var qualityName = '';
+    var qualityRole = '';
+    var qualityAt = '';
+    if (quality is Map) {
+      qualityName = s(quality['displayName']);
+      qualityRole = s(quality['roleLabel']);
+      qualityAt = _formatCreatedAt(s(quality['approvedAt']));
+    }
+    final qualityApprover = qualityName.isEmpty
+        ? qualityRole
+        : (qualityRole.isEmpty ? qualityName : '$qualityName · $qualityRole');
     return PmaApprovalView(
       omNumber: s(raw['omNumber']),
       revision: raw['revision'] is num ? (raw['revision'] as num).toInt() : 0,
@@ -120,6 +152,8 @@ class PmaApprovalView {
       state: s(raw['state']),
       technologyApproverLabel: technologyApprover,
       technologyApprovedAtLabel: technologyAt,
+      qualityApproverLabel: qualityApprover,
+      qualityApprovedAtLabel: qualityAt,
     );
   }
 }

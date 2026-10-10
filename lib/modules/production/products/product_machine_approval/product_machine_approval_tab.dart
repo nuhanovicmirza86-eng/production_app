@@ -59,6 +59,9 @@ class _ProductMachineApprovalTabState extends State<ProductMachineApprovalTab> {
   bool get _canApproveTechnology =>
       ProductionAccessHelper.canApproveProductMachineTechnology(_role);
 
+  bool get _canConfirmQuality =>
+      ProductionAccessHelper.canConfirmProductMachineQuality(_role);
+
   bool get _choosePlant =>
       ProductionAccessHelper.isCompanyWideContextRole(_role);
 
@@ -117,6 +120,21 @@ class _ProductMachineApprovalTabState extends State<ProductMachineApprovalTab> {
     if (approved == true) await _load();
   }
 
+  Future<void> _openQualityAction({
+    required PmaApprovalView view,
+    required bool confirm,
+  }) async {
+    final done = await showDialog<bool>(
+      context: context,
+      builder: (context) => _PmaQualityActionDialog(
+        gateway: _gateway,
+        view: view,
+        confirm: confirm,
+      ),
+    );
+    if (done == true) await _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final productTitle = widget.productCode.isEmpty
@@ -153,26 +171,45 @@ class _ProductMachineApprovalTabState extends State<ProductMachineApprovalTab> {
     );
   }
 
+  Widget _card(PmaApprovalView view) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: _ApprovalCard(
+        view: view,
+        canApproveTechnology: _canApproveTechnology && view.isDraft,
+        canConfirmQuality: _canConfirmQuality && view.isTechnologyApproved,
+        onApproveTechnology: () => _openTechnologyApproval(view),
+        onConfirmQuality: () => _openQualityAction(view: view, confirm: true),
+        onReturnQuality: () => _openQualityAction(view: view, confirm: false),
+      ),
+    );
+  }
+
   Widget _body() {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return Center(child: Text(_error!));
     }
+    final confirmed = _approvals.where((view) => view.isQualityConfirmed);
+    final inProgress = _approvals.where((view) => !view.isQualityConfirmed);
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Column(
-          key: Key('pma_approved_section'),
+        Column(
+          key: const Key('pma_approved_section'),
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Odobrene mašine',
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
             ),
-            SizedBox(height: 8),
-            Text(
-              'Trenutno nema potvrđenih odobrenih mašina za ovaj proizvod.',
-            ),
+            const SizedBox(height: 8),
+            if (confirmed.isEmpty)
+              const Text(
+                'Trenutno nema potvrđenih odobrenih mašina za ovaj proizvod.',
+              )
+            else
+              ...confirmed.map(_card),
           ],
         ),
         const SizedBox(height: 24),
@@ -185,20 +222,10 @@ class _ProductMachineApprovalTabState extends State<ProductMachineApprovalTab> {
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
             ),
             const SizedBox(height: 8),
-            if (_approvals.isEmpty)
+            if (inProgress.isEmpty)
               const Text('Nema odobrenja u toku.')
             else
-              ..._approvals.map(
-                (view) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _ApprovalCard(
-                    view: view,
-                    canApproveTechnology:
-                        _canApproveTechnology && view.isDraft,
-                    onApproveTechnology: () => _openTechnologyApproval(view),
-                  ),
-                ),
-              ),
+              ...inProgress.map(_card),
           ],
         ),
       ],
@@ -210,19 +237,31 @@ class _ApprovalCard extends StatelessWidget {
   const _ApprovalCard({
     required this.view,
     required this.canApproveTechnology,
+    required this.canConfirmQuality,
     required this.onApproveTechnology,
+    required this.onConfirmQuality,
+    required this.onReturnQuality,
   });
 
   final PmaApprovalView view;
   final bool canApproveTechnology;
+  final bool canConfirmQuality;
   final VoidCallback onApproveTechnology;
+  final VoidCallback onConfirmQuality;
+  final VoidCallback onReturnQuality;
 
   @override
   Widget build(BuildContext context) {
     final machines = view.machines.isEmpty
         ? view.machineScopeLabel
         : view.machines.join('\n');
-    final technologyApproved = view.isTechnologyApproved;
+    final message = view.isQualityReturned
+        ? 'Vraćeno od Kontrole kvaliteta.'
+        : view.isTechnologyApproved
+        ? 'Čeka potvrdu Kontrole kvaliteta.'
+        : view.isQualityConfirmed
+        ? ''
+        : 'Priprema odobrenja. Mašina još nije odobrena.';
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -240,17 +279,18 @@ class _ApprovalCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text('Status: ${view.statusLabel}'),
-            if (technologyApproved)
-              const Text('Čeka potvrdu Kontrole kvaliteta.')
-            else
-              const Text('Priprema odobrenja. Mašina još nije odobrena.'),
+            if (message.isNotEmpty) Text(message),
             Text('Pogon: ${view.plantName}'),
             const SizedBox(height: 8),
             Text(view.machineScopeLabel),
             Text(machines),
-            if (technologyApproved && view.technologySignatureLabel.isNotEmpty) ...[
+            if (view.technologySignatureLabel.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text('Technology odobrio: ${view.technologySignatureLabel}'),
+            ],
+            if (view.isQualityConfirmed && view.qualitySignatureLabel.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text('Kvalitet potvrdio: ${view.qualitySignatureLabel}'),
             ],
             const SizedBox(height: 8),
             Text('Kreirao: ${view.creatorLabel}'),
@@ -261,6 +301,20 @@ class _ApprovalCard extends StatelessWidget {
                 key: Key('pma_approve_technology_${view.omNumber}_${view.revision}'),
                 onPressed: onApproveTechnology,
                 child: const Text('Odobri tehnologiju'),
+              ),
+            ],
+            if (canConfirmQuality) ...[
+              const SizedBox(height: 12),
+              FilledButton(
+                key: Key('pma_confirm_quality_${view.omNumber}_${view.revision}'),
+                onPressed: onConfirmQuality,
+                child: const Text('Potvrdi kvalitet'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton(
+                key: Key('pma_return_technology_${view.omNumber}_${view.revision}'),
+                onPressed: onReturnQuality,
+                child: const Text('Vrati tehnologiji'),
               ),
             ],
           ],
@@ -350,6 +404,108 @@ class _PmaTechnologyApprovalDialogState
           key: const Key('pma_confirm_technology_approval'),
           onPressed: _saving ? null : _approve,
           child: const Text('Odobri tehnologiju'),
+        ),
+      ],
+    );
+  }
+}
+
+class _PmaQualityActionDialog extends StatefulWidget {
+  const _PmaQualityActionDialog({
+    required this.gateway,
+    required this.view,
+    required this.confirm,
+  });
+
+  final ProductMachineApprovalGateway gateway;
+  final PmaApprovalView view;
+  final bool confirm;
+
+  @override
+  State<_PmaQualityActionDialog> createState() => _PmaQualityActionDialogState();
+}
+
+class _PmaQualityActionDialogState extends State<_PmaQualityActionDialog> {
+  bool _saving = false;
+  String? _error;
+
+  Future<void> _submit() async {
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      if (widget.confirm) {
+        await widget.gateway.confirmQuality(
+          omNumber: widget.view.omNumber,
+          revision: widget.view.revision,
+        );
+      } else {
+        await widget.gateway.returnToTechnology(
+          omNumber: widget.view.omNumber,
+          revision: widget.view.revision,
+        );
+      }
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = _message(error);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final view = widget.view;
+    final title = widget.confirm ? 'Potvrdi kvalitet' : 'Vrati tehnologiji';
+    final products = view.products.isEmpty ? '—' : view.products.join('\n');
+    final machines = view.machines.isEmpty ? '—' : view.machines.join('\n');
+    return AlertDialog(
+      key: Key(
+        widget.confirm
+            ? 'pma_quality_confirmation_dialog'
+            : 'pma_quality_return_dialog',
+      ),
+      title: Text(title),
+      content: SizedBox(
+        width: 520,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(view.title, style: const TextStyle(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 12),
+              Text('Proizvod:\n$products'),
+              const SizedBox(height: 8),
+              Text('Pogon: ${view.plantName}'),
+              const SizedBox(height: 8),
+              Text('Mašine:\n$machines'),
+              const SizedBox(height: 8),
+              Text('Status: ${view.statusLabel}'),
+              if (_error != null) ...[
+                const SizedBox(height: 8),
+                Text(_error!),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Odustani'),
+        ),
+        FilledButton(
+          key: Key(
+            widget.confirm
+                ? 'pma_confirm_quality_approval'
+                : 'pma_confirm_quality_return',
+          ),
+          onPressed: _saving ? null : _submit,
+          child: Text(title),
         ),
       ],
     );

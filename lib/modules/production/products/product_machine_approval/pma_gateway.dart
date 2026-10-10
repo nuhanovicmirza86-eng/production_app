@@ -15,6 +15,16 @@ abstract class ProductMachineApprovalGateway {
     required int revision,
   });
 
+  Future<PmaApprovalView> confirmQuality({
+    required String omNumber,
+    required int revision,
+  });
+
+  Future<PmaApprovalView> returnToTechnology({
+    required String omNumber,
+    required int revision,
+  });
+
   Future<List<PmaPlantOption>> listPlants(String companyId);
 
   Future<List<PmaMachineOption>> listMachines({
@@ -91,6 +101,39 @@ class FirebaseProductMachineApprovalGateway
       throw Exception('Odobrenje nije sačuvano.');
     }
     return PmaApprovalView.fromCallable(Map<String, dynamic>.from(raw));
+  }
+
+  Future<PmaApprovalView> _qualityCall(String name, String omNumber, int revision) async {
+    final result = await _functions.httpsCallable(name).call(<String, dynamic>{
+      'omNumber': omNumber,
+      'revision': revision,
+    });
+    final data = result.data;
+    final raw = data is Map ? data['approval'] : null;
+    if (raw is! Map) {
+      throw Exception('Odobrenje nije sačuvano.');
+    }
+    return PmaApprovalView.fromCallable(Map<String, dynamic>.from(raw));
+  }
+
+  @override
+  Future<PmaApprovalView> confirmQuality({
+    required String omNumber,
+    required int revision,
+  }) {
+    return _qualityCall('confirmProductMachineQuality', omNumber, revision);
+  }
+
+  @override
+  Future<PmaApprovalView> returnToTechnology({
+    required String omNumber,
+    required int revision,
+  }) {
+    return _qualityCall(
+      'returnProductMachineApprovalToTechnology',
+      omNumber,
+      revision,
+    );
   }
 
   @override
