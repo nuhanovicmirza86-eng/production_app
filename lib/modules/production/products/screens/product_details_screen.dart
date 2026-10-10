@@ -7,6 +7,7 @@ import '../../bom/services/bom_service.dart';
 import '../../bom/widgets/bom_item_traceability_form_fields.dart';
 import '../services/product_lookup_service.dart';
 import '../services/product_service.dart';
+import '../product_machine_approval/product_machine_approval_tab.dart';
 import '../widgets/product_details_auxiliary_tabs.dart';
 import 'product_edit_screen.dart';
 
@@ -230,7 +231,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 7, vsync: this);
+    _tabController = TabController(
+      length: productDetailsTabLabels.length,
+      vsync: this,
+    );
     _loadProduct();
   }
 
@@ -1339,6 +1343,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     );
   }
 
+  Widget _buildMachineApprovalsTab(Map<String, dynamic> product) {
+    return ProductMachineApprovalTab(
+      companyData: widget.companyData,
+      productId: _productId,
+      productCode: _s(product['productCode']),
+      productName: _s(product['productName']),
+    );
+  }
+
   Widget _buildBomItemsCard() {
     if (_isBomLoading) {
       return const Padding(
@@ -1744,14 +1757,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
         TabBar(
           controller: _tabController,
           isScrollable: true,
-          tabs: const [
-            Tab(text: 'Osnovni podaci'),
-            Tab(text: 'BOM'),
-            Tab(text: 'Routing'),
-            Tab(text: 'Nalozi'),
-            Tab(text: 'Zaliha'),
-            Tab(text: 'Dokumentacija'),
-            Tab(text: 'Reklamacije'),
+          tabs: [
+            for (final label in productDetailsTabLabels) Tab(text: label),
           ],
         ),
         Expanded(
@@ -1765,6 +1772,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
               _buildStockTab(product),
               _buildDocumentationTab(),
               _buildComplaintsTab(),
+              _buildMachineApprovalsTab(product),
             ],
           ),
         ),

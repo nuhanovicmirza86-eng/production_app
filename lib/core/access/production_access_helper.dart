@@ -697,6 +697,15 @@ class ProductionAccessHelper {
         r == roleQualityControl;
   }
 
+  /// Priprema PMA nacrta. Formalni potpis nije dio ovog prava.
+  static bool canPrepareProductMachineApprovalDraft(dynamic roleRaw) {
+    final r = normalizeRole(roleRaw);
+    return r == roleAdmin ||
+        r == roleProductionManager ||
+        r == roleQualityControl ||
+        r == roleTechnologyEngineer;
+  }
+
   /// Usklađeno s backend [canUseProductionAssistant] (`production_callable_helpers.js`).
   ///
   /// Vođa smjene nema Callable operativnog asistenta nad podacima praćenja; u hubu ostaje

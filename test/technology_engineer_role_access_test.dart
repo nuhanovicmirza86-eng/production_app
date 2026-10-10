@@ -117,6 +117,36 @@ void main() {
     }
   });
 
+  test('PMA draft preparers are the locked M2 roles', () {
+    expect(
+      ProductionAccessHelper.canPrepareProductMachineApprovalDraft(role),
+      isTrue,
+    );
+    for (final allowed in [
+      ProductionAccessHelper.roleAdmin,
+      ProductionAccessHelper.roleProductionManager,
+      ProductionAccessHelper.roleQualityControl,
+    ]) {
+      expect(
+        ProductionAccessHelper.canPrepareProductMachineApprovalDraft(allowed),
+        isTrue,
+        reason: allowed,
+      );
+    }
+    for (final denied in [
+      ProductionAccessHelper.roleSuperAdmin,
+      ProductionAccessHelper.roleDevelopmentEngineer,
+      ProductionAccessHelper.roleProductionOperator,
+      ProductionAccessHelper.roleShiftLead,
+    ]) {
+      expect(
+        ProductionAccessHelper.canPrepareProductMachineApprovalDraft(denied),
+        isFalse,
+        reason: denied,
+      );
+    }
+  });
+
   test('development_engineer still does not see Products', () {
     expect(
       ProductionAccessHelper.canView(
